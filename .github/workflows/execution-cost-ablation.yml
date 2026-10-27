@@ -1,0 +1,37 @@
+name: Execution Cost Ablation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/market-regime-v1-main
+    paths:
+      - "scripts/run_execution_cost_ablation.py"
+      - "Bybit_Trading_Engine_v14_research.py"
+      - "scripts/run_uploaded_dataset_backtests.py"
+      - ".github/workflows/execution-cost-ablation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  execution-cost-ablation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile execution-cost research
+        run: python -m py_compile Bybit_Trading_Engine_v14_research.py scripts/run_uploaded_dataset_backtests.py scripts/run_execution_cost_ablation.py
+      - name: Compare market and limit execution on chronological holdout
+        run: python scripts/run_execution_cost_ablation.py --output execution_cost_ablation.csv
+      - name: Upload execution-cost report
+        uses: actions/upload-artifact@v4
+        with:
+          name: execution-cost-ablation-report
+          path: execution_cost_ablation.csv
+          if-no-files-found: error

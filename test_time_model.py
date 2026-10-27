@@ -97,6 +97,44 @@ def test_h2_range_fade_config_is_read_from_strategy_section():
     cfg._apply({"strategy": {"enable_h2_range_fade": False}})
     assert cfg.enable_h2_range_fade is False
 
+
+def test_config_rejects_unimplemented_strategy_keys():
+    cfg = engine_mod.BotConfig()
+    try:
+        cfg._apply({"strategy": {"cooldown_bars": 4}})
+    except ValueError as exc:
+        assert "cooldown_bars" in str(exc), exc
+    else:
+        raise AssertionError("unsupported strategy key was silently accepted")
+
+
+def test_config_rejects_unknown_top_level_keys():
+    cfg = engine_mod.BotConfig()
+    try:
+        cfg._apply({"mystery_setting": True})
+    except ValueError as exc:
+        assert "mystery_setting" in str(exc), exc
+    else:
+        raise AssertionError("unknown top-level key was silently accepted")
+
+
+def test_config_rejects_extreme_tp2_and_non_finite_numbers():
+    extreme = engine_mod.BotConfig(tp1_r_multiple=50.0, tp2_r_multiple=100.0)
+    try:
+        extreme.validate()
+    except ValueError as exc:
+        assert "tp2_r_multiple > 10R" in str(exc), exc
+    else:
+        raise AssertionError("extreme TP2 target was accepted")
+
+    non_finite = engine_mod.BotConfig(capital_usdt=float("nan"))
+    try:
+        non_finite.validate()
+    except ValueError as exc:
+        assert "capital_usdt must be finite" in str(exc), exc
+    else:
+        raise AssertionError("NaN capital was accepted")
+
 def test_unsupported_timeframe_fails_closed():
     e, seen = bare_engine("7m")
     ts_open = 1_800_000_000_000
@@ -248,6 +286,9 @@ def test_limit_entry_uses_limit_price_when_bar_opens_above_and_trades_through():
 
 if __name__ == "__main__":
     tests = [test_mtm_uses_close_timestamp_for_15m_bar,
+             test_config_rejects_unimplemented_strategy_keys,
+             test_config_rejects_unknown_top_level_keys,
+             test_config_rejects_extreme_tp2_and_non_finite_numbers,
              test_h2_range_fade_is_disabled_by_default_and_enabled_explicitly,
              test_h2_range_fade_config_is_read_from_strategy_section,
              test_open_position_management_receives_bar_close_timestamp_across_utc_midnight,

@@ -164,7 +164,7 @@ def backtest_symbol(
             elif i - pos["entry_index"] >= max_hold_bars:
                 close_position(bar, bar.close, "time_stop", maker_exit=False)
             else:
-                favorable = (bar.high - pos["entry"]) * sign
+                favorable = (bar.high - pos["entry"]) if side == "long" else (pos["entry"] - bar.low)
                 if favorable >= breakeven_trigger_r * pos["risk_usdt"] / pos["qty"] and not pos["be_moved"]:
                     # Lock entry price; future bars only see the updated stop.
                     pos["stop"] = pos["entry"]
@@ -178,8 +178,12 @@ def backtest_symbol(
                 limit_price = bar.close - atr[i] * entry_pullback_atr if signal == "long" else bar.close + atr[i] * entry_pullback_atr
                 pending = {"side": signal, "limit": limit_price, "atr": atr[i], "signal_index": i}
 
-        peak = max(peak, equity)
-        max_dd = max(max_dd, (peak - equity) / peak if peak > 0 else 0.0)
+        marked_equity = equity
+        if pos is not None:
+            mark_sign = 1.0 if pos["side"] == "long" else -1.0
+            marked_equity += (bar.close - pos["entry"]) * pos["qty"] * mark_sign
+        peak = max(peak, marked_equity)
+        max_dd = max(max_dd, (peak - marked_equity) / peak if peak > 0 else 0.0)
 
     if pos is not None:
         close_position(bars[-1], bars[-1].close, "end_of_data", maker_exit=False)

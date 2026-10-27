@@ -135,6 +135,7 @@ def run_fold(data, stamps, fold, start_frac, end_frac, chase_limit):
         if not bars or not (start_ts <= bars[-1].ts <= end_ts): return None
         sig=original_eval(sym,bars,conf)
         if sig is None or str(sig.get("direction","")).lower()!="long": return None
+        if float(sig.get("vol_ratio", 0.0)) < VOL_MIN: return None
         prev=bars[:-1]
         hi,_,_=core.compute_donchian_and_volume(prev,conf.donchian_period)
         atr=float(sig.get("atr",0))

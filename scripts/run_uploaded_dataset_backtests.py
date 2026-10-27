@@ -122,7 +122,7 @@ def run() -> None:
             "start_utc": engine_mod.datetime.fromtimestamp(start / 1000, tz=engine_mod.timezone.utc).isoformat(),
             "end_utc": engine_mod.datetime.fromtimestamp(end / 1000, tz=engine_mod.timezone.utc).isoformat(),
             "trades": audit["total_trades"],
-            "gross_pnl_usdt": round(sum(t.gross_pnl_usdt for t in trades), 2),
+            "gross_pnl_usdt": round(sum(t.gross_pnl for t in trades), 2),
             "costs_usdt": round(costs, 2),
             "net_pnl_usdt": round(audit["net_pnl"], 2),
             "net_pf": round(audit["pf"], 4),

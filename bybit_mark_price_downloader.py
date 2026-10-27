@@ -20,7 +20,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 BASE_URL = "https://api.bybit.com/v5/market/mark-price-kline"
-MAX_LIMIT = 1000\nINTERVAL = "60"  # one hour; funding settlements are normally hour-aligned
+MAX_LIMIT = 1000
+INTERVAL = "60"  # one hour; funding settlements are normally hour-aligned
 
 
 def _request_page(symbol: str, start_ms: int, end_ms: int, limit: int = MAX_LIMIT,

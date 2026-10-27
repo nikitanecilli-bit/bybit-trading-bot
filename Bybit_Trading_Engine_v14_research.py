@@ -878,13 +878,19 @@ class UnifiedQuantEngine:
         persist_state: bool = False,
         state_path: str = "bot_state_backup.json",
         funding_dir: Optional[str] = None,
+        mark_price_dir: Optional[str] = None,
     ):
         self._explicit_config = config_path
         self.funding_dir = funding_dir
+        self.mark_price_dir = mark_price_dir
+        if mark_price_dir and not funding_dir:
+            raise ValueError("--mark-price-dir requires --funding-dir")
         self.funding_by_symbol: Dict[str, List[Dict[str, float]]] = {}
         self._funding_mark_prices: Dict[str, Dict[int, float]] = {}
         if funding_dir:
             self._load_funding_history(funding_dir)
+        if mark_price_dir:
+            self._load_mark_price_history(mark_price_dir)
         self.cfg = BotConfig.load_from_dashboard_json(config_path)
         self.risk_mgr = AdaptiveRiskManager(self.cfg)
         self.plan_b = PlanBStatePersistence(state_path, enabled=persist_state)
@@ -933,6 +939,35 @@ class UnifiedQuantEngine:
             self.funding_by_symbol[symbol] = rows
         if not self.funding_by_symbol:
             raise ValueError(f"No funding CSV files found in {directory}")
+
+    def _load_mark_price_history(self, directory: str) -> None:
+        """Load <SYMBOL>.csv mark klines; use 1-minute candle open at timestamp_ms."""
+        if not os.path.isdir(directory):
+            raise ValueError(f"Mark-price directory does not exist: {directory}")
+        for path in glob.glob(os.path.join(directory, "*.csv")):
+            symbol = os.path.splitext(os.path.basename(path))[0].upper()
+            marks: Dict[int, float] = {}
+            with open(path, "r", encoding="utf-8-sig", newline="") as handle:
+                reader = csv.DictReader(handle)
+                if not reader.fieldnames or not {"timestamp_ms", "open"}.issubset(reader.fieldnames):
+                    raise ValueError(f"{path}: required columns timestamp_ms,open")
+                for line_no, row in enumerate(reader, start=2):
+                    try:
+                        row_symbol = str(row.get("symbol") or symbol).upper()
+                        ts = int(row["timestamp_ms"])
+                        mark = float(row["open"])
+                    except (TypeError, ValueError, KeyError) as exc:
+                        raise ValueError(f"{path}:{line_no}: invalid mark-price row") from exc
+                    if row_symbol != symbol or ts <= 0 or not math.isfinite(mark) or mark <= 0:
+                        raise ValueError(f"{path}:{line_no}: invalid symbol/timestamp/mark price")
+                    if ts in marks:
+                        raise ValueError(f"{path}:{line_no}: duplicate mark-price timestamp {ts}")
+                    marks[ts] = mark
+            if not marks:
+                raise ValueError(f"{path}: no mark-price rows found")
+            self._funding_mark_prices[symbol] = marks
+        if not self._funding_mark_prices:
+            raise ValueError(f"No mark-price CSV files found in {directory}")
 
     def reset_state_for_new_run(self) -> None:
         self.risk_mgr.reset_for_backtest(self.cfg)
@@ -1514,13 +1549,20 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
         if tf not in timeframe_ms:
             raise ValueError(f"Unsupported timeframe for funding mark proxy: {engine.cfg.timeframe!r}")
         interval = timeframe_ms[tf]
-        engine._funding_mark_prices = {}
-        for sym in symbols:
-            mark_map = {}
-            for candle in candles[sym]:
-                mark_map[candle.ts] = candle.open
-                mark_map.setdefault(candle.ts + interval, candle.close)
-            engine._funding_mark_prices[sym] = mark_map
+        if engine.mark_price_dir:
+            missing_marks = sorted(set(symbols) - set(engine._funding_mark_prices))
+            if missing_marks:
+                raise RuntimeError(f"Mark-price CSV missing for symbols: {', '.join(missing_marks)}")
+        else:
+            # Compatibility fallback only: OHLC traded-price candles are not mark prices.
+            # Prefer --mark-price-dir for funding-adjusted research.
+            engine._funding_mark_prices = {}
+            for sym in symbols:
+                mark_map = {}
+                for candle in candles[sym]:
+                    mark_map[candle.ts] = candle.open
+                    mark_map.setdefault(candle.ts + interval, candle.close)
+                engine._funding_mark_prices[sym] = mark_map
     bars_total = len(candles[symbols[0]])
     for bar in range(25, bars_total):
         lo = max(0, bar + 1 - CALC_WINDOW)
@@ -1556,6 +1598,8 @@ def main() -> None:
     parser.add_argument("--data-dir", type=str, default=None, help="Папка с <SYMBOL>.csv (ts,open,high,low,close,volume)")
     parser.add_argument("--funding-dir", type=str, default=None,
                         help="Папка с <SYMBOL>.csv (funding_timestamp_ms,funding_rate), обязателен отдельный файл на символ")
+    parser.add_argument("--mark-price-dir", type=str, default=None,
+                        help="Папка с <SYMBOL>.csv mark-price klines; timestamp_ms должен совпадать с funding settlement")
     parser.add_argument("--bars", type=int, default=1200)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--no-planted-edge", action="store_true", help="Синтетика без заложенного эджа")
@@ -1565,7 +1609,7 @@ def main() -> None:
 
     engine = UnifiedQuantEngine(config_path=args.config, journal_output_path=args.journal,
                                 persist_state=args.persist_state, state_path=args.state_path,
-                                funding_dir=args.funding_dir)
+                                funding_dir=args.funding_dir, mark_price_dir=args.mark_price_dir)
     pool = list(dict.fromkeys(engine.cfg.active_trading_pool))
 
     if args.data_dir:

@@ -1,0 +1,30 @@
+name: Research engine checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile Python files
+        run: python -m py_compile Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py scripts/scan_secrets.py
+      - name: Scan for obvious secrets
+        run: python scripts/scan_secrets.py .
+      - name: Test gap execution
+        run: python test_gap_execution.py
+      - name: Test time model
+        run: python test_time_model.py

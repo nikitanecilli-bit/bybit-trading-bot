@@ -381,7 +381,7 @@ class OpenPositionState:
     size_usdt: float
     risk_usdt: float
     order_type: str
-    maker_exits: bool = False
+    maker_exits: Optional[bool] = None
     tp1_hit: bool = False
     realized_tp1_gross_usdt: float = 0.0
     remaining_fraction: float = 1.0
@@ -1205,10 +1205,11 @@ class UnifiedQuantEngine:
         fees = slip = 0.0
         f, s = self._leg_cost(pos.size_usdt, entry_maker)                     # вход
         fees += f; slip += s
+        maker_exits = (pos.order_type == "limit") if pos.maker_exits is None else pos.maker_exits
         if pos.tp1_hit:                                                        # TP1-нога
-            f, s = self._leg_cost(pos.size_usdt * TP1_FRACTION, pos.maker_exits)
+            f, s = self._leg_cost(pos.size_usdt * TP1_FRACTION, maker_exits)
             fees += f; slip += s
-        final_maker = pos.maker_exits and exit_reason == "take_profit"         # финальная нога
+        final_maker = maker_exits and exit_reason == "take_profit"             # финальная нога
         f, s = self._leg_cost(pos.size_usdt * pos.remaining_fraction, final_maker)
         fees += f; slip += s
         fees, slip = _money_round(fees), _money_round(slip)

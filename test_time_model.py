@@ -647,8 +647,85 @@ def test_sequential_kill_switch_closes_do_not_double_count_unrealized_pnl():
 
 
 
+def test_full_step_candle_kill_switch_flattens_portfolio_and_blocks_reentry():
+    cfg = engine_mod.BotConfig(
+        timeframe="15m", capital_usdt=10_000.0,
+        daily_stop_loss_pct=5.0, emergency_kill_switch_pct=5.0,
+    )
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.cfg = cfg
+    e._last_mark_prices = {}
+    e._intrabar_risk_marks = {}
+    e._intrabar_risk_marks_ts = None
+    ts = 1_800_000_000_000
+    e.open_positions = {
+        "BTCUSDT": engine_mod.OpenPositionState(
+            trade_id="btc-full-cycle", symbol="BTCUSDT", direction="long", strategy="test",
+            entry_ts=ts - 1_800_000, entry_price=100.0, stop_price=70.0,
+            tp1_price=120.0, tp2_price=130.0, initial_stop_dist=30.0,
+            size_usdt=10_000.0, risk_usdt=3_000.0, order_type="market",
+            equity_at_entry=10_000.0,
+        ),
+        "ETHUSDT": engine_mod.OpenPositionState(
+            trade_id="eth-full-cycle", symbol="ETHUSDT", direction="short", strategy="test",
+            entry_ts=ts - 1_800_000, entry_price=100.0, stop_price=130.0,
+            tp1_price=80.0, tp2_price=70.0, initial_stop_dist=30.0,
+            size_usdt=10_000.0, risk_usdt=3_000.0, order_type="market",
+            equity_at_entry=10_000.0,
+        ),
+    }
+    e.pending = {}
+    e.closed_trades = []
+    e.trade_seq = 0
+    e.risk_mgr = engine_mod.AdaptiveRiskManager(cfg)
+    e.tg = type("Notifier", (), {"send_message": lambda self, message: None})()
+    e._persist = lambda: None
+
+    btc = [
+        engine_mod.Candle(ts=ts - 1_800_000, open=100, high=101, low=99, close=100, volume=10),
+        engine_mod.Candle(ts=ts - 900_000, open=100, high=101, low=99, close=100, volume=10),
+        engine_mod.Candle(ts=ts, open=100, high=102, low=90, close=100, volume=10),
+    ]
+    eth = [
+        engine_mod.Candle(ts=ts - 1_800_000, open=100, high=101, low=99, close=100, volume=10),
+        engine_mod.Candle(ts=ts - 900_000, open=100, high=101, low=99, close=100, volume=10),
+        engine_mod.Candle(ts=ts, open=100, high=110, low=98, close=100, volume=10),
+    ]
+    marks = {"BTCUSDT": btc[-1], "ETHUSDT": eth[-1]}
+    e._prepare_portfolio_intrabar_marks(marks)
+
+    engine_mod.UnifiedQuantEngine.step_candle(e, "BTCUSDT", btc)
+    assert e.risk_mgr.kill_switch_triggered is True
+    assert len(e.closed_trades) == 1, len(e.closed_trades)
+    assert e.closed_trades[0].token == "BTCUSDT"
+    assert e.closed_trades[0].exit_price == 90.0
+    assert e.closed_trades[0].exit_reason == "kill_switch"
+    assert "ETHUSDT" in e.open_positions
+
+    engine_mod.UnifiedQuantEngine.step_candle(e, "ETHUSDT", eth)
+    assert len(e.closed_trades) == 2, len(e.closed_trades)
+    assert not e.open_positions, e.open_positions
+    assert {r.token: r.exit_price for r in e.closed_trades} == {
+        "BTCUSDT": 90.0, "ETHUSDT": 110.0,
+    }
+    assert all(r.exit_reason == "kill_switch" for r in e.closed_trades)
+    assert e.risk_mgr.unrealized_pnl == 0.0, e.risk_mgr.unrealized_pnl
+    net_journal = round(sum(r.pnl_usdt for r in e.closed_trades), 2)
+    assert e.risk_mgr.realized_equity == round(cfg.capital_usdt + net_journal, 4)
+
+    # Re-processing the same bar must neither recreate entries nor duplicate exits.
+    engine_mod.UnifiedQuantEngine.step_candle(e, "BTCUSDT", btc)
+    engine_mod.UnifiedQuantEngine.step_candle(e, "ETHUSDT", eth)
+    assert len(e.closed_trades) == 2, len(e.closed_trades)
+    assert not e.open_positions, e.open_positions
+    assert not e.pending, e.pending
+    assert e.risk_mgr.can_open_new_trade(0) == (False, "KILL_SWITCH_ACTIVE")
+
+
+
 if __name__ == "__main__":
-    tests = [test_sequential_kill_switch_closes_do_not_double_count_unrealized_pnl,
+    tests = [test_full_step_candle_kill_switch_flattens_portfolio_and_blocks_reentry,
+             test_sequential_kill_switch_closes_do_not_double_count_unrealized_pnl,
              test_combined_intrabar_losses_trigger_daily_stop_and_kill_switch,
              test_kill_switch_exit_price_is_written_to_closed_trade_journal,
              test_portfolio_intrabar_marks_prepared_for_all_open_symbols_before_risk_check,

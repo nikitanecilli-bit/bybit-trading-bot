@@ -131,6 +131,22 @@ class BotConfig:
 
     def validate(self) -> None:
         errs = []
+        numeric_values = {
+            "capital_usdt": self.capital_usdt,
+            "max_risk_trade_pct": self.max_risk_trade_pct,
+            "leverage_val": self.leverage_val,
+            "daily_stop_loss_pct": self.daily_stop_loss_pct,
+            "emergency_kill_switch_pct": self.emergency_kill_switch_pct,
+            "max_chase_limit_pct": self.max_chase_limit_pct,
+            "stop_atr_mult": self.stop_atr_mult,
+            "tp1_r_multiple": self.tp1_r_multiple,
+            "tp2_r_multiple": self.tp2_r_multiple,
+            "atr_trail_mult": self.atr_trail_mult,
+            "min_volume_ratio": self.min_volume_ratio,
+        }
+        for name, value in numeric_values.items():
+            if not math.isfinite(value):
+                errs.append(f"{name} must be finite")
         if self.capital_usdt <= 0: errs.append("capital_usdt <= 0")
         if not (0 < self.max_risk_trade_pct <= 5): errs.append("риск на сделку вне (0; 5]%")
         if not (1 <= self.leverage_val <= 125): errs.append("плечо вне [1; 125]")
@@ -141,6 +157,10 @@ class BotConfig:
         if self.donchian_period < 2 or self.atr_period < 2: errs.append("периоды индикаторов < 2")
         if self.stop_atr_mult <= 0: errs.append("stop_atr_mult <= 0")
         if not (0 < self.tp1_r_multiple < self.tp2_r_multiple): errs.append("нужно 0 < TP1 < TP2")
+        # Defensive guard: extreme targets can silently turn the strategy into a
+        # trailing/time-stop system. Raise this limit only after explicit research.
+        if self.tp2_r_multiple > 10.0:
+            errs.append("tp2_r_multiple > 10R: extreme targets require explicit strategy review")
         if self.atr_trail_mult <= 0: errs.append("atr_trail_mult <= 0")
         if self.max_hold_bars < 1: errs.append("max_hold_bars < 1")
         if self.min_volume_ratio <= 0: errs.append("min_volume_ratio <= 0")
@@ -148,6 +168,58 @@ class BotConfig:
             raise ValueError("; ".join(errs))
 
     def _apply(self, data: Dict) -> None:
+        allowed_top = {
+            "bot_version", "maintenance_gate_status", "capital_usdt", "goals_plan",
+            "risk_management", "strategy", "strategy_params", "execution_and_exits",
+            "active_trading_pool", "disabled_instruments", "blocked_sessions_utc",
+            "blocked_directions", "applied_patches_log",
+        }
+        unknown_top = sorted(set(data) - allowed_top)
+        if unknown_top:
+            raise ValueError(f"unsupported top-level config keys: {', '.join(unknown_top)}")
+
+        allowed_goals = {
+            "targetRetPct", "maxRiskTradePct", "maxDDPct", "targetWinRate",
+            "targetPF", "minExpectancyR", "maxCostDragPct",
+        }
+        goals = data.get("goals_plan", {}) or {}
+        if not isinstance(goals, dict):
+            raise ValueError("goals_plan must be an object")
+        unknown_goals = sorted(set(goals) - allowed_goals)
+        if unknown_goals:
+            raise ValueError(f"unsupported goals_plan keys: {', '.join(unknown_goals)}")
+
+        allowed_risk = {
+            "risk_per_trade_pct", "leverage_mode", "leverage_val", "daily_stop_loss_pct",
+            "emergency_kill_switch_pct", "max_chase_limit_pct", "max_concurrent_positions",
+        }
+        rm_check = data.get("risk_management", {}) or {}
+        if not isinstance(rm_check, dict):
+            raise ValueError("risk_management must be an object")
+        unknown_risk = sorted(set(rm_check) - allowed_risk)
+        if unknown_risk:
+            raise ValueError(f"unsupported risk_management keys: {', '.join(unknown_risk)}")
+
+        allowed_strategy = {
+            "donchian_period", "atr_period", "max_hold_bars", "min_volume_ratio",
+            "stop_atr_mult", "tp1_r_multiple", "tp2_r_multiple", "atr_trail_mult",
+            "timeframe", "enable_h2_range_fade",
+        }
+        strategy_check = data.get("strategy", data.get("strategy_params", {})) or {}
+        if not isinstance(strategy_check, dict):
+            raise ValueError("strategy must be an object")
+        unknown_strategy = sorted(set(strategy_check) - allowed_strategy)
+        if unknown_strategy:
+            raise ValueError(f"unsupported strategy keys (not implemented): {', '.join(unknown_strategy)}")
+
+        allowed_execution = {"maker_entry_and_tp1", "accelerated_atr_trail_after_1_5r"}
+        ex_check = data.get("execution_and_exits", {}) or {}
+        if not isinstance(ex_check, dict):
+            raise ValueError("execution_and_exits must be an object")
+        unknown_execution = sorted(set(ex_check) - allowed_execution)
+        if unknown_execution:
+            raise ValueError(f"unsupported execution_and_exits keys: {', '.join(unknown_execution)}")
+
         self.bot_version = str(data.get("bot_version", self.bot_version))
         self.maintenance_gate_status = str(data.get("maintenance_gate_status", self.maintenance_gate_status))
         self.capital_usdt = float(data.get("capital_usdt", self.capital_usdt))

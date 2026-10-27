@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from research_v15.backtest import Bar, backtest_symbol
+from research_v15.portfolio_replay import replay_portfolio
 
 FILE_RE = re.compile(r"(?i)([a-z0-9]+usdt)_(1h)_.*\.csv$")
 ONE_HOUR_MS = 3_600_000
@@ -101,7 +102,14 @@ def main():
     net_positive = sum(r["net_pnl"] > 0 for r in results)
     total_trades = sum(r["trades_count"] for r in results)
     print(f"SUMMARY symbols={len(results)} profitable_symbols={net_positive} total_trades={total_trades} sum_individual_net_pnl={sum(r['net_pnl'] for r in results):.2f} USDT")
-    print("LIMITATIONS: Binance OHLCV proxy; funding excluded; maker fill assumed on touch; conservative stop-first intrabar rule; each symbol starts with separate 10,000 USDT; no portfolio overlap/capital constraints; first 200 bars are indicator warm-up.")
+    print("LIMITATIONS: Binance OHLCV proxy; funding excluded; maker fill assumed on touch; conservative stop-first intrabar rule; individual symbol runs are candidate generation only; first 200 bars are indicator warm-up.")
+
+    portfolio = replay_portfolio(results, starting_equity=10_000.0, risk_pct=0.01, max_portfolio_risk_pct=0.03)
+    print("\\nPORTFOLIO REPLAY — shared equity and 3% aggregate stop-risk cap")
+    print(f"starting_equity={portfolio['starting_equity']:.2f} ending_equity={portfolio['ending_equity']:.2f} net_pnl={portfolio['net_pnl']:.2f} USDT")
+    print(f"candidate_trades={portfolio['candidate_trades']} accepted={portfolio['accepted_trades']} rejected={portfolio['rejected_trades']} acceptance={portfolio['acceptance_rate_pct']:.2f}%")
+    print(f"max_realized_drawdown={portfolio['max_realized_drawdown_pct']:.2f}% reconciliation_error={portfolio['reconciliation_error']:.10f}")
+    print("PORTFOLIO REPLAY LIMITATIONS: candidate signals come from independent per-symbol runs; rejected entries do not regenerate later signals; drawdown is realized-only; funding, correlation, gap risk and portfolio mark-to-market are excluded.")
 
 
 if __name__ == "__main__":

@@ -79,6 +79,22 @@ def run_variant(symbol, timeframe, candles, cutoff_ts, variant):
     original = core.evaluate_signal
     step_ms = TIMEFRAME_MS[timeframe]
 
+    # Precompute the higher-timeframe trend from the full available history.
+    # The engine passes only CALC_WINDOW lower-timeframe bars to evaluate_signal;
+    # on 15m this is just 50 hours and cannot provide the 36+ 4h bars needed by
+    # the trend classifier. Each lookup includes only 4h candles fully closed by
+    # the signal candle's close time (no look-ahead).
+    all_4h = aggregate_4h(candles, step_ms)
+    trend_by_signal_ts = {}
+    closed_count = 0
+    for signal_candle in candles:
+        signal_close_ts = signal_candle.ts + step_ms
+        while (closed_count < len(all_4h)
+               and all_4h[closed_count].ts + 14_400_000 <= signal_close_ts):
+            closed_count += 1
+        # trend_direction only needs its latest slow+slope+1 bars.
+        trend_by_signal_ts[signal_candle.ts] = trend_direction(all_4h[max(0, closed_count - 36):closed_count])
+
     def wrapped(symbol_arg, history, cfg_arg):
         if not history or history[-1].ts < cutoff_ts:
             return None
@@ -86,9 +102,8 @@ def run_variant(symbol, timeframe, candles, cutoff_ts, variant):
         if signal is None or variant == "baseline":
             return signal
         direction = str(signal.get("direction", "")).lower()
-        # For 15m and 1h signals, only fully closed 4h candles define the trend.
-        bars_4h = aggregate_4h(history, step_ms)
-        trend = trend_direction(bars_4h)
+        # Use only completed 4h candles, with sufficient history even on 15m.
+        trend = trend_by_signal_ts.get(history[-1].ts, "neutral")
         if variant in ("trend_gate", "trend_plus_breakout", "trend_plus_breakout_confirm"):
             if (direction == "long" and trend != "up") or (direction == "short" and trend != "down"):
                 return None

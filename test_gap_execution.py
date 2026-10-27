@@ -81,12 +81,84 @@ def test_limit_buy_not_touched_is_not_filled():
     assert "BTCUSDT" not in e.pending
 
 
+def make_position(direction, entry=100.0, stop=95.0):
+    return engine_mod.OpenPositionState(
+        trade_id="gap-stop-test",
+        symbol="BTCUSDT",
+        direction=direction,
+        strategy="test",
+        entry_ts=1_799_999_100_000,
+        entry_price=entry,
+        stop_price=stop,
+        tp1_price=entry + 10.0 if direction == "long" else entry - 10.0,
+        tp2_price=entry + 20.0 if direction == "long" else entry - 20.0,
+        initial_stop_dist=abs(entry - stop),
+        size_usdt=1000.0,
+        risk_usdt=50.0,
+        order_type="market",
+    )
+
+
+def test_long_stop_gap_fills_at_open_below_stop():
+    e = make_engine()
+    pos = make_position("long", entry=100.0, stop=95.0)
+    e.open_positions["BTCUSDT"] = pos
+    captured = []
+    e._close_position = lambda *args: captured.append(args)
+    history = [
+        candle(100.0, 101.0, 99.0, 100.0, ts=1_799_998_200_000),
+        candle(100.0, 101.0, 99.0, 100.0, ts=1_799_999_100_000),
+        candle(90.0, 93.0, 88.0, 91.0),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(e, "BTCUSDT", history, False, history[-1].ts + 900_000)
+    assert len(captured) == 1
+    assert captured[0][1] == 90.0, captured[0][1]
+    assert captured[0][2] == "stop_loss", captured[0][2]
+
+
+def test_short_stop_gap_fills_at_open_above_stop():
+    e = make_engine()
+    pos = make_position("short", entry=100.0, stop=105.0)
+    e.open_positions["BTCUSDT"] = pos
+    captured = []
+    e._close_position = lambda *args: captured.append(args)
+    history = [
+        candle(100.0, 101.0, 99.0, 100.0, ts=1_799_998_200_000),
+        candle(100.0, 101.0, 99.0, 100.0, ts=1_799_999_100_000),
+        candle(110.0, 112.0, 108.0, 109.0),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(e, "BTCUSDT", history, False, history[-1].ts + 900_000)
+    assert len(captured) == 1
+    assert captured[0][1] == 110.0, captured[0][1]
+    assert captured[0][2] == "stop_loss", captured[0][2]
+
+
+def test_long_stop_without_gap_fills_at_stop_price():
+    e = make_engine()
+    pos = make_position("long", entry=100.0, stop=95.0)
+    e.open_positions["BTCUSDT"] = pos
+    captured = []
+    e._close_position = lambda *args: captured.append(args)
+    history = [
+        candle(100.0, 101.0, 99.0, 100.0, ts=1_799_998_200_000),
+        candle(100.0, 101.0, 99.0, 100.0, ts=1_799_999_100_000),
+        candle(98.0, 99.0, 94.0, 96.0),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(e, "BTCUSDT", history, False, history[-1].ts + 900_000)
+    assert len(captured) == 1
+    assert captured[0][1] == 95.0, captured[0][1]
+    assert captured[0][2] == "stop_loss", captured[0][2]
+
+
 if __name__ == "__main__":
     tests = [
         test_market_long_gap_above_chase_limit_is_cancelled,
         test_market_long_gap_within_limit_fills_at_next_open,
         test_limit_buy_gapped_below_limit_fills_at_open_not_worse_limit,
         test_limit_buy_not_touched_is_not_filled,
+        test_long_stop_gap_fills_at_open_below_stop,
+        test_short_stop_gap_fills_at_open_above_stop,
+        test_long_stop_without_gap_fills_at_stop_price,
     ]
     for test in tests:
         test()

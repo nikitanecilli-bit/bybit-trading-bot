@@ -1,6 +1,7 @@
 """Regression tests for funding cashflows included in net trade PnL."""
 import importlib.util
 import sys
+import tempfile
 from pathlib import Path
 
 ENGINE_PATH = Path(__file__).with_name("Bybit_Trading_Engine_v14_research.py")
@@ -113,3 +114,37 @@ def test_missing_mark_proxy_fails_loudly():
         assert "Missing exact candle-boundary mark proxy" in str(exc)
     else:
         raise AssertionError("missing mark proxy must not silently omit funding")
+
+
+
+def test_mark_price_history_loader_uses_minute_candle_open():
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e._funding_mark_prices = {}
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "BTCUSDT.csv"
+        path.write_text(
+            "symbol,timestamp_ms,time_utc,open,high,low,close\\n"
+            "BTCUSDT,1800000000000,2030-01-15T08:00:00Z,101.25,102,100,101.5\\n",
+            encoding="utf-8",
+        )
+        e._load_mark_price_history(directory)
+    assert e._funding_mark_prices["BTCUSDT"][1_800_000_000_000] == 101.25
+
+
+def test_mark_price_history_loader_rejects_duplicate_timestamps():
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e._funding_mark_prices = {}
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "BTCUSDT.csv"
+        path.write_text(
+            "symbol,timestamp_ms,open\\n"
+            "BTCUSDT,1800000000000,101.25\\n"
+            "BTCUSDT,1800000000000,101.5\\n",
+            encoding="utf-8",
+        )
+        try:
+            e._load_mark_price_history(directory)
+        except ValueError as exc:
+            assert "duplicate mark-price timestamp" in str(exc)
+        else:
+            raise AssertionError("Duplicate mark-price timestamps must be rejected")

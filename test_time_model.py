@@ -199,6 +199,45 @@ def test_blocked_signal_hours_utc_suppresses_signal_and_validates_values():
     else:
         raise AssertionError("invalid UTC hour was accepted")
 
+
+def test_portfolio_risk_cap_limits_new_position_size():
+    e = _bare_fill_engine()
+    e.cfg.max_portfolio_risk_pct = 1.0
+    e.risk_mgr = engine_mod.AdaptiveRiskManager(e.cfg)
+    e.open_positions["ETHUSDT"] = type(
+        "ExistingPosition", (), {"risk_usdt": 90.0, "remaining_fraction": 1.0}
+    )()
+    e.pending["BTCUSDT"] = _pending_signal("market", "long", 100.0)
+    candle = engine_mod.Candle(
+        ts=1_800_000_000_000, open=100.0, high=101.0, low=99.0, close=100.5, volume=10.0
+    )
+    assert e._try_fill_pending("BTCUSDT", candle) is True
+    opened = e.open_positions["BTCUSDT"]
+    assert opened.risk_usdt <= 10.0, opened.risk_usdt
+    assert e._open_portfolio_risk_usdt() <= 100.0, e._open_portfolio_risk_usdt()
+
+
+def test_position_size_respects_remaining_portfolio_risk_budget():
+    cfg = engine_mod.BotConfig(capital_usdt=10_000.0, max_risk_trade_pct=1.0)
+    rm = engine_mod.AdaptiveRiskManager(cfg)
+    size, risk = rm.calculate_position_size(100.0, 98.0, risk_budget_usdt=25.0)
+    assert size > 0
+    assert risk <= 25.0, risk
+
+
+def test_max_portfolio_risk_config_is_loaded_and_validated():
+    cfg = engine_mod.BotConfig()
+    cfg._apply({"risk_management": {"max_portfolio_risk_pct": 1.75}})
+    assert cfg.max_portfolio_risk_pct == 1.75
+    for bad in (0.0, 10.1):
+        invalid = engine_mod.BotConfig(max_portfolio_risk_pct=bad)
+        try:
+            invalid.validate()
+        except ValueError as exc:
+            assert "max_portfolio_risk_pct" in str(exc), exc
+        else:
+            raise AssertionError(f"invalid portfolio risk cap accepted: {bad}")
+
 def test_unsupported_timeframe_fails_closed():
     e, seen = bare_engine("7m")
     ts_open = 1_800_000_000_000
@@ -306,7 +345,9 @@ def _bare_fill_engine(max_chase=1.5):
     class RiskSpy:
         def can_open_new_trade(self, count):
             return True, "OK"
-        def calculate_position_size(self, entry_price, stop_price, order_type="market"):
+        def calculate_position_size(self, entry_price, stop_price, order_type="market", risk_budget_usdt=None):
+            if risk_budget_usdt is not None:
+                return 1000.0, min(50.0, risk_budget_usdt)
             return 1000.0, 50.0
         current_equity = 10_000.0
     e.risk_mgr = RiskSpy()
@@ -350,6 +391,9 @@ def test_limit_entry_uses_limit_price_when_bar_opens_above_and_trades_through():
 
 if __name__ == "__main__":
     tests = [test_mtm_uses_close_timestamp_for_15m_bar,
+             test_portfolio_risk_cap_limits_new_position_size,
+             test_position_size_respects_remaining_portfolio_risk_budget,
+             test_max_portfolio_risk_config_is_loaded_and_validated,
              test_blocked_signal_hours_utc_suppresses_signal_and_validates_values,
              test_blocked_weekdays_utc_suppresses_signal_and_validates_values,
              test_blocked_weekdays_config_rejects_wrong_type,

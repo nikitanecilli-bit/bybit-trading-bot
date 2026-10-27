@@ -209,10 +209,11 @@ class V15BacktestTests(unittest.TestCase):
     def test_position_size_respects_risk_budget_and_notional_cap(self):
         sized = position_size(10_000, 0.01, 100, 5)
         self.assertAlmostEqual(sized["risk_budget"], 100)
-        self.assertAlmostEqual(sized["qty"], 20)
-        self.assertAlmostEqual(sized["notional"], 2_000)
-        self.assertAlmostEqual(sized["planned_stop_loss"], 100)
-        self.assertAlmostEqual(sized["planned_stop_loss_pct_equity"], 0.01)
+        self.assertLess(sized["qty"], sized["qty_by_price_risk"])
+        self.assertAlmostEqual(sized["notional"], sized["qty"] * 100)
+        self.assertLessEqual(sized["total_estimated_stop_loss"], sized["risk_budget"])
+        self.assertLessEqual(sized["total_estimated_stop_loss_pct_equity"], 0.01)
+        self.assertGreater(sized["estimated_stop_cost"], 0)
 
     def test_position_size_notional_cap_limits_high_risk_quantity(self):
         sized = position_size(10_000, 0.05, 100, 0.1)
@@ -229,6 +230,12 @@ class V15BacktestTests(unittest.TestCase):
         self.assertLess(economics["net_pnl"], economics["gross_pnl"])
         self.assertGreater(economics["fees"], 0)
         self.assertGreater(economics["slippage"], 0)
+
+    def test_short_position_size_uses_short_stop_above_entry(self):
+        sized = position_size(10_000, 0.01, 100, 5, "short")
+        self.assertAlmostEqual(sized["qty"], sized["qty_by_total_risk"])
+        self.assertLessEqual(sized["total_estimated_stop_loss"], sized["risk_budget"])
+        self.assertGreater(sized["estimated_stop_cost"], 0)
 
     def test_position_size_rejects_invalid_inputs(self):
         for args in ((0, 0.01, 100, 5), (1000, 0, 100, 5), (1000, 0.01, 0, 5), (1000, 0.01, 100, 0)):

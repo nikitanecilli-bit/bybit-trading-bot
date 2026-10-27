@@ -7,6 +7,7 @@ on:
       - research/market-regime-v1-main
     paths:
       - "scripts/run_h1_long_execution_sensitivity.py"
+      - "scripts/run_h1_limit_fill_stress.py"
       - "Bybit_Trading_Engine_v14_research.py"
       - "scripts/run_uploaded_dataset_backtests.py"
       - ".github/workflows/h1-long-execution-sensitivity.yml"
@@ -27,9 +28,19 @@ jobs:
         run: python -m py_compile Bybit_Trading_Engine_v14_research.py scripts/run_uploaded_dataset_backtests.py scripts/run_h1_long_execution_sensitivity.py
       - name: Run fixed sensitivity matrix
         run: python scripts/run_h1_long_execution_sensitivity.py
-      - name: Upload report
+      - name: Upload sensitivity report
         uses: actions/upload-artifact@v4
         with:
           name: h1-long-execution-sensitivity
           path: h1_long_execution_sensitivity.csv
+          if-no-files-found: error
+      - name: Compile conservative fill stress test
+        run: python -m py_compile scripts/run_h1_limit_fill_stress.py
+      - name: Run conservative limit-fill stress matrix
+        run: python scripts/run_h1_limit_fill_stress.py
+      - name: Upload fill stress report
+        uses: actions/upload-artifact@v4
+        with:
+          name: h1-limit-fill-stress
+          path: h1_limit_fill_stress.csv
           if-no-files-found: error

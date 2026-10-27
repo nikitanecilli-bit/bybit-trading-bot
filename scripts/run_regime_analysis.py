@@ -106,13 +106,18 @@ def run(output_path):
             data_label=f"BINANCE_PROXY {timeframe} {symbol}",
         )
 
+        # Preserve both aggregate rows and the direction split. Direction is
+        # the executed trade direction, while regime belongs to the completed
+        # signal candle immediately before the entry candle.
         groups = defaultdict(list)
         for trade in engine.closed_trades:
             regime = trade_signal_regime(trade, labels_by_ts, timeframe_ms)
-            groups[regime].append(trade)
-        groups["__all__"] = list(engine.closed_trades)
+            groups[(regime, trade.direction.lower())].append(trade)
+            groups[(regime, "both")].append(trade)
+            groups[("__all__", trade.direction.lower())].append(trade)
+            groups[("__all__", "both")].append(trade)
 
-        for regime, trades in sorted(groups.items()):
+        for (regime, direction), trades in sorted(groups.items()):
             stats = summarize_trades(trades)
             report.append({
                 "symbol": symbol,
@@ -120,6 +125,7 @@ def run(output_path):
                 "archive": archive,
                 "bars": bar_count,
                 "regime": "all_baseline" if regime == "__all__" else regime,
+                "direction": direction,
                 **stats,
             })
 
@@ -131,7 +137,7 @@ def run(output_path):
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         writer.writerows(report)
-    print(f"Wrote {len(report)} symbol/timeframe/regime rows to {output_path}")
+    print(f"Wrote {len(report)} symbol/timeframe/regime/direction rows to {output_path}")
     print("Reminder: regime grouping is descriptive, not evidence that a gate improves out-of-sample performance.")
 
 

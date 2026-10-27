@@ -24,6 +24,7 @@ ENTRY_OFFSET_BPS = 20.0
 ENTRY_PENETRATION_BPS = 5.0
 WAIT_BARS = 3
 COST_MULTIPLIER = 2.0
+CHASE_LIMITS = [1.5, 2.0, 2.5, 3.0, 100.0]
 
 def iso(ts):
     return datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -81,7 +82,7 @@ def synchronized_data():
     em.check_alignment(data)
     return data, stamps
 
-def run_fold(data, stamps, fold, start_frac, end_frac):
+def run_fold(data, stamps, fold, start_frac, end_frac, chase_limit):
     n = len(stamps)
     start_idx, end_idx = int(n*start_frac), int(n*end_frac)
     start_ts, end_ts = stamps[start_idx], stamps[end_idx-1]
@@ -97,7 +98,7 @@ def run_fold(data, stamps, fold, start_frac, end_frac):
             if not f or c.close <= f["donchian_high"]:
                 continue
             accepted = f["volume_ratio"] >= VOL_MIN and f["breakout_atr"] >= BREAKOUT_ATR_MIN
-            row = {"fold":fold, "symbol":sym, "signal_ts":c.ts, "signal_time_utc":iso(c.ts),
+            row = {"fold":fold, "chase_limit_pct":chase_limit, "symbol":sym, "signal_ts":c.ts, "signal_time_utc":iso(c.ts),
                    "candidate_type":"long_donchian_breakout", "passes_selected_filter":int(accepted),
                    **{k:round(v,6) if isinstance(v,(int,float)) else v for k,v in f.items()}}
             for h in (6,12,24,48):
@@ -122,7 +123,7 @@ def run_fold(data, stamps, fold, start_frac, end_frac):
     cfg.bot_version=f"diagnostic-v{VOL_MIN:g}-b{BREAKOUT_ATR_MIN:g}-cost{COST_MULTIPLIER:g}"
     cfg.timeframe="1h"; cfg.active_trading_pool=sorted(data); cfg.capital_usdt=10000.0
     cfg.max_risk_trade_pct=1.0; cfg.max_portfolio_risk_pct=2.0; cfg.max_concurrent_positions=5
-    cfg.daily_stop_loss_pct=5.0; cfg.emergency_kill_switch_pct=30.0
+    cfg.daily_stop_loss_pct=5.0; cfg.emergency_kill_switch_pct=30.0; cfg.max_chase_limit_pct=chase_limit
     cfg.donchian_period=20; cfg.atr_period=14; cfg.min_volume_ratio=VOL_MIN
     cfg.stop_atr_mult=2.5; cfg.tp1_r_multiple=2.0; cfg.tp2_r_multiple=5.0
     cfg.atr_trail_mult=3.0; cfg.max_hold_bars=32
@@ -202,7 +203,7 @@ def run_fold(data, stamps, fold, start_frac, end_frac):
                 if matched is None or sts>matched[0]: matched=(sts,sig)
         feat=features(data[t.token], next((i for i,c in enumerate(data[t.token]) if c.ts==matched[0]),0)) if matched else None
         trades_out.append({
-            "fold":fold,"symbol":t.token,"trade_id":t.id,"direction":t.direction,
+            "fold":fold,"chase_limit_pct":chase_limit,"symbol":t.token,"trade_id":t.id,"direction":t.direction,
             "signal_ts":matched[0] if matched else "", "signal_time_utc":iso(matched[0]) if matched else "",
             "entry_time_utc":t.entry_date,"exit_time_utc":t.exit_date,
             "entry_price":t.entry_price,"exit_price":t.exit_price,"order_type":t.order_type,
@@ -226,11 +227,21 @@ def run_fold(data, stamps, fold, start_frac, end_frac):
 
 def main():
     data,stamps=synchronized_data()
-    signals=[]; trades=[]
-    for fold,a,b in FOLDS:
-        sr,tr=run_fold(data,stamps,fold,a,b); signals.extend(sr); trades.extend(tr)
-        print(f"fold={fold}: breakout_candidates={len(sr)}, passes_filter={sum(r['passes_selected_filter'] for r in sr)}, engine_trades={len(tr)}, net={sum(float(t['pnl_net_usdt']) for t in tr):+.2f}")
-    for path,rows in [("h1_signal_diagnostics.csv",signals),("h1_trade_diagnostics.csv",trades)]:
+    signals=[]; trades=[]; summary=[]
+    for chase_limit in CHASE_LIMITS:
+        for fold,a,b in FOLDS:
+            sr,tr=run_fold(data,stamps,fold,a,b,chase_limit)
+            signals.extend(sr); trades.extend(tr)
+            net=sum(float(t['pnl_net_usdt']) for t in tr)
+            wins=sum(float(t['pnl_net_usdt'])>0 for t in tr)
+            gross_win=sum(max(0,float(t['pnl_net_usdt'])) for t in tr)
+            gross_loss=abs(sum(min(0,float(t['pnl_net_usdt'])) for t in tr))
+            summary.append({"chase_limit_pct":chase_limit,"fold":fold,"breakout_candidates":len(sr),
+                "passes_filter":sum(r['passes_selected_filter'] for r in sr),"engine_emitted":sum(r.get('engine_emitted_signal',0) for r in sr),
+                "filled_trades":len(tr),"net_pnl_usdt":round(net,2),"win_rate_pct":round(100*wins/len(tr),2) if tr else 0,
+                "profit_factor":round(gross_win/gross_loss,3) if gross_loss else ""})
+            print(f"chase<={chase_limit:g}% fold={fold}: candidates={len(sr)}, selected={sum(r['passes_selected_filter'] for r in sr)}, emitted={sum(r.get('engine_emitted_signal',0) for r in sr)}, trades={len(tr)}, net={net:+.2f}")
+    for path,rows in [("h1_chase_limit_ablation_summary.csv",summary),("h1_signal_diagnostics.csv",signals),("h1_trade_diagnostics.csv",trades)]:
         if rows:
             fields=[]
             for row in rows:

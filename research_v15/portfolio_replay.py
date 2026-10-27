@@ -58,11 +58,28 @@ def replay_portfolio(
     rejected: list[dict[str, Any]] = []
     realized_pnl = 0.0
 
-    # Group entries by timestamp. Exits at the same timestamp are released only
-    # after all entries for that timestamp, avoiding optimistic intrabar ordering.
+    def realize_positions(cutoff_ts: int, inclusive: bool) -> None:
+        nonlocal equity, peak_equity, max_drawdown, realized_pnl
+        exiting = [
+            p for p in open_positions
+            if int(p["exit_ts"]) <= cutoff_ts if inclusive
+        ] if inclusive else [
+            p for p in open_positions if int(p["exit_ts"]) < cutoff_ts
+        ]
+        for position in sorted(exiting, key=lambda p: (int(p["exit_ts"]), p["symbol"])):
+            equity += position["net_pnl"]
+            realized_pnl += position["net_pnl"]
+            peak_equity = max(peak_equity, equity)
+            if peak_equity > 0:
+                max_drawdown = max(max_drawdown, (peak_equity - equity) / peak_equity)
+            open_positions.remove(position)
+
+    # Group entries by timestamp. Exits earlier than this timestamp are realized
+    # before sizing; exits at the same timestamp are released only after entries.
     cursor = 0
     while cursor < len(candidates):
         entry_ts = int(candidates[cursor]["entry_ts"])
+        realize_positions(entry_ts, inclusive=False)
         group_end = cursor
         while group_end < len(candidates) and int(candidates[group_end]["entry_ts"]) == entry_ts:
             group_end += 1
@@ -93,24 +110,12 @@ def replay_portfolio(
             })
             open_positions.append(accepted[-1])
 
-        # Realize exits through this timestamp only after same-time admissions.
-        exiting = [p for p in open_positions if int(p["exit_ts"]) <= entry_ts]
-        for position in exiting:
-            equity += position["net_pnl"]
-            realized_pnl += position["net_pnl"]
-            peak_equity = max(peak_equity, equity)
-            if peak_equity > 0:
-                max_drawdown = max(max_drawdown, (peak_equity - equity) / peak_equity)
-            open_positions.remove(position)
+        realize_positions(entry_ts, inclusive=True)
         cursor = group_end
 
-    # Close remaining candidates in chronological exit order.
-    for position in sorted(open_positions, key=lambda p: (int(p["exit_ts"]), p["symbol"])):
-        equity += position["net_pnl"]
-        realized_pnl += position["net_pnl"]
-        peak_equity = max(peak_equity, equity)
-        if peak_equity > 0:
-            max_drawdown = max(max_drawdown, (peak_equity - equity) / peak_equity)
+    # Realize all remaining positions by exit time.
+    if open_positions:
+        realize_positions(max(int(p["exit_ts"]) for p in open_positions), inclusive=True)
 
     total_candidates = len(candidates)
     return {

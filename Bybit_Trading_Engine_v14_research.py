@@ -1255,7 +1255,18 @@ class UnifiedQuantEngine:
         timestamps = {c.ts for c in marks.values()}
         if len(timestamps) != 1:
             raise ValueError("Финальные свечи для символов должны иметь одинаковый timestamp")
-        final_ts = next(iter(timestamps))
+        timeframe_ms = {
+            "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
+            "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
+            "4h": 14_400_000, "6h": 21_600_000, "12h": 43_200_000,
+            "1d": 86_400_000,
+        }
+        timeframe = str(self.cfg.timeframe).strip().lower()
+        if timeframe not in timeframe_ms:
+            raise ValueError(f"Неподдерживаемый timeframe для финализации: {self.cfg.timeframe!r}")
+        # Candle.ts is the bar-open timestamp everywhere in this engine.
+        # Final journal exits and daily risk accounting must use the bar-close boundary.
+        final_ts = next(iter(timestamps)) + timeframe_ms[timeframe]
         for sym, candle in marks.items():
             self._last_mark_prices[sym] = candle.close
         self.risk_mgr.mark_to_market(self._unrealized_pnl_at_marks(), final_ts)

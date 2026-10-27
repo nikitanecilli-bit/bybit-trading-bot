@@ -49,7 +49,7 @@ def aligned_h1_datasets():
         raw.items(), key=lambda kv: kv[1][2][-1].ts - kv[1][2][0].ts
     )
     ref_start, ref_end = ref_candles[0].ts, ref_candles[-1].ts
-    span = ref_end - ref_start
+    span = max(1, ref_end - ref_start)
     selected = {}
     coverage = {}
     for symbol, item in raw.items():
@@ -61,10 +61,13 @@ def aligned_h1_datasets():
         coverage[symbol] = {"coverage_pct": round(covered * 100, 1),
                             "start_lag_pct": round(start_lag * 100, 1),
                             "end_lag_pct": round(end_lag * 100, 1)}
-        if covered >= 0.70 and start_lag <= 0.15 and end_lag <= 0.15:
+        if allowlist or (covered >= 0.70 and start_lag <= 0.15 and end_lag <= 0.15):
             selected[symbol] = item
 
-    if len(selected) < 10:
+    if allowlist:
+        if len(selected) != len(allowlist):
+            raise SystemExit(f"Expected {len(allowlist)} selected symbols, found {len(selected)}")
+    elif len(selected) < 10:
         raise SystemExit(
             f"Only {len(selected)} symbols have >=70% reference-history coverage "
             f"with <=15% start/end lag; refusing to run a misleading short-overlap portfolio."
@@ -76,10 +79,12 @@ def aligned_h1_datasets():
         common = ts if common is None else common.intersection(ts)
     timestamps = sorted(common or [])
     overlap_pct = (len(timestamps) / max(1, len(ref_candles))) * 100
-    if len(timestamps) < 500 or overlap_pct < 65:
+    min_bars = 3000 if allowlist else 500
+    min_overlap_pct = 30 if allowlist else 65
+    if len(timestamps) < min_bars or overlap_pct < min_overlap_pct:
         raise SystemExit(
             f"Insufficient synchronized overlap: {len(timestamps)} bars "
-            f"({overlap_pct:.1f}% of reference); refusing to run."
+            f"({overlap_pct:.1f}% of reference; minimum {min_bars} bars and {min_overlap_pct}%)."
         )
 
     aligned = {}

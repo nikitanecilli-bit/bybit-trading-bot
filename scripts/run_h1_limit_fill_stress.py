@@ -69,6 +69,16 @@ def run_segment(symbol, tf, candles, start_idx, end_idx, mode, offset_bps, penet
             filled=original_fill(sym,candle)
             if filled:
                 ages.pop(sym,None); return True
+            # Match the engine's existing behavior: if a genuinely touched order
+            # cannot open (e.g. risk gate), cancel rather than silently retry.
+            ages.pop(sym,None)
+            return False
+        # Treat insufficient penetration exactly like an unfilled limit candle.
+        # Temporarily put the test price just below this candle's low so the
+        # original engine executes its normal no-touch path, then restore price.
+        sig["entry_price"]=min(ref, float(candle.low)) * (1.0-1e-10)
+        original_fill(sym,candle)
+        sig["entry_price"]=ref
         if meta["age"]<wait_bars:
             engine.pending[sym]=sig
             return False

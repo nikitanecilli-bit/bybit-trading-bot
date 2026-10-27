@@ -149,6 +149,7 @@ def replay_portfolio(
         stats = by_symbol.setdefault(symbol, {
             "candidate_trades": 0, "accepted_trades": 0, "rejected_trades": 0,
             "candidate_net_pnl": 0.0, "accepted_net_pnl": 0.0,
+            "accepted_gross_pnl": 0.0, "accepted_fees": 0.0, "accepted_slippage": 0.0,
         })
         stats["candidate_trades"] += 1
         stats["candidate_net_pnl"] += float(trade["net_pnl"])

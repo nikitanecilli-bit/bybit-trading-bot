@@ -25,7 +25,17 @@ jobs:
         run: |
           START_DATE="$(date -u -d '180 days ago' +%F)"
           echo "Downloading from UTC $START_DATE through now"
-          python bybit_downloader.py --symbols BNBUSDT CAKEUSDT DASHUSDT DOTUSDT ICPUSDT JSTUSDT LINKUSDT RAYUSDT SOLUSDT WLDUSDT XLMUSDT --intervals 60 --datasets kline mark funding --start "$START_DATE" --end now --out data/bybit_recent --delay 0.2
+          SYMBOLS="BNBUSDT CAKEUSDT DASHUSDT DOTUSDT ICPUSDT JSTUSDT LINKUSDT RAYUSDT SOLUSDT WLDUSDT XLMUSDT"
+          SUCCESS=0
+          for BASE_URL in https://api.bybit.com https://api.bybit.kz https://api.bybit.nl https://api.bybit.ae; do
+            echo "Trying Bybit public API endpoint: $BASE_URL"
+            if python bybit_downloader.py --symbols $SYMBOLS --intervals 60 --datasets kline mark funding --start "$START_DATE" --end now --out data/bybit_recent --delay 0.2 --base-url "$BASE_URL"; then
+              SUCCESS=1
+              break
+            fi
+            echo "Endpoint failed; trying next supported regional host."
+          done
+          test "$SUCCESS" -eq 1
       - name: Run frozen-candidate Bybit H1 holdout
         run: python scripts/run_bybit_h1_long_only_holdout.py --data-dir data/bybit_recent --output bybit_h1_long_only_holdout.csv --trades-output bybit_h1_long_only_holdout_trades.csv
       - name: Upload Bybit H1 validation reports

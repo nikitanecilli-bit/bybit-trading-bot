@@ -163,11 +163,13 @@ def run(data_dir="data/bybit_recent", output="bybit_h1_long_only_holdout.csv",
         trades = list(engine.closed_trades)
         funding_costs = []
         adjusted_pnls = []
+        adjusted_rs = []
         for trade in trades:
             fcost = funding_cost_for_trade(trade, funding)
             adjusted = float(trade.pnl_usdt) - fcost
             funding_costs.append(fcost)
             adjusted_pnls.append(adjusted)
+            adjusted_rs.append(adjusted / max(float(trade.risk_usdt), 1e-9))
             all_trades.append({
                 "symbol": symbol, "direction": trade.direction,
                 "entry_date": trade.entry_date, "exit_date": trade.exit_date,
@@ -201,7 +203,7 @@ def run(data_dir="data/bybit_recent", output="bybit_h1_long_only_holdout.csv",
             "positive_funding_cost_upper_bound_usdt": round(sum(funding_costs), 2),
             "net_after_funding_upper_bound_usdt": round(sum(adjusted_pnls), 2),
             "profit_factor_after_funding_upper_bound": round(pf(adjusted_pnls), 4),
-            "expectancy_r_after_funding_upper_bound": round(statistics.mean(adjusted_pnls) / 100.0, 5) if adjusted_pnls else 0.0,
+            "expectancy_r_after_funding_upper_bound": round(statistics.mean(adjusted_rs), 5) if adjusted_rs else 0.0,
             "max_trade_sequence_dd_pct_after_funding_upper_bound": round(max_dd_pct(adjusted_pnls), 2),
             "source": "Bybit public linear-perpetual API",
         })

@@ -428,6 +428,7 @@ def test_intrabar_risk_mark_uses_adverse_extreme_when_stop_not_hit():
     e.cfg = engine_mod.BotConfig(timeframe="15m")
     e._last_mark_prices = {}
     e._intrabar_risk_marks = {}
+    e._intrabar_risk_marks_ts = None
     e.open_positions = {}
     e.pending = {}
     e.risk_mgr = type("RiskSpy", (), {"on_new_timestamp": lambda self, ts: None})()
@@ -468,8 +469,28 @@ def test_intrabar_risk_mark_uses_gap_adjusted_stop_fill_when_stop_crossed():
 
 
 
+def test_intrabar_marks_accumulate_for_symbols_at_same_timestamp():
+    e, _ = bare_engine("15m")
+    ts = 1_800_000_000_000
+    e._update_mark_to_market = lambda timestamp: None
+    e._last_mark_prices = {"ETHUSDT": 100.0}
+    e._intrabar_risk_marks = {}
+    e._intrabar_risk_marks_ts = None
+    e.open_positions["BTCUSDT"] = type("Pos", (), {"direction": "long", "stop_price": 80.0})()
+    e.open_positions["ETHUSDT"] = type("Pos", (), {"direction": "short", "stop_price": 120.0})()
+    e.step_candle("BTCUSDT", [engine_mod.Candle(ts=ts, open=100, high=102, low=90, close=101, volume=10)])
+    assert e._intrabar_risk_marks == {"BTCUSDT": 90.0}, e._intrabar_risk_marks
+    e.step_candle("ETHUSDT", [engine_mod.Candle(ts=ts, open=100, high=115, low=98, close=102, volume=10)])
+    assert e._intrabar_risk_marks == {"BTCUSDT": 90.0, "ETHUSDT": 115.0}, e._intrabar_risk_marks
+    e.step_candle("BTCUSDT", [engine_mod.Candle(ts=ts + 900_000, open=101, high=103, low=99, close=102, volume=10)])
+    assert e._intrabar_risk_marks == {"BTCUSDT": 99.0}, e._intrabar_risk_marks
+
+
+
+
 if __name__ == "__main__":
-    tests = [test_intrabar_risk_mark_uses_adverse_extreme_when_stop_not_hit,
+    tests = [test_intrabar_marks_accumulate_for_symbols_at_same_timestamp,
+             test_intrabar_risk_mark_uses_adverse_extreme_when_stop_not_hit,
              test_intrabar_risk_mark_uses_gap_adjusted_stop_fill_when_stop_crossed,
              test_mtm_uses_close_timestamp_for_15m_bar,
              test_daily_stop_blocks_entries_until_next_utc_day,

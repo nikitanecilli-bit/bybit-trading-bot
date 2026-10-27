@@ -733,6 +733,8 @@ def test_tp1_partial_fill_keeps_equity_consistent_with_remaining_position():
     e._intrabar_risk_marks_ts = ts
     e.closed_trades = []
     e.risk_mgr = engine_mod.AdaptiveRiskManager(cfg)
+    e.tg = type("Notifier", (), {"send_message": lambda self, message: None})()
+    e._persist = lambda: None
 
     engine_mod.UnifiedQuantEngine._apply_tp1(pos)
     e.risk_mgr.mark_to_market(e._unrealized_pnl_at_marks(), ts)

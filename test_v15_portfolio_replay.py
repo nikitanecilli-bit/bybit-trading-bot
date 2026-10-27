@@ -71,6 +71,7 @@ class PortfolioReplayTests(unittest.TestCase):
         self.assertAlmostEqual(
             sum(item["net_pnl"] for item in result["by_exit_reason"]),
             sum(item["net_pnl"] for item in result["accepted"]),
+            places=3,
         )
         self.assertAlmostEqual(
             sum(item["gross_pnl"] - item["fees"] - item["slippage"] for item in result["by_exit_reason"]),

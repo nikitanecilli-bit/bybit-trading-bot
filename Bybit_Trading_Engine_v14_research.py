@@ -117,6 +117,8 @@ class BotConfig:
     max_hold_bars: int = 16
 
     maker_entry_and_tp1: bool = False
+    # None preserves legacy coupling to maker_entry_and_tp1; explicit False isolates maker entry.
+    maker_tp1_and_target: Optional[bool] = None
     accelerated_atr_trail_after_1_5r: bool = False
     enable_h2_range_fade: bool = False
 
@@ -228,7 +230,7 @@ class BotConfig:
         if unknown_strategy:
             raise ValueError(f"unsupported strategy keys (not implemented): {', '.join(unknown_strategy)}")
 
-        allowed_execution = {"maker_entry_and_tp1", "accelerated_atr_trail_after_1_5r"}
+        allowed_execution = {"maker_entry_and_tp1", "maker_tp1_and_target", "accelerated_atr_trail_after_1_5r"}
         ex_check = data.get("execution_and_exits", {}) or {}
         if not isinstance(ex_check, dict):
             raise ValueError("execution_and_exits must be an object")
@@ -281,6 +283,7 @@ class BotConfig:
 
         ex = data.get("execution_and_exits", {}) or {}
         self.maker_entry_and_tp1 = _as_bool(ex.get("maker_entry_and_tp1", False))
+        self.maker_tp1_and_target = (_as_bool(ex.get("maker_tp1_and_target", False)) if "maker_tp1_and_target" in ex else None)
         self.accelerated_atr_trail_after_1_5r = _as_bool(ex.get("accelerated_atr_trail_after_1_5r", False))
 
         if isinstance(data.get("active_trading_pool"), list):
@@ -378,6 +381,7 @@ class OpenPositionState:
     size_usdt: float
     risk_usdt: float
     order_type: str
+    maker_exits: bool = False
     tp1_hit: bool = False
     realized_tp1_gross_usdt: float = 0.0
     remaining_fraction: float = 1.0
@@ -952,10 +956,10 @@ class UnifiedQuantEngine:
             gross = pos.realized_tp1_gross_usdt + remaining_gross
             entry_cost = pos.size_usdt * (MAKER_FEE if pos.order_type == "limit" else TAKER_FEE)
             entry_slip = 0.0 if pos.order_type == "limit" else pos.size_usdt * TAKER_SLIP
-            tp1_cost = (pos.size_usdt * TP1_FRACTION * (MAKER_FEE if pos.order_type == "limit" else TAKER_FEE)) if pos.tp1_hit else 0.0
-            # TP1 is already an executed leg: include its slippage for market orders too.
+            tp1_cost = (pos.size_usdt * TP1_FRACTION * (MAKER_FEE if pos.maker_exits else TAKER_FEE)) if pos.tp1_hit else 0.0
+            # TP1 is already an executed leg: account for slippage only when it was taker.
             tp1_slip = (pos.size_usdt * TP1_FRACTION * TAKER_SLIP
-                        if pos.tp1_hit and pos.order_type != "limit" else 0.0)
+                        if pos.tp1_hit and not pos.maker_exits else 0.0)
             # Предполагаем taker на оставшемся выходе для консервативной оценки плавающего equity.
             exit_cost = pos.size_usdt * pos.remaining_fraction * (TAKER_FEE + TAKER_SLIP)
             total += gross - entry_cost - entry_slip - tp1_cost - tp1_slip - exit_cost
@@ -1098,7 +1102,9 @@ class UnifiedQuantEngine:
             strategy=sig["strategy"], entry_ts=curr.ts, entry_price=fill,
             stop_price=stop_price, tp1_price=tp1, tp2_price=tp2,
             initial_stop_dist=sig["stop_dist"], size_usdt=size_usdt, risk_usdt=risk_usdt,
-            order_type=sig["order_type"], max_favorable_px=fill, max_adverse_px=fill,
+            order_type=sig["order_type"],
+            maker_exits=(self.cfg.maker_entry_and_tp1 if self.cfg.maker_tp1_and_target is None else self.cfg.maker_tp1_and_target),
+            max_favorable_px=fill, max_adverse_px=fill,
             equity_at_entry=self.risk_mgr.current_equity,
         )
         self._persist()
@@ -1195,14 +1201,14 @@ class UnifiedQuantEngine:
 
         # Издержки по ногам. Сначала суммируем точные значения всех ног,
         # затем округляем итог в денежном формате (half-up), а не каждую ногу отдельно.
-        maker_mode = pos.order_type == "limit"
+        entry_maker = pos.order_type == "limit"
         fees = slip = 0.0
-        f, s = self._leg_cost(pos.size_usdt, maker_mode)                      # вход
+        f, s = self._leg_cost(pos.size_usdt, entry_maker)                     # вход
         fees += f; slip += s
         if pos.tp1_hit:                                                        # TP1-нога
-            f, s = self._leg_cost(pos.size_usdt * TP1_FRACTION, maker_mode)
+            f, s = self._leg_cost(pos.size_usdt * TP1_FRACTION, pos.maker_exits)
             fees += f; slip += s
-        final_maker = maker_mode and exit_reason == "take_profit"              # финальная нога
+        final_maker = pos.maker_exits and exit_reason == "take_profit"         # финальная нога
         f, s = self._leg_cost(pos.size_usdt * pos.remaining_fraction, final_maker)
         fees += f; slip += s
         fees, slip = _money_round(fees), _money_round(slip)

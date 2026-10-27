@@ -48,7 +48,8 @@ def run_one(symbol, timeframe, candles, archive, mode):
     cfg.tp2_r_multiple = 5.0
     cfg.atr_trail_mult = 3.0
     cfg.max_hold_bars = 32
-    cfg.maker_entry_and_tp1 = (mode == "limit_entry_package")
+    cfg.maker_entry_and_tp1 = (mode != "market")
+    cfg.maker_tp1_and_target = (mode == "limit_entry_plus_maker_exits")
     cfg.enable_h2_range_fade = False
     cfg.validate()
     engine.risk_mgr.cfg = cfg
@@ -126,7 +127,7 @@ def main():
 
     rows = []
     for (symbol, timeframe), (bar_count, archive, candles) in sorted(datasets.items()):
-        for mode in ("market", "limit_entry_package"):
+        for mode in ("market", "limit_entry_only", "limit_entry_plus_maker_exits"):
             result = run_one(symbol, timeframe, candles, archive, mode)
             if result:
                 rows.append(result)
@@ -146,7 +147,7 @@ def main():
 
     print("\nSUMMARY: independent per-symbol holdout runs; not a combined portfolio.")
     for timeframe in ("15m", "1h"):
-        for mode in ("market", "limit_entry_package"):
+        for mode in ("market", "limit_entry_only", "limit_entry_plus_maker_exits"):
             group = [r for r in rows if r["timeframe"] == timeframe and r["mode"] == mode]
             if not group:
                 continue
@@ -165,7 +166,7 @@ def main():
                 f"profitable_symbols={sum(r['net_pnl_usdt'] > 0 for r in group)}"
             )
     print(f"\nWrote {args.output}")
-    print("CAVEAT: limit mode couples maker entry and maker TP1/target; OHLC touches do not model queue priority.")
+    print("CAVEAT: OHLC touches do not model queue priority or bid/ask spread; limit-fill results are approximate.")
 
 
 if __name__ == "__main__":

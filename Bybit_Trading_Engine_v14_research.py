@@ -111,6 +111,7 @@ class BotConfig:
 
     maker_entry_and_tp1: bool = False
     accelerated_atr_trail_after_1_5r: bool = False
+    enable_h2_range_fade: bool = False
 
     active_trading_pool: List[str] = field(
         default_factory=lambda: ["SOLUSDT", "BTCUSDT", "ETHUSDT", "AVAXUSDT", "DOGEUSDT"]
@@ -186,6 +187,7 @@ class BotConfig:
                 setattr(self, attr, float(st[attr]))
         if "timeframe" in st:
             self.timeframe = str(st["timeframe"])
+        self.enable_h2_range_fade = _as_bool(st.get("enable_h2_range_fade", False))
 
         ex = data.get("execution_and_exits", {}) or {}
         self.maker_entry_and_tp1 = _as_bool(ex.get("maker_entry_and_tp1", False))
@@ -389,7 +391,7 @@ class QuantStrategyCore:
             direction, strategy_name = "long", "H1-momentum-breakout"
         elif curr.close < lo_ch and vol_ratio >= cfg.min_volume_ratio:
             direction, strategy_name = "short", "H1-momentum-breakout"
-        elif 0.75 <= vol_ratio < cfg.min_volume_ratio:
+        elif cfg.enable_h2_range_fade and 0.75 <= vol_ratio < cfg.min_volume_ratio:
             ch_range = hi_ch - lo_ch
             if ch_range > atr * 2.2:
                 if curr.low <= lo_ch + 0.15 * ch_range and curr.close > curr.open:

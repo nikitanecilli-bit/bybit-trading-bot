@@ -330,12 +330,11 @@ def run_fold(data, stamps, context_data, context_index, market_universe_data, ma
     return signal_rows,trades_out
 
 def main():
-    data,stamps=synchronized_data()
+    data,stamps,context_data,context_index,market_universe_data,market_universe_index=synchronized_data()
     signals=[]; trades=[]; summaries=[]
-    chase_limits=[1.0,1.5,2.0,2.5,3.0]
-    for chase in chase_limits:
+    for chase in CHASE_LIMITS:
         for fold,a,b in FOLDS:
-            sr,tr=run_fold(data,stamps,fold,a,b,chase_limit=chase)
+            sr,tr=run_fold(data,stamps,context_data,context_index,market_universe_data,market_universe_index,fold,a,b,chase_limit=chase)
             signals.extend(sr); trades.extend(tr)
             pnl=sum(float(t["pnl_net_usdt"]) for t in tr)
             wins=sum(float(t["pnl_net_usdt"])>0 for t in tr)
@@ -368,7 +367,7 @@ def main():
             with open(path,"w",newline="",encoding="utf-8") as f:
                 w=csv.DictWriter(f,fieldnames=fields); w.writeheader(); w.writerows(rows)
             print(f"Wrote {path}: {len(rows)} rows")
-    print("CAVEATS: Binance OHLCV proxy, modelled fees/slippage, OHLC limit penetration is not queue/fill simulation. This is a research ablation, not a live recommendation.")
+    print("CAVEATS: Binance OHLCV proxy, modelled fees/slippage, OHLC limit penetration is not queue/fill simulation. Research ablation only; no production changes.")
 
 if __name__ == "__main__":
     main()

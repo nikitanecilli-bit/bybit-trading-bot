@@ -941,7 +941,7 @@ class UnifiedQuantEngine:
             raise ValueError(f"No funding CSV files found in {directory}")
 
     def _load_mark_price_history(self, directory: str) -> None:
-        """Load <SYMBOL>.csv mark klines; use 1-minute candle open at timestamp_ms."""
+        """Load <SYMBOL>.csv mark klines; use hourly candle open at timestamp_ms."""
         if not os.path.isdir(directory):
             raise ValueError(f"Mark-price directory does not exist: {directory}")
         for path in glob.glob(os.path.join(directory, "*.csv")):

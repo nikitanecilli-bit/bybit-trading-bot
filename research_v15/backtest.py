@@ -202,6 +202,31 @@ def trade_economics(
     }
 
 
+
+def position_size(
+    equity: float,
+    risk_pct: float,
+    entry_price: float,
+    stop_distance: float,
+) -> dict[str, float]:
+    """Size position under risk and 1x-notional caps, before trading costs."""
+    if equity <= 0 or entry_price <= 0 or stop_distance <= 0 or not 0 < risk_pct <= 0.05:
+        raise ValueError("invalid equity, risk percentage, entry price or stop distance")
+    risk_budget = equity * risk_pct
+    qty_by_risk = risk_budget / stop_distance
+    qty_by_notional = equity / entry_price
+    qty = min(qty_by_risk, qty_by_notional)
+    return {
+        "risk_budget": risk_budget,
+        "qty_by_risk": qty_by_risk,
+        "qty_by_notional": qty_by_notional,
+        "qty": qty,
+        "notional": qty * entry_price,
+        "planned_stop_loss": qty * stop_distance,
+        "planned_stop_loss_pct_equity": qty * stop_distance / equity,
+    }
+
+
 def backtest_symbol(
     bars: Sequence[Bar],
     symbol: str = "UNKNOWN",
@@ -280,12 +305,10 @@ def backtest_symbol(
                 if entry > 0:
                     stop_distance = max(entry * min_stop_pct, pending["atr"] * stop_atr_multiple)
                     stop = entry - stop_distance if side == "long" else entry + stop_distance
-                    risk_cash = equity * risk_pct
-                    qty_by_risk = risk_cash / stop_distance
-                    qty_by_notional = equity / entry
-                    qty = min(qty_by_risk, qty_by_notional)
+                    sizing = position_size(equity, risk_pct, entry, stop_distance)
+                    qty = sizing["qty"]
                     if qty > 0:
-                        pos = {"side": side, "entry": entry, "entry_ts": bar.ts, "entry_index": i, "stop": stop, "initial_stop": stop, "risk_usdt": stop_distance * qty, "qty": qty, "target": entry + target_r * stop_distance if side == "long" else entry - target_r * stop_distance, "be_moved": False}
+                        pos = {"side": side, "entry": entry, "entry_ts": bar.ts, "entry_index": i, "stop": stop, "initial_stop": stop, "risk_usdt": sizing["planned_stop_loss"], "risk_budget": sizing["risk_budget"], "qty": qty, "target": entry + target_r * stop_distance if side == "long" else entry - target_r * stop_distance, "be_moved": False}
                     pending = None
 
         if pos is not None:

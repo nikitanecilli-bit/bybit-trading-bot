@@ -20,7 +20,7 @@ from run_uploaded_dataset_backtests import read_zip_datasets
 
 SYMBOLS = ["RAYUSDT", "PUMPUSDT", "TAOUSDT", "AAVEUSDT", "CAKEUSDT"]
 CONTEXT_SYMBOLS = ["BTCUSDT", "ETHUSDT"]
-FOLDS = [(1, .50, .65), (2, .65, .80), (3, .80, 1.00)]
+FOLDS = [(1, "2026-04-27T12:00:00Z", "2026-06-21T05:00:00Z"), (2, "2026-06-21T06:00:00Z", "2026-08-14T23:00:00Z"), (3, "2026-08-15T00:00:00Z", "2026-10-27T00:00:00Z")]
 VOL_MIN = 1.6
 BREAKOUT_ATR_MIN = .25
 ENTRY_OFFSET_BPS = 20.0
@@ -141,10 +141,15 @@ def market_context(data, context_data, context_index, market_universe_data, mark
     out["broad_median_efficiency_24h"] = float(__import__("statistics").median(broad_e24)) if broad_e24 else ""
     return out
 
-def run_fold(data, stamps, context_data, context_index, market_universe_data, market_universe_index, fold, start_frac, end_frac, chase_limit):
-    n = len(stamps)
-    start_idx, end_idx = int(n*start_frac), int(n*end_frac)
+def run_fold(data, stamps, context_data, context_index, market_universe_data, market_universe_index, fold, start_time, end_time, chase_limit):
+    requested_start = int(datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()*1000)
+    requested_end = int(datetime.strptime(end_time, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()*1000)
+    start_idx = next((i for i, ts in enumerate(stamps) if ts >= requested_start), None)
+    end_idx = next((i for i, ts in enumerate(stamps) if ts > requested_end), len(stamps))
+    if start_idx is None or end_idx <= start_idx:
+        raise SystemExit(f"Fold {fold} has no data in requested range {start_time}..{end_time}")
     start_ts, end_ts = stamps[start_idx], stamps[end_idx-1]
+    print(f"fold={fold} actual_window={iso(start_ts)}..{iso(end_ts)} bars={end_idx-start_idx}")
     # Candidate table includes every long Donchian breakout, even if it fails the
     # selected volume/strength filter or is never filled.
     signal_rows = []

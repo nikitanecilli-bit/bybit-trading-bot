@@ -9,7 +9,7 @@ Binance OHLCV proxy; research only; no production strategy changes.
 """
 from __future__ import annotations
 import csv, os, sys
-import numpy as np
+import statistics
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -349,9 +349,9 @@ def main():
                 "gross_pnl_usdt":round(gross,2),"fees_usdt":round(fees,2),"slippage_usdt":round(slip,2),
                 "win_rate_pct":round(100*wins/len(tr),2) if tr else 0,
                 "profit_factor":round(pos/neg,3) if neg else "",
-                "mean_net_R":round(np.mean([float(t["net_R"]) for t in tr]),4) if tr else "",
-                "median_MFE_R":round(float(np.median([float(t["MFE_R"]) for t in tr])),3) if tr else "",
-                "median_MAE_R":round(float(np.median([float(t["MAE_R"]) for t in tr])),3) if tr else "",
+                "mean_net_R":round(statistics.mean([float(t["net_R"]) for t in tr]),4) if tr else "",
+                "median_MFE_R":round(float(statistics.median([float(t["MFE_R"]) for t in tr])),3) if tr else "",
+                "median_MAE_R":round(float(statistics.median([float(t["MAE_R"]) for t in tr])),3) if tr else "",
                 "max_abs_body_filled_pct":round(max([abs(float(t.get("signal_candle_body_pct",0) or 0)) for t in tr],default=0),3)
             })
             print(f"chase={chase:.1f}% fold={fold}: trades={len(tr)}, net={pnl:+.2f}, PF={pos/neg if neg else 0:.2f}")

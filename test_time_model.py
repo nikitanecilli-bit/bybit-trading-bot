@@ -15,6 +15,8 @@ def bare_engine(timeframe="15m"):
     e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
     e.cfg = engine_mod.BotConfig(timeframe=timeframe)
     e._last_mark_prices = {}
+    e._intrabar_risk_marks = {}
+    e._intrabar_risk_marks_ts = None
     e.open_positions = {}
     e.pending = {}
     seen = []

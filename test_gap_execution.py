@@ -257,6 +257,83 @@ def test_partial_tp1_then_stop_closes_only_remaining_fraction():
 
 
 
+def _close_with_real_accounting(pos, exit_price, exit_reason):
+    e = make_engine()
+    e.cfg.capital_usdt = 10_000.0
+    e.open_positions[pos.symbol] = pos
+    e.closed_trades = []
+    e._last_mark_prices = {}
+    e._intrabar_risk_marks = {}
+    e.risk_mgr = engine_mod.AdaptiveRiskManager(e.cfg)
+    e.tg = type("Notifier", (), {"send_message": lambda self, message: None})()
+    e._persist = lambda: None
+    exit_ts = 1_800_000_000_000
+    engine_mod.UnifiedQuantEngine._close_position(
+        e, pos, exit_price, exit_reason, exit_ts, mae_r=1.0, mfe_r=2.0,
+    )
+    assert len(e.closed_trades) == 1
+    assert not e.open_positions
+    return e.closed_trades[0]
+
+
+def test_market_long_stop_journal_matches_independent_fee_and_slippage_math():
+    pos = make_position("long", entry=100.0, stop=95.0)
+    pos.size_usdt = 1_000.0
+    record = _close_with_real_accounting(pos, 95.0, "stop_loss")
+
+    gross = round(1_000.0 * (95.0 - 100.0) / 100.0, 2)
+    fees = round(1_000.0 * engine_mod.TAKER_FEE + 1_000.0 * engine_mod.TAKER_FEE, 2)
+    slip = round(1_000.0 * engine_mod.TAKER_SLIP + 1_000.0 * engine_mod.TAKER_SLIP, 2)
+    assert record.gross_pnl == gross == -50.0
+    assert record.exchange_fees_usdt == fees
+    assert record.slippage_cost_usdt == slip
+    assert record.pnl_usdt == round(gross - fees - slip, 2)
+    assert record.pnl_usdt == -51.55
+
+
+def test_limit_tp2_after_tp1_journal_accounts_for_three_execution_legs():
+    pos = make_position("long", entry=100.0, stop=95.0)
+    pos.order_type = "limit"
+    pos.size_usdt = 1_000.0
+    pos.tp1_price = 110.0
+    pos.tp2_price = 120.0
+    engine_mod.UnifiedQuantEngine._apply_tp1(pos)
+    record = _close_with_real_accounting(pos, 120.0, "take_profit")
+
+    gross = round(1_000.0 * 0.5 * (110.0 - 100.0) / 100.0
+                  + 1_000.0 * 0.5 * (120.0 - 100.0) / 100.0, 2)
+    fees = round(1_000.0 * engine_mod.MAKER_FEE
+                 + 500.0 * engine_mod.MAKER_FEE
+                 + 500.0 * engine_mod.MAKER_FEE, 2)
+    slip = 0.0
+    assert record.gross_pnl == gross == 150.0
+    assert record.exchange_fees_usdt == fees == 0.40
+    assert record.slippage_cost_usdt == slip
+    assert record.pnl_usdt == round(gross - fees - slip, 2) == 149.60
+
+
+def test_limit_tp1_then_market_trailing_stop_charges_correct_exit_fee_types():
+    pos = make_position("long", entry=100.0, stop=95.0)
+    pos.order_type = "limit"
+    pos.size_usdt = 1_000.0
+    pos.tp1_price = 110.0
+    pos.tp2_price = 120.0
+    engine_mod.UnifiedQuantEngine._apply_tp1(pos)
+    # Remaining half exits at 105 via a taker stop; TP1 was a maker leg.
+    record = _close_with_real_accounting(pos, 105.0, "trailing_stop")
+
+    gross = round(50.0 + 500.0 * (105.0 - 100.0) / 100.0, 2)
+    fees = round(1_000.0 * engine_mod.MAKER_FEE
+                 + 500.0 * engine_mod.MAKER_FEE
+                 + 500.0 * engine_mod.TAKER_FEE, 2)
+    slip = round(500.0 * engine_mod.TAKER_SLIP, 2)
+    assert record.gross_pnl == gross == 75.0
+    assert record.exchange_fees_usdt == fees == 0.575
+    assert record.slippage_cost_usdt == slip == 0.11
+    assert record.pnl_usdt == round(gross - fees - slip, 2) == 74.32
+
+
+
 if __name__ == "__main__":
     tests = [
         test_market_long_gap_above_chase_limit_is_cancelled,
@@ -271,6 +348,9 @@ if __name__ == "__main__":
         test_short_stop_wins_when_same_candle_hits_tp1,
         test_short_stop_wins_when_same_candle_hits_tp2,
         test_partial_tp1_then_stop_closes_only_remaining_fraction,
+        test_market_long_stop_journal_matches_independent_fee_and_slippage_math,
+        test_limit_tp2_after_tp1_journal_accounts_for_three_execution_legs,
+        test_limit_tp1_then_market_trailing_stop_charges_correct_exit_fee_types,
     ]
     for test in tests:
         test()

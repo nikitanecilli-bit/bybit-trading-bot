@@ -106,6 +106,9 @@ def replay_portfolio(
                 "qty": float(sizing["qty"]), "scale_factor": scale,
                 "risk_usdt": proposed_risk,
                 "net_pnl": float(trade["net_pnl"]) * scale,
+                "gross_pnl": float(trade.get("gross_pnl", trade["net_pnl"])) * scale,
+                "fees": float(trade.get("fees", 0.0)) * scale,
+                "slippage": float(trade.get("slippage", 0.0)) * scale,
                 "exit_reason": trade.get("exit_reason", "unknown"),
             })
             open_positions.append(accepted[-1])
@@ -145,6 +148,9 @@ def replay_portfolio(
         "net_pnl": round(equity - starting_equity, 8),
         "realized_pnl_sum": round(realized_pnl, 8),
         "reconciliation_error": round((equity - starting_equity) - realized_pnl, 10),
+        "accepted_gross_pnl": round(sum(float(t["gross_pnl"]) for t in accepted), 8),
+        "accepted_fees": round(sum(float(t["fees"]) for t in accepted), 8),
+        "accepted_slippage": round(sum(float(t["slippage"]) for t in accepted), 8),
         "candidate_trades": total_candidates,
         "accepted_trades": len(accepted),
         "rejected_trades": len(rejected),

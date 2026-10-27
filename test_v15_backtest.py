@@ -1,7 +1,7 @@
 """Regression tests for the v15 simulator."""
 import unittest
 
-from research_v15.backtest import Bar, backtest_symbol, limit_order_expired, limit_order_fill, rolling_atr
+from research_v15.backtest import Bar, backtest_symbol, limit_order_expired, limit_order_fill, resolve_stop_target, rolling_atr, stop_order_fill
 
 
 class V15BacktestTests(unittest.TestCase):
@@ -102,6 +102,49 @@ class V15BacktestTests(unittest.TestCase):
             limit_order_fill(bar, "long", 0)
         with self.assertRaises(ValueError):
             limit_order_expired(-1, 3)
+
+
+    def test_long_stop_hit_fills_at_stop(self):
+        bar = Bar(1, 102, 104, 98, 101)
+        self.assertEqual(stop_order_fill(bar, "long", 99), 99)
+
+    def test_long_stop_gap_fills_at_worse_open(self):
+        bar = Bar(1, 95, 98, 94, 97)
+        self.assertEqual(stop_order_fill(bar, "long", 99), 95)
+
+    def test_short_stop_gap_fills_at_worse_open(self):
+        bar = Bar(1, 105, 107, 102, 103)
+        self.assertEqual(stop_order_fill(bar, "short", 101), 105)
+
+    def test_stop_not_touched_returns_none(self):
+        bar = Bar(1, 102, 104, 100, 103)
+        self.assertIsNone(stop_order_fill(bar, "long", 99))
+        self.assertIsNone(stop_order_fill(bar, "short", 105))
+
+    def test_stop_wins_when_stop_and_target_both_touched(self):
+        long_bar = Bar(1, 100, 112, 88, 101)
+        short_bar = Bar(2, 100, 112, 88, 99)
+        self.assertEqual(resolve_stop_target(long_bar, "long", 90, 110), (90, "stop_or_gap", False))
+        self.assertEqual(resolve_stop_target(short_bar, "short", 110, 90), (110, "stop_or_gap", False))
+
+    def test_target_fill_is_limit_style_when_stop_not_touched(self):
+        long_bar = Bar(1, 100, 112, 95, 108)
+        short_bar = Bar(2, 100, 105, 88, 92)
+        self.assertEqual(resolve_stop_target(long_bar, "long", 90, 110), (110, "target", True))
+        self.assertEqual(resolve_stop_target(short_bar, "short", 110, 90), (90, "target", True))
+
+    def test_target_can_be_disabled(self):
+        bar = Bar(1, 100, 112, 95, 108)
+        self.assertIsNone(resolve_stop_target(bar, "long", 90, 110, target_allowed=False))
+
+    def test_stop_helpers_reject_invalid_inputs(self):
+        bar = Bar(1, 100, 101, 99, 100)
+        with self.assertRaises(ValueError):
+            stop_order_fill(bar, "buy", 99)
+        with self.assertRaises(ValueError):
+            stop_order_fill(bar, "long", 0)
+        with self.assertRaises(ValueError):
+            resolve_stop_target(bar, "buy", 99, 101)
 
 
 if __name__ == "__main__":

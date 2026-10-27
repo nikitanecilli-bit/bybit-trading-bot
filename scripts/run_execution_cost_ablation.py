@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Chronological holdout: market execution vs the engine's existing limit-entry mode.
+"""Chronological holdout for limit-entry offsets and order timeouts.
 
-The limit mode currently couples maker entry with maker TP1/target execution.
-This is a useful first execution-package comparison, but not a pure entry-only
-ablation. Intrabar limit fills are approximated from OHLC and are optimistic
-about queue priority; results are diagnostic, not live-performance claims.
+All exits are modeled as taker to isolate the entry policy. Limit fills use OHLC
+touches and fixed-price resting orders, optimistic without queue priority, spread,
+partial fills, and adverse selection.
 """
 from __future__ import annotations
 
@@ -21,7 +20,7 @@ import Bybit_Trading_Engine_v14_research as engine_mod
 from run_uploaded_dataset_backtests import read_zip_datasets
 
 
-def run_one(symbol, timeframe, candles, archive, mode):
+def run_one(symbol, timeframe, candles, archive, mode, offset_bps=0.0, max_wait_bars=1):
     split_idx = int(len(candles) * 0.70)
     if split_idx < 200 or split_idx >= len(candles):
         return None
@@ -49,13 +48,15 @@ def run_one(symbol, timeframe, candles, archive, mode):
     cfg.atr_trail_mult = 3.0
     cfg.max_hold_bars = 32
     cfg.maker_entry_and_tp1 = (mode != "market")
-    cfg.maker_tp1_and_target = (mode == "limit_entry_plus_maker_exits")
+    # Isolate maker entry: all exits remain taker in this experiment.
+    cfg.maker_tp1_and_target = False
     cfg.enable_h2_range_fade = False
     cfg.validate()
     engine.risk_mgr.cfg = cfg
     engine.tg.send_message = lambda *_args, **_kwargs: None
 
     counts = {"signals": 0, "filled": 0, "unfilled": 0}
+    pending_meta = {}
     original_eval = engine_mod.QuantStrategyCore.evaluate_signal
 
     def wrapped_eval(symbol_arg, history, cfg_arg):
@@ -70,11 +71,38 @@ def run_one(symbol, timeframe, candles, archive, mode):
     original_try_fill = engine._try_fill_pending
 
     def counted_try_fill(symbol_arg, candle):
-        had_pending = symbol_arg in engine.pending
+        if symbol_arg not in engine.pending:
+            return original_try_fill(symbol_arg, candle)
+
+        sig = engine.pending[symbol_arg]
+        meta = pending_meta.get(symbol_arg)
+        if meta is None:
+            direction = sig["direction"]
+            ref = float(sig["entry_price"])
+            signed_offset = -offset_bps if direction == "long" else offset_bps
+            sig["entry_price"] = ref * (1.0 + signed_offset / 10_000.0)
+            sig["order_type"] = "limit"
+            meta = {"age": 0}
+            pending_meta[symbol_arg] = meta
+
+        meta["age"] += 1
+        ref = float(sig["entry_price"])
+        is_long = sig["direction"] == "long"
+        touched = candle.low <= ref if is_long else candle.high >= ref
         filled = original_try_fill(symbol_arg, candle)
-        if had_pending:
-            counts["filled" if filled else "unfilled"] += 1
-        return filled
+
+        if filled:
+            counts["filled"] += 1
+            pending_meta.pop(symbol_arg, None)
+            return True
+
+        if not touched and meta["age"] < max_wait_bars:
+            engine.pending[symbol_arg] = sig
+            return False
+
+        counts["unfilled"] += 1
+        pending_meta.pop(symbol_arg, None)
+        return False
 
     engine._try_fill_pending = counted_try_fill
     try:
@@ -95,6 +123,8 @@ def run_one(symbol, timeframe, candles, archive, mode):
         "timeframe": timeframe,
         "symbol": symbol,
         "mode": mode,
+        "limit_offset_bps": offset_bps if mode != "market" else 0.0,
+        "max_wait_bars": max_wait_bars if mode != "market" else 0,
         "bars_total": len(candles),
         "holdout_start_utc": engine_mod.datetime.fromtimestamp(
             cutoff_ts / 1000, tz=engine_mod.timezone.utc
@@ -126,9 +156,18 @@ def main():
         raise SystemExit("No valid OHLCV datasets found in ZIP archives.")
 
     rows = []
+    variants = [("market", 0.0, 0)]
+    variants += [
+        (f"limit_{offset:g}bps_wait{wait}", offset, wait)
+        for offset in (0.0, 5.0, 10.0, 20.0)
+        for wait in (1, 3, 5)
+    ]
     for (symbol, timeframe), (bar_count, archive, candles) in sorted(datasets.items()):
-        for mode in ("market", "limit_entry_only", "limit_entry_plus_maker_exits"):
-            result = run_one(symbol, timeframe, candles, archive, mode)
+        for mode, offset_bps, max_wait_bars in variants:
+            result = run_one(
+                symbol, timeframe, candles, archive, mode,
+                offset_bps=offset_bps, max_wait_bars=max_wait_bars,
+            )
             if result:
                 rows.append(result)
                 print(
@@ -147,7 +186,7 @@ def main():
 
     print("\nSUMMARY: independent per-symbol holdout runs; not a combined portfolio.")
     for timeframe in ("15m", "1h"):
-        for mode in ("market", "limit_entry_only", "limit_entry_plus_maker_exits"):
+        for mode, _offset, _wait in variants:
             group = [r for r in rows if r["timeframe"] == timeframe and r["mode"] == mode]
             if not group:
                 continue
@@ -166,7 +205,8 @@ def main():
                 f"profitable_symbols={sum(r['net_pnl_usdt'] > 0 for r in group)}"
             )
     print(f"\nWrote {args.output}")
-    print("CAVEAT: OHLC touches do not model queue priority or bid/ask spread; limit-fill results are approximate.")
+    print("CAVEAT: OHLC touches do not model queue priority, bid/ask spread, adverse selection, or partial fills.")
+    print("CAVEAT: limit orders rest at a fixed price for 1/3/5 bars; no live order-book data.")
 
 
 if __name__ == "__main__":

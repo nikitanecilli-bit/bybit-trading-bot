@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install diagnostic dependency
+        run: python -m pip install numpy
       - name: Compile
         run: python -m py_compile Bybit_Trading_Engine_v14_research.py scripts/run_uploaded_dataset_backtests.py scripts/run_h1_signal_trade_diagnostics.py scripts/run_h1_market_context_diagnostics.py
       - name: Run signal and trade diagnostics

@@ -66,7 +66,7 @@ def load_h1_datasets():
                         if len(common_bars) != 4321:
                             print(f"SKIP {symbol}: expected 4321 common-window bars, got {len(common_bars)}")
                             continue
-                        candidates[symbol].append((len(common_bars), archive, common_bars))
+                        candidates[symbol].append((len(bars), archive, common_bars))
                     except Exception as exc:
                         print(f"REJECT {symbol} {archive}: {exc}")
         except zipfile.BadZipFile:
@@ -76,7 +76,7 @@ def load_h1_datasets():
         options.sort(key=lambda x: (x[0], x[1]), reverse=True)
         chosen[symbol] = options[0]
         if len(options) > 1:
-            print(f"DUPLICATE {symbol}: using longest file from {options[0][1]} ({options[0][0]} bars)")
+            print(f"DUPLICATE {symbol}: using longest source from {options[0][1]} ({options[0][0]} source bars; {len(options[0][2])} common-window bars)")
     return chosen
 
 

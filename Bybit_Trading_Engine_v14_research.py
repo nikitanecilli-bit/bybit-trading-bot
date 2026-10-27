@@ -118,6 +118,7 @@ class BotConfig:
     )
     disabled_instruments: List[str] = field(default_factory=list)
     blocked_sessions_utc: List[str] = field(default_factory=list)
+    blocked_weekdays_utc: List[int] = field(default_factory=list)  # Monday=0 ... Sunday=6
     blocked_directions: List[str] = field(default_factory=list)
     applied_patches_log: List[Dict] = field(default_factory=list)
 
@@ -163,6 +164,8 @@ class BotConfig:
             errs.append("tp2_r_multiple > 10R: extreme targets require explicit strategy review")
         if self.atr_trail_mult <= 0: errs.append("atr_trail_mult <= 0")
         if self.max_hold_bars < 1: errs.append("max_hold_bars < 1")
+        if any(day not in range(7) for day in self.blocked_weekdays_utc):
+            errs.append("blocked_weekdays_utc must contain only integers 0..6 (Monday=0)")
         if self.min_volume_ratio <= 0: errs.append("min_volume_ratio <= 0")
         if errs:
             raise ValueError("; ".join(errs))
@@ -172,7 +175,7 @@ class BotConfig:
             "_note", "bot_version", "maintenance_gate_status", "capital_usdt", "goals_plan",
             "risk_management", "strategy", "strategy_params", "execution_and_exits",
             "active_trading_pool", "disabled_instruments", "blocked_sessions_utc",
-            "blocked_directions", "applied_patches_log",
+            "blocked_weekdays_utc", "blocked_directions", "applied_patches_log",
         }
         unknown_top = sorted(set(data) - allowed_top)
         if unknown_top:
@@ -269,8 +272,15 @@ class BotConfig:
             self.active_trading_pool = [str(x) for x in data["active_trading_pool"]]
         if isinstance(data.get("disabled_instruments"), list):
             self.disabled_instruments = [str(x) for x in data["disabled_instruments"]]
-        if isinstance(data.get("blocked_sessions_utc"), list):
+        if "blocked_sessions_utc" in data:
+            if not isinstance(data["blocked_sessions_utc"], list):
+                raise ValueError("blocked_sessions_utc must be a list")
             self.blocked_sessions_utc = [str(x).lower() for x in data["blocked_sessions_utc"]]
+        if "blocked_weekdays_utc" in data:
+            days = data["blocked_weekdays_utc"]
+            if not isinstance(days, list) or any(isinstance(day, bool) or not isinstance(day, int) for day in days):
+                raise ValueError("blocked_weekdays_utc must be a list of integers 0..6 (Monday=0)")
+            self.blocked_weekdays_utc = days[:]
         if isinstance(data.get("blocked_directions"), list):
             self.blocked_directions = [str(x).lower() for x in data["blocked_directions"]]
         if isinstance(data.get("applied_patches_log"), list):
@@ -444,6 +454,9 @@ class QuantStrategyCore:
         history = candles[:-1]
         session = QuantStrategyCore.get_utc_session(curr.ts)
         if session in cfg.blocked_sessions_utc:
+            return None
+        weekday_utc = datetime.fromtimestamp(curr.ts / 1000.0, tz=timezone.utc).weekday()
+        if weekday_utc in cfg.blocked_weekdays_utc:
             return None
 
         if curr.open > 0:

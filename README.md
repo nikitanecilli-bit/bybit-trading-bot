@@ -81,3 +81,25 @@ The adapter deliberately fails on duplicate candles, invalid OHLCV, missing/irre
 
 **Research caveat:** this is only the format/validation bridge. It does not yet provide an unbiased historical universe (current symbols can create survivorship bias), nor does the engine currently consume the downloaded funding-history CSVs. Do not describe this pass as funding-adjusted or as a complete survivorship-bias audit. Validate fees/slippage settings and add funding accounting before treating the result as a realistic net return.
 
+### Per-symbol report (keep losers in the sample)
+
+After adapting the data, run the engine once per symbol. Each isolated run produces a journal, and the wrapper writes a combined CSV/JSON summary without filtering out losing instruments:
+
+```bash
+python scripts/run_per_symbol_backtests.py \
+  --symbols BTCUSDT ETHUSDT SOLUSDT \
+  --data-dir engine_data \
+  --engine Bybit_Trading_Engine_v14_research.py \
+  --out-dir per_symbol_results
+```
+
+If using a research config, add `--config path/to/research_config.json`. Outputs include `per_symbol_summary.csv`, `per_symbol_summary.json`, each symbol's journal, stdout/stderr logs, and `failures.json`. Inspect the actual summary column names from the engine journal; the wrapper preserves all returned keys. A symbol that fails is recorded and causes a non-zero exit, rather than silently disappearing from the report.
+
+Run checks:
+
+```bash
+python -m unittest test_data_adapter.py test_per_symbol_report.py
+```
+
+The report is a first-pass instrument screen, not proof of an edge. It still depends on the engine's fee/slippage assumptions, the strategy configuration, and the selected universe. Do not rank by net PnL alone: compare trade count, profit factor, expectancy, drawdown and separate chronological out-of-sample performance. Funding costs and historical delisted/inactive symbols must be addressed before calling returns realistic or survivorship-bias-resistant.
+

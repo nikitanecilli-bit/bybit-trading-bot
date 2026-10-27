@@ -27,7 +27,7 @@ jobs:
           echo "Downloading from UTC $START_DATE through now"
           SYMBOLS="BNBUSDT CAKEUSDT DASHUSDT DOTUSDT ICPUSDT JSTUSDT LINKUSDT RAYUSDT SOLUSDT WLDUSDT XLMUSDT"
           SUCCESS=0
-          for BASE_URL in https://api.bybit.com https://api.bybit.kz https://api.bybit.nl https://api.bybit.ae; do
+          for BASE_URL in https://api.bybit.com https://api.bytick.com https://api.bybit.kz https://api.bybit.nl https://api.bybit.ae https://api.bybit-tr.com; do
             echo "Trying Bybit public API endpoint: $BASE_URL"
             if python bybit_downloader.py --symbols $SYMBOLS --intervals 60 --datasets kline mark funding --start "$START_DATE" --end now --out data/bybit_recent --delay 0.2 --base-url "$BASE_URL"; then
               SUCCESS=1

@@ -258,6 +258,34 @@ def test_daily_stop_blocks_entries_until_next_utc_day():
     assert rm.can_open_new_trade(0) == (True, "OK")
 
 
+
+def test_daily_stop_uses_previous_close_equity_as_new_utc_day_baseline():
+    cfg = engine_mod.BotConfig(
+        capital_usdt=10_000.0,
+        daily_stop_loss_pct=5.0,
+        emergency_kill_switch_pct=30.0,
+    )
+    rm = engine_mod.AdaptiveRiskManager(cfg)
+    day1_close = 1_767_311_100_000  # 2026-01-01 23:45 UTC close boundary
+    day2_close = 1_767_312_900_000  # 2026-01-02 00:15 UTC close boundary
+
+    rm.mark_to_market(-400.0, day1_close)
+    assert rm.current_equity == 9_600.0
+    assert rm.day_start_equity == 10_000.0
+
+    # Engine calls on_new_timestamp at the new bar-close boundary before applying
+    # the new bar's mark. The baseline must remain the previous close equity.
+    rm.on_new_timestamp(day2_close)
+    assert rm.day_start_equity == 9_600.0
+    assert rm.daily_stop_triggered is False
+
+    alerts = rm.mark_to_market(-900.0, day2_close)
+    assert rm.current_equity == 9_100.0
+    assert alerts["daily_stop_hit"] is True
+    assert rm.daily_stop_triggered is True
+    assert rm.can_open_new_trade(0) == (False, "DAILY_STOP_ACTIVE")
+
+
 def test_kill_switch_remains_latched_across_utc_day_change():
     cfg = engine_mod.BotConfig(
         capital_usdt=10_000.0,
@@ -948,6 +976,7 @@ if __name__ == "__main__":
              test_intrabar_risk_mark_uses_gap_adjusted_stop_fill_when_stop_crossed,
              test_mtm_uses_close_timestamp_for_15m_bar,
              test_daily_stop_blocks_entries_until_next_utc_day,
+             test_daily_stop_uses_previous_close_equity_as_new_utc_day_baseline,
              test_kill_switch_remains_latched_across_utc_day_change,
              test_portfolio_risk_cap_limits_new_position_size,
              test_position_size_respects_remaining_portfolio_risk_budget,

@@ -1,7 +1,7 @@
 """Regression tests for the v15 simulator."""
 import unittest
 
-from research_v15.backtest import Bar, backtest_symbol, breakeven_action, limit_order_expired, limit_order_fill, resolve_stop_target, rolling_atr, stop_order_fill, trade_economics, position_size
+from research_v15.backtest import Bar, backtest_symbol, breakeven_action, limit_order_expired, limit_order_fill, resolve_stop_target, rolling_atr, stop_order_fill, trade_economics, position_size, mark_to_market_equity
 
 
 class V15BacktestTests(unittest.TestCase):
@@ -205,6 +205,21 @@ class V15BacktestTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             trade_economics("long", 100, 101, 0)
 
+
+    def test_mark_to_market_equity_includes_entry_and_estimated_exit_costs(self):
+        equity = mark_to_market_equity(10_000, "long", 100, 101, 2)
+        gross_marked_equity = 10_000 + (101 - 100) * 2
+        self.assertLess(equity, gross_marked_equity)
+        self.assertAlmostEqual(
+            equity,
+            10_000 + trade_economics("long", 100, 101, 2, maker_entry=True, maker_exit=False)["net_pnl"],
+        )
+
+    def test_mark_to_market_equity_handles_short_position(self):
+        equity = mark_to_market_equity(10_000, "short", 100, 99, 2)
+        gross_marked_equity = 10_000 + (100 - 99) * 2
+        self.assertLess(equity, gross_marked_equity)
+        self.assertGreater(equity, 10_000)
 
     def test_position_size_respects_risk_budget_and_notional_cap(self):
         sized = position_size(10_000, 0.01, 100, 5)

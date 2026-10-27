@@ -467,6 +467,7 @@ def test_intrabar_risk_mark_uses_adverse_extreme_when_stop_not_hit():
     e._update_mark_to_market = lambda ts: seen.append(e._intrabar_risk_marks.copy())
     e._persist = lambda: None
     e._try_fill_pending = lambda symbol, curr: False
+    e._manage_position = lambda *args, **kwargs: None
     e.risk_mgr.can_open_new_trade = lambda count: (False, "test")
     pos = type("Pos", (), {"direction": "long", "stop_price": 90.0})()
     e.open_positions["BTCUSDT"] = pos
@@ -487,6 +488,7 @@ def test_intrabar_risk_mark_uses_gap_adjusted_stop_fill_when_stop_crossed():
     e._update_mark_to_market = lambda ts: seen.append(e._intrabar_risk_marks.copy())
     e._persist = lambda: None
     e._try_fill_pending = lambda symbol, curr: False
+    e._manage_position = lambda *args, **kwargs: None
     e.risk_mgr.can_open_new_trade = lambda count: (False, "test")
     pos = type("Pos", (), {"direction": "long", "stop_price": 95.0})()
     e.open_positions["BTCUSDT"] = pos

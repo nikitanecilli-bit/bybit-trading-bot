@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Trade/signal diagnostics for the selected H1 universe. Research branch only.
 
-Exports every long Donchian breakout candidate (including rejected/unfilled signals),
+Exports long Donchian breakout candidates (including rejected/unfilled signals),
 market features at signal close, forward OHLC outcomes, and actual engine trades.
-Binance OHLCV proxy; fixed selected configuration; no production changes.
+IMPORTANT: BotConfig.max_max_signal_body_pct actually caps the absolute signal-candle body
+percentage, not distance from the breakout level or entry. CSV labels use that meaning.
+Binance OHLCV proxy; research only; no production strategy changes.
 """
 from __future__ import annotations
 import csv, os, sys
@@ -304,6 +306,8 @@ def run_fold(data, stamps, context_data, context_index, market_universe_data, ma
             "MAE_R":t.mae,"MFE_R":t.mfe,"duration_hours":round((datetime.strptime(t.exit_date,"%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)-entry_dt).total_seconds()/3600,2),
             "signal_volume_ratio":feat["volume_ratio"] if feat else "",
             "signal_breakout_atr":feat["breakout_atr"] if feat else "",
+            "signal_candle_body_pct":feat["candle_body_pct"] if feat else "",
+            "signal_abs_candle_body_pct":abs(feat["candle_body_pct"]) if feat else "",
             "signal_atr_pct":feat["atr_pct"] if feat else "",
             "signal_ret_24h_pct":feat["ret_24h_pct"] if feat else "",
             "signal_efficiency_24h":feat["efficiency_24h"] if feat else "",

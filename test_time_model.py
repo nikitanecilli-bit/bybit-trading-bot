@@ -590,8 +590,66 @@ def test_kill_switch_exit_price_is_written_to_closed_trade_journal():
 
 
 
+def test_sequential_kill_switch_closes_do_not_double_count_unrealized_pnl():
+    cfg = engine_mod.BotConfig(
+        timeframe="15m", capital_usdt=10_000.0,
+        daily_stop_loss_pct=5.0, emergency_kill_switch_pct=30.0,
+    )
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.cfg = cfg
+    ts = 1_800_000_900_000
+    e._last_mark_prices = {"BTCUSDT": 90.0, "ETHUSDT": 110.0}
+    e._intrabar_risk_marks = {"BTCUSDT": 90.0, "ETHUSDT": 110.0}
+    e._intrabar_risk_marks_ts = ts
+    e.open_positions = {
+        "BTCUSDT": engine_mod.OpenPositionState(
+            trade_id="btc-kill", symbol="BTCUSDT", direction="long", strategy="test",
+            entry_ts=ts - 900_000, entry_price=100.0, stop_price=80.0,
+            tp1_price=110.0, tp2_price=120.0, initial_stop_dist=20.0,
+            size_usdt=1_000.0, risk_usdt=200.0, order_type="market",
+            equity_at_entry=10_000.0,
+        ),
+        "ETHUSDT": engine_mod.OpenPositionState(
+            trade_id="eth-kill", symbol="ETHUSDT", direction="short", strategy="test",
+            entry_ts=ts - 900_000, entry_price=100.0, stop_price=120.0,
+            tp1_price=90.0, tp2_price=80.0, initial_stop_dist=20.0,
+            size_usdt=1_000.0, risk_usdt=200.0, order_type="market",
+            equity_at_entry=10_000.0,
+        ),
+    }
+    e.closed_trades = []
+    e.risk_mgr = engine_mod.AdaptiveRiskManager(cfg)
+    e.risk_mgr.kill_switch_triggered = True
+    e.risk_mgr.peak_equity = 10_000.0
+    e.tg = type("Notifier", (), {"send_message": lambda self, message: None})()
+    e._persist = lambda: None
+
+    positions = list(e.open_positions.values())
+    for pos in positions:
+        exit_px = e._intrabar_risk_marks[pos.symbol]
+        engine_mod.UnifiedQuantEngine._close_position(
+            e, pos, exit_px, "kill_switch", ts, mae_r=0.5, mfe_r=0.0,
+        )
+
+    assert len(e.closed_trades) == 2, len(e.closed_trades)
+    assert not e.open_positions, e.open_positions
+    assert {r.token: r.exit_price for r in e.closed_trades} == {
+        "BTCUSDT": 90.0, "ETHUSDT": 110.0,
+    }
+    total_journal_net = round(sum(r.pnl_usdt for r in e.closed_trades), 2)
+    assert e.risk_mgr.realized_equity == round(cfg.capital_usdt + total_journal_net, 4), (
+        e.risk_mgr.realized_equity, total_journal_net,
+    )
+    assert e.risk_mgr.unrealized_pnl == 0.0, e.risk_mgr.unrealized_pnl
+    assert e.risk_mgr.current_equity == round(cfg.capital_usdt + total_journal_net, 4), (
+        e.risk_mgr.current_equity, total_journal_net,
+    )
+
+
+
 if __name__ == "__main__":
-    tests = [test_combined_intrabar_losses_trigger_daily_stop_and_kill_switch,
+    tests = [test_sequential_kill_switch_closes_do_not_double_count_unrealized_pnl,
+             test_combined_intrabar_losses_trigger_daily_stop_and_kill_switch,
              test_kill_switch_exit_price_is_written_to_closed_trade_journal,
              test_portfolio_intrabar_marks_prepared_for_all_open_symbols_before_risk_check,
              test_intrabar_marks_accumulate_for_symbols_at_same_timestamp,

@@ -1,0 +1,38 @@
+name: Bybit recent-data long-only validation
+
+on:
+  push:
+    branches: [research/market-regime-v1-main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bybit-h1-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install downloader dependency
+        run: python -m pip install requests
+      - name: Download recent Bybit H1 candles, mark prices and funding
+        run: |
+          START_DATE="$(date -u -d '180 days ago' +%F)"
+          echo "Downloading from UTC $START_DATE through now"
+          python bybit_downloader.py --symbols BNBUSDT CAKEUSDT DASHUSDT DOTUSDT ICPUSDT JSTUSDT LINKUSDT RAYUSDT SOLUSDT WLDUSDT XLMUSDT --intervals 60 --datasets kline mark funding --start "$START_DATE" --end now --out data/bybit_recent --delay 0.2
+      - name: Run frozen-candidate Bybit H1 holdout
+        run: python scripts/run_bybit_h1_long_only_holdout.py --data-dir data/bybit_recent --output bybit_h1_long_only_holdout.csv --trades-output bybit_h1_long_only_holdout_trades.csv
+      - name: Upload Bybit H1 validation reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: bybit-h1-long-only-validation
+          path: |
+            bybit_h1_long_only_holdout.csv
+            bybit_h1_long_only_holdout_trades.csv
+          if-no-files-found: error

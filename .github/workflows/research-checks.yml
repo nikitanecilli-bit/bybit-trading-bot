@@ -28,6 +28,14 @@ jobs:
         run: python scripts/run_uploaded_dataset_backtests.py
       - name: Validate H1 candidates on chronological holdout
         run: python scripts/run_h1_walk_forward.py
+      - name: Validate train-selected H1 long-only candidates
+        run: python scripts/run_h1_long_only_walk_forward.py --output h1_long_only_walk_forward.csv
+      - name: Upload H1 long-only walk-forward report
+        uses: actions/upload-artifact@v4
+        with:
+          name: h1-long-only-walk-forward-report
+          path: h1_long_only_walk_forward.csv
+          if-no-files-found: error
       - name: Test causal market-regime classifier
         run: python test_market_regime.py
       - name: Test regime analysis report helpers

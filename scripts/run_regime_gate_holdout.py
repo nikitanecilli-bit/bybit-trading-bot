@@ -3,8 +3,8 @@
 
 The final 30% of each dataset is the evaluation window. No new entries are
 allowed before its start; indicator history remains available from earlier bars.
-The candidate gate is predeclared and simple: long signals only in trend_up,
-short signals only in trend_down. This is an experiment, not a live-bot change.
+Compares baseline, long-only, short-only, and a predeclared trend-alignment gate
+(long only in trend_up, short only in trend_down). This is research, not a live-bot change.
 """
 from __future__ import annotations
 
@@ -74,8 +74,13 @@ def run_variant(symbol, timeframe, candles, cutoff_ts, labels_by_ts, variant):
         signal = original(symbol_arg, history, cfg_arg)
         if signal is None or variant == "baseline":
             return signal
+        direction = str(signal.get("direction", "")).lower()
+        if variant == "long_only":
+            return signal if direction == "long" else None
+        if variant == "short_only":
+            return signal if direction == "short" else None
         regime = labels_by_ts.get(history[-1].ts, "unknown")
-        return signal if gate_allows(signal.get("direction", ""), regime) else None
+        return signal if gate_allows(direction, regime) else None
 
     core.evaluate_signal = staticmethod(wrapped)
     try:
@@ -108,7 +113,7 @@ def run(output_path):
         labelled = classify_candles(rows)
         labels_by_ts = {int(row["ts"]): str(row["regime"]) for row in labelled}
 
-        for variant in ("baseline", "trend_aligned_gate"):
+        for variant in ("baseline", "long_only", "short_only", "trend_aligned_gate"):
             trades = run_variant(symbol, timeframe, candles, cutoff_ts, labels_by_ts, variant)
             groups = defaultdict(list)
             for trade in trades:

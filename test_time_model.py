@@ -476,6 +476,7 @@ def test_intrabar_marks_accumulate_for_symbols_at_same_timestamp():
     e._last_mark_prices = {"ETHUSDT": 100.0}
     e._intrabar_risk_marks = {}
     e._intrabar_risk_marks_ts = None
+    e._manage_position = lambda *args, **kwargs: None
     e.open_positions["BTCUSDT"] = type("Pos", (), {"direction": "long", "stop_price": 80.0})()
     e.open_positions["ETHUSDT"] = type("Pos", (), {"direction": "short", "stop_price": 120.0})()
     e.step_candle("BTCUSDT", [engine_mod.Candle(ts=ts, open=100, high=102, low=90, close=101, volume=10)])

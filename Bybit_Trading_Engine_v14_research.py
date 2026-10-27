@@ -881,6 +881,7 @@ class UnifiedQuantEngine:
         self.trade_seq: int = 0
         self._rejected_cfg: Dict[str, float] = {}
         self._last_mark_prices: Dict[str, float] = {}
+        self._intrabar_risk_marks: Dict[str, float] = {}
         self._state_restored = False
 
         if restore_plan_b:
@@ -895,13 +896,14 @@ class UnifiedQuantEngine:
         self.closed_trades.clear()
         self.trade_seq = 0
         self._last_mark_prices.clear()
+        self._intrabar_risk_marks.clear()
         self._state_restored = False
 
     def _unrealized_pnl_at_marks(self) -> float:
-        """Оценка equity по последним ценам закрытия; выходные издержки оценены консервативно как taker."""
+        """Оценка equity по консервативным внутрисвечным risk marks; выходные издержки — taker."""
         total = 0.0
         for sym, pos in self.open_positions.items():
-            mark = self._last_mark_prices.get(sym, pos.entry_price)
+            mark = self._intrabar_risk_marks.get(sym, self._last_mark_prices.get(sym, pos.entry_price))
             sign = 1.0 if pos.direction == "long" else -1.0
             remaining_gross = pos.size_usdt * pos.remaining_fraction * sign * (mark - pos.entry_price) / pos.entry_price
             # Включаем уже реализованную часть TP1 и вычитаем ориентировочные расходы сделки.
@@ -970,6 +972,22 @@ class UnifiedQuantEngine:
             raise ValueError(f"Неподдерживаемый timeframe для mark-to-market: {self.cfg.timeframe!r}")
         bar_close_ts = curr.ts + timeframe_ms[timeframe]
         self._last_mark_prices[symbol] = curr.close
+        # Risk controls must not ignore adverse intrabar excursions that recover by close.
+        # If the protective stop was crossed, use the modeled stop fill (including gap),
+        # not the candle extreme: the position would have exited at the stop first.
+        risk_mark = curr.close
+        pos_for_risk = self.open_positions.get(symbol)
+        if pos_for_risk is not None:
+            is_long_for_risk = pos_for_risk.direction == "long"
+            stop_crossed = (curr.low <= pos_for_risk.stop_price) if is_long_for_risk else (curr.high >= pos_for_risk.stop_price)
+            if stop_crossed:
+                if is_long_for_risk:
+                    risk_mark = min(pos_for_risk.stop_price, curr.open)
+                else:
+                    risk_mark = max(pos_for_risk.stop_price, curr.open)
+            else:
+                risk_mark = curr.low if is_long_for_risk else curr.high
+        self._intrabar_risk_marks = {symbol: risk_mark}
         self.risk_mgr.on_new_timestamp(bar_close_ts)
         self._update_mark_to_market(bar_close_ts)
 
@@ -1115,7 +1133,7 @@ class UnifiedQuantEngine:
                 if pos.bars_held >= cfg.max_hold_bars:
                     exit_price, exit_reason = curr.close, "time_stop"
 
-        if exit_price is None and self.risk_mgr.kill_switch_triggered:            exit_price, exit_reason = curr.close, "kill_switch"
+        if exit_price is None and self.risk_mgr.kill_switch_triggered:            exit_price, exit_reason = self._intrabar_risk_marks.get(symbol, curr.close), "kill_switch"
 
         if exit_price is not None and exit_reason is not None:
             self._close_position(pos, exit_price, exit_reason, exit_ts, mae_r, mfe_r)

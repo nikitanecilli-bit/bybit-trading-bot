@@ -1,0 +1,65 @@
+name: H1 Selected-Universe Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/market-regime-v1-main
+    paths:
+      - ".github/workflows/h1-selected-universe-validation.yml"
+      - "scripts/h1_symbol_universes.json"
+      - "scripts/h1_symbol_screening_notes.md"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-selected-universe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - universe: primary
+            symbols: "LINKUSDT,RAYUSDT,PUMPUSDT,APTUSDT,TAOUSDT"
+          - universe: reserve
+            symbols: "POLUSDT,AAVEUSDT,CAKEUSDT,DOGEUSDT,ATOMUSDT"
+    env:
+      H1_SYMBOL_ALLOWLIST: ${{ matrix.symbols }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile selected-universe test suite
+        run: >-
+          python -m py_compile
+          Bybit_Trading_Engine_v14_research.py
+          scripts/run_uploaded_dataset_backtests.py
+          scripts/run_h1_direction_execution_ablation.py
+          scripts/run_h1_long_execution_sensitivity.py
+          scripts/run_h1_limit_fill_stress.py
+          scripts/run_h1_signal_quality_ablation.py
+          scripts/run_h1_shared_capital_portfolio_validation.py
+      - name: Direction and execution ablation
+        run: python scripts/run_h1_direction_execution_ablation.py
+      - name: Long execution sensitivity
+        run: python scripts/run_h1_long_execution_sensitivity.py
+      - name: Conservative limit-fill stress
+        run: python scripts/run_h1_limit_fill_stress.py
+      - name: Signal-quality ablation
+        run: python scripts/run_h1_signal_quality_ablation.py
+      - name: Shared-capital portfolio validation
+        run: python scripts/run_h1_shared_capital_portfolio_validation.py
+      - name: Upload selected-universe reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: h1-selected-${{ matrix.universe }}
+          path: |
+            h1_direction_execution_ablation.csv
+            h1_long_execution_sensitivity.csv
+            h1_limit_fill_stress.csv
+            h1_signal_quality_ablation.csv
+            h1_shared_capital_portfolio_validation.csv
+          if-no-files-found: error

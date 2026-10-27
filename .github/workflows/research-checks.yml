@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile Python files
-        run: python -m py_compile market_regime.py test_market_regime.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py scripts/scan_secrets.py scripts/run_uploaded_dataset_backtests.py
+        run: python -m py_compile market_regime.py test_market_regime.py scripts/run_regime_analysis.py test_regime_analysis.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py scripts/scan_secrets.py scripts/run_uploaded_dataset_backtests.py
       - name: Scan for obvious secrets
         run: python scripts/scan_secrets.py .
       - name: Backtest uploaded historical datasets
@@ -30,6 +30,16 @@ jobs:
         run: python scripts/run_h1_walk_forward.py
       - name: Test causal market-regime classifier
         run: python test_market_regime.py
+      - name: Test regime analysis report helpers
+        run: python test_regime_analysis.py
+      - name: Generate baseline performance by market regime
+        run: python scripts/run_regime_analysis.py --output regime_analysis.csv
+      - name: Upload regime analysis report
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-regime-baseline-report
+          path: regime_analysis.csv
+          if-no-files-found: error
       - name: Test gap execution
         run: python test_gap_execution.py
       - name: Test time model

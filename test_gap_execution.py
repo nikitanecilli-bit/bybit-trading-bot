@@ -335,6 +335,41 @@ def test_limit_tp1_then_market_trailing_stop_charges_correct_exit_fee_types():
 
 
 
+def test_market_short_stop_journal_matches_independent_fee_and_slippage_math():
+    pos = make_position("short", entry=100.0, stop=105.0)
+    pos.size_usdt = 1_000.0
+    record = _close_with_real_accounting(pos, 105.0, "stop_loss")
+
+    gross = round(1_000.0 * -1.0 * (105.0 - 100.0) / 100.0, 2)
+    fees = round(1_000.0 * engine_mod.TAKER_FEE + 1_000.0 * engine_mod.TAKER_FEE, 2)
+    slip = round(1_000.0 * engine_mod.TAKER_SLIP + 1_000.0 * engine_mod.TAKER_SLIP, 2)
+    assert record.gross_pnl == gross == -50.0
+    assert record.exchange_fees_usdt == fees == 1.10
+    assert record.slippage_cost_usdt == slip == 0.45
+    assert record.pnl_usdt == -51.55
+
+
+def test_long_gap_stop_journal_uses_actual_gap_fill_price():
+    pos = make_position("long", entry=100.0, stop=95.0)
+    pos.size_usdt = 1_000.0
+    # Stop at 95, but a gap through it fills at the candle open 90.
+    record = _close_with_real_accounting(pos, 90.0, "stop_loss")
+
+    assert record.exit_price == 90.0
+    assert record.gross_pnl == -100.0
+    assert record.exchange_fees_usdt == 1.10
+    assert record.slippage_cost_usdt == 0.45
+    assert record.pnl_usdt == -101.55
+
+
+def test_financial_rounding_uses_half_up_at_half_cent():
+    assert engine_mod._money_round(0.575) == 0.58
+    assert engine_mod._money_round(-0.575) == -0.58
+    assert engine_mod._money_round(1.005) == 1.01
+    assert engine_mod._money_round(-1.005) == -1.01
+
+
+
 if __name__ == "__main__":
     tests = [
         test_market_long_gap_above_chase_limit_is_cancelled,
@@ -352,6 +387,9 @@ if __name__ == "__main__":
         test_market_long_stop_journal_matches_independent_fee_and_slippage_math,
         test_limit_tp2_after_tp1_journal_accounts_for_three_execution_legs,
         test_limit_tp1_then_market_trailing_stop_charges_correct_exit_fee_types,
+        test_market_short_stop_journal_matches_independent_fee_and_slippage_math,
+        test_long_gap_stop_journal_uses_actual_gap_fill_price,
+        test_financial_rounding_uses_half_up_at_half_cent,
     ]
     for test in tests:
         test()

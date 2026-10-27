@@ -24,6 +24,10 @@ ENTRY_PENETRATION_BPS = 5.0
 WAIT_BARS = 3
 STARTING_CAPITAL = 10_000.0
 MAX_CONCURRENT_POSITIONS = 5
+COST_MULTIPLIERS = [1.0, 1.5, 2.0]
+BASE_TAKER_FEE = em.TAKER_FEE
+BASE_MAKER_FEE = em.MAKER_FEE
+BASE_TAKER_SLIP = em.TAKER_SLIP
 
 
 def aligned_h1_datasets():
@@ -86,7 +90,11 @@ def aligned_h1_datasets():
     return aligned, archives, timestamps
 
 def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, end_frac,
-                          min_vol, min_breakout_atr):
+                          min_vol, min_breakout_atr, cost_multiplier):
+    # Explicit cost stress: scale fees and taker slippage from engine defaults.
+    em.TAKER_FEE = BASE_TAKER_FEE * cost_multiplier
+    em.MAKER_FEE = BASE_MAKER_FEE * cost_multiplier
+    em.TAKER_SLIP = BASE_TAKER_SLIP * cost_multiplier
     n = len(timestamps)
     start_idx, end_idx = int(n * start_frac), int(n * end_frac)
     start_ts, end_ts = timestamps[start_idx], timestamps[end_idx - 1]
@@ -95,7 +103,7 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
 
     engine = em.UnifiedQuantEngine(journal_output_path="/tmp/ignored_h1_portfolio_quality.json")
     cfg = engine.cfg
-    cfg.bot_version = f"h1-portfolio-v{min_vol:g}-b{min_breakout_atr:g}"
+    cfg.bot_version = f"h1-portfolio-v{min_vol:g}-b{min_breakout_atr:g}-cost{cost_multiplier:g}"
     cfg.timeframe = "1h"
     cfg.active_trading_pool = list(symbols)
     cfg.capital_usdt = STARTING_CAPITAL
@@ -183,7 +191,8 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
     return {
         "timeframe": "1h",
         "fold": fold,
-        "variant": f"vol{min_vol:g}_breakATR{min_breakout_atr:g}",
+        "variant": f"vol{min_vol:g}_breakATR{min_breakout_atr:g}_cost{cost_multiplier:g}",
+        "cost_multiplier": cost_multiplier,
         "min_volume_ratio": min_vol,
         "min_breakout_atr": min_breakout_atr,
         "symbols": len(symbols),
@@ -210,20 +219,22 @@ def main():
     for fold, start_frac, end_frac in FOLDS:
         for min_vol in VOL_THRESHOLDS:
             for min_breakout in BREAKOUT_ATR_THRESHOLDS:
-                result = run_portfolio_variant(
-                    datasets, symbols, timestamps, fold, start_frac, end_frac, min_vol, min_breakout
-                )
-                rows.append(result)
-                print(f"fold={fold} {result['variant']} trades={result['trades']} "
-                      f"net={result['net_pnl']:+.2f} ({result['return_pct']:+.2f}%) "
-                      f"PF={result['profit_factor']:.3f} DD={result['max_drawdown_pct']:.2f}% "
-                      f"costs={result['costs']:.2f}")
+                for cost_multiplier in COST_MULTIPLIERS:
+                    result = run_portfolio_variant(
+                        datasets, symbols, timestamps, fold, start_frac, end_frac,
+                        min_vol, min_breakout, cost_multiplier
+                    )
+                    rows.append(result)
+                    print(f"fold={fold} {result['variant']} trades={result['trades']} "
+                          f"net={result['net_pnl']:+.2f} ({result['return_pct']:+.2f}%) "
+                          f"PF={result['profit_factor']:.3f} DD={result['max_drawdown_pct']:.2f}% "
+                          f"costs={result['costs']:.2f}")
     path = "h1_shared_capital_portfolio_validation.csv"
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         writer.writerows(rows)
-    print(f"Saved {path}; {len(rows)} portfolio-fold runs.")
+    print(f"Saved {path}; {len(rows)} portfolio-fold-cost runs. Cost multipliers={COST_MULTIPLIERS}.")
     print("CAVEAT: Binance OHLCV proxy; modelled costs; limit penetration is not a real queue/fill model.")
 
 

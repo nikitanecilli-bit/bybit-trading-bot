@@ -167,6 +167,41 @@ def limit_order_expired(age_bars: int, valid_bars: int) -> bool:
         raise ValueError("invalid order age or lifetime")
     return age_bars > valid_bars
 
+
+def trade_economics(
+    side: str,
+    entry_price: float,
+    raw_exit_price: float,
+    qty: float,
+    maker_entry: bool = True,
+    maker_exit: bool = False,
+) -> dict[str, float]:
+    """Calculate gross PnL and explicit fees/slippage for a completed trade.
+
+    Gross PnL is measured at the raw execution reference prices. Slippage is
+    then deducted separately, while exit fees use the actual slipped price.
+    """
+    if side not in ("long", "short"):
+        raise ValueError("side must be 'long' or 'short'")
+    if min(entry_price, raw_exit_price, qty) <= 0:
+        raise ValueError("prices and quantity must be positive")
+    sign = 1.0 if side == "long" else -1.0
+    exit_price = raw_exit_price if maker_exit else raw_exit_price * (1.0 - sign * TAKER_SLIPPAGE)
+    entry_fee = entry_price * qty * (MAKER_FEE if maker_entry else TAKER_FEE)
+    exit_fee = exit_price * qty * (MAKER_FEE if maker_exit else TAKER_FEE)
+    gross = (raw_exit_price - entry_price) * qty * sign
+    slippage = 0.0 if maker_exit else abs(raw_exit_price - exit_price) * qty
+    fees = entry_fee + exit_fee
+    net = gross - fees - slippage
+    return {
+        "exit_price": exit_price,
+        "gross_pnl": gross,
+        "fees": fees,
+        "slippage": slippage,
+        "net_pnl": net,
+    }
+
+
 def backtest_symbol(
     bars: Sequence[Bar],
     symbol: str = "UNKNOWN",
@@ -218,15 +253,13 @@ def backtest_symbol(
         nonlocal equity, pos, peak, max_dd
         if pos is None:
             return
-        side_sign = 1.0 if pos["side"] == "long" else -1.0
-        # Stops pay taker fee and adverse slippage; target limits pay maker fee.
-        exit_price = raw_exit if maker_exit else raw_exit * (1.0 - side_sign * TAKER_SLIPPAGE)
-        gross = (raw_exit - pos["entry"]) * pos["qty"] * side_sign
-        entry_fee = pos["entry"] * pos["qty"] * MAKER_FEE
-        exit_fee = exit_price * pos["qty"] * (MAKER_FEE if maker_exit else TAKER_FEE)
-        fees = entry_fee + exit_fee
-        slip_cost = 0.0 if maker_exit else abs(raw_exit - exit_price) * pos["qty"]
-        net = gross - fees - slip_cost
+        # Entry is a resting limit; stops/time exits pay taker fee and slippage.
+        economics = trade_economics(pos["side"], pos["entry"], raw_exit, pos["qty"], maker_entry=True, maker_exit=maker_exit)
+        exit_price = economics["exit_price"]
+        gross = economics["gross_pnl"]
+        fees = economics["fees"]
+        slip_cost = economics["slippage"]
+        net = economics["net_pnl"]
         equity += net
         trades.append(Trade(pos["side"], pos["entry_ts"], bar.ts, pos["entry"], exit_price, pos["qty"], pos["risk_usdt"], gross, fees, slip_cost, net, net / pos["risk_usdt"] if pos["risk_usdt"] else 0.0, reason))
         peak = max(peak, equity)

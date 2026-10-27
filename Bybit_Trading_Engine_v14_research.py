@@ -37,6 +37,7 @@ import json
 import logging
 import math
 import os
+from decimal import Decimal, ROUND_HALF_UP
 import re
 import time
 import urllib.parse
@@ -58,6 +59,11 @@ MAKER_FEE = 0.00020
 TAKER_SLIP = 0.000225   # проскальзывание на одну taker-ногу (round-trip ~0.045%)
 TP1_FRACTION = 0.5
 CALC_WINDOW = 200       # сколько последних свечей достаточно для ATR/Дончиана
+
+
+def _money_round(value: float) -> float:
+    """Round financial values to cents using conventional half-up rounding."""
+    return float(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
 def _as_bool(v: Any, default: bool = False) -> bool:
@@ -1182,9 +1188,10 @@ class UnifiedQuantEngine:
         sign = 1.0 if pos.direction == "long" else -1.0
         rem_chg = sign * (exit_price - pos.entry_price) / pos.entry_price
         rem_gross = pos.size_usdt * pos.remaining_fraction * rem_chg
-        gross_pnl = round(pos.realized_tp1_gross_usdt + rem_gross, 2)
+        gross_pnl = _money_round(pos.realized_tp1_gross_usdt + rem_gross)
 
-        # Издержки по ногам. Maker — только лимитный вход, TP1 и TP2; стопы/time/kill — всегда taker.
+        # Издержки по ногам. Сначала суммируем точные значения всех ног,
+        # затем округляем итог в денежном формате (half-up), а не каждую ногу отдельно.
         maker_mode = pos.order_type == "limit"
         fees = slip = 0.0
         f, s = self._leg_cost(pos.size_usdt, maker_mode)                      # вход
@@ -1195,9 +1202,9 @@ class UnifiedQuantEngine:
         final_maker = maker_mode and exit_reason == "take_profit"              # финальная нога
         f, s = self._leg_cost(pos.size_usdt * pos.remaining_fraction, final_maker)
         fees += f; slip += s
-        fees, slip = round(fees, 2), round(slip, 2)
+        fees, slip = _money_round(fees), _money_round(slip)
 
-        net_pnl = round(gross_pnl - fees - slip, 2)
+        net_pnl = _money_round(gross_pnl - fees - slip)
         risk = max(1e-6, pos.risk_usdt)
         eq0 = pos.equity_at_entry if pos.equity_at_entry > 0 else self.cfg.capital_usdt
 

@@ -39,9 +39,7 @@ def ema(values: Sequence[float], period: int) -> list[float]:
     return result
 
 
-def donchian_breakout(
-    candles: Sequence[Candle], index: int, period: int = 48
-) -> Signal:
+def donchian_breakout(candles: Sequence[Candle], index: int, period: int = 48) -> Signal:
     """Signal on candle index close versus the previous period candles.
 
     Long: current close is strictly above prior highs maximum.
@@ -65,29 +63,26 @@ def donchian_breakout(
     return None
 
 
-def v15_signal(
-    candles: Sequence[Candle],
-    index: int,
-    donchian_period: int = 48,
-    ema_fast_period: int = 50,
-    ema_slow_period: int = 200,
-) -> Signal:
+def v15_signal(candles: Sequence[Candle], index: int, donchian_period: int = 48,
+               ema_fast_period: int = 50, ema_slow_period: int = 200) -> Signal:
     """Combine Donchian close breakout with EMA trend filter.
 
     EMAs use only candles up to and including index. For a usable 50/200
     trend comparison, callers should supply at least 200 prior candles.
     """
-    _validate_candles(candles)
     if index < 0 or index >= len(candles):
         raise IndexError("index is outside candle sequence")
     if ema_fast_period < 1 or ema_slow_period < 1:
         raise ValueError("EMA periods must be >= 1")
+    # Validate only data available at this decision point, not future candles.
+    visible_candles = candles[:index + 1]
+    _validate_candles(visible_candles)
 
-    breakout = donchian_breakout(candles, index, donchian_period)
+    breakout = donchian_breakout(visible_candles, index, donchian_period)
     if breakout is None:
         return None
 
-    closes = [float(c["close"]) for c in candles[:index + 1]]
+    closes = [float(c["close"]) for c in visible_candles]
     fast = ema(closes, ema_fast_period)[-1]
     slow = ema(closes, ema_slow_period)[-1]
 

@@ -400,6 +400,10 @@ def backtest_symbol(
         close_position(bars[-1], bars[-1].close, "end_of_data", maker_exit=False)
 
     net_pnl = equity - starting_equity
+    trade_net_pnl = sum(t.net_pnl for t in trades)
+    # Keep a visible invariant: realized equity change must equal the sum of
+    # per-trade net PnL after fees and slippage.
+    equity_reconciliation_error = net_pnl - trade_net_pnl
     gross_pnl = sum(t.gross_pnl for t in trades)
     costs = sum(t.fees + t.slippage for t in trades)
     wins = [t for t in trades if t.net_pnl > 0]
@@ -409,6 +413,8 @@ def backtest_symbol(
     return {
         "symbol": symbol, "bars": len(bars), "starting_equity": round(starting_equity, 2),
         "ending_equity": round(equity, 2), "net_pnl": round(net_pnl, 2),
+        "trade_net_pnl_sum": round(trade_net_pnl, 8),
+        "equity_reconciliation_error": round(equity_reconciliation_error, 10),
         "gross_pnl": round(gross_pnl, 2), "costs_including_slippage": round(costs, 2),
         "trades_count": len(trades), "win_rate_pct": round(100 * len(wins) / len(trades), 2) if trades else 0.0,
         "profit_factor": round(gross_profit / gross_loss, 4) if gross_loss else (float("inf") if gross_profit else 0.0),

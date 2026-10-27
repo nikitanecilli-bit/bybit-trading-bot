@@ -27,8 +27,8 @@ def make_engine(max_chase_pct=1.5):
             return True, "OK"
 
         @staticmethod
-        def calculate_position_size(entry_price, stop_price, order_type="market"):
-            return 1000.0, 10.0
+        def calculate_position_size(entry_price, stop_price, order_type="market", risk_budget_usdt=None):
+            return 1000.0, min(10.0, risk_budget_usdt) if risk_budget_usdt is not None else 10.0
 
     e.risk_mgr = RiskSpy()
     return e

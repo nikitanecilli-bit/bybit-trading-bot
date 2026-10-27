@@ -864,12 +864,12 @@ class UnifiedQuantEngine:
         self._update_mark_to_market(bar_close_ts)
 
         if symbol in self.open_positions:
-            self._manage_position(symbol, candles_history, fill_bar=False)
+            self._manage_position(symbol, candles_history, fill_bar=False, exit_ts=bar_close_ts)
             return
 
         if symbol in self.pending:
             if self._try_fill_pending(symbol, curr):
-                self._manage_position(symbol, candles_history, fill_bar=True)
+                self._manage_position(symbol, candles_history, fill_bar=True, exit_ts=bar_close_ts)
                 return
 
         can_open, _ = self.risk_mgr.can_open_new_trade(len(self.open_positions) + len(self.pending))
@@ -932,7 +932,7 @@ class UnifiedQuantEngine:
         pos.remaining_fraction = 1.0 - TP1_FRACTION
         pos.tp1_hit = True
 
-    def _manage_position(self, symbol: str, hist: List[Candle], fill_bar: bool) -> None:
+    def _manage_position(self, symbol: str, hist: List[Candle], fill_bar: bool, exit_ts: int) -> None:
         pos = self.open_positions[symbol]
         curr = hist[-1]
         cfg = self.cfg
@@ -1000,7 +1000,7 @@ class UnifiedQuantEngine:
         if exit_price is None and self.risk_mgr.kill_switch_triggered:            exit_price, exit_reason = curr.close, "kill_switch"
 
         if exit_price is not None and exit_reason is not None:
-            self._close_position(pos, exit_price, exit_reason, curr.ts, mae_r, mfe_r)
+            self._close_position(pos, exit_price, exit_reason, exit_ts, mae_r, mfe_r)
 
     @staticmethod
     def _leg_cost(notional: float, maker: bool) -> Tuple[float, float]:

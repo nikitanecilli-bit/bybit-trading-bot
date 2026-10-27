@@ -4,8 +4,8 @@ import bybit_mark_price_downloader as dl
 
 def test_fetch_sorts_and_deduplicates(monkeypatch):
     pages = [
-        [["120000", "12", "13", "11", "12.5"], ["60000", "10", "12", "9", "11"]],
-        [["60000", "10", "12", "9", "11"], ["0", "1", "1", "1", "1"]],
+        [["120000", "12", "13", "11", "12.5"]],
+        [["60000", "10", "12", "9", "11"], ["60000", "10", "12", "9", "11"]],
     ]
     def fake_request(symbol, start, end, limit=dl.MAX_LIMIT, timeout=20.0):
         return pages.pop(0)

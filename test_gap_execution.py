@@ -328,9 +328,10 @@ def test_limit_tp1_then_market_trailing_stop_charges_correct_exit_fee_types():
                  + 500.0 * engine_mod.TAKER_FEE, 2)
     slip = round(500.0 * engine_mod.TAKER_SLIP, 2)
     assert record.gross_pnl == gross == 75.0
-    assert record.exchange_fees_usdt == fees == 0.57
+    assert record.exchange_fees_usdt == 0.58
+    # Exact decimal fee sum is 0.575 USDT, rounded half-up to cents.
     assert record.slippage_cost_usdt == slip == 0.11
-    assert record.pnl_usdt == round(gross - fees - slip, 2) == 74.32
+    assert record.pnl_usdt == 74.31
 
 
 

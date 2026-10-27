@@ -303,7 +303,7 @@ def backtest_symbol(
             raise ValueError("timestamps must be strictly increasing")
 
     if len(bars) < max(donchian_period, ema_slow_period, atr_period) + 2:
-        return {"symbol": symbol, "bars": len(bars), "trades": [], "starting_equity": starting_equity, "ending_equity": starting_equity, "net_pnl": 0.0, "max_dd_pct": 0.0}
+        return {"symbol": symbol, "bars": len(bars), "trades": [], "starting_equity": starting_equity, "ending_equity": starting_equity, "net_pnl": 0.0, "trade_net_pnl_sum": 0.0, "equity_reconciliation_error": 0.0, "max_dd_pct": 0.0}
 
     atr = rolling_atr(bars, atr_period)
     candle_dicts = [{"open": b.open, "high": b.high, "low": b.low, "close": b.close} for b in bars]

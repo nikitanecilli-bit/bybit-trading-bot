@@ -172,6 +172,33 @@ def test_blocked_weekdays_config_rejects_wrong_type():
     else:
         raise AssertionError("invalid blocked_weekdays_utc type was accepted")
 
+
+def test_blocked_signal_hours_utc_suppresses_signal_and_validates_values():
+    from unittest.mock import patch
+
+    ts = int(engine_mod.datetime(2026, 1, 5, 12, 0, tzinfo=engine_mod.timezone.utc).timestamp() * 1000)
+    candles = [
+        engine_mod.Candle(ts=ts + i * 900_000, open=100.0, high=101.0,
+                          low=99.0, close=100.5, volume=10.0)
+        for i in range(4)
+    ]
+    candles[-1] = engine_mod.Candle(ts=ts + 3 * 900_000, open=110.5,
+                                    high=112.0, low=109.0, close=111.0, volume=100.0)
+    with patch.object(engine_mod.QuantStrategyCore, "compute_donchian_and_volume", return_value=(110.0, 90.0, 10.0)), \
+         patch.object(engine_mod.QuantStrategyCore, "compute_atr", return_value=1.0):
+        cfg = engine_mod.BotConfig(donchian_period=2, atr_period=2, min_volume_ratio=1.6)
+        assert engine_mod.QuantStrategyCore.evaluate_signal("BTCUSDT", candles, cfg) is not None
+        cfg.blocked_signal_hours_utc = [12]
+        assert engine_mod.QuantStrategyCore.evaluate_signal("BTCUSDT", candles, cfg) is None
+
+    invalid = engine_mod.BotConfig(blocked_signal_hours_utc=[24])
+    try:
+        invalid.validate()
+    except ValueError as exc:
+        assert "blocked_signal_hours_utc" in str(exc), exc
+    else:
+        raise AssertionError("invalid UTC hour was accepted")
+
 def test_unsupported_timeframe_fails_closed():
     e, seen = bare_engine("7m")
     ts_open = 1_800_000_000_000
@@ -323,6 +350,7 @@ def test_limit_entry_uses_limit_price_when_bar_opens_above_and_trades_through():
 
 if __name__ == "__main__":
     tests = [test_mtm_uses_close_timestamp_for_15m_bar,
+             test_blocked_signal_hours_utc_suppresses_signal_and_validates_values,
              test_blocked_weekdays_utc_suppresses_signal_and_validates_values,
              test_blocked_weekdays_config_rejects_wrong_type,
              test_config_rejects_unimplemented_strategy_keys,

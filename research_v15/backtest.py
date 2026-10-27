@@ -69,6 +69,33 @@ def rolling_atr(bars: Sequence[Bar], period: int = 14) -> list[float]:
     return out
 
 
+
+def limit_order_fill(bar: Bar, side: str, limit_price: float) -> float | None:
+    """Return a conservative limit fill price for a bar, or None if not touched.
+
+    A gap through the limit is filled at the opening price when that is better
+    for the order; an intrabar touch is filled at the limit. This is still an
+    OHLC approximation and does not model queue priority or partial fills.
+    """
+    if side not in ("long", "short"):
+        raise ValueError("side must be 'long' or 'short'")
+    if limit_price <= 0:
+        raise ValueError("limit_price must be positive")
+    if side == "long":
+        if bar.low > limit_price:
+            return None
+        return min(limit_price, bar.open)
+    if bar.high < limit_price:
+        return None
+    return max(limit_price, bar.open)
+
+
+def limit_order_expired(age_bars: int, valid_bars: int) -> bool:
+    """Orders are valid for ages 1..valid_bars after the signal candle."""
+    if age_bars < 0 or valid_bars < 1:
+        raise ValueError("invalid order age or lifetime")
+    return age_bars > valid_bars
+
 def backtest_symbol(
     bars: Sequence[Bar],
     symbol: str = "UNKNOWN",
@@ -139,20 +166,23 @@ def backtest_symbol(
         # Process a resting limit from an earlier completed signal. No same-close fill.
         if pos is None and pending is not None:
             age = i - pending["signal_index"]
-            if age > limit_valid_bars:
+            if limit_order_expired(age, limit_valid_bars):
                 pending = None
-            elif bar.low <= pending["limit"] <= bar.high:
+            else:
                 side = pending["side"]
-                entry = pending["limit"]
-                stop_distance = max(entry * min_stop_pct, pending["atr"] * stop_atr_multiple)
-                stop = entry - stop_distance if side == "long" else entry + stop_distance
-                risk_cash = equity * risk_pct
-                qty_by_risk = risk_cash / stop_distance
-                qty_by_notional = equity / entry
-                qty = min(qty_by_risk, qty_by_notional)
-                if qty > 0:
-                    pos = {"side": side, "entry": entry, "entry_ts": bar.ts, "entry_index": i, "stop": stop, "initial_stop": stop, "risk_usdt": stop_distance * qty, "qty": qty, "target": entry + target_r * stop_distance if side == "long" else entry - target_r * stop_distance, "be_moved": False}
-                pending = None
+                entry = limit_order_fill(bar, side, pending["limit"])
+                if entry is None:
+                    entry = 0.0
+                if entry > 0:
+                    stop_distance = max(entry * min_stop_pct, pending["atr"] * stop_atr_multiple)
+                    stop = entry - stop_distance if side == "long" else entry + stop_distance
+                    risk_cash = equity * risk_pct
+                    qty_by_risk = risk_cash / stop_distance
+                    qty_by_notional = equity / entry
+                    qty = min(qty_by_risk, qty_by_notional)
+                    if qty > 0:
+                        pos = {"side": side, "entry": entry, "entry_ts": bar.ts, "entry_index": i, "stop": stop, "initial_stop": stop, "risk_usdt": stop_distance * qty, "qty": qty, "target": entry + target_r * stop_distance if side == "long" else entry - target_r * stop_distance, "be_moved": False}
+                    pending = None
 
         if pos is not None:
             side = pos["side"]

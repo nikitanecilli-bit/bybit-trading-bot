@@ -119,12 +119,12 @@ def backtest_symbol(
         side_sign = 1.0 if pos["side"] == "long" else -1.0
         # Stops pay taker fee and adverse slippage; target limits pay maker fee.
         exit_price = raw_exit if maker_exit else raw_exit * (1.0 - side_sign * TAKER_SLIPPAGE)
-        gross = (exit_price - pos["entry"]) * pos["qty"] * side_sign
+        gross = (raw_exit - pos["entry"]) * pos["qty"] * side_sign
         entry_fee = pos["entry"] * pos["qty"] * MAKER_FEE
         exit_fee = exit_price * pos["qty"] * (MAKER_FEE if maker_exit else TAKER_FEE)
         fees = entry_fee + exit_fee
         slip_cost = 0.0 if maker_exit else abs(raw_exit - exit_price) * pos["qty"]
-        net = gross - fees
+        net = gross - fees - slip_cost
         equity += net
         trades.append(Trade(pos["side"], pos["entry_ts"], bar.ts, pos["entry"], exit_price, pos["qty"], pos["risk_usdt"], gross, fees, slip_cost, net, net / pos["risk_usdt"] if pos["risk_usdt"] else 0.0, reason))
         peak = max(peak, equity)
@@ -155,7 +155,7 @@ def backtest_symbol(
             sign = 1.0 if side == "long" else -1.0
             # Conservative OHLC handling: if stop and target both touch, stop wins.
             stop_hit = bar.low <= pos["stop"] if side == "long" else bar.high >= pos["stop"]
-            target_hit = bar.high >= pos["target"] if side == "long" else bar.low <= pos["target"]
+            target_hit = (bar.high >= pos["target"] if side == "long" else bar.low <= pos["target"]) and i > pos["entry_index"]
             if stop_hit:
                 raw_exit = min(bar.open, pos["stop"]) if side == "long" else max(bar.open, pos["stop"])
                 close_position(bar, raw_exit, "stop_or_gap", maker_exit=False)

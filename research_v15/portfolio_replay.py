@@ -84,34 +84,56 @@ def replay_portfolio(
         while group_end < len(candidates) and int(candidates[group_end]["entry_ts"]) == entry_ts:
             group_end += 1
 
+        proposals = []
+        open_risks = [p["risk_usdt"] for p in open_positions]
+        available = float(portfolio_risk_capacity(
+            equity, max_portfolio_risk_pct, open_risks, 0.0
+        )["available_risk"])
+        requested_risk = 0.0
         for trade in candidates[cursor:group_end]:
-            open_risks = [p["risk_usdt"] for p in open_positions]
             stop_distance = float(trade["initial_risk_usdt"]) / float(trade["qty"])
             sizing = position_size(equity, risk_pct, float(trade["entry_price"]), stop_distance, trade["side"])
             proposed_risk = float(sizing["total_estimated_stop_loss"])
-            capacity = portfolio_risk_capacity(equity, max_portfolio_risk_pct, open_risks, proposed_risk)
-            if not capacity["approved"] or sizing["qty"] <= 0:
+            if sizing["qty"] <= 0 or proposed_risk <= 0:
                 rejected.append({
                     "symbol": trade["symbol"], "entry_ts": int(trade["entry_ts"]),
                     "proposed_risk_usdt": round(proposed_risk, 8),
-                    "available_risk_usdt": round(float(capacity["available_risk"]), 8),
+                    "available_risk_usdt": round(available, 8),
+                    "reason": "invalid_position_size",
+                })
+                continue
+            proposals.append((trade, sizing, proposed_risk))
+            requested_risk += proposed_risk
+
+        # Allocate scarce capacity proportionally across simultaneous signals.
+        # This avoids alphabetical symbol order deciding which signals survive.
+        allocation_factor = min(1.0, available / requested_risk) if requested_risk > 0 else 0.0
+        for trade, sizing, proposed_risk in proposals:
+            if allocation_factor <= 0:
+                rejected.append({
+                    "symbol": trade["symbol"], "entry_ts": int(trade["entry_ts"]),
+                    "proposed_risk_usdt": round(proposed_risk, 8),
+                    "available_risk_usdt": round(available, 8),
                     "reason": "portfolio_risk_limit",
                 })
                 continue
 
-            scale = float(sizing["qty"]) / float(trade["qty"])
-            accepted.append({
+            scale = float(sizing["qty"]) / float(trade["qty"]) * allocation_factor
+            allocated_risk = proposed_risk * allocation_factor
+            accepted_trade = {
                 "symbol": trade["symbol"], "side": trade["side"],
                 "entry_ts": int(trade["entry_ts"]), "exit_ts": int(trade["exit_ts"]),
-                "qty": float(sizing["qty"]), "scale_factor": scale,
-                "risk_usdt": proposed_risk,
+                "qty": float(sizing["qty"]) * allocation_factor, "scale_factor": scale,
+                "portfolio_allocation_factor": allocation_factor,
+                "risk_usdt": allocated_risk,
                 "net_pnl": float(trade["net_pnl"]) * scale,
                 "gross_pnl": float(trade.get("gross_pnl", trade["net_pnl"])) * scale,
                 "fees": float(trade.get("fees", 0.0)) * scale,
                 "slippage": float(trade.get("slippage", 0.0)) * scale,
                 "exit_reason": trade.get("exit_reason", "unknown"),
-            })
-            open_positions.append(accepted[-1])
+            }
+            accepted.append(accepted_trade)
+            open_positions.append(accepted_trade)
 
         realize_positions(entry_ts, inclusive=True)
         cursor = group_end

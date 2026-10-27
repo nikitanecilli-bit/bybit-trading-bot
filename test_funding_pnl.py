@@ -123,8 +123,8 @@ def test_mark_price_history_loader_uses_minute_candle_open():
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "BTCUSDT.csv"
         path.write_text(
-            "symbol,timestamp_ms,time_utc,open,high,low,close\\n"
-            "BTCUSDT,1800000000000,2030-01-15T08:00:00Z,101.25,102,100,101.5\\n",
+            "symbol,timestamp_ms,time_utc,open,high,low,close\n"
+            "BTCUSDT,1800000000000,2030-01-15T08:00:00Z,101.25,102,100,101.5\n",
             encoding="utf-8",
         )
         e._load_mark_price_history(directory)
@@ -137,9 +137,9 @@ def test_mark_price_history_loader_rejects_duplicate_timestamps():
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "BTCUSDT.csv"
         path.write_text(
-            "symbol,timestamp_ms,open\\n"
-            "BTCUSDT,1800000000000,101.25\\n"
-            "BTCUSDT,1800000000000,101.5\\n",
+            "symbol,timestamp_ms,open\n"
+            "BTCUSDT,1800000000000,101.25\n"
+            "BTCUSDT,1800000000000,101.5\n",
             encoding="utf-8",
         )
         try:

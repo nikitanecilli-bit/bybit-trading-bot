@@ -1207,7 +1207,9 @@ class UnifiedQuantEngine:
                 if not pos.tp1_hit:
                     tp1_hit = (curr.high >= pos.tp1_price) if is_long else (curr.low <= pos.tp1_price)
                     if tp1_hit:
-                        self._apply_tp1(pos)
+                        # Use the candle-close boundary as the conservative TP1 timestamp,
+                        # consistent with the TP2-in-same-candle path above.
+                        self._apply_tp1(pos, tp1_bar_close_ts)
 
                 if pos.tp1_hit:
                     trail_mult = (1.15 if (cfg.accelerated_atr_trail_after_1_5r and mfe_r >= 1.5)

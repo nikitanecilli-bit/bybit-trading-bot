@@ -90,6 +90,48 @@ def limit_order_fill(bar: Bar, side: str, limit_price: float) -> float | None:
     return max(limit_price, bar.open)
 
 
+
+def stop_order_fill(bar: Bar, side: str, stop_price: float) -> float | None:
+    """Return stop-market fill price, including adverse opening gaps.
+
+    This OHLC approximation assumes a stop triggers when the bar crosses the
+    stop. If the bar opens beyond it, the open is used instead of the stop.
+    """
+    if side not in ("long", "short"):
+        raise ValueError("side must be 'long' or 'short'")
+    if stop_price <= 0:
+        raise ValueError("stop_price must be positive")
+    if side == "long":
+        if bar.low > stop_price:
+            return None
+        return min(bar.open, stop_price)
+    if bar.high < stop_price:
+        return None
+    return max(bar.open, stop_price)
+
+
+def resolve_stop_target(
+    bar: Bar,
+    side: str,
+    stop_price: float,
+    target_price: float,
+    target_allowed: bool = True,
+) -> tuple[float, str, bool] | None:
+    """Resolve stop/target touches conservatively; stop wins if both are hit.
+
+    Returns (raw_fill_price, reason, maker_exit), or None if neither is hit.
+    """
+    stop_fill = stop_order_fill(bar, side, stop_price)
+    if stop_fill is not None:
+        return stop_fill, "stop_or_gap", False
+    if target_allowed:
+        if side == "long" and bar.high >= target_price:
+            return target_price, "target", True
+        if side == "short" and bar.low <= target_price:
+            return target_price, "target", True
+    return None
+
+
 def limit_order_expired(age_bars: int, valid_bars: int) -> bool:
     """Orders are valid for ages 1..valid_bars after the signal candle."""
     if age_bars < 0 or valid_bars < 1:
@@ -194,12 +236,15 @@ def backtest_symbol(
             be_trigger = i > pos["entry_index"] and favorable >= breakeven_trigger_r * pos["risk_usdt"] / pos["qty"] and not pos["be_moved"]
             be_stop_same_bar = be_trigger and (bar.low <= pos["entry"] if side == "long" else bar.high >= pos["entry"])
             if stop_hit:
-                raw_exit = min(bar.open, pos["stop"]) if side == "long" else max(bar.open, pos["stop"])
+                raw_exit = stop_order_fill(bar, side, pos["stop"])
                 close_position(bar, raw_exit, "stop_or_gap", maker_exit=False)
             elif be_stop_same_bar:
                 close_position(bar, pos["entry"], "breakeven_stop_intrabar_ambiguous", maker_exit=False)
             elif target_hit:
-                close_position(bar, pos["target"], "target", maker_exit=True)
+                # The stop was already checked above; target is safe to resolve alone here.
+                resolved = resolve_stop_target(bar, side, pos["stop"], pos["target"], target_allowed=True)
+                if resolved is not None and resolved[1] == "target":
+                    close_position(bar, resolved[0], resolved[1], maker_exit=resolved[2])
             elif i - pos["entry_index"] >= max_hold_bars:
                 close_position(bar, bar.close, "time_stop", maker_exit=False)
             elif be_trigger:

@@ -1549,7 +1549,7 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
         if tf not in timeframe_ms:
             raise ValueError(f"Unsupported timeframe for funding mark proxy: {engine.cfg.timeframe!r}")
         interval = timeframe_ms[tf]
-        if engine.mark_price_dir:
+        if getattr(engine, "mark_price_dir", None):
             missing_marks = sorted(set(symbols) - set(engine._funding_mark_prices))
             if missing_marks:
                 raise RuntimeError(f"Mark-price CSV missing for symbols: {', '.join(missing_marks)}")

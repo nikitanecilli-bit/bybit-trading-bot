@@ -157,22 +157,25 @@ def backtest_symbol(
         if pos is not None:
             side = pos["side"]
             sign = 1.0 if side == "long" else -1.0
-            # Conservative OHLC handling: if stop and target both touch, stop wins.
+            # Conservative OHLC handling: stop wins when intrabar order is ambiguous.
             stop_hit = bar.low <= pos["stop"] if side == "long" else bar.high >= pos["stop"]
             target_hit = (bar.high >= pos["target"] if side == "long" else bar.low <= pos["target"]) and i > pos["entry_index"]
+            favorable = (bar.high - pos["entry"]) if side == "long" else (pos["entry"] - bar.low)
+            be_trigger = i > pos["entry_index"] and favorable >= breakeven_trigger_r * pos["risk_usdt"] / pos["qty"] and not pos["be_moved"]
+            be_stop_same_bar = be_trigger and (bar.low <= pos["entry"] if side == "long" else bar.high >= pos["entry"])
             if stop_hit:
                 raw_exit = min(bar.open, pos["stop"]) if side == "long" else max(bar.open, pos["stop"])
                 close_position(bar, raw_exit, "stop_or_gap", maker_exit=False)
+            elif be_stop_same_bar:
+                close_position(bar, pos["entry"], "breakeven_stop_intrabar_ambiguous", maker_exit=False)
             elif target_hit:
                 close_position(bar, pos["target"], "target", maker_exit=True)
             elif i - pos["entry_index"] >= max_hold_bars:
                 close_position(bar, bar.close, "time_stop", maker_exit=False)
-            else:
-                favorable = (bar.high - pos["entry"]) if side == "long" else (pos["entry"] - bar.low)
-                if favorable >= breakeven_trigger_r * pos["risk_usdt"] / pos["qty"] and not pos["be_moved"]:
-                    # Lock entry price; future bars only see the updated stop.
-                    pos["stop"] = pos["entry"]
-                    pos["be_moved"] = True
+            elif be_trigger:
+                # Lock entry price; future bars only see the updated stop.
+                pos["stop"] = pos["entry"]
+                pos["be_moved"] = True
 
         # Signal at close i creates an order eligible from bar i+1.
         if pos is None and pending is None and i + 1 < len(bars) and i >= max(donchian_period, ema_slow_period, atr_period):

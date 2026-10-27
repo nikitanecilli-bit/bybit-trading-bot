@@ -1,7 +1,7 @@
 """Regression tests for the v15 simulator."""
 import unittest
 
-from research_v15.backtest import Bar, backtest_symbol, breakeven_action, limit_order_expired, limit_order_fill, resolve_stop_target, rolling_atr, stop_order_fill, trade_economics
+from research_v15.backtest import Bar, backtest_symbol, breakeven_action, limit_order_expired, limit_order_fill, resolve_stop_target, rolling_atr, stop_order_fill, trade_economics, position_size
 
 
 class V15BacktestTests(unittest.TestCase):
@@ -204,6 +204,36 @@ class V15BacktestTests(unittest.TestCase):
             trade_economics("buy", 100, 101, 1)
         with self.assertRaises(ValueError):
             trade_economics("long", 100, 101, 0)
+
+
+    def test_position_size_respects_risk_budget_and_notional_cap(self):
+        sized = position_size(10_000, 0.01, 100, 5)
+        self.assertAlmostEqual(sized["risk_budget"], 100)
+        self.assertAlmostEqual(sized["qty"], 20)
+        self.assertAlmostEqual(sized["notional"], 2_000)
+        self.assertAlmostEqual(sized["planned_stop_loss"], 100)
+        self.assertAlmostEqual(sized["planned_stop_loss_pct_equity"], 0.01)
+
+    def test_position_size_notional_cap_limits_high_risk_quantity(self):
+        sized = position_size(10_000, 0.05, 100, 0.1)
+        self.assertAlmostEqual(sized["qty"], 100)
+        self.assertAlmostEqual(sized["notional"], 10_000)
+        self.assertAlmostEqual(sized["planned_stop_loss"], 10)
+        self.assertLessEqual(sized["notional"], 10_000)
+
+    def test_gap_stop_can_exceed_planned_risk_and_costs_are_separate(self):
+        sized = position_size(10_000, 0.01, 100, 5)
+        # Long stop is 95, but market gaps down to 90 before execution.
+        economics = trade_economics("long", 100, 90, sized["qty"], maker_entry=True, maker_exit=False)
+        self.assertGreater(abs(economics["gross_pnl"]), sized["planned_stop_loss"])
+        self.assertLess(economics["net_pnl"], economics["gross_pnl"])
+        self.assertGreater(economics["fees"], 0)
+        self.assertGreater(economics["slippage"], 0)
+
+    def test_position_size_rejects_invalid_inputs(self):
+        for args in ((0, 0.01, 100, 5), (1000, 0, 100, 5), (1000, 0.01, 0, 5), (1000, 0.01, 100, 0)):
+            with self.subTest(args=args), self.assertRaises(ValueError):
+                position_size(*args)
 
 
 if __name__ == "__main__":

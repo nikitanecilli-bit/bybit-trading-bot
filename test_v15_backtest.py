@@ -14,6 +14,8 @@ class V15BacktestTests(unittest.TestCase):
         result = backtest_symbol(bars, symbol="TEST", donchian_period=5, ema_fast_period=3, ema_slow_period=8)
         self.assertEqual(result["trades_count"], 0)
         self.assertEqual(result["net_pnl"], 0.0)
+        self.assertEqual(result["trade_net_pnl_sum"], 0.0)
+        self.assertEqual(result["equity_reconciliation_error"], 0.0)
 
     def test_duplicate_or_unsorted_timestamps_rejected(self):
         bars = [Bar(1000, 100, 101, 99, 100), Bar(1000, 100, 101, 99, 100)]

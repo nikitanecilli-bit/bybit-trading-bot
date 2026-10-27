@@ -1,0 +1,19 @@
+{
+  "source": "Existing H1 signal-quality ablation results; 50 symbols, 12 parameter combinations, 3 chronological folds; Binance OHLCV proxy and modeled costs.",
+  "ranking_method": "Robust screening score using median per-symbol-run net PnL, positive run percentage, median profit factor, inverse median drawdown, number of parameter configurations positive in all three folds, and number positive in the final fold. This is a research shortlist, not a profitability claim.",
+  "primary": [
+    "LINKUSDT",
+    "RAYUSDT",
+    "PUMPUSDT",
+    "APTUSDT",
+    "TAOUSDT"
+  ],
+  "reserve": [
+    "POLUSDT",
+    "AAVEUSDT",
+    "CAKEUSDT",
+    "DOGEUSDT",
+    "ATOMUSDT"
+  ],
+  "caution": "The same historical archive has already been inspected during screening; selected-universe reruns are focused validation, not an independent blind holdout. Require future untouched data and realistic Bybit fills before production."
+}

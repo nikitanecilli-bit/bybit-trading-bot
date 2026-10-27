@@ -120,7 +120,7 @@ def run_fold(data, stamps, fold, start_frac, end_frac):
     engine = em.UnifiedQuantEngine(journal_output_path="/tmp/ignored_signal_diagnostic.json")
     cfg=engine.cfg
     cfg.bot_version=f"diagnostic-v{VOL_MIN:g}-b{BREAKOUT_ATR_MIN:g}-cost{COST_MULTIPLIER:g}"
-    cfg.timeframe="1h"; cfg.active_trading_pool=list(data); cfg.capital_usdt=10000.0
+    cfg.timeframe="1h"; cfg.active_trading_pool=sorted(data); cfg.capital_usdt=10000.0
     cfg.max_risk_trade_pct=1.0; cfg.max_portfolio_risk_pct=2.0; cfg.max_concurrent_positions=5
     cfg.daily_stop_loss_pct=5.0; cfg.emergency_kill_switch_pct=30.0
     cfg.donchian_period=20; cfg.atr_period=14; cfg.min_volume_ratio=VOL_MIN
@@ -184,7 +184,7 @@ def run_fold(data, stamps, fold, start_frac, end_frac):
     engine._try_fill_pending=wrapped_fill
     try:
         em.check_alignment(fold_data)
-        em.run_simulation_pass(engine,fold_data,list(data),
+        em.run_simulation_pass(engine,fold_data,sorted(data),
             data_label=f"BINANCE_PROXY H1 selected universe diagnostic fold={fold}")
     finally:
         core.evaluate_signal=staticmethod(original_eval)

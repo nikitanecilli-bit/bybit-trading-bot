@@ -238,6 +238,40 @@ def test_max_portfolio_risk_config_is_loaded_and_validated():
         else:
             raise AssertionError(f"invalid portfolio risk cap accepted: {bad}")
 
+
+def test_daily_stop_blocks_entries_until_next_utc_day():
+    cfg = engine_mod.BotConfig(
+        capital_usdt=10_000.0,
+        daily_stop_loss_pct=5.0,
+        emergency_kill_switch_pct=30.0,
+    )
+    rm = engine_mod.AdaptiveRiskManager(cfg)
+    day1_close = 1_767_311_100_000  # 2026-01-01 23:45 UTC
+    day2_open = 1_767_312_000_000   # 2026-01-02 00:00 UTC
+    alerts = rm.register_closed_trade_pnl(-600.0, day1_close)
+    assert alerts["daily_stop_hit"] is True
+    assert rm.can_open_new_trade(0) == (False, "DAILY_STOP_ACTIVE")
+    rm.mark_to_market(0.0, day2_open)
+    assert rm.daily_stop_triggered is False
+    assert rm.can_open_new_trade(0) == (True, "OK")
+
+
+def test_kill_switch_remains_latched_across_utc_day_change():
+    cfg = engine_mod.BotConfig(
+        capital_usdt=10_000.0,
+        daily_stop_loss_pct=5.0,
+        emergency_kill_switch_pct=30.0,
+    )
+    rm = engine_mod.AdaptiveRiskManager(cfg)
+    day1_close = 1_767_311_100_000
+    day2_open = 1_767_312_000_000
+    alerts = rm.mark_to_market(-3_100.0, day1_close)
+    assert alerts["kill_switch_hit"] is True
+    assert rm.can_open_new_trade(0) == (False, "KILL_SWITCH_ACTIVE")
+    rm.mark_to_market(0.0, day2_open)
+    assert rm.kill_switch_triggered is True
+    assert rm.can_open_new_trade(0) == (False, "KILL_SWITCH_ACTIVE")
+
 def test_unsupported_timeframe_fails_closed():
     e, seen = bare_engine("7m")
     ts_open = 1_800_000_000_000
@@ -391,6 +425,8 @@ def test_limit_entry_uses_limit_price_when_bar_opens_above_and_trades_through():
 
 if __name__ == "__main__":
     tests = [test_mtm_uses_close_timestamp_for_15m_bar,
+             test_daily_stop_blocks_entries_until_next_utc_day,
+             test_kill_switch_remains_latched_across_utc_day_change,
              test_portfolio_risk_cap_limits_new_position_size,
              test_position_size_respects_remaining_portfolio_risk_budget,
              test_max_portfolio_risk_config_is_loaded_and_validated,

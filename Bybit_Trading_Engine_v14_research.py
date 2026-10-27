@@ -882,6 +882,7 @@ class UnifiedQuantEngine:
         self._rejected_cfg: Dict[str, float] = {}
         self._last_mark_prices: Dict[str, float] = {}
         self._intrabar_risk_marks: Dict[str, float] = {}
+        self._intrabar_risk_marks_ts: Optional[int] = None
         self._state_restored = False
 
         if restore_plan_b:
@@ -897,6 +898,7 @@ class UnifiedQuantEngine:
         self.trade_seq = 0
         self._last_mark_prices.clear()
         self._intrabar_risk_marks.clear()
+        self._intrabar_risk_marks_ts = None
         self._state_restored = False
 
     def _unrealized_pnl_at_marks(self) -> float:
@@ -987,7 +989,13 @@ class UnifiedQuantEngine:
                     risk_mark = max(pos_for_risk.stop_price, curr.open)
             else:
                 risk_mark = curr.low if is_long_for_risk else curr.high
-        self._intrabar_risk_marks = {symbol: risk_mark}
+        # Symbols are stepped one at a time. Preserve adverse marks for other symbols
+        # processed at the same bar-close timestamp, but never carry an old candle's
+        # extreme into a later bar.
+        if self._intrabar_risk_marks_ts != bar_close_ts:
+            self._intrabar_risk_marks.clear()
+            self._intrabar_risk_marks_ts = bar_close_ts
+        self._intrabar_risk_marks[symbol] = risk_mark
         self.risk_mgr.on_new_timestamp(bar_close_ts)
         self._update_mark_to_market(bar_close_ts)
 

@@ -25,7 +25,7 @@ jobs:
           - universe: primary
             symbols: "RAYUSDT,PUMPUSDT,TAOUSDT,AAVEUSDT,CAKEUSDT"
           - universe: reserve
-            symbols: "DASHUSDT,ENAUSDT,HBARUSDT,ASTERUSDT,JSTUSDT"
+            symbols: "ENAUSDT,GMXUSDT,ONDOUSDT,SKYUSDT,QNTUSDT"
     env:
       H1_SYMBOL_ALLOWLIST: ${{ matrix.symbols }}
     steps:

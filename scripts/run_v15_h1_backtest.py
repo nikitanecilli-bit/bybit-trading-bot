@@ -80,7 +80,7 @@ def main():
         result["start_utc"] = datetime.fromtimestamp(bars[0].ts / 1000, tz=timezone.utc).isoformat()
         result["end_utc"] = datetime.fromtimestamp(bars[-1].ts / 1000, tz=timezone.utc).isoformat()
         results.append(result)
-        print(f"{symbol}: trades={result[\"trades_count\"]}, net={result[\"net_pnl\"]:.2f} USDT, PF={result[\"profit_factor\"]}, DD={result[\"max_dd_pct\"]:.2f}%")
+        print(f"{symbol}: trades={result['trades_count']}, net={result['net_pnl']:.2f} USDT, PF={result['profit_factor']}, DD={result['max_dd_pct']:.2f}%")
 
     print("\nSUMMARY — independent per-symbol runs, not a portfolio")
     print("symbol,bars,start_utc,end_utc,trades,net_pnl,gross_pnl,costs_including_slippage,profit_factor,expectancy_r,max_dd_pct,source_archive")

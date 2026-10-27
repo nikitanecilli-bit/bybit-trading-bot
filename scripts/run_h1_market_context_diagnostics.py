@@ -2,6 +2,7 @@
 """Market-context diagnostics for the selected H1 universe and BTC/ETH benchmarks."""
 from __future__ import annotations
 import csv, os, sys, math
+from datetime import datetime, timezone
 from collections import defaultdict
 import numpy as np
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -11,7 +12,7 @@ from run_uploaded_dataset_backtests import read_zip_datasets
 
 SYMBOLS=["RAYUSDT","PUMPUSDT","TAOUSDT","AAVEUSDT","CAKEUSDT"]
 BENCHMARKS=["BTCUSDT","ETHUSDT"]
-FOLDS=[(1,.50,.65),(2,.65,.80),(3,.80,1.00)]
+FOLDS=[(1,"2026-04-27T12:00:00Z","2026-06-21T05:00:00Z"),(2,"2026-06-21T06:00:00Z","2026-08-14T23:00:00Z"),(3,"2026-08-15T00:00:00Z","2026-10-27T00:00:00Z")]
 
 def calc(candles, start, end, symbol, fold):
     cs=candles[start:end+1]
@@ -74,8 +75,14 @@ def main():
     maps={s:{c.ts:c for c in cs} for s,cs in raw.items()}
     aligned={s:[m[t] for t in stamps] for s,m in maps.items()}
     rows=[]
-    for fold,a,b in FOLDS:
-      i0,i1=int(len(stamps)*a),int(len(stamps)*b)-1
+    for fold,start_iso,end_iso in FOLDS:
+      start_ts=int(datetime.strptime(start_iso,"%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()*1000)
+      end_ts=int(datetime.strptime(end_iso,"%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()*1000)
+      i0=next((i for i,t in enumerate(stamps) if t>=start_ts),None)
+      i1=next((i for i in range(len(stamps)-1,-1,-1) if stamps[i]<=end_ts),None)
+      if i0 is None or i1 is None or i1-i0<80:
+        raise SystemExit(f"Invalid fold window {fold}: {start_iso}..{end_iso}; indices={i0},{i1}")
+      print(f"fold={fold} window={start_iso}..{end_iso} bars={i1-i0+1}")
       for sym,cs in aligned.items():
         r=calc(cs,i0,i1,sym,fold)
         if r: rows.append(r)

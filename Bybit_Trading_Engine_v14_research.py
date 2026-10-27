@@ -379,6 +379,7 @@ class OpenPositionState:
     risk_usdt: float
     order_type: str
     tp1_hit: bool = False
+    tp1_ts_ms: Optional[int] = None  # conservatively the TP1 candle-close boundary
     realized_tp1_gross_usdt: float = 0.0
     remaining_fraction: float = 1.0
     bars_held: int = 0
@@ -418,6 +419,7 @@ class TradeRecord:
     gross_r_multiple: float = 0.0
     risk_usdt: float = 0.0
     risk_pct: float = 0.0        # фактический риск в % от эквити на входе
+    funding_cost_usdt: float = 0.0  # positive=paid, negative=received
 
 
 # =====================================================================
@@ -769,7 +771,7 @@ class MaintenanceGateAuditor:
 
         net_pnl = sum(t.pnl_usdt for t in trades)
         gross_pnl = sum(t.gross_pnl for t in trades)
-        total_costs = sum(t.exchange_fees_usdt + t.slippage_cost_usdt for t in trades)
+        total_costs = sum(t.exchange_fees_usdt + t.slippage_cost_usdt + t.funding_cost_usdt for t in trades)
         ret_pct = (net_pnl / cfg.capital_usdt) * 100.0
 
         wins = [t for t in trades if t.pnl_usdt > 0]
@@ -851,7 +853,9 @@ class MaintenanceGateAuditor:
 
         return {
             "total_trades": n, "net_pnl": round(net_pnl, 2), "gross_pnl": round(gross_pnl, 2),
-            "total_costs": round(total_costs, 2), "ret_pct": round(ret_pct, 2),
+            "total_costs": round(total_costs, 2),
+            "funding_cost_usdt": round(sum(t.funding_cost_usdt for t in trades), 2),
+            "ret_pct": round(ret_pct, 2),
             "win_rate": round(win_rate, 1), "pf": round(pf, 2),
             "expectancy_r": expectancy_r, "max_dd_pct": round(max_dd_pct, 2),
             "avg_risk_pct": round(avg_risk_pct, 2), "cost_drag_pct": round(cost_drag_pct, 1),
@@ -873,8 +877,20 @@ class UnifiedQuantEngine:
         restore_plan_b: bool = False,
         persist_state: bool = False,
         state_path: str = "bot_state_backup.json",
+        funding_dir: Optional[str] = None,
+        mark_price_dir: Optional[str] = None,
     ):
         self._explicit_config = config_path
+        self.funding_dir = funding_dir
+        self.mark_price_dir = mark_price_dir
+        if mark_price_dir and not funding_dir:
+            raise ValueError("--mark-price-dir requires --funding-dir")
+        self.funding_by_symbol: Dict[str, List[Dict[str, float]]] = {}
+        self._funding_mark_prices: Dict[str, Dict[int, float]] = {}
+        if funding_dir:
+            self._load_funding_history(funding_dir)
+        if mark_price_dir:
+            self._load_mark_price_history(mark_price_dir)
         self.cfg = BotConfig.load_from_dashboard_json(config_path)
         self.risk_mgr = AdaptiveRiskManager(self.cfg)
         self.plan_b = PlanBStatePersistence(state_path, enabled=persist_state)
@@ -895,6 +911,63 @@ class UnifiedQuantEngine:
             self.open_positions, self.pending, self.trade_seq = self.plan_b.load_state(self.risk_mgr)
             # Даже если файл содержит только risk state, это не свежий backtest.
             self._state_restored = True
+
+    def _load_funding_history(self, directory: str) -> None:
+        """Load <SYMBOL>.csv files with funding_timestamp_ms and funding_rate columns."""
+        if not os.path.isdir(directory):
+            raise ValueError(f"Funding directory does not exist: {directory}")
+        for path in glob.glob(os.path.join(directory, "*.csv")):
+            symbol = os.path.splitext(os.path.basename(path))[0].upper()
+            rows = []
+            with open(path, "r", encoding="utf-8-sig", newline="") as handle:
+                reader = csv.DictReader(handle)
+                if not reader.fieldnames or not {"funding_timestamp_ms", "funding_rate"}.issubset(reader.fieldnames):
+                    raise ValueError(f"{path}: required columns funding_timestamp_ms,funding_rate")
+                for line_no, row in enumerate(reader, start=2):
+                    try:
+                        row_symbol = str(row.get("symbol") or symbol).upper()
+                        ts = int(row["funding_timestamp_ms"])
+                        rate = float(row["funding_rate"])
+                    except (TypeError, ValueError, KeyError) as exc:
+                        raise ValueError(f"{path}:{line_no}: invalid funding row") from exc
+                    if row_symbol != symbol or ts <= 0 or not math.isfinite(rate):
+                        raise ValueError(f"{path}:{line_no}: invalid symbol/timestamp/rate")
+                    rows.append({"ts": ts, "rate": rate})
+            rows.sort(key=lambda x: x["ts"])
+            if len({x["ts"] for x in rows}) != len(rows):
+                raise ValueError(f"{path}: duplicate funding timestamps")
+            self.funding_by_symbol[symbol] = rows
+        if not self.funding_by_symbol:
+            raise ValueError(f"No funding CSV files found in {directory}")
+
+    def _load_mark_price_history(self, directory: str) -> None:
+        """Load <SYMBOL>.csv mark klines; use hourly candle open at timestamp_ms."""
+        if not os.path.isdir(directory):
+            raise ValueError(f"Mark-price directory does not exist: {directory}")
+        for path in glob.glob(os.path.join(directory, "*.csv")):
+            symbol = os.path.splitext(os.path.basename(path))[0].upper()
+            marks: Dict[int, float] = {}
+            with open(path, "r", encoding="utf-8-sig", newline="") as handle:
+                reader = csv.DictReader(handle)
+                if not reader.fieldnames or not {"timestamp_ms", "open"}.issubset(reader.fieldnames):
+                    raise ValueError(f"{path}: required columns timestamp_ms,open")
+                for line_no, row in enumerate(reader, start=2):
+                    try:
+                        row_symbol = str(row.get("symbol") or symbol).upper()
+                        ts = int(row["timestamp_ms"])
+                        mark = float(row["open"])
+                    except (TypeError, ValueError, KeyError) as exc:
+                        raise ValueError(f"{path}:{line_no}: invalid mark-price row") from exc
+                    if row_symbol != symbol or ts <= 0 or not math.isfinite(mark) or mark <= 0:
+                        raise ValueError(f"{path}:{line_no}: invalid symbol/timestamp/mark price")
+                    if ts in marks:
+                        raise ValueError(f"{path}:{line_no}: duplicate mark-price timestamp {ts}")
+                    marks[ts] = mark
+            if not marks:
+                raise ValueError(f"{path}: no mark-price rows found")
+            self._funding_mark_prices[symbol] = marks
+        if not self._funding_mark_prices:
+            raise ValueError(f"No mark-price CSV files found in {directory}")
 
     def reset_state_for_new_run(self) -> None:
         self.risk_mgr.reset_for_backtest(self.cfg)
@@ -1105,17 +1178,27 @@ class UnifiedQuantEngine:
         return True
 
     @staticmethod
-    def _apply_tp1(pos: OpenPositionState) -> None:
+    def _apply_tp1(pos: OpenPositionState, tp1_ts_ms: int = 0) -> None:
         tp1_move = abs(pos.tp1_price - pos.entry_price) / pos.entry_price
         pos.realized_tp1_gross_usdt = round(pos.size_usdt * TP1_FRACTION * tp1_move, 4)
         pos.remaining_fraction = 1.0 - TP1_FRACTION
         pos.tp1_hit = True
+        # OHLC cannot reveal the exact intrabar TP1 time. Use bar close so funding
+        # during the TP1 candle is conservatively charged on the full position.
+        pos.tp1_ts_ms = tp1_ts_ms
 
     def _manage_position(self, symbol: str, hist: List[Candle], fill_bar: bool, exit_ts: int) -> None:
         pos = self.open_positions[symbol]
         curr = hist[-1]
         cfg = self.cfg
         is_long = pos.direction == "long"
+        timeframe_ms = {"1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
+                        "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
+                        "4h": 14_400_000, "6h": 21_600_000, "12h": 43_200_000, "1d": 86_400_000}
+        tf = str(cfg.timeframe).strip().lower()
+        if tf not in timeframe_ms:
+            raise ValueError(f"Unsupported timeframe for funding TP1 timing: {cfg.timeframe!r}")
+        tp1_bar_close_ts = curr.ts + timeframe_ms[tf]
         pos.bars_held += 1
         atr = QuantStrategyCore.compute_atr(hist[:-1], cfg.atr_period)
         stop_dist = max(1e-8, pos.initial_stop_dist)
@@ -1153,13 +1236,15 @@ class UnifiedQuantEngine:
             tp2_hit = (curr.high >= pos.tp2_price) if is_long else (curr.low <= pos.tp2_price)
             if tp2_hit:
                 if not pos.tp1_hit:
-                    self._apply_tp1(pos)          # TP1 лежит между входом и TP2 — он тоже взят
+                    self._apply_tp1(pos, tp1_bar_close_ts)          # TP1 лежит между входом и TP2 — он тоже взят
                 exit_price, exit_reason = pos.tp2_price, "take_profit"
             else:
                 if not pos.tp1_hit:
                     tp1_hit = (curr.high >= pos.tp1_price) if is_long else (curr.low <= pos.tp1_price)
                     if tp1_hit:
-                        self._apply_tp1(pos)
+                        # Use the candle-close boundary as the conservative TP1 timestamp,
+                        # consistent with the TP2-in-same-candle path above.
+                        self._apply_tp1(pos, tp1_bar_close_ts)
 
                 if pos.tp1_hit:
                     trail_mult = (1.15 if (cfg.accelerated_atr_trail_after_1_5r and mfe_r >= 1.5)
@@ -1192,6 +1277,28 @@ class UnifiedQuantEngine:
         rem_chg = sign * (exit_price - pos.entry_price) / pos.entry_price
         rem_gross = pos.size_usdt * pos.remaining_fraction * rem_chg
         gross_pnl = _money_round(pos.realized_tp1_gross_usdt + rem_gross)
+        funding_cost = 0.0
+        if getattr(self, "funding_dir", None):
+            if pos.symbol not in self.funding_by_symbol:
+                raise RuntimeError(f"Funding enabled but no CSV for traded symbol {pos.symbol}")
+            mark_map = self._funding_mark_prices.get(pos.symbol, {})
+            sign_for_funding = 1.0 if pos.direction == "long" else -1.0
+            for event in self.funding_by_symbol[pos.symbol]:
+                ts = int(event["ts"])
+                if not (pos.entry_ts < ts <= exit_ts):
+                    continue
+                mark_price = mark_map.get(ts)
+                if mark_price is None or not math.isfinite(mark_price) or mark_price <= 0:
+                    raise RuntimeError(
+                        f"Missing exact candle-boundary mark proxy for {pos.symbol} funding timestamp {ts}; "
+                        "refusing to silently omit funding"
+                    )
+                fraction = (1.0 if pos.tp1_ts_ms is None or ts <= pos.tp1_ts_ms
+                            else pos.remaining_fraction)
+                quantity = pos.size_usdt / pos.entry_price
+                funding_notional = quantity * mark_price * fraction
+                funding_cost += sign_for_funding * funding_notional * float(event["rate"])
+        funding_cost = _money_round(funding_cost)
 
         # Издержки по ногам. Сначала суммируем точные значения всех ног,
         # затем округляем итог в денежном формате (half-up), а не каждую ногу отдельно.
@@ -1207,7 +1314,7 @@ class UnifiedQuantEngine:
         fees += f; slip += s
         fees, slip = _money_round(fees), _money_round(slip)
 
-        net_pnl = _money_round(gross_pnl - fees - slip)
+        net_pnl = _money_round(gross_pnl - fees - slip - funding_cost)
         risk = max(1e-6, pos.risk_usdt)
         eq0 = pos.equity_at_entry if pos.equity_at_entry > 0 else self.cfg.capital_usdt
 
@@ -1227,6 +1334,7 @@ class UnifiedQuantEngine:
             gross_r_multiple=gross_pnl / risk,
             risk_usdt=round(pos.risk_usdt, 4),
             risk_pct=round(pos.risk_usdt / eq0 * 100.0, 3),
+            funding_cost_usdt=funding_cost,
         )
         self.closed_trades.append(record)
         del self.open_positions[pos.symbol]
@@ -1430,6 +1538,31 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
         raise RuntimeError("Нельзя запускать backtest поверх восстановленного состояния. "
                            "Для live-resume нужен отдельный цикл с reconciliation по бирже.")
     engine.reset_state_for_new_run()
+    if engine.funding_dir:
+        missing = sorted(set(symbols) - set(engine.funding_by_symbol))
+        if missing:
+            raise RuntimeError(f"Funding enabled but CSV missing for symbols: {', '.join(missing)}")
+        timeframe_ms = {"1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
+                        "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
+                        "4h": 14_400_000, "6h": 21_600_000, "12h": 43_200_000, "1d": 86_400_000}
+        tf = str(engine.cfg.timeframe).strip().lower()
+        if tf not in timeframe_ms:
+            raise ValueError(f"Unsupported timeframe for funding mark proxy: {engine.cfg.timeframe!r}")
+        interval = timeframe_ms[tf]
+        if getattr(engine, "mark_price_dir", None):
+            missing_marks = sorted(set(symbols) - set(engine._funding_mark_prices))
+            if missing_marks:
+                raise RuntimeError(f"Mark-price CSV missing for symbols: {', '.join(missing_marks)}")
+        else:
+            # Compatibility fallback only: OHLC traded-price candles are not mark prices.
+            # Prefer --mark-price-dir for funding-adjusted research.
+            engine._funding_mark_prices = {}
+            for sym in symbols:
+                mark_map = {}
+                for candle in candles[sym]:
+                    mark_map[candle.ts] = candle.open
+                    mark_map.setdefault(candle.ts + interval, candle.close)
+                engine._funding_mark_prices[sym] = mark_map
     bars_total = len(candles[symbols[0]])
     for bar in range(25, bars_total):
         lo = max(0, bar + 1 - CALC_WINDOW)
@@ -1463,6 +1596,10 @@ def main() -> None:
     parser.add_argument("--config", type=str, default=None, help="Путь к bot_live_config_*.json")
     parser.add_argument("--journal", type=str, default="bybit_trade_journal_v6_1.json")
     parser.add_argument("--data-dir", type=str, default=None, help="Папка с <SYMBOL>.csv (ts,open,high,low,close,volume)")
+    parser.add_argument("--funding-dir", type=str, default=None,
+                        help="Папка с <SYMBOL>.csv (funding_timestamp_ms,funding_rate), обязателен отдельный файл на символ")
+    parser.add_argument("--mark-price-dir", type=str, default=None,
+                        help="Папка с <SYMBOL>.csv mark-price klines; timestamp_ms должен совпадать с funding settlement")
     parser.add_argument("--bars", type=int, default=1200)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--no-planted-edge", action="store_true", help="Синтетика без заложенного эджа")
@@ -1471,7 +1608,8 @@ def main() -> None:
     args = parser.parse_args()
 
     engine = UnifiedQuantEngine(config_path=args.config, journal_output_path=args.journal,
-                                persist_state=args.persist_state, state_path=args.state_path)
+                                persist_state=args.persist_state, state_path=args.state_path,
+                                funding_dir=args.funding_dir, mark_price_dir=args.mark_price_dir)
     pool = list(dict.fromkeys(engine.cfg.active_trading_pool))
 
     if args.data_dir:

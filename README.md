@@ -60,3 +60,24 @@ The scanner is heuristic and is not a guarantee. Review staged changes manually 
 3. Do not use `git add .` without checking `git status`.
 4. Never commit real API keys, tokens, passwords, private keys, live journals, runtime state, or raw personal data.
 5. If a credential was ever pushed, revoke/rotate it first; `.gitignore` does not erase Git history.
+
+## Real-data adapter (research/data-adapter-v1)
+
+The downloader and engine use different CSV schemas. Convert downloader kline files before running the engine:
+
+```bash
+python bybit_downloader.py --symbols BTCUSDT ETHUSDT SOLUSDT --intervals 15 --datasets kline --category linear --start 2023-01-01 --out data
+python -m unittest test_data_adapter.py
+python scripts/adapt_bybit_klines.py --symbols BTCUSDT ETHUSDT SOLUSDT --category linear --interval 15 --input-dir data --output-dir engine_data
+```
+
+Then set `active_trading_pool` in a research config to exactly the same symbols and run:
+
+```bash
+python Bybit_Trading_Engine_v14_research.py --mode backtest --config path/to/research_config.json --data-dir engine_data --journal research_journal.json
+```
+
+The adapter deliberately fails on duplicate candles, invalid OHLCV, missing/irregular bars, or fewer than two common timestamps. It writes all selected symbols on the exact common timestamp intersection because the engine requires aligned bars. This may shorten the usable period to the overlap between listings; check the printed excluded-bar counts before interpreting results.
+
+**Research caveat:** this is only the format/validation bridge. It does not yet provide an unbiased historical universe (current symbols can create survivorship bias), nor does the engine currently consume the downloaded funding-history CSVs. Do not describe this pass as funding-adjusted or as a complete survivorship-bias audit. Validate fees/slippage settings and add funding accounting before treating the result as a realistic net return.
+

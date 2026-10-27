@@ -74,6 +74,11 @@ def run_one(symbol, timeframe, candles, archive, mode, offset_bps=0.0, max_wait_
         if symbol_arg not in engine.pending:
             return original_try_fill(symbol_arg, candle)
 
+        if mode == "market":
+            filled = original_try_fill(symbol_arg, candle)
+            counts["filled" if filled else "unfilled"] += 1
+            return filled
+
         sig = engine.pending[symbol_arg]
         meta = pending_meta.get(symbol_arg)
         if meta is None:

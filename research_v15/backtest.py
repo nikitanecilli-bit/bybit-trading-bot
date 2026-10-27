@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from typing import Any, Sequence
 
-from research_v15.donchian_signal import v15_signal
+from research_v15.donchian_signal import donchian_breakout, ema
 
 MAKER_FEE = 0.0002
 TAKER_FEE = 0.00055
@@ -105,6 +105,10 @@ def backtest_symbol(
         return {"symbol": symbol, "bars": len(bars), "trades": [], "starting_equity": starting_equity, "ending_equity": starting_equity, "net_pnl": 0.0, "max_dd_pct": 0.0}
 
     atr = rolling_atr(bars, atr_period)
+    candle_dicts = [{"open": b.open, "high": b.high, "low": b.low, "close": b.close} for b in bars]
+    closes = [b.close for b in bars]
+    fast_ema = ema(closes, ema_fast_period)
+    slow_ema = ema(closes, ema_slow_period)
     equity = float(starting_equity)
     peak = equity
     max_dd = 0.0
@@ -172,8 +176,8 @@ def backtest_symbol(
 
         # Signal at close i creates an order eligible from bar i+1.
         if pos is None and pending is None and i + 1 < len(bars) and i >= max(donchian_period, ema_slow_period, atr_period):
-            candle_dicts = [{"open": x.open, "high": x.high, "low": x.low, "close": x.close} for x in bars[:i + 1]]
-            signal = v15_signal(candle_dicts, i, donchian_period, ema_fast_period, ema_slow_period)
+            breakout = donchian_breakout(candle_dicts, i, donchian_period)
+            signal = breakout if ((breakout == "long" and fast_ema[i] > slow_ema[i]) or (breakout == "short" and fast_ema[i] < slow_ema[i])) else None
             if signal:
                 limit_price = bar.close - atr[i] * entry_pullback_atr if signal == "long" else bar.close + atr[i] * entry_pullback_atr
                 pending = {"side": signal, "limit": limit_price, "atr": atr[i], "signal_index": i}

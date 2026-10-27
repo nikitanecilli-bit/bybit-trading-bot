@@ -95,14 +95,14 @@ def backtest_symbol(
         raise ValueError("invalid starting equity or risk_pct")
     if limit_valid_bars < 1 or max_hold_bars < 1 or target_r <= 0:
         raise ValueError("invalid order lifetime, holding period, or target")
-    if len(bars) < max(donchian_period, ema_slow_period, atr_period) + 2:
-        return {"symbol": symbol, "bars": len(bars), "trades": [], "starting_equity": starting_equity, "ending_equity": starting_equity, "net_pnl": 0.0, "max_dd_pct": 0.0}
-
     for i, b in enumerate(bars):
         if min(b.open, b.high, b.low, b.close) <= 0 or b.high < max(b.open, b.close, b.low) or b.low > min(b.open, b.close, b.high):
             raise ValueError(f"invalid OHLC at bar {i}")
         if i and bars[i].ts <= bars[i - 1].ts:
             raise ValueError("timestamps must be strictly increasing")
+
+    if len(bars) < max(donchian_period, ema_slow_period, atr_period) + 2:
+        return {"symbol": symbol, "bars": len(bars), "trades": [], "starting_equity": starting_equity, "ending_equity": starting_equity, "net_pnl": 0.0, "max_dd_pct": 0.0}
 
     atr = rolling_atr(bars, atr_period)
     equity = float(starting_equity)

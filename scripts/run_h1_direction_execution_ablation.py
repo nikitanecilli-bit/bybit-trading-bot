@@ -68,9 +68,11 @@ def run_segment(symbol, tf, candles, start_idx, end_idx, direction_mode, entry_m
 
 def main():
     datasets=read_zip_datasets()
+    allowed={s.strip().upper() for s in os.getenv("H1_SYMBOL_ALLOWLIST", "").split(",") if s.strip()}
+    if allowed: print("Selected-universe filter: " + ", ".join(sorted(allowed)))
     out=[]
     for (symbol,tf),(_,archive,candles) in sorted(datasets.items()):
-        if tf!="1h" or len(candles)<500: continue
+        if tf!="1h" or len(candles)<500 or (allowed and symbol.upper() not in allowed): continue
         n=len(candles)
         for fold,(train_frac,test_frac) in enumerate(FOLDS,1):
             start,end=int(n*train_frac),int(n*test_frac)

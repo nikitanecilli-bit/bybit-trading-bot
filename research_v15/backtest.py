@@ -203,6 +203,24 @@ def trade_economics(
 
 
 
+def mark_to_market_equity(
+    realized_equity: float,
+    side: str,
+    entry_price: float,
+    mark_price: float,
+    qty: float,
+) -> float:
+    """Estimate equity if an open position were closed at the mark price.
+
+    Includes entry fee and modeled taker exit fee/slippage, making open-trade
+    drawdown more conservative than marking only gross unrealized PnL.
+    """
+    if realized_equity <= 0:
+        raise ValueError("realized_equity must be positive")
+    economics = trade_economics(side, entry_price, mark_price, qty, maker_entry=True, maker_exit=False)
+    return realized_equity + economics["net_pnl"]
+
+
 def position_size(
     equity: float,
     risk_pct: float,
@@ -374,8 +392,7 @@ def backtest_symbol(
 
         marked_equity = equity
         if pos is not None:
-            mark_sign = 1.0 if pos["side"] == "long" else -1.0
-            marked_equity += (bar.close - pos["entry"]) * pos["qty"] * mark_sign
+            marked_equity = mark_to_market_equity(equity, pos["side"], pos["entry"], bar.close, pos["qty"])
         peak = max(peak, marked_equity)
         max_dd = max(max_dd, (peak - marked_equity) / peak if peak > 0 else 0.0)
 

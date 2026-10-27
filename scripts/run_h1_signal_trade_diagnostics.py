@@ -63,11 +63,10 @@ def features(candles, i):
     }
 
 def synchronized_data():
+    all_data = read_zip_datasets()
     targets = set(SYMBOLS + CONTEXT_SYMBOLS)
-    raw = {}
-    for (sym, tf), item in read_zip_datasets().items():
-        if tf == "1h" and sym in targets and len(item[2]) >= 500:
-            raw[sym] = item
+    raw = {sym: item for (sym, tf), item in all_data.items()
+           if tf == "1h" and sym in targets and len(item[2]) >= 500}
     missing = sorted(set(SYMBOLS)-set(raw))
     if missing:
         raise SystemExit(f"Missing selected H1 datasets: {missing}")
@@ -89,14 +88,22 @@ def synchronized_data():
     context_data = {s: raw[s][2] for s in CONTEXT_SYMBOLS if s in raw}
     context_index = {s: {c.ts:i for i,c in enumerate(candles)}
                      for s,candles in context_data.items()}
+    # Broad market breadth uses every valid H1 symbol available in the uploaded
+    # archives, not just the five symbols selected for trading.
+    market_universe_data = {sym: item[2] for (sym, tf), item in all_data.items()
+                            if tf == "1h" and len(item[2]) >= 500}
+    market_universe_index = {sym: {c.ts:i for i,c in enumerate(candles)}
+                             for sym,candles in market_universe_data.items()}
     em.check_alignment(data)
-    return data, stamps, context_data, context_index
+    print(f"Selected symbols={len(data)}; broad H1 context symbols={len(market_universe_data)}; selected bars={len(stamps)}")
+    return data, stamps, context_data, context_index, market_universe_data, market_universe_index
 
-def market_context(data, context_data, context_index, i):
-    """Completed-bar BTC/ETH context and cross-sectional breadth; no lookahead."""
+def market_context(data, context_data, context_index, market_universe_data, market_universe_index, i):
+    """Completed-bar BTC/ETH and broad cross-sectional context; no lookahead."""
     out = {}
+    ts = data[SYMBOLS[0]][i].ts
     for sym, prefix in (("BTCUSDT", "btc"), ("ETHUSDT", "eth")):
-        ctx_i = context_index.get(sym, {}).get(data[SYMBOLS[0]][i].ts)
+        ctx_i = context_index.get(sym, {}).get(ts)
         f = features(context_data[sym], ctx_i) if ctx_i is not None else None
         for src, dst in (
             ("ret_24h_pct", "ret_24h_pct"), ("ret_72h_pct", "ret_72h_pct"),
@@ -112,9 +119,27 @@ def market_context(data, context_data, context_index, i):
     out["universe_median_ret_24h_pct"] = float(__import__("statistics").median(r24)) if r24 else ""
     out["universe_median_ret_72h_pct"] = float(__import__("statistics").median(r72)) if r72 else ""
     out["universe_median_efficiency_24h"] = float(__import__("statistics").median(e24)) if e24 else ""
+
+    broad_r24, broad_r72, broad_e24 = [], [], []
+    for sym, candles in market_universe_data.items():
+        j = market_universe_index[sym].get(ts)
+        if j is None or j < 72:
+            continue
+        close = candles[j].close
+        r24_value = (close / candles[j-24].close - 1.0) * 100.0
+        r72_value = (close / candles[j-72].close - 1.0) * 100.0
+        path24 = sum(abs(candles[k].close-candles[k-1].close) for k in range(j-23, j+1))
+        eff24_value = abs(close-candles[j-24].close) / path24 if path24 else 0.0
+        broad_r24.append(r24_value); broad_r72.append(r72_value); broad_e24.append(eff24_value)
+    out["broad_universe_coverage_count"] = len(broad_r24)
+    out["broad_positive_24h_share"] = sum(x > 0 for x in broad_r24) / len(broad_r24) if broad_r24 else ""
+    out["broad_positive_72h_share"] = sum(x > 0 for x in broad_r72) / len(broad_r72) if broad_r72 else ""
+    out["broad_median_ret_24h_pct"] = float(__import__("statistics").median(broad_r24)) if broad_r24 else ""
+    out["broad_median_ret_72h_pct"] = float(__import__("statistics").median(broad_r72)) if broad_r72 else ""
+    out["broad_median_efficiency_24h"] = float(__import__("statistics").median(broad_e24)) if broad_e24 else ""
     return out
 
-def run_fold(data, stamps, context_data, context_index, fold, start_frac, end_frac, chase_limit):
+def run_fold(data, stamps, context_data, context_index, market_universe_data, market_universe_index, fold, start_frac, end_frac, chase_limit):
     n = len(stamps)
     start_idx, end_idx = int(n*start_frac), int(n*end_frac)
     start_ts, end_ts = stamps[start_idx], stamps[end_idx-1]
@@ -125,7 +150,7 @@ def run_fold(data, stamps, context_data, context_index, fold, start_frac, end_fr
     context_cache = {}
     def cached_context(i):
         if i not in context_cache:
-            context_cache[i] = market_context(data, context_data, context_index, i)
+            context_cache[i] = market_context(data, context_data, context_index, market_universe_data, market_universe_index, i)
         return context_cache[i]
     for sym, candles in data.items():
         for i, c in enumerate(candles):
@@ -283,7 +308,7 @@ def run_fold(data, stamps, context_data, context_index, fold, start_frac, end_fr
             "signal_ret_24h_pct":feat["ret_24h_pct"] if feat else "",
             "signal_efficiency_24h":feat["efficiency_24h"] if feat else "",
             **{k:v for k,v in (signal_lookup.get((t.token,matched[0]),{}).items() if matched else [])
-               if k.startswith(("btc_","eth_","universe_"))},
+               if k.startswith(("btc_","eth_","universe_","broad_"))},
         })
     for row in signal_rows:
         row.setdefault("engine_emitted_signal",0)
@@ -294,11 +319,11 @@ def run_fold(data, stamps, context_data, context_index, fold, start_frac, end_fr
     return signal_rows,trades_out
 
 def main():
-    data,stamps,context_data,context_index=synchronized_data()
+    data,stamps,context_data,context_index,market_universe_data,market_universe_index=synchronized_data()
     signals=[]; trades=[]; summary=[]
     for chase_limit in CHASE_LIMITS:
         for fold,a,b in FOLDS:
-            sr,tr=run_fold(data,stamps,context_data,context_index,fold,a,b,chase_limit)
+            sr,tr=run_fold(data,stamps,context_data,context_index,market_universe_data,market_universe_index,fold,a,b,chase_limit)
             signals.extend(sr); trades.extend(tr)
             net=sum(float(t['pnl_net_usdt']) for t in tr)
             wins=sum(float(t['pnl_net_usdt'])>0 for t in tr)

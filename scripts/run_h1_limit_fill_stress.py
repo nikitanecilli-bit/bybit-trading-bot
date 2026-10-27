@@ -109,8 +109,10 @@ def report(label,rows):
 
 def main():
     datasets=read_zip_datasets(); out=[]
+    allowed={s.strip().upper() for s in os.getenv("H1_SYMBOL_ALLOWLIST", "").split(",") if s.strip()}
+    if allowed: print("Selected-universe filter: " + ", ".join(sorted(allowed)))
     for (symbol,tf),(_,archive,candles) in sorted(datasets.items()):
-        if tf!="1h" or len(candles)<500: continue
+        if tf!="1h" or len(candles)<500 or (allowed and symbol.upper() not in allowed): continue
         n=len(candles)
         for fold,start_frac,end_frac in FOLDS:
             start,end=int(n*start_frac),int(n*end_frac)

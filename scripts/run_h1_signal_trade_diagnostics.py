@@ -147,6 +147,32 @@ def run_fold(data, stamps, fold, start_frac, end_frac, chase_limit):
             row["signal_status"]="pending"
         return sig
     core.evaluate_signal=staticmethod(wrapped_eval)
+    # Record why each candidate is not evaluated by the engine. This separates
+    # candle-body chase rejection from same-symbol position/pending state and
+    # portfolio-level risk/capacity gates without changing engine decisions.
+    original_step=engine.step_candle
+    def wrapped_step(sym,bars):
+        row = signal_lookup.get((sym, int(bars[-1].ts))) if bars else None
+        reason = ""
+        if row and row["passes_selected_filter"]:
+            if sym in engine.open_positions:
+                reason = "same_symbol_position_open"
+            elif sym in engine.pending:
+                reason = "same_symbol_pending_order"
+            else:
+                can_open, gate = engine.risk_mgr.can_open_new_trade(len(engine.open_positions) + len(engine.pending))
+                reason = "evaluate_signal" if can_open else f"risk_gate:{gate}"
+        original_step(sym,bars)
+        if row and row["passes_selected_filter"]:
+            if row.get("engine_emitted_signal",0):
+                row["engine_skip_reason"] = "signal_emitted"
+            elif reason == "evaluate_signal":
+                c = bars[-1]
+                body_pct = abs(c.close-c.open)/c.open*100 if c.open else 0
+                row["engine_skip_reason"] = "max_chase_candle_body" if body_pct > chase_limit else "other_signal_rejection"
+            else:
+                row["engine_skip_reason"] = reason
+    engine.step_candle=wrapped_step
     original_fill=engine._try_fill_pending
     order_age={}
     def wrapped_fill(sym,candle):
@@ -190,6 +216,7 @@ def run_fold(data, stamps, fold, start_frac, end_frac, chase_limit):
             data_label=f"BINANCE_PROXY H1 selected universe diagnostic fold={fold}")
     finally:
         core.evaluate_signal=staticmethod(original_eval)
+        engine.step_candle=original_step
         em.TAKER_FEE, em.MAKER_FEE, em.TAKER_SLIP = base_taker, base_maker, base_slip
 
     # Finalize candidate status and map trades to originating signal by fill timestamp.
@@ -223,7 +250,7 @@ def run_fold(data, stamps, fold, start_frac, end_frac, chase_limit):
         row.setdefault("fill_status","not_emitted_or_not_attempted")
         row.setdefault("signal_status","rejected_by_selected_filter" if not row["passes_selected_filter"] else "selected_but_not_emitted")
         row.setdefault("limit_order_price",""); row.setdefault("fill_ts",""); row.setdefault("fill_time_utc","")
-        row.setdefault("fill_price",""); row.setdefault("cancel_ts","")
+        row.setdefault("fill_price",""); row.setdefault("cancel_ts",""); row.setdefault("engine_skip_reason","")
     return signal_rows,trades_out
 
 def main():

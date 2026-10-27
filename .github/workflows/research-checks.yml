@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile Python files
-        run: python -m py_compile Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py test_v15_donchian_signal.py test_v15_backtest.py research_v15/donchian_signal.py research_v15/backtest.py scripts/scan_secrets.py scripts/run_uploaded_dataset_backtests.py scripts/run_v15_h1_backtest.py test_v15_portfolio.py research_v15/portfolio.py
+        run: python -m py_compile Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py test_v15_donchian_signal.py test_v15_backtest.py research_v15/donchian_signal.py research_v15/backtest.py scripts/scan_secrets.py scripts/run_uploaded_dataset_backtests.py scripts/run_v15_h1_backtest.py test_v15_portfolio.py research_v15/portfolio.py test_v15_portfolio_replay.py research_v15/portfolio_replay.py
       - name: Scan for obvious secrets
         run: python scripts/scan_secrets.py .
       - name: Backtest uploaded historical datasets
@@ -39,5 +39,7 @@ jobs:
         run: python test_v15_backtest.py
       - name: Test v15 portfolio risk guardrails
         run: python test_v15_portfolio.py
+      - name: Test v15 portfolio replay
+        run: python test_v15_portfolio_replay.py
       - name: Run v15 H1 diagnostic backtest
         run: python scripts/run_v15_h1_backtest.py

@@ -11,10 +11,12 @@ import glob
 import io
 import os
 import re
+import sys
 import zipfile
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import Bybit_Trading_Engine_v14_research as engine_mod
 
 

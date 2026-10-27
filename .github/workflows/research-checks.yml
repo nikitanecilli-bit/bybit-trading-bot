@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile Python files
-        run: python -m py_compile market_regime.py test_market_regime.py scripts/run_regime_analysis.py test_regime_analysis.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py scripts/scan_secrets.py scripts/run_uploaded_dataset_backtests.py
+        run: python -m py_compile market_regime.py test_market_regime.py scripts/run_regime_analysis.py test_regime_analysis.py scripts/run_regime_gate_holdout.py test_regime_gate_holdout.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py scripts/scan_secrets.py scripts/run_uploaded_dataset_backtests.py
       - name: Scan for obvious secrets
         run: python scripts/scan_secrets.py .
       - name: Backtest uploaded historical datasets
@@ -32,8 +32,18 @@ jobs:
         run: python test_market_regime.py
       - name: Test regime analysis report helpers
         run: python test_regime_analysis.py
+      - name: Test frozen regime gate
+        run: python test_regime_gate_holdout.py
       - name: Generate baseline performance by market regime (including long/short split)
         run: python scripts/run_regime_analysis.py --output regime_analysis.csv
+      - name: Compare baseline vs frozen regime gate on chronological holdout
+        run: python scripts/run_regime_gate_holdout.py --output regime_gate_holdout.csv
+      - name: Upload regime gate holdout report
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-regime-gate-holdout-report
+          path: regime_gate_holdout.csv
+          if-no-files-found: error
       - name: Upload regime analysis report
         uses: actions/upload-artifact@v4
         with:

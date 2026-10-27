@@ -146,7 +146,7 @@ def test_blocked_weekdays_utc_suppresses_signal_and_validates_values():
         for i in range(4)
     ]
     candles[-1] = engine_mod.Candle(ts=ts_monday + 3 * 900_000,
-                                    open=100.0, high=112.0, low=99.0, close=111.0, volume=100.0)
+                                    open=110.5, high=112.0, low=109.0, close=111.0, volume=100.0)
     with patch.object(engine_mod.QuantStrategyCore, "compute_donchian_and_volume", return_value=(110.0, 90.0, 10.0)), \
          patch.object(engine_mod.QuantStrategyCore, "compute_atr", return_value=1.0):
         cfg = engine_mod.BotConfig(donchian_period=2, atr_period=2, min_volume_ratio=1.6)

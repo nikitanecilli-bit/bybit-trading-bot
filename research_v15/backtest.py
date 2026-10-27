@@ -132,6 +132,35 @@ def resolve_stop_target(
     return None
 
 
+
+def breakeven_action(
+    bar: Bar,
+    side: str,
+    entry_price: float,
+    risk_distance: float,
+    trigger_r: float,
+    already_moved: bool,
+    entry_bar: bool = False,
+) -> str | None:
+    """Return 'exit', 'move', or None for conservative breakeven handling.
+
+    If the trigger and return to entry occur in the same OHLC bar, return
+    'exit' because the intrabar sequence is unknowable. Fees still apply to
+    that exit, so breakeven does not imply zero net PnL.
+    """
+    if side not in ("long", "short"):
+        raise ValueError("side must be 'long' or 'short'")
+    if entry_price <= 0 or risk_distance <= 0 or trigger_r <= 0:
+        raise ValueError("entry price, risk distance, and trigger must be positive")
+    if already_moved or entry_bar:
+        return None
+    favorable = bar.high - entry_price if side == "long" else entry_price - bar.low
+    if favorable < trigger_r * risk_distance:
+        return None
+    returned_to_entry = bar.low <= entry_price if side == "long" else bar.high >= entry_price
+    return "exit" if returned_to_entry else "move"
+
+
 def limit_order_expired(age_bars: int, valid_bars: int) -> bool:
     """Orders are valid for ages 1..valid_bars after the signal candle."""
     if age_bars < 0 or valid_bars < 1:
@@ -232,13 +261,14 @@ def backtest_symbol(
             # Conservative OHLC handling: stop wins when intrabar order is ambiguous.
             stop_hit = bar.low <= pos["stop"] if side == "long" else bar.high >= pos["stop"]
             target_hit = (bar.high >= pos["target"] if side == "long" else bar.low <= pos["target"]) and i > pos["entry_index"]
-            favorable = (bar.high - pos["entry"]) if side == "long" else (pos["entry"] - bar.low)
-            be_trigger = i > pos["entry_index"] and favorable >= breakeven_trigger_r * pos["risk_usdt"] / pos["qty"] and not pos["be_moved"]
-            be_stop_same_bar = be_trigger and (bar.low <= pos["entry"] if side == "long" else bar.high >= pos["entry"])
+            be_action = breakeven_action(
+                bar, side, pos["entry"], pos["risk_usdt"] / pos["qty"],
+                breakeven_trigger_r, pos["be_moved"], entry_bar=(i == pos["entry_index"]),
+            )
             if stop_hit:
                 raw_exit = stop_order_fill(bar, side, pos["stop"])
                 close_position(bar, raw_exit, "stop_or_gap", maker_exit=False)
-            elif be_stop_same_bar:
+            elif be_action == "exit":
                 close_position(bar, pos["entry"], "breakeven_stop_intrabar_ambiguous", maker_exit=False)
             elif target_hit:
                 # The stop was already checked above; target is safe to resolve alone here.
@@ -247,8 +277,9 @@ def backtest_symbol(
                     close_position(bar, resolved[0], resolved[1], maker_exit=resolved[2])
             elif i - pos["entry_index"] >= max_hold_bars:
                 close_position(bar, bar.close, "time_stop", maker_exit=False)
-            elif be_trigger:
+            elif be_action == "move":
                 # Lock entry price; future bars only see the updated stop.
+                # The stop never moves back toward the initial risk.
                 pos["stop"] = pos["entry"]
                 pos["be_moved"] = True
 

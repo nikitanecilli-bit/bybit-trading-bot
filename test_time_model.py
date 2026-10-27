@@ -48,6 +48,22 @@ def test_mtm_respects_configured_1h_close_boundary():
     assert e._risk_timestamps == [ts_open + 3_600_000], e._risk_timestamps
 
 
+
+def test_open_position_management_receives_bar_close_timestamp_across_utc_midnight():
+    e, _ = bare_engine("15m")
+    calls = []
+    e.open_positions["BTCUSDT"] = object()
+    e._manage_position = lambda symbol, history, fill_bar, exit_ts: calls.append(exit_ts)
+    ts_open = int(engine_mod.datetime(2026, 1, 1, 23, 45, tzinfo=engine_mod.timezone.utc).timestamp() * 1000)
+    candle = engine_mod.Candle(ts=ts_open, open=100, high=101, low=99, close=100.5, volume=10)
+
+    e.step_candle("BTCUSDT", [candle])
+
+    expected_close_ts = ts_open + 900_000
+    assert calls == [expected_close_ts], calls
+    close_day = engine_mod.datetime.fromtimestamp(expected_close_ts / 1000, tz=engine_mod.timezone.utc).date()
+    assert close_day.isoformat() == "2026-01-02", close_day
+
 def test_unsupported_timeframe_fails_closed():
     e, seen = bare_engine("7m")
     ts_open = 1_800_000_000_000
@@ -199,6 +215,7 @@ def test_limit_entry_uses_limit_price_when_bar_opens_above_and_trades_through():
 
 if __name__ == "__main__":
     tests = [test_mtm_uses_close_timestamp_for_15m_bar,
+             test_open_position_management_receives_bar_close_timestamp_across_utc_midnight,
              test_mtm_respects_configured_1h_close_boundary,
              test_unsupported_timeframe_fails_closed,
              test_wick_above_donchian_without_close_does_not_trigger_long_breakout,

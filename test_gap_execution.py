@@ -150,6 +150,113 @@ def test_long_stop_without_gap_fills_at_stop_price():
     assert captured[0][2] == "stop_loss", captured[0][2]
 
 
+def test_long_stop_wins_when_same_candle_hits_tp1():
+    e = make_engine()
+    pos = make_position("long", entry=100.0, stop=95.0)
+    e.open_positions["BTCUSDT"] = pos
+    captured = []
+    e._close_position = lambda *args: captured.append(args)
+    history = [
+        candle(100, 101, 99, 100, ts=1_799_998_200_000),
+        candle(100, 101, 99, 100, ts=1_799_999_100_000),
+        candle(100, 112, 94, 101),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(e, "BTCUSDT", history, False, history[-1].ts + 900_000)
+    assert len(captured) == 1
+    assert captured[0][1:3] == (95.0, "stop_loss")
+    assert pos.tp1_hit is False
+    assert pos.remaining_fraction == 1.0
+
+
+def test_long_stop_wins_when_same_candle_hits_tp2():
+    e = make_engine()
+    pos = make_position("long", entry=100.0, stop=95.0)
+    e.open_positions["BTCUSDT"] = pos
+    captured = []
+    e._close_position = lambda *args: captured.append(args)
+    history = [
+        candle(100, 101, 99, 100, ts=1_799_998_200_000),
+        candle(100, 101, 99, 100, ts=1_799_999_100_000),
+        candle(100, 125, 94, 101),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(e, "BTCUSDT", history, False, history[-1].ts + 900_000)
+    assert len(captured) == 1
+    assert captured[0][1:3] == (95.0, "stop_loss")
+    assert pos.tp1_hit is False
+    assert pos.remaining_fraction == 1.0
+
+
+def test_short_stop_wins_when_same_candle_hits_tp1():
+    e = make_engine()
+    pos = make_position("short", entry=100.0, stop=105.0)
+    e.open_positions["BTCUSDT"] = pos
+    captured = []
+    e._close_position = lambda *args: captured.append(args)
+    history = [
+        candle(100, 101, 99, 100, ts=1_799_998_200_000),
+        candle(100, 101, 99, 100, ts=1_799_999_100_000),
+        candle(100, 106, 88, 99),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(e, "BTCUSDT", history, False, history[-1].ts + 900_000)
+    assert len(captured) == 1
+    assert captured[0][1:3] == (105.0, "stop_loss")
+    assert pos.tp1_hit is False
+    assert pos.remaining_fraction == 1.0
+
+
+def test_short_stop_wins_when_same_candle_hits_tp2():
+    e = make_engine()
+    pos = make_position("short", entry=100.0, stop=105.0)
+    e.open_positions["BTCUSDT"] = pos
+    captured = []
+    e._close_position = lambda *args: captured.append(args)
+    history = [
+        candle(100, 101, 99, 100, ts=1_799_998_200_000),
+        candle(100, 101, 99, 100, ts=1_799_999_100_000),
+        candle(100, 106, 75, 99),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(e, "BTCUSDT", history, False, history[-1].ts + 900_000)
+    assert len(captured) == 1
+    assert captured[0][1:3] == (105.0, "stop_loss")
+    assert pos.tp1_hit is False
+    assert pos.remaining_fraction == 1.0
+
+
+def test_partial_tp1_then_stop_closes_only_remaining_fraction():
+    e = make_engine()
+    pos = make_position("long", entry=100.0, stop=95.0)
+    pos.tp1_price = 110.0
+    pos.tp2_price = 120.0
+    e.open_positions["BTCUSDT"] = pos
+    # First candle reaches TP1 but not the original stop.
+    first = [
+        candle(100, 101, 99, 100, ts=1_799_998_200_000),
+        candle(100, 101, 99, 100, ts=1_799_999_100_000),
+        candle(100, 111, 98, 110),
+    ]
+    e._close_position = lambda *args: None
+    engine_mod.UnifiedQuantEngine._manage_position(e, "BTCUSDT", first, False, first[-1].ts + 900_000)
+    assert pos.tp1_hit is True
+    assert pos.remaining_fraction == 0.5
+    assert pos.realized_tp1_gross_usdt == 50.0
+
+    # A later candle crosses the moved trailing stop; close should account for only the remainder.
+    captured = []
+    e._close_position = lambda *args: captured.append(args)
+    second = [
+        first[0], first[1],
+        candle(100, 111, 98, 110),
+        candle(110, 112, 99, 101),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(e, "BTCUSDT", second, False, second[-1].ts + 900_000)
+    assert len(captured) == 1
+    assert captured[0][1] == pos.stop_price
+    assert captured[0][2] == "trailing_stop"
+    assert pos.remaining_fraction == 0.5
+    assert pos.realized_tp1_gross_usdt == 50.0
+
+
+
 if __name__ == "__main__":
     tests = [
         test_market_long_gap_above_chase_limit_is_cancelled,
@@ -159,6 +266,11 @@ if __name__ == "__main__":
         test_long_stop_gap_fills_at_open_below_stop,
         test_short_stop_gap_fills_at_open_above_stop,
         test_long_stop_without_gap_fills_at_stop_price,
+        test_long_stop_wins_when_same_candle_hits_tp1,
+        test_long_stop_wins_when_same_candle_hits_tp2,
+        test_short_stop_wins_when_same_candle_hits_tp1,
+        test_short_stop_wins_when_same_candle_hits_tp2,
+        test_partial_tp1_then_stop_closes_only_remaining_fraction,
     ]
     for test in tests:
         test()

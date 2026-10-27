@@ -7,6 +7,7 @@ on:
       - research/market-regime-v1-main
     paths:
       - "scripts/run_h1_signal_trade_diagnostics.py"
+      - "scripts/run_h1_market_context_diagnostics.py"
       - "Bybit_Trading_Engine_v14_research.py"
       - "scripts/run_uploaded_dataset_backtests.py"
       - ".github/workflows/h1-signal-trade-diagnostics.yml"
@@ -24,9 +25,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile
-        run: python -m py_compile Bybit_Trading_Engine_v14_research.py scripts/run_uploaded_dataset_backtests.py scripts/run_h1_signal_trade_diagnostics.py
+        run: python -m py_compile Bybit_Trading_Engine_v14_research.py scripts/run_uploaded_dataset_backtests.py scripts/run_h1_signal_trade_diagnostics.py scripts/run_h1_market_context_diagnostics.py
       - name: Run signal and trade diagnostics
         run: python scripts/run_h1_signal_trade_diagnostics.py
+      - name: Run BTC ETH and altcoin market context diagnostics
+        run: python scripts/run_h1_market_context_diagnostics.py
       - name: Upload diagnostic tables
         uses: actions/upload-artifact@v4
         with:
@@ -34,4 +37,5 @@ jobs:
           path: |
             h1_signal_diagnostics.csv
             h1_trade_diagnostics.csv
+            h1_market_context_by_symbol.csv
           if-no-files-found: error

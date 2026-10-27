@@ -9,14 +9,14 @@ The shortlist uses two constraints: (1) results across the prior H1 signal-quali
 4. AAVEUSDT
 5. CAKEUSDT
 
-## Reserve candidates — revised exploratory test (5)
-1. ENAUSDT
-2. GMXUSDT
-3. ONDOUSDT
-4. SKYUSDT
-5. QNTUSDT
+## Reserve candidates — hybrid regime test (5)
+1. DASHUSDT
+2. HBARUSDT
+3. ENAUSDT
+4. GMXUSDT
+5. ONDOUSDT
 
-This replaces the previous reserve basket (DASH, ENA, HBAR, ASTER, JST), which had 0 of 12 parameter configurations positive in the middle fold in the shared-capital run at 2x modeled costs. The new basket is deliberately a hypothesis to test, not a claim of profitability: individual folds show mixed behavior, and these candidates were selected after inspecting the same historical archive.
+The previous reserve basket DASH/ENA/HBAR/ASTER/JST was positive in all 12 configurations on folds 1 and 3 but negative in all 12 on fold 2. The alternative ENA/GMX/ONDO/SKY/QNT basket improved the middle fold (7/12 positive at 2x modeled costs) but lost on fold 1 in all 12 configurations. This hybrid retains DASH and HBAR for the first/last folds and adds ENA, GMX, ONDO, which showed some middle-fold resilience. It is an experiment, not a claim of profitability.
 
 ## High-scoring shorter-history watchlist
 - LINKUSDT

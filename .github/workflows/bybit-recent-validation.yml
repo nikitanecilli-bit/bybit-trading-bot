@@ -1,8 +1,6 @@
 name: Bybit recent-data long-only validation
 
 on:
-  push:
-    branches: [research/market-regime-v1-main]
   workflow_dispatch:
 
 permissions:

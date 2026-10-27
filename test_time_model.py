@@ -647,6 +647,70 @@ def test_sequential_kill_switch_closes_do_not_double_count_unrealized_pnl():
 
 
 
+
+def test_equity_reconciles_journal_and_remaining_open_positions_after_each_close():
+    cfg = engine_mod.BotConfig(
+        timeframe="15m", capital_usdt=10_000.0,
+        daily_stop_loss_pct=50.0, emergency_kill_switch_pct=90.0,
+    )
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.cfg = cfg
+    ts = 1_800_000_900_000
+    e._last_mark_prices = {"BTCUSDT": 95.0, "ETHUSDT": 105.0}
+    e._intrabar_risk_marks = {"BTCUSDT": 95.0, "ETHUSDT": 105.0}
+    e._intrabar_risk_marks_ts = ts
+    e.open_positions = {
+        "BTCUSDT": engine_mod.OpenPositionState(
+            trade_id="btc-reconcile", symbol="BTCUSDT", direction="long", strategy="test",
+            entry_ts=ts - 900_000, entry_price=100.0, stop_price=90.0,
+            tp1_price=110.0, tp2_price=120.0, initial_stop_dist=10.0,
+            size_usdt=1_000.0, risk_usdt=100.0, order_type="market",
+            equity_at_entry=10_000.0,
+        ),
+        "ETHUSDT": engine_mod.OpenPositionState(
+            trade_id="eth-reconcile", symbol="ETHUSDT", direction="short", strategy="test",
+            entry_ts=ts - 900_000, entry_price=100.0, stop_price=110.0,
+            tp1_price=90.0, tp2_price=80.0, initial_stop_dist=10.0,
+            size_usdt=1_000.0, risk_usdt=100.0, order_type="market",
+            equity_at_entry=10_000.0,
+        ),
+    }
+    e.closed_trades = []
+    e.risk_mgr = engine_mod.AdaptiveRiskManager(cfg)
+    e.tg = type("Notifier", (), {"send_message": lambda self, message: None})()
+    e._persist = lambda: None
+
+    # Both open positions have -50 gross and -1.55 estimated execution costs.
+    e.risk_mgr.mark_to_market(e._unrealized_pnl_at_marks(), ts)
+    assert e.risk_mgr.unrealized_pnl == -103.10
+    assert e.risk_mgr.current_equity == 9_896.90
+
+    btc = e.open_positions["BTCUSDT"]
+    engine_mod.UnifiedQuantEngine._close_position(
+        e, btc, 95.0, "stop_loss", ts, mae_r=0.5, mfe_r=0.0,
+    )
+    journal_net = round(sum(r.pnl_usdt for r in e.closed_trades), 2)
+    assert journal_net == -51.55
+    assert e.risk_mgr.realized_equity == 9_948.45
+    assert e.risk_mgr.unrealized_pnl == -51.55
+    assert e.risk_mgr.current_equity == 9_896.90
+    assert e.risk_mgr.current_equity == round(
+        cfg.capital_usdt + journal_net + e.risk_mgr.unrealized_pnl, 2,
+    )
+
+    eth = e.open_positions["ETHUSDT"]
+    engine_mod.UnifiedQuantEngine._close_position(
+        e, eth, 105.0, "stop_loss", ts, mae_r=0.5, mfe_r=0.0,
+    )
+    journal_net = round(sum(r.pnl_usdt for r in e.closed_trades), 2)
+    assert journal_net == -103.10
+    assert not e.open_positions
+    assert e.risk_mgr.unrealized_pnl == 0.0
+    assert e.risk_mgr.realized_equity == 9_896.90
+    assert e.risk_mgr.current_equity == 9_896.90
+    assert e.risk_mgr.current_equity == round(cfg.capital_usdt + journal_net, 2)
+
+
 def test_full_step_candle_kill_switch_flattens_portfolio_and_blocks_reentry():
     cfg = engine_mod.BotConfig(
         timeframe="15m", capital_usdt=10_000.0,
@@ -782,7 +846,8 @@ def test_daily_stop_keeps_managing_existing_positions_without_new_entries():
 
 
 if __name__ == "__main__":
-    tests = [test_daily_stop_keeps_managing_existing_positions_without_new_entries,
+    tests = [test_equity_reconciles_journal_and_remaining_open_positions_after_each_close,
+             test_daily_stop_keeps_managing_existing_positions_without_new_entries,
              test_full_step_candle_kill_switch_flattens_portfolio_and_blocks_reentry,
              test_sequential_kill_switch_closes_do_not_double_count_unrealized_pnl,
              test_combined_intrabar_losses_trigger_daily_stop_and_kill_switch,

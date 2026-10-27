@@ -17,6 +17,7 @@ import Bybit_Trading_Engine_v14_research as em
 from run_uploaded_dataset_backtests import read_zip_datasets
 
 SYMBOLS = ["RAYUSDT", "PUMPUSDT", "TAOUSDT", "AAVEUSDT", "CAKEUSDT"]
+CONTEXT_SYMBOLS = ["BTCUSDT", "ETHUSDT"]
 FOLDS = [(1, .50, .65), (2, .65, .80), (3, .80, 1.00)]
 VOL_MIN = 1.6
 BREAKOUT_ATR_MIN = .25
@@ -62,27 +63,52 @@ def features(candles, i):
     }
 
 def synchronized_data():
+    targets = set(SYMBOLS + CONTEXT_SYMBOLS)
     raw = {}
     for (sym, tf), item in read_zip_datasets().items():
-        if tf == "1h" and sym in SYMBOLS and len(item[2]) >= 500:
+        if tf == "1h" and sym in targets and len(item[2]) >= 500:
             raw[sym] = item
-    missing = sorted(set(SYMBOLS)-set(raw))
+    missing = sorted(targets-set(raw))
     if missing:
-        raise SystemExit(f"Missing selected H1 datasets: {missing}")
+        raise SystemExit(f"Missing selected/context H1 datasets: {missing}")
     common = None
     for _, _, candles in raw.values():
-        stamps = {c.ts for c in candles}
-        common = stamps if common is None else common.intersection(stamps)
+        stamps_set = {c.ts for c in candles}
+        common = stamps_set if common is None else common.intersection(stamps_set)
     stamps = sorted(common or [])
     if len(stamps) < 3000:
         raise SystemExit(f"Insufficient synchronized H1 history: {len(stamps)} bars")
-    data = {s: [dict_by_ts[t] for t in stamps]
-            for s, (_, _, candles) in raw.items()
-            for dict_by_ts in [{c.ts:c for c in candles}]}
+    aligned = {s: [dict_by_ts[t] for t in stamps]
+               for s, (_, _, candles) in raw.items()
+               for dict_by_ts in [{c.ts:c for c in candles}]}
+    data = {s: aligned[s] for s in SYMBOLS}
+    context_data = {s: aligned[s] for s in CONTEXT_SYMBOLS}
     em.check_alignment(data)
-    return data, stamps
+    em.check_alignment(context_data)
+    return data, stamps, context_data
 
-def run_fold(data, stamps, fold, start_frac, end_frac, chase_limit):
+def market_context(data, context_data, i):
+    """Completed-bar BTC/ETH context and cross-sectional breadth; no lookahead."""
+    out = {}
+    for sym, prefix in (("BTCUSDT", "btc"), ("ETHUSDT", "eth")):
+        f = features(context_data[sym], i)
+        for src, dst in (
+            ("ret_24h_pct", "ret_24h_pct"), ("ret_72h_pct", "ret_72h_pct"),
+            ("atr_pct", "atr_pct"), ("efficiency_24h", "efficiency_24h"),
+            ("efficiency_72h", "efficiency_72h"),
+        ):
+            out[f"{prefix}_{dst}"] = f[src] if f else ""
+    cross = [features(data[sym], i) for sym in SYMBOLS]
+    r24 = [f["ret_24h_pct"] for f in cross if f and f["ret_24h_pct"] != ""]
+    r72 = [f["ret_72h_pct"] for f in cross if f and f["ret_72h_pct"] != ""]
+    e24 = [f["efficiency_24h"] for f in cross if f and f["efficiency_24h"] != ""]
+    out["universe_positive_24h_share"] = sum(x > 0 for x in r24) / len(r24) if r24 else ""
+    out["universe_median_ret_24h_pct"] = float(__import__("statistics").median(r24)) if r24 else ""
+    out["universe_median_ret_72h_pct"] = float(__import__("statistics").median(r72)) if r72 else ""
+    out["universe_median_efficiency_24h"] = float(__import__("statistics").median(e24)) if e24 else ""
+    return out
+
+def run_fold(data, stamps, context_data, fold, start_frac, end_frac, chase_limit):
     n = len(stamps)
     start_idx, end_idx = int(n*start_frac), int(n*end_frac)
     start_ts, end_ts = stamps[start_idx], stamps[end_idx-1]
@@ -90,6 +116,11 @@ def run_fold(data, stamps, fold, start_frac, end_frac, chase_limit):
     # selected volume/strength filter or is never filled.
     signal_rows = []
     signal_lookup = {}
+    context_cache = {}
+    def cached_context(i):
+        if i not in context_cache:
+            context_cache[i] = market_context(data, context_data, i)
+        return context_cache[i]
     for sym, candles in data.items():
         for i, c in enumerate(candles):
             if not (start_ts <= c.ts <= end_ts):
@@ -100,7 +131,8 @@ def run_fold(data, stamps, fold, start_frac, end_frac, chase_limit):
             accepted = f["volume_ratio"] >= VOL_MIN and f["breakout_atr"] >= BREAKOUT_ATR_MIN
             row = {"fold":fold, "chase_limit_pct":chase_limit, "symbol":sym, "signal_ts":c.ts, "signal_time_utc":iso(c.ts),
                    "candidate_type":"long_donchian_breakout", "passes_selected_filter":int(accepted),
-                   **{k:round(v,6) if isinstance(v,(int,float)) else v for k,v in f.items()}}
+                   **{k:round(v,6) if isinstance(v,(int,float)) else v for k,v in f.items()},
+                   **{k:round(v,6) if isinstance(v,(int,float)) else v for k,v in cached_context(i).items()}}
             for h in (6,12,24,48):
                 j=i+h
                 if j < len(candles):
@@ -244,6 +276,8 @@ def run_fold(data, stamps, fold, start_frac, end_frac, chase_limit):
             "signal_atr_pct":feat["atr_pct"] if feat else "",
             "signal_ret_24h_pct":feat["ret_24h_pct"] if feat else "",
             "signal_efficiency_24h":feat["efficiency_24h"] if feat else "",
+            **{k:v for k,v in (signal_lookup.get((t.token,matched[0]),{}).items() if matched else [])
+               if k.startswith(("btc_","eth_","universe_"))},
         })
     for row in signal_rows:
         row.setdefault("engine_emitted_signal",0)
@@ -254,11 +288,11 @@ def run_fold(data, stamps, fold, start_frac, end_frac, chase_limit):
     return signal_rows,trades_out
 
 def main():
-    data,stamps=synchronized_data()
+    data,stamps,context_data=synchronized_data()
     signals=[]; trades=[]; summary=[]
     for chase_limit in CHASE_LIMITS:
         for fold,a,b in FOLDS:
-            sr,tr=run_fold(data,stamps,fold,a,b,chase_limit)
+            sr,tr=run_fold(data,stamps,context_data,fold,a,b,chase_limit)
             signals.extend(sr); trades.extend(tr)
             net=sum(float(t['pnl_net_usdt']) for t in tr)
             wins=sum(float(t['pnl_net_usdt'])>0 for t in tr)

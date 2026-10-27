@@ -953,9 +953,12 @@ class UnifiedQuantEngine:
             entry_cost = pos.size_usdt * (MAKER_FEE if pos.order_type == "limit" else TAKER_FEE)
             entry_slip = 0.0 if pos.order_type == "limit" else pos.size_usdt * TAKER_SLIP
             tp1_cost = (pos.size_usdt * TP1_FRACTION * (MAKER_FEE if pos.order_type == "limit" else TAKER_FEE)) if pos.tp1_hit else 0.0
-            # Предполагаем taker на выходе для консервативной оценки плавающего equity.
+            # TP1 is already an executed leg: include its slippage for market orders too.
+            tp1_slip = (pos.size_usdt * TP1_FRACTION * TAKER_SLIP
+                        if pos.tp1_hit and pos.order_type != "limit" else 0.0)
+            # Предполагаем taker на оставшемся выходе для консервативной оценки плавающего equity.
             exit_cost = pos.size_usdt * pos.remaining_fraction * (TAKER_FEE + TAKER_SLIP)
-            total += gross - entry_cost - entry_slip - tp1_cost - exit_cost
+            total += gross - entry_cost - entry_slip - tp1_cost - tp1_slip - exit_cost
         return total
 
     def _update_mark_to_market(self, ts_ms: int) -> None:

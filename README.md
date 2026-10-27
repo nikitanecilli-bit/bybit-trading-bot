@@ -103,3 +103,18 @@ python -m unittest test_data_adapter.py test_per_symbol_report.py
 
 The report is a first-pass instrument screen, not proof of an edge. It still depends on the engine's fee/slippage assumptions, the strategy configuration, and the selected universe. Do not rank by net PnL alone: compare trade count, profit factor, expectancy, drawdown and separate chronological out-of-sample performance. Funding costs and historical delisted/inactive symbols must be addressed before calling returns realistic or survivorship-bias-resistant.
 
+### Discover the current instrument universe
+
+```bash
+# All currently trading linear USDT perpetuals
+python scripts/discover_linear_universe.py --out universe_symbols.txt --json-out universe_snapshot.json
+
+# Or current top 100 by 24h turnover
+python scripts/discover_linear_universe.py --top 100 --out universe_symbols.txt --json-out universe_snapshot.json
+
+# Download 15m candles for the generated list (Bash)
+python bybit_downloader.py --symbols $(cat universe_symbols.txt) --intervals 15 --datasets kline --category linear --start 2023-01-01 --out data
+```
+
+This uses public Bybit V5 instrument/ticker endpoints. See the [official kline API](https://bybit-exchange.github.io/docs/v5/market/kline) for candle endpoint semantics. The list is a **snapshot of today's tradable contracts**, and ranking by today's turnover is not a historical universe. It cannot by itself answer whether a strategy worked on coins that later delisted or lost liquidity. Preserve `universe_snapshot.json` with each experiment so the selection rule and snapshot are auditable.
+

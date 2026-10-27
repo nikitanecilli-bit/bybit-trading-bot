@@ -86,14 +86,20 @@ def main():
     if not out: raise SystemExit("No results")
     with open("h1_direction_execution_ablation.csv","w",newline="",encoding="utf-8") as f:
         w=csv.DictWriter(f,fieldnames=list(out[0].keys()));w.writeheader();w.writerows(out)
-    import pandas as pd
-    df=pd.DataFrame(out)
-    print("\nSUMMARY (independent symbol runs; not portfolio PnL)")
-    for (fold,variant),g in df.groupby(["fold","variant"]):
-        print(f"fold={fold} {variant}: runs={len(g)} trades={g.trades.sum()} net={g.net_pnl.sum():+.2f} "
-              f"positive_runs={(g.net_pnl>0).sum()} median_pf={g.profit_factor.median():.3f} costs={g.costs.sum():.2f}")
-    for variant,g in df.groupby("variant"):
-        print(f"TOTAL {variant}: runs={len(g)} trades={g.trades.sum()} net={g.net_pnl.sum():+.2f} "
-              f"positive_runs={(g.net_pnl>0).sum()} median_pf={g.profit_factor.median():.3f} costs={g.costs.sum():.2f}")
+    def report(label, rows):
+        pfs=sorted(row["profit_factor"] for row in rows)
+        median_pf=pfs[len(pfs)//2] if len(pfs)%2 else (pfs[len(pfs)//2-1]+pfs[len(pfs)//2])/2
+        print(f"{label}: runs={len(rows)} trades={sum(row['trades'] for row in rows)} "
+              f"net={sum(row['net_pnl'] for row in rows):+.2f} "
+              f"positive_runs={sum(row['net_pnl']>0 for row in rows)} "
+              f"median_pf={median_pf:.3f} costs={sum(row['costs'] for row in rows):.2f}")
+    print("\\nSUMMARY (independent symbol runs; not portfolio PnL)")
+    for fold in sorted(set(row["fold"] for row in out)):
+        for variant in [v[0] for v in VARIANTS]:
+            group=[row for row in out if row["fold"]==fold and row["variant"]==variant]
+            if group: report(f"fold={fold} {variant}",group)
+    for variant in [v[0] for v in VARIANTS]:
+        group=[row for row in out if row["variant"]==variant]
+        if group: report(f"TOTAL {variant}",group)
     print("CAVEAT: Binance OHLCV proxy; fixed limit touched by candle assumed filled; no queue/spread/partial-fill model; not Bybit execution.")
 if __name__=="__main__": main()

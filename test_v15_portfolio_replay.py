@@ -4,7 +4,7 @@ import unittest
 from research_v15.portfolio_replay import replay_portfolio
 
 
-def trade(entry_ts, exit_ts, pnl=10.0, symbol_side="long"):
+def trade(entry_ts, exit_ts, pnl=10.0, symbol_side="long", exit_reason="test"):
     return {
         "side": symbol_side,
         "entry_ts": entry_ts,
@@ -14,7 +14,7 @@ def trade(entry_ts, exit_ts, pnl=10.0, symbol_side="long"):
         "qty": 1.0,
         "initial_risk_usdt": 1.0,
         "net_pnl": pnl,
-        "exit_reason": "test",
+        "exit_reason": exit_reason,
     }
 
 
@@ -55,6 +55,28 @@ class PortfolioReplayTests(unittest.TestCase):
         result = replay_portfolio(results, starting_equity=10_000, risk_pct=0.01, max_portfolio_risk_pct=0.015)
         self.assertEqual(result["accepted_trades"], 2)
         self.assertEqual(result["rejected_trades"], 0)
+
+    def test_exit_reason_diagnostics_reconcile_accepted_trades(self):
+        results = [
+            {"symbol": "AAAUSDT", "trades": [
+                trade(1, 2, 10, exit_reason="target"),
+                trade(3, 4, -5, exit_reason="stop_or_gap"),
+                trade(5, 6, 2, exit_reason="target"),
+            ]},
+        ]
+        result = replay_portfolio(results, starting_equity=10_000, risk_pct=0.01, max_portfolio_risk_pct=0.03)
+        by_reason = {item["exit_reason"]: item for item in result["by_exit_reason"]}
+        self.assertEqual(by_reason["target"]["trades"], 2)
+        self.assertEqual(by_reason["stop_or_gap"]["trades"], 1)
+        self.assertAlmostEqual(
+            sum(item["net_pnl"] for item in result["by_exit_reason"]),
+            sum(item["net_pnl"] for item in result["accepted"]),
+        )
+        self.assertAlmostEqual(
+            sum(item["gross_pnl"] - item["fees"] - item["slippage"] for item in result["by_exit_reason"]),
+            sum(item["net_pnl"] for item in result["by_exit_reason"]),
+            places=3,
+        )
 
     def test_invalid_trade_data_rejected(self):
         with self.assertRaises(ValueError):

@@ -142,6 +142,38 @@ def replay_portfolio(
     if open_positions:
         realize_positions(max(int(p["exit_ts"]) for p in open_positions), inclusive=True)
 
+    # Exit-reason diagnostics use only portfolio-accepted trades, with PnL and
+    # costs scaled to the actual replay allocation.
+    by_exit_reason: dict[str, dict[str, float | int]] = {}
+    for trade in accepted:
+        reason = str(trade.get("exit_reason") or "unknown")
+        stats = by_exit_reason.setdefault(reason, {
+            "trades": 0, "wins": 0, "losses": 0, "gross_pnl": 0.0,
+            "fees": 0.0, "slippage": 0.0, "net_pnl": 0.0,
+        })
+        stats["trades"] += 1
+        stats["wins"] += int(float(trade["net_pnl"]) > 0)
+        stats["losses"] += int(float(trade["net_pnl"]) < 0)
+        stats["gross_pnl"] += float(trade["gross_pnl"])
+        stats["fees"] += float(trade["fees"])
+        stats["slippage"] += float(trade["slippage"])
+        stats["net_pnl"] += float(trade["net_pnl"])
+    exit_reason_summary = []
+    for reason, stats in sorted(by_exit_reason.items()):
+        count = int(stats["trades"])
+        exit_reason_summary.append({
+            "exit_reason": reason,
+            "trades": count,
+            "wins": int(stats["wins"]),
+            "losses": int(stats["losses"]),
+            "win_rate_pct": round(100 * int(stats["wins"]) / count, 4) if count else 0.0,
+            "gross_pnl": round(float(stats["gross_pnl"]), 4),
+            "fees": round(float(stats["fees"]), 4),
+            "slippage": round(float(stats["slippage"]), 4),
+            "net_pnl": round(float(stats["net_pnl"]), 4),
+            "avg_net_pnl": round(float(stats["net_pnl"]) / count, 4) if count else 0.0,
+        })
+
     total_candidates = len(candidates)
     by_symbol = {}
     for trade in candidates:
@@ -188,6 +220,7 @@ def replay_portfolio(
         "max_portfolio_risk_pct": max_portfolio_risk_pct * 100,
         "risk_pct_per_position": risk_pct * 100,
         "by_symbol": symbol_summary,
+        "by_exit_reason": exit_reason_summary,
         "accepted": accepted,
         "rejected": rejected,
         "assumptions": {

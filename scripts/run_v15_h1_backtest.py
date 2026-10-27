@@ -110,6 +110,10 @@ def main():
     print(f"candidate_trades={portfolio['candidate_trades']} accepted={portfolio['accepted_trades']} rejected={portfolio['rejected_trades']} acceptance={portfolio['acceptance_rate_pct']:.2f}%")
     print(f"max_realized_drawdown={portfolio['max_realized_drawdown_pct']:.2f}% reconciliation_error={portfolio['reconciliation_error']:.10f}")
     print(f"accepted_gross_pnl={portfolio['accepted_gross_pnl']:.2f} fees={portfolio['accepted_fees']:.2f} slippage={portfolio['accepted_slippage']:.2f} USDT")
+    print("\\nPORTFOLIO EXIT-REASON DIAGNOSTICS — accepted trades only")
+    print("exit_reason,trades,wins,losses,win_rate_pct,gross_pnl,fees,slippage,net_pnl,avg_net_pnl")
+    for item in sorted(portfolio["by_exit_reason"], key=lambda item: item["net_pnl"]):
+        print(f"{item['exit_reason']},{item['trades']},{item['wins']},{item['losses']},{item['win_rate_pct']:.2f},{item['gross_pnl']:.2f},{item['fees']:.2f},{item['slippage']:.2f},{item['net_pnl']:.2f},{item['avg_net_pnl']:.2f}")
     print("\nPORTFOLIO SYMBOL DIAGNOSTICS — ranked by accepted-trade net PnL")
     print("symbol,candidates,accepted,rejected,acceptance_pct,candidate_net_pnl,accepted_gross_pnl,accepted_fees,accepted_slippage,accepted_net_pnl")
     ranked = sorted(portfolio["by_symbol"], key=lambda item: item["accepted_net_pnl"])

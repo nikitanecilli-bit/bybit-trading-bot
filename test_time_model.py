@@ -424,7 +424,9 @@ def test_limit_entry_uses_limit_price_when_bar_opens_above_and_trades_through():
 
 
 if __name__ == "__main__":
-    tests = [test_mtm_uses_close_timestamp_for_15m_bar,
+    tests = [test_intrabar_risk_mark_uses_adverse_extreme_when_stop_not_hit,
+             test_intrabar_risk_mark_uses_gap_adjusted_stop_fill_when_stop_crossed,
+             test_mtm_uses_close_timestamp_for_15m_bar,
              test_daily_stop_blocks_entries_until_next_utc_day,
              test_kill_switch_remains_latched_across_utc_day_change,
              test_portfolio_risk_cap_limits_new_position_size,
@@ -452,3 +454,44 @@ if __name__ == "__main__":
         test()
         print("PASS", test.__name__)
     print(f"{len(tests)}/{len(tests)} tests passed")
+
+def test_intrabar_risk_mark_uses_adverse_extreme_when_stop_not_hit():
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.cfg = engine_mod.BotConfig(timeframe="15m")
+    e._last_mark_prices = {}
+    e._intrabar_risk_marks = {}
+    e.open_positions = {}
+    e.pending = {}
+    e.risk_mgr = type("RiskSpy", (), {"on_new_timestamp": lambda self, ts: None})()
+    seen = []
+    e._update_mark_to_market = lambda ts: seen.append(e._intrabar_risk_marks.copy())
+    e._persist = lambda: None
+    e._try_fill_pending = lambda symbol, curr: False
+    e.risk_mgr.can_open_new_trade = lambda count: (False, "test")
+    pos = type("Pos", (), {"direction": "long", "stop_price": 90.0})()
+    e.open_positions["BTCUSDT"] = pos
+    candle = engine_mod.Candle(ts=1_800_000_000_000, open=100, high=105, low=92, close=101, volume=10)
+    e.step_candle("BTCUSDT", [candle])
+    assert seen == [{"BTCUSDT": 92}], seen
+
+
+def test_intrabar_risk_mark_uses_gap_adjusted_stop_fill_when_stop_crossed():
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.cfg = engine_mod.BotConfig(timeframe="15m")
+    e._last_mark_prices = {}
+    e._intrabar_risk_marks = {}
+    e.open_positions = {}
+    e.pending = {}
+    e.risk_mgr = type("RiskSpy", (), {"on_new_timestamp": lambda self, ts: None})()
+    seen = []
+    e._update_mark_to_market = lambda ts: seen.append(e._intrabar_risk_marks.copy())
+    e._persist = lambda: None
+    e._try_fill_pending = lambda symbol, curr: False
+    e.risk_mgr.can_open_new_trade = lambda count: (False, "test")
+    pos = type("Pos", (), {"direction": "long", "stop_price": 95.0})()
+    e.open_positions["BTCUSDT"] = pos
+    candle = engine_mod.Candle(ts=1_800_000_000_000, open=90, high=100, low=85, close=98, volume=10)
+    e.step_candle("BTCUSDT", [candle])
+    assert seen == [{"BTCUSDT": 90}], seen
+
+

@@ -9,11 +9,11 @@
     "CAKEUSDT"
   ],
   "reserve": [
-    "DASHUSDT",
     "ENAUSDT",
-    "HBARUSDT",
-    "ASTERUSDT",
-    "JSTUSDT"
+    "GMXUSDT",
+    "ONDOUSDT",
+    "SKYUSDT",
+    "QNTUSDT"
   ],
   "short_history_watchlist": [
     "LINKUSDT",
@@ -22,5 +22,5 @@
     "ATOMUSDT",
     "DOGEUSDT"
   ],
-  "caution": "This is a research shortlist, not a profitability claim. Same historical archive was already inspected; reruns are focused validation, not an independent blind holdout. Require future untouched data and realistic Bybit fills before production."
+  "caution": "The reserve set is an exploratory replacement shortlist selected to test alternative regime behavior after the previous reserve basket failed in the June–August fold. This is not a profitability claim. Same historical archive was already inspected; reruns are focused validation, not an independent blind holdout. Require future untouched data and realistic Bybit fills before production."
 }

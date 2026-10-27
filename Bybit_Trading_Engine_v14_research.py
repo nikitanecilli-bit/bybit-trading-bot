@@ -977,7 +977,7 @@ class UnifiedQuantEngine:
         # not the candle extreme: the position would have exited at the stop first.
         risk_mark = curr.close
         pos_for_risk = self.open_positions.get(symbol)
-        if pos_for_risk is not None:
+        if pos_for_risk is not None and hasattr(pos_for_risk, "direction") and hasattr(pos_for_risk, "stop_price"):
             is_long_for_risk = pos_for_risk.direction == "long"
             stop_crossed = (curr.low <= pos_for_risk.stop_price) if is_long_for_risk else (curr.high >= pos_for_risk.stop_price)
             if stop_crossed:

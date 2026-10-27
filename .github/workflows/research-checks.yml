@@ -36,7 +36,7 @@ jobs:
         run: python test_regime_gate_holdout.py
       - name: Generate baseline performance by market regime (including long/short split)
         run: python scripts/run_regime_analysis.py --output regime_analysis.csv
-      - name: Compare baseline vs frozen regime gate on chronological holdout
+      - name: Compare baseline, directional ablations and frozen regime gate on chronological holdout
         run: python scripts/run_regime_gate_holdout.py --output regime_gate_holdout.csv
       - name: Upload regime gate holdout report
         uses: actions/upload-artifact@v4

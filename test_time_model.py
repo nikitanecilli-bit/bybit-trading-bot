@@ -1,0 +1,214 @@
+"""Focused regression tests for candle-time semantics in research engine copy."""
+import importlib.util
+import sys
+from pathlib import Path
+
+ENGINE_PATH = Path(__file__).with_name("Bybit_Trading_Engine_v14_research.py")
+spec = importlib.util.spec_from_file_location("research_engine", ENGINE_PATH)
+engine_mod = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = engine_mod
+spec.loader.exec_module(engine_mod)
+
+
+def bare_engine(timeframe="15m"):
+    # Avoid notifier/config I/O; exercise only step_candle's timestamp contract.
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.cfg = engine_mod.BotConfig(timeframe=timeframe)
+    e._last_mark_prices = {}
+    e.open_positions = {}
+    e.pending = {}
+    seen = []
+    risk_timestamps = []
+    e.risk_mgr = type("RiskSpy", (), {"on_new_timestamp": lambda self, ts: risk_timestamps.append(ts)})()
+    e._update_mark_to_market = lambda ts: seen.append(ts)
+    e._risk_timestamps = risk_timestamps
+    e._persist = lambda: None
+    e.step_candle = engine_mod.UnifiedQuantEngine.step_candle.__get__(e, engine_mod.UnifiedQuantEngine)
+    e._try_fill_pending = lambda symbol, curr: False
+    e.risk_mgr.can_open_new_trade = lambda count: (False, "test")
+    return e, seen
+
+
+def test_mtm_uses_close_timestamp_for_15m_bar():
+    e, seen = bare_engine("15m")
+    ts_open = 1_800_000_000_000
+    candle = engine_mod.Candle(ts=ts_open, open=100, high=101, low=99, close=100.5, volume=10)
+    e.step_candle("BTCUSDT", [candle])
+    assert seen == [ts_open + 900_000], seen
+    assert e._risk_timestamps == [ts_open + 900_000], e._risk_timestamps
+    assert e._last_mark_prices["BTCUSDT"] == 100.5
+
+
+def test_mtm_respects_configured_1h_close_boundary():
+    e, seen = bare_engine("1h")
+    ts_open = 1_800_000_000_000
+    candle = engine_mod.Candle(ts=ts_open, open=100, high=102, low=98, close=101, volume=10)
+    e.step_candle("ETHUSDT", [candle])
+    assert seen == [ts_open + 3_600_000], seen
+    assert e._risk_timestamps == [ts_open + 3_600_000], e._risk_timestamps
+
+
+def test_unsupported_timeframe_fails_closed():
+    e, seen = bare_engine("7m")
+    ts_open = 1_800_000_000_000
+    candle = engine_mod.Candle(ts=ts_open, open=100, high=101, low=99, close=100, volume=10)
+    try:
+        e.step_candle("SOLUSDT", [candle])
+    except ValueError as exc:
+        assert "Неподдерживаемый timeframe" in str(exc)
+    else:
+        raise AssertionError("unsupported timeframe must raise ValueError")
+    assert seen == [], seen
+
+
+
+
+def _signal_test_candles(last_open, last_high, last_low, last_close):
+    # Tiny deterministic history; indicator calculations are stubbed in the tests below.
+    return [
+        engine_mod.Candle(ts=1_800_000_000_000 + i * 900_000,
+                          open=99.5, high=100.0, low=99.0, close=99.5, volume=10)
+        for i in range(3)
+    ] + [engine_mod.Candle(ts=1_800_002_700_000, open=last_open,
+                           high=last_high, low=last_low, close=last_close, volume=20)]
+
+
+def test_wick_above_donchian_without_close_does_not_trigger_long_breakout():
+    cfg = engine_mod.BotConfig(donchian_period=2, atr_period=2, min_volume_ratio=1.6)
+    candles = _signal_test_candles(last_open=99.5, last_high=105.0, last_low=99.2, last_close=99.8)
+    from unittest.mock import patch
+    with patch.object(engine_mod.QuantStrategyCore, "compute_donchian_and_volume", return_value=(100.0, 99.0, 10.0)), \
+         patch.object(engine_mod.QuantStrategyCore, "compute_atr", return_value=1.0):
+        signal = engine_mod.QuantStrategyCore.evaluate_signal("BTCUSDT", candles, cfg)
+    assert signal is None, signal
+
+
+def test_wick_below_donchian_without_close_does_not_trigger_short_breakout():
+    cfg = engine_mod.BotConfig(donchian_period=2, atr_period=2, min_volume_ratio=1.6)
+    candles = _signal_test_candles(last_open=99.5, last_high=99.8, last_low=94.0, last_close=99.2)
+    from unittest.mock import patch
+    with patch.object(engine_mod.QuantStrategyCore, "compute_donchian_and_volume", return_value=(101.0, 99.0, 10.0)), \
+         patch.object(engine_mod.QuantStrategyCore, "compute_atr", return_value=1.0):
+        signal = engine_mod.QuantStrategyCore.evaluate_signal("BTCUSDT", candles, cfg)
+    assert signal is None, signal
+
+
+def test_close_above_donchian_with_volume_confirms_long_breakout():
+    cfg = engine_mod.BotConfig(donchian_period=2, atr_period=2, min_volume_ratio=1.6)
+    candles = _signal_test_candles(last_open=99.5, last_high=101.0, last_low=99.2, last_close=100.5)
+    from unittest.mock import patch
+    with patch.object(engine_mod.QuantStrategyCore, "compute_donchian_and_volume", return_value=(100.0, 99.0, 10.0)), \
+         patch.object(engine_mod.QuantStrategyCore, "compute_atr", return_value=1.0):
+        signal = engine_mod.QuantStrategyCore.evaluate_signal("BTCUSDT", candles, cfg)
+    assert signal is not None, signal
+    assert signal["direction"] == "long", signal
+
+
+def test_signal_is_not_filled_until_next_candle():
+    """A signal formed from bar N must not attempt execution on bar N itself."""
+    from unittest.mock import patch
+
+    e, _ = bare_engine("15m")
+    e.risk_mgr.can_open_new_trade = lambda count: (True, "ok")
+    e._persist = lambda: None
+
+    signal = {
+        "direction": "long", "entry_price": 100.0, "order_type": "market",
+        "strategy": "test", "stop_dist": 2.0,
+    }
+    signal_calls = []
+    def fake_signal(symbol, history, cfg):
+        signal_calls.append(history[-1].ts)
+        return signal if len(signal_calls) == 1 else None
+
+    fill_attempts = []
+    def fake_fill(symbol, candle):
+        fill_attempts.append((symbol, candle.ts))
+        # Simulate a not-filled order, keeping this test focused on timing only.
+        e.pending.pop(symbol, None)
+        return False
+
+    e._try_fill_pending = fake_fill
+    t0 = 1_800_000_000_000
+    c1 = engine_mod.Candle(ts=t0, open=100, high=101, low=99, close=100.5, volume=10)
+    c2 = engine_mod.Candle(ts=t0 + 900_000, open=100.5, high=102, low=100, close=101, volume=11)
+
+    with patch.object(engine_mod.QuantStrategyCore, "evaluate_signal", side_effect=fake_signal):
+        e.step_candle("BTCUSDT", [c1])
+        assert fill_attempts == [], fill_attempts
+        assert "BTCUSDT" in e.pending, e.pending
+
+        e.step_candle("BTCUSDT", [c1, c2])
+
+    assert fill_attempts == [("BTCUSDT", c2.ts)], fill_attempts
+    assert signal_calls == [c1.ts, c2.ts], signal_calls
+
+
+
+def _bare_fill_engine(max_chase=1.5):
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.cfg = engine_mod.BotConfig(timeframe="15m", max_chase_limit_pct=max_chase)
+    e.open_positions = {}
+    e.pending = {}
+    e.trade_seq = 0
+    e._persist = lambda: None
+    class RiskSpy:
+        def can_open_new_trade(self, count):
+            return True, "OK"
+        def calculate_position_size(self, entry_price, stop_price, order_type="market"):
+            return 1000.0, 50.0
+        current_equity = 10_000.0
+    e.risk_mgr = RiskSpy()
+    return e
+
+
+def _pending_signal(order_type="market", direction="long", entry=100.0):
+    return {
+        "direction": direction, "entry_price": entry, "order_type": order_type,
+        "strategy": "test", "stop_dist": 2.0,
+    }
+
+
+def test_market_entry_rejected_when_next_open_gaps_beyond_chase_limit():
+    e = _bare_fill_engine(max_chase=1.5)
+    e.pending["BTCUSDT"] = _pending_signal("market", "long", 100.0)
+    candle = engine_mod.Candle(ts=1_800_000_000_000, open=103.0, high=104.0, low=102.0, close=103.5, volume=10)
+    filled = e._try_fill_pending("BTCUSDT", candle)
+    assert filled is False
+    assert "BTCUSDT" not in e.open_positions
+    assert "BTCUSDT" not in e.pending
+
+
+def test_market_entry_fills_at_next_open_when_gap_is_within_limit():
+    e = _bare_fill_engine(max_chase=1.5)
+    e.pending["BTCUSDT"] = _pending_signal("market", "long", 100.0)
+    candle = engine_mod.Candle(ts=1_800_000_000_000, open=101.0, high=102.0, low=100.5, close=101.5, volume=10)
+    filled = e._try_fill_pending("BTCUSDT", candle)
+    assert filled is True
+    assert e.open_positions["BTCUSDT"].entry_price == 101.0
+
+
+def test_limit_entry_uses_limit_price_when_bar_opens_above_and_trades_through():
+    e = _bare_fill_engine(max_chase=1.5)
+    e.pending["BTCUSDT"] = _pending_signal("limit", "long", 100.0)
+    candle = engine_mod.Candle(ts=1_800_000_000_000, open=103.0, high=104.0, low=99.0, close=101.0, volume=10)
+    filled = e._try_fill_pending("BTCUSDT", candle)
+    assert filled is True
+    assert e.open_positions["BTCUSDT"].entry_price == 100.0
+
+
+if __name__ == "__main__":
+    tests = [test_mtm_uses_close_timestamp_for_15m_bar,
+             test_mtm_respects_configured_1h_close_boundary,
+             test_unsupported_timeframe_fails_closed,
+             test_wick_above_donchian_without_close_does_not_trigger_long_breakout,
+             test_wick_below_donchian_without_close_does_not_trigger_short_breakout,
+             test_close_above_donchian_with_volume_confirms_long_breakout,
+             test_signal_is_not_filled_until_next_candle,
+             test_market_entry_rejected_when_next_open_gaps_beyond_chase_limit,
+             test_market_entry_fills_at_next_open_when_gap_is_within_limit,
+             test_limit_entry_uses_limit_price_when_bar_opens_above_and_trades_through]
+    for test in tests:
+        test()
+        print("PASS", test.__name__)
+    print(f"{len(tests)}/{len(tests)} tests passed")

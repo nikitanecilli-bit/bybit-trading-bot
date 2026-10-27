@@ -1241,7 +1241,7 @@ class UnifiedQuantEngine:
         rem_gross = pos.size_usdt * pos.remaining_fraction * rem_chg
         gross_pnl = _money_round(pos.realized_tp1_gross_usdt + rem_gross)
         funding_cost = 0.0
-        if self.funding_dir:
+        if getattr(self, "funding_dir", None):
             if pos.symbol not in self.funding_by_symbol:
                 raise RuntimeError(f"Funding enabled but no CSV for traded symbol {pos.symbol}")
             mark_map = self._funding_mark_prices.get(pos.symbol, {})

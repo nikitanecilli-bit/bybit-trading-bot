@@ -31,22 +31,59 @@ def aligned_h1_datasets():
            if tf == "1h" and len(item[2]) >= 500}
     if len(raw) < 2:
         raise SystemExit(f"Need at least 2 H1 symbols, found {len(raw)}")
+
+    # Use the longest available H1 history as the reference window. Exclude
+    # newly listed/short-history symbols that would shrink the shared period.
+    ref_symbol, (_, _, ref_candles) = max(
+        raw.items(), key=lambda kv: kv[1][2][-1].ts - kv[1][2][0].ts
+    )
+    ref_start, ref_end = ref_candles[0].ts, ref_candles[-1].ts
+    span = ref_end - ref_start
+    selected = {}
+    coverage = {}
+    for symbol, item in raw.items():
+        candles = item[2]
+        start_ts, end_ts = candles[0].ts, candles[-1].ts
+        start_lag = max(0.0, (start_ts - ref_start) / span)
+        end_lag = max(0.0, (ref_end - end_ts) / span)
+        covered = (end_ts - start_ts) / span
+        coverage[symbol] = {"coverage_pct": round(covered * 100, 1),
+                            "start_lag_pct": round(start_lag * 100, 1),
+                            "end_lag_pct": round(end_lag * 100, 1)}
+        if covered >= 0.70 and start_lag <= 0.15 and end_lag <= 0.15:
+            selected[symbol] = item
+
+    if len(selected) < 10:
+        raise SystemExit(
+            f"Only {len(selected)} symbols have >=70% reference-history coverage "
+            f"with <=15% start/end lag; refusing to run a misleading short-overlap portfolio."
+        )
+
     common = None
-    for _, _, candles in raw.values():
+    for _, _, candles in selected.values():
         ts = {c.ts for c in candles}
         common = ts if common is None else common.intersection(ts)
     timestamps = sorted(common or [])
-    if len(timestamps) < 500:
-        raise SystemExit(f"Insufficient common synchronized H1 bars: {len(timestamps)}")
+    overlap_pct = (len(timestamps) / max(1, len(ref_candles))) * 100
+    if len(timestamps) < 500 or overlap_pct < 65:
+        raise SystemExit(
+            f"Insufficient synchronized overlap: {len(timestamps)} bars "
+            f"({overlap_pct:.1f}% of reference); refusing to run."
+        )
+
     aligned = {}
     archives = {}
-    for symbol, (_, archive, candles) in raw.items():
+    for symbol, (_, archive, candles) in selected.items():
         by_ts = {c.ts: c for c in candles}
         aligned[symbol] = [by_ts[t] for t in timestamps]
         archives[symbol] = archive
     em.check_alignment(aligned)
+    print(f"Reference={ref_symbol}; selected {len(aligned)}/{len(raw)} symbols; "
+          f"common overlap={overlap_pct:.1f}% ({len(timestamps)} H1 bars)")
+    print("Selected symbol coverage: " + ", ".join(
+        f"{s}:{coverage[s]['coverage_pct']}%" for s in sorted(aligned)
+    ))
     return aligned, archives, timestamps
-
 
 def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, end_frac,
                           min_vol, min_breakout_atr):

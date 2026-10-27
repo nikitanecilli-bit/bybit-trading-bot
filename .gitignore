@@ -1,0 +1,55 @@
+# Credentials and local environment
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Local runtime state and logs
+*.log
+logs/
+bot_state_backup.json
+bybit_trade_journal*.json
+*.pid
+*.sock
+*.sqlite
+*.sqlite3
+*.db
+
+# Generated data and research outputs (keep reports and source code)
+data/cache/
+backtest_results/
+results/generated/
+reports/generated/
+cache/
+*.parquet
+*.feather
+*.pkl
+*.pickle
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Packaging
+build/
+dist/

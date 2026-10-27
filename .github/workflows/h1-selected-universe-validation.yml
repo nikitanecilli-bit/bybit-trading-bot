@@ -23,9 +23,9 @@ jobs:
       matrix:
         include:
           - universe: primary
-            symbols: "LINKUSDT,RAYUSDT,PUMPUSDT,APTUSDT,TAOUSDT"
+            symbols: "RAYUSDT,PUMPUSDT,TAOUSDT,AAVEUSDT,CAKEUSDT"
           - universe: reserve
-            symbols: "POLUSDT,AAVEUSDT,CAKEUSDT,DOGEUSDT,ATOMUSDT"
+            symbols: "DASHUSDT,ENAUSDT,HBARUSDT,ASTERUSDT,JSTUSDT"
     env:
       H1_SYMBOL_ALLOWLIST: ${{ matrix.symbols }}
     steps:

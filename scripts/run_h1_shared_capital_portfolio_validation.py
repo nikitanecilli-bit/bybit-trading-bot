@@ -32,8 +32,14 @@ BASE_TAKER_SLIP = em.TAKER_SLIP
 
 
 def aligned_h1_datasets():
+    allowlist = {s.strip().upper() for s in os.getenv("H1_SYMBOL_ALLOWLIST", "").split(",") if s.strip()}
     raw = {symbol: item for (symbol, tf), item in read_zip_datasets().items()
-           if tf == "1h" and len(item[2]) >= 500}
+           if tf == "1h" and len(item[2]) >= 500 and (not allowlist or symbol.upper() in allowlist)}
+    if allowlist:
+        missing = sorted(allowlist - set(raw))
+        if missing:
+            raise SystemExit(f"Selected symbols missing H1 datasets: {missing}")
+        print("Selected-universe filter: " + ", ".join(sorted(allowlist)))
     if len(raw) < 2:
         raise SystemExit(f"Need at least 2 H1 symbols, found {len(raw)}")
 

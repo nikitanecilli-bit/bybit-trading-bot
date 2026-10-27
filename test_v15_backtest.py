@@ -1,7 +1,7 @@
 """Regression tests for the v15 simulator."""
 import unittest
 
-from research_v15.backtest import Bar, backtest_symbol, limit_order_expired, limit_order_fill, resolve_stop_target, rolling_atr, stop_order_fill
+from research_v15.backtest import Bar, backtest_symbol, breakeven_action, limit_order_expired, limit_order_fill, resolve_stop_target, rolling_atr, stop_order_fill
 
 
 class V15BacktestTests(unittest.TestCase):
@@ -145,6 +145,36 @@ class V15BacktestTests(unittest.TestCase):
             stop_order_fill(bar, "long", 0)
         with self.assertRaises(ValueError):
             resolve_stop_target(bar, "buy", 99, 101)
+
+
+    def test_breakeven_does_not_trigger_before_threshold(self):
+        bar = Bar(1, 100, 108, 99, 107)
+        self.assertIsNone(breakeven_action(bar, "long", 100, 10, 0.95, False))
+        self.assertIsNone(breakeven_action(bar, "short", 100, 10, 0.95, False))
+
+    def test_breakeven_moves_stop_when_threshold_reached_without_return(self):
+        long_bar = Bar(1, 100, 110, 102, 109)
+        short_bar = Bar(2, 100, 98, 90, 91)
+        self.assertEqual(breakeven_action(long_bar, "long", 100, 10, 0.95, False), "move")
+        self.assertEqual(breakeven_action(short_bar, "short", 100, 10, 0.95, False), "move")
+
+    def test_breakeven_same_bar_return_exits_conservatively(self):
+        long_bar = Bar(1, 100, 110, 99, 101)
+        short_bar = Bar(2, 100, 101, 90, 99)
+        self.assertEqual(breakeven_action(long_bar, "long", 100, 10, 0.95, False), "exit")
+        self.assertEqual(breakeven_action(short_bar, "short", 100, 10, 0.95, False), "exit")
+
+    def test_breakeven_does_not_retrigger_after_moved_or_on_entry_bar(self):
+        bar = Bar(1, 100, 115, 99, 110)
+        self.assertIsNone(breakeven_action(bar, "long", 100, 10, 0.95, True))
+        self.assertIsNone(breakeven_action(bar, "long", 100, 10, 0.95, False, entry_bar=True))
+
+    def test_breakeven_rejects_invalid_inputs(self):
+        bar = Bar(1, 100, 101, 99, 100)
+        with self.assertRaises(ValueError):
+            breakeven_action(bar, "buy", 100, 10, 0.95, False)
+        with self.assertRaises(ValueError):
+            breakeven_action(bar, "long", 100, 0, 0.95, False)
 
 
 if __name__ == "__main__":

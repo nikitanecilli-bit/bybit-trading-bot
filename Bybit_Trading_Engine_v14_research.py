@@ -1143,7 +1143,7 @@ class UnifiedQuantEngine:
         return True
 
     @staticmethod
-    def _apply_tp1(pos: OpenPositionState, tp1_ts_ms: int) -> None:
+    def _apply_tp1(pos: OpenPositionState, tp1_ts_ms: int = 0) -> None:
         tp1_move = abs(pos.tp1_price - pos.entry_price) / pos.entry_price
         pos.realized_tp1_gross_usdt = round(pos.size_usdt * TP1_FRACTION * tp1_move, 4)
         pos.remaining_fraction = 1.0 - TP1_FRACTION

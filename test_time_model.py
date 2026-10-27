@@ -64,6 +64,39 @@ def test_open_position_management_receives_bar_close_timestamp_across_utc_midnig
     close_day = engine_mod.datetime.fromtimestamp(expected_close_ts / 1000, tz=engine_mod.timezone.utc).date()
     assert close_day.isoformat() == "2026-01-02", close_day
 
+
+def test_h2_range_fade_is_disabled_by_default_and_enabled_explicitly():
+    from unittest.mock import patch
+
+    candles = [
+        engine_mod.Candle(ts=1_800_000_000_000 + i * 900_000,
+                          open=94.0, high=96.0, low=92.0, close=95.0, volume=10.0)
+        for i in range(4)
+    ]
+    candles[-1] = engine_mod.Candle(ts=candles[-1].ts, open=94.0, high=96.0,
+                                   low=92.0, close=95.0, volume=10.0)
+    with patch.object(engine_mod.QuantStrategyCore, "compute_donchian_and_volume",
+                      return_value=(110.0, 90.0, 10.0)), \
+         patch.object(engine_mod.QuantStrategyCore, "compute_atr", return_value=1.0):
+        disabled_cfg = engine_mod.BotConfig(donchian_period=2, atr_period=2)
+        disabled = engine_mod.QuantStrategyCore.evaluate_signal("BTCUSDT", candles, disabled_cfg)
+        assert disabled is None, disabled
+
+        enabled_cfg = engine_mod.BotConfig(donchian_period=2, atr_period=2,
+                                           enable_h2_range_fade=True)
+        enabled = engine_mod.QuantStrategyCore.evaluate_signal("BTCUSDT", candles, enabled_cfg)
+        assert enabled is not None, enabled
+        assert enabled["strategy"] == "H2-range-fade", enabled
+        assert enabled["direction"] == "long", enabled
+
+
+def test_h2_range_fade_config_is_read_from_strategy_section():
+    cfg = engine_mod.BotConfig()
+    cfg._apply({"strategy": {"enable_h2_range_fade": True}})
+    assert cfg.enable_h2_range_fade is True
+    cfg._apply({"strategy": {"enable_h2_range_fade": False}})
+    assert cfg.enable_h2_range_fade is False
+
 def test_unsupported_timeframe_fails_closed():
     e, seen = bare_engine("7m")
     ts_open = 1_800_000_000_000
@@ -215,6 +248,8 @@ def test_limit_entry_uses_limit_price_when_bar_opens_above_and_trades_through():
 
 if __name__ == "__main__":
     tests = [test_mtm_uses_close_timestamp_for_15m_bar,
+             test_h2_range_fade_is_disabled_by_default_and_enabled_explicitly,
+             test_h2_range_fade_config_is_read_from_strategy_section,
              test_open_position_management_receives_bar_close_timestamp_across_utc_midnight,
              test_mtm_respects_configured_1h_close_boundary,
              test_unsupported_timeframe_fails_closed,

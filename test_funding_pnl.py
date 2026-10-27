@@ -117,7 +117,7 @@ def test_missing_mark_proxy_fails_loudly():
 
 
 
-def test_mark_price_history_loader_uses_minute_candle_open():
+def test_mark_price_history_loader_uses_hourly_candle_open():
     e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
     e._funding_mark_prices = {}
     with tempfile.TemporaryDirectory() as directory:

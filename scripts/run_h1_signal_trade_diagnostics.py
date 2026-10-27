@@ -209,7 +209,7 @@ def run_fold(data, stamps, fold, start_frac, end_frac):
             "exit_reason":t.exit_reason,"pnl_net_usdt":t.pnl_usdt,"pnl_gross_usdt":t.gross_pnl,
             "net_R":t.r_multiple,"gross_R":t.gross_r_multiple,"risk_usdt":t.risk_usdt,
             "risk_pct":t.risk_pct,"fees_usdt":t.exchange_fees_usdt,"slippage_usdt":t.slippage_cost_usdt,
-            "MAE_R":t.mae,"MFE_R":t.mfe,"duration_hours":round((datetime.strptime(t.exit_date,"%Y-%m-%dT%H:%M:%SZ")-entry_dt).total_seconds()/3600,2),
+            "MAE_R":t.mae,"MFE_R":t.mfe,"duration_hours":round((datetime.strptime(t.exit_date,"%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)-entry_dt).total_seconds()/3600,2),
             "signal_volume_ratio":feat["volume_ratio"] if feat else "",
             "signal_breakout_atr":feat["breakout_atr"] if feat else "",
             "signal_atr_pct":feat["atr_pct"] if feat else "",

@@ -450,6 +450,7 @@ def test_intrabar_risk_mark_uses_gap_adjusted_stop_fill_when_stop_crossed():
     e.cfg = engine_mod.BotConfig(timeframe="15m")
     e._last_mark_prices = {}
     e._intrabar_risk_marks = {}
+    e._intrabar_risk_marks_ts = None
     e.open_positions = {}
     e.pending = {}
     e.risk_mgr = type("RiskSpy", (), {"on_new_timestamp": lambda self, ts: None})()

@@ -39,8 +39,13 @@ class PortfolioReplayTests(unittest.TestCase):
             {"symbol": "DDDUSDT", "trades": [trade(1, 10, 10)]},
         ]
         result = replay_portfolio(results, starting_equity=10_000, risk_pct=0.01, max_portfolio_risk_pct=0.025)
-        self.assertEqual(result["accepted_trades"], 2)
-        self.assertEqual(result["rejected_trades"], 2)
+        self.assertEqual(result["accepted_trades"], 4)
+        self.assertEqual(result["rejected_trades"], 0)
+        self.assertTrue(all(t["portfolio_allocation_factor"] < 1 for t in result["accepted"]))
+        self.assertLessEqual(
+            sum(t["risk_usdt"] for t in result["accepted"]),
+            250.0 + 1e-8,
+        )
 
     def test_releases_risk_after_positions_exit(self):
         results = [

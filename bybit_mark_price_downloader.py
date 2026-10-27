@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Download Bybit V5 historical mark-price klines for funding settlement timestamps.
 
-For linear perpetuals, funding timestamps usually align to minute boundaries.
-The engine uses the open of the 1-minute mark-price candle whose start timestamp
-matches the settlement timestamp. No API key is required.
+For linear perpetuals, funding timestamps usually align to hour boundaries.
+The downloader uses 1-hour mark-price candles to keep historical downloads small;
+the engine uses the candle open only when its timestamp exactly matches settlement.
+If a settlement is not hour-aligned, download 1-minute klines by changing INTERVAL.
 """
 from __future__ import annotations
 
@@ -19,13 +20,13 @@ from datetime import datetime, timezone
 from typing import Any
 
 BASE_URL = "https://api.bybit.com/v5/market/mark-price-kline"
-MAX_LIMIT = 1000
+MAX_LIMIT = 1000\nINTERVAL = "60"  # one hour; funding settlements are normally hour-aligned
 
 
 def _request_page(symbol: str, start_ms: int, end_ms: int, limit: int = MAX_LIMIT,
                   timeout: float = 20.0) -> list[list[Any]]:
     params = urllib.parse.urlencode({
-        "category": "linear", "symbol": symbol.upper(), "interval": "1",
+        "category": "linear", "symbol": symbol.upper(), "interval": INTERVAL,
         "start": start_ms, "end": end_ms, "limit": limit,
     })
     req = urllib.request.Request(
@@ -46,7 +47,7 @@ def _request_page(symbol: str, start_ms: int, end_ms: int, limit: int = MAX_LIMI
 
 def fetch_mark_price_klines(symbol: str, start_ms: int, end_ms: int,
                             pause_seconds: float = 0.1) -> list[dict[str, Any]]:
-    """Fetch 1-minute mark candles in [start_ms, end_ms], sorted and deduplicated."""
+    """Fetch 1-hour mark candles in [start_ms, end_ms], sorted and deduplicated."""
     symbol = symbol.strip().upper()
     if not symbol or not symbol.endswith("USDT") or not symbol.isalnum():
         raise ValueError("symbol must be a USDT linear perpetual symbol, e.g. BTCUSDT")
@@ -114,7 +115,7 @@ def main() -> None:
 
     rows = fetch_mark_price_klines(args.symbol, args.start_ms, args.end_ms, args.pause)
     write_csv(rows, args.output)
-    print(f"Wrote {len(rows)} mark-price candles to {args.output}")
+    print(f"Wrote {len(rows)} hourly mark-price candles to {args.output}")
     if not rows:
         print("WARNING: no mark-price rows returned; funding-adjusted backtests will fail on missing timestamps.")
 

@@ -68,30 +68,36 @@ def synchronized_data():
     for (sym, tf), item in read_zip_datasets().items():
         if tf == "1h" and sym in targets and len(item[2]) >= 500:
             raw[sym] = item
-    missing = sorted(targets-set(raw))
+    missing = sorted(set(SYMBOLS)-set(raw))
     if missing:
-        raise SystemExit(f"Missing selected/context H1 datasets: {missing}")
+        raise SystemExit(f"Missing selected H1 datasets: {missing}")
+    missing_context = sorted(set(CONTEXT_SYMBOLS)-set(raw))
+    if missing_context:
+        print(f"WARNING: market context unavailable for: {missing_context}")
+    # Fold boundaries are based ONLY on the five trading symbols. Context data
+    # must not shorten the experiment window if BTC/ETH history starts later.
     common = None
-    for _, _, candles in raw.values():
-        stamps_set = {c.ts for c in candles}
+    for sym in SYMBOLS:
+        stamps_set = {c.ts for c in raw[sym][2]}
         common = stamps_set if common is None else common.intersection(stamps_set)
     stamps = sorted(common or [])
     if len(stamps) < 3000:
-        raise SystemExit(f"Insufficient synchronized H1 history: {len(stamps)} bars")
-    aligned = {s: [dict_by_ts[t] for t in stamps]
-               for s, (_, _, candles) in raw.items()
-               for dict_by_ts in [{c.ts:c for c in candles}]}
-    data = {s: aligned[s] for s in SYMBOLS}
-    context_data = {s: aligned[s] for s in CONTEXT_SYMBOLS}
+        raise SystemExit(f"Insufficient synchronized selected-symbol history: {len(stamps)} bars")
+    data = {s: [dict_by_ts[t] for t in stamps]
+            for s in SYMBOLS
+            for dict_by_ts in [{c.ts:c for c in raw[s][2]}]}
+    context_data = {s: raw[s][2] for s in CONTEXT_SYMBOLS if s in raw}
+    context_index = {s: {c.ts:i for i,c in enumerate(candles)}
+                     for s,candles in context_data.items()}
     em.check_alignment(data)
-    em.check_alignment(context_data)
-    return data, stamps, context_data
+    return data, stamps, context_data, context_index
 
-def market_context(data, context_data, i):
+def market_context(data, context_data, context_index, i):
     """Completed-bar BTC/ETH context and cross-sectional breadth; no lookahead."""
     out = {}
     for sym, prefix in (("BTCUSDT", "btc"), ("ETHUSDT", "eth")):
-        f = features(context_data[sym], i)
+        ctx_i = context_index.get(sym, {}).get(data[SYMBOLS[0]][i].ts)
+        f = features(context_data[sym], ctx_i) if ctx_i is not None else None
         for src, dst in (
             ("ret_24h_pct", "ret_24h_pct"), ("ret_72h_pct", "ret_72h_pct"),
             ("atr_pct", "atr_pct"), ("efficiency_24h", "efficiency_24h"),
@@ -108,7 +114,7 @@ def market_context(data, context_data, i):
     out["universe_median_efficiency_24h"] = float(__import__("statistics").median(e24)) if e24 else ""
     return out
 
-def run_fold(data, stamps, context_data, fold, start_frac, end_frac, chase_limit):
+def run_fold(data, stamps, context_data, context_index, fold, start_frac, end_frac, chase_limit):
     n = len(stamps)
     start_idx, end_idx = int(n*start_frac), int(n*end_frac)
     start_ts, end_ts = stamps[start_idx], stamps[end_idx-1]
@@ -119,7 +125,7 @@ def run_fold(data, stamps, context_data, fold, start_frac, end_frac, chase_limit
     context_cache = {}
     def cached_context(i):
         if i not in context_cache:
-            context_cache[i] = market_context(data, context_data, i)
+            context_cache[i] = market_context(data, context_data, context_index, i)
         return context_cache[i]
     for sym, candles in data.items():
         for i, c in enumerate(candles):
@@ -288,11 +294,11 @@ def run_fold(data, stamps, context_data, fold, start_frac, end_frac, chase_limit
     return signal_rows,trades_out
 
 def main():
-    data,stamps,context_data=synchronized_data()
+    data,stamps,context_data,context_index=synchronized_data()
     signals=[]; trades=[]; summary=[]
     for chase_limit in CHASE_LIMITS:
         for fold,a,b in FOLDS:
-            sr,tr=run_fold(data,stamps,context_data,fold,a,b,chase_limit)
+            sr,tr=run_fold(data,stamps,context_data,context_index,fold,a,b,chase_limit)
             signals.extend(sr); trades.extend(tr)
             net=sum(float(t['pnl_net_usdt']) for t in tr)
             wins=sum(float(t['pnl_net_usdt'])>0 for t in tr)

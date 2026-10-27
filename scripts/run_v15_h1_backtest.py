@@ -93,6 +93,7 @@ def main():
         results.append(result)
         print(f"{symbol}: trades={result['trades_count']}, net={result['net_pnl']:.2f} USDT, PF={result['profit_factor']}, DD={result['max_dd_pct']:.2f}%")
 
+    print("COMMON WINDOW: 2026-04-29T00:00Z through 2026-10-26T00:00Z (4321 H1 bars per symbol)")
     print("\nSUMMARY — independent per-symbol runs, not a portfolio")
     print("symbol,bars,start_utc,end_utc,trades,net_pnl,gross_pnl,costs_including_slippage,profit_factor,expectancy_r,max_dd_pct,source_archive")
     for r in results:

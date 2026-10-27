@@ -74,7 +74,7 @@ def fetch_mark_price_klines(symbol: str, start_ms: int, end_ms: int,
                 raise ValueError(f"Invalid mark-price timestamp/prices: {item!r}")
             if high < max(op, low, close) or low > min(op, high, close):
                 raise ValueError(f"Invalid mark-price OHLC boundaries: {item!r}")
-            if start_ms <= ts <= end_ms:
+            if start_ms <= ts <= cursor_end:
                 by_ts[ts] = {
                     "symbol": symbol,
                     "timestamp_ms": ts,

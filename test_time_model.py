@@ -492,8 +492,30 @@ def test_intrabar_marks_accumulate_for_symbols_at_same_timestamp():
 
 
 
+def test_portfolio_intrabar_marks_prepared_for_all_open_symbols_before_risk_check():
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.cfg = engine_mod.BotConfig(timeframe="15m")
+    e._last_mark_prices = {}
+    e._intrabar_risk_marks = {}
+    e._intrabar_risk_marks_ts = None
+    e.open_positions = {
+        "BTCUSDT": type("Pos", (), {"direction": "long", "stop_price": 80.0})(),
+        "ETHUSDT": type("Pos", (), {"direction": "short", "stop_price": 120.0})(),
+    }
+    ts = 1_800_000_000_000
+    e._prepare_portfolio_intrabar_marks({
+        "BTCUSDT": engine_mod.Candle(ts=ts, open=100, high=105, low=90, close=101, volume=10),
+        "ETHUSDT": engine_mod.Candle(ts=ts, open=100, high=115, low=95, close=102, volume=10),
+    })
+    assert e._intrabar_risk_marks == {"BTCUSDT": 90.0, "ETHUSDT": 115.0}, e._intrabar_risk_marks
+    assert e._intrabar_risk_marks_ts == ts + 900_000
+
+
+
+
 if __name__ == "__main__":
-    tests = [test_intrabar_marks_accumulate_for_symbols_at_same_timestamp,
+    tests = [test_portfolio_intrabar_marks_prepared_for_all_open_symbols_before_risk_check,
+             test_intrabar_marks_accumulate_for_symbols_at_same_timestamp,
              test_intrabar_risk_mark_uses_adverse_extreme_when_stop_not_hit,
              test_intrabar_risk_mark_uses_gap_adjusted_stop_fill_when_stop_crossed,
              test_mtm_uses_close_timestamp_for_15m_bar,

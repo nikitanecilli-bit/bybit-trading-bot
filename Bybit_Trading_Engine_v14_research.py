@@ -901,6 +901,40 @@ class UnifiedQuantEngine:
         self._intrabar_risk_marks_ts = None
         self._state_restored = False
 
+    @staticmethod
+    def _risk_mark_for_position(pos, candle: Candle) -> float:
+        """Adverse intrabar mark, using stop fill rather than later wick after stop."""
+        is_long = pos.direction == "long"
+        stop_crossed = candle.low <= pos.stop_price if is_long else candle.high >= pos.stop_price
+        if stop_crossed:
+            return min(pos.stop_price, candle.open) if is_long else max(pos.stop_price, candle.open)
+        return candle.low if is_long else candle.high
+
+    def _prepare_portfolio_intrabar_marks(self, bar_candles: Dict[str, Candle]) -> None:
+        """Pre-mark all currently open symbols before evaluating portfolio risk for this bar."""
+        if not bar_candles:
+            return
+        timeframe_ms = {
+            "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
+            "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
+            "4h": 14_400_000, "6h": 21_600_000, "12h": 43_200_000,
+            "1d": 86_400_000,
+        }
+        timeframe = str(self.cfg.timeframe).strip().lower()
+        if timeframe not in timeframe_ms:
+            raise ValueError(f"Неподдерживаемый timeframe для intrabar marks: {self.cfg.timeframe!r}")
+        first_candle = next(iter(bar_candles.values()))
+        bar_close_ts = first_candle.ts + timeframe_ms[timeframe]
+        if any(c.ts != first_candle.ts for c in bar_candles.values()):
+            raise ValueError("Нельзя агрегировать portfolio risk marks: свечи не синхронизированы")
+        self._intrabar_risk_marks.clear()
+        self._intrabar_risk_marks_ts = bar_close_ts
+        for sym, candle in bar_candles.items():
+            self._last_mark_prices[sym] = candle.close
+            pos = self.open_positions.get(sym)
+            if pos is not None:
+                self._intrabar_risk_marks[sym] = self._risk_mark_for_position(pos, candle)
+
     def _unrealized_pnl_at_marks(self) -> float:
         """Оценка equity по консервативным внутрисвечным risk marks; выходные издержки — taker."""
         total = 0.0
@@ -980,15 +1014,7 @@ class UnifiedQuantEngine:
         risk_mark = curr.close
         pos_for_risk = self.open_positions.get(symbol)
         if pos_for_risk is not None and hasattr(pos_for_risk, "direction") and hasattr(pos_for_risk, "stop_price"):
-            is_long_for_risk = pos_for_risk.direction == "long"
-            stop_crossed = (curr.low <= pos_for_risk.stop_price) if is_long_for_risk else (curr.high >= pos_for_risk.stop_price)
-            if stop_crossed:
-                if is_long_for_risk:
-                    risk_mark = min(pos_for_risk.stop_price, curr.open)
-                else:
-                    risk_mark = max(pos_for_risk.stop_price, curr.open)
-            else:
-                risk_mark = curr.low if is_long_for_risk else curr.high
+            risk_mark = self._risk_mark_for_position(pos_for_risk, curr)
         # Symbols are stepped one at a time. Preserve adverse marks for other symbols
         # processed at the same bar-close timestamp, but never carry an old candle's
         # extreme into a later bar.
@@ -1386,6 +1412,9 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
     bars_total = len(candles[symbols[0]])
     for bar in range(25, bars_total):
         lo = max(0, bar + 1 - CALC_WINDOW)
+        # Evaluate portfolio drawdown against all symbols' adverse marks for this
+        # synchronized bar before any single symbol can trigger a risk decision.
+        engine._prepare_portfolio_intrabar_marks({sym: candles[sym][bar] for sym in symbols})
         for sym in symbols:
             engine.step_candle(sym, candles[sym][lo:bar + 1])
 

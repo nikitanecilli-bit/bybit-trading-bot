@@ -11,10 +11,12 @@ import glob
 import io
 import os
 import re
+import sys
 import zipfile
 from collections import defaultdict
 from datetime import datetime, timezone
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from research_v15.backtest import Bar, backtest_symbol
 
 FILE_RE = re.compile(r"(?i)([a-z0-9]+usdt)_(1h)_.*\.csv$")

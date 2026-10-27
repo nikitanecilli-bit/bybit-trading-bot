@@ -1,0 +1,35 @@
+name: H1 Long Execution Sensitivity
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/market-regime-v1-main
+    paths:
+      - "scripts/run_h1_long_execution_sensitivity.py"
+      - "Bybit_Trading_Engine_v14_research.py"
+      - "scripts/run_uploaded_dataset_backtests.py"
+      - ".github/workflows/h1-long-execution-sensitivity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  sensitivity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile
+        run: python -m py_compile Bybit_Trading_Engine_v14_research.py scripts/run_uploaded_dataset_backtests.py scripts/run_h1_long_execution_sensitivity.py
+      - name: Run fixed sensitivity matrix
+        run: python scripts/run_h1_long_execution_sensitivity.py
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: h1-long-execution-sensitivity
+          path: h1_long_execution_sensitivity.csv
+          if-no-files-found: error

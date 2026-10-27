@@ -747,16 +747,16 @@ def test_tp1_partial_fill_keeps_equity_consistent_with_remaining_position():
     assert e.risk_mgr.current_equity == 10_098.45
 
     # Closing the remaining half at TP2 reconciles the conservative MTM estimate
-    # with the actual modeled maker take-profit execution and journal.
+    # with the modeled market-order execution and journal.
     engine_mod.UnifiedQuantEngine._close_position(
         e, pos, 120.0, "take_profit", ts, mae_r=0.0, mfe_r=4.0,
     )
     assert len(e.closed_trades) == 1
     assert e.closed_trades[0].gross_pnl == 150.0
-    assert e.closed_trades[0].pnl_usdt == 149.60
-    assert e.risk_mgr.realized_equity == 10_149.60
+    assert e.closed_trades[0].pnl_usdt == 148.45
+    assert e.risk_mgr.realized_equity == 10_148.45
     assert e.risk_mgr.unrealized_pnl == 0.0
-    assert e.risk_mgr.current_equity == 10_149.60
+    assert e.risk_mgr.current_equity == 10_148.45
 
 
 def test_finalize_open_positions_uses_bar_close_timestamp_across_utc_midnight():

@@ -86,3 +86,17 @@ def breakout_quality(candles, direction, lookback=20, approach_bars=3,
     else:
         impulse = curr.close < level and body_atr >= min_body_atr and close_pos <= 0.25
     return bool(impulse and volume_ratio >= min_volume_ratio)
+
+def previous_bar_breakout_confirmed(candles, direction, lookback=20):
+    """True if the candle immediately before the current signal closed beyond its
+    Donchian boundary calculated strictly from candles before that confirmation bar.
+    The current signal candle is present as candles[-1] and is not used.
+    """
+    if direction not in ("long", "short") or len(candles) < lookback + 2:
+        return False
+    confirmation = candles[-2]
+    reference = candles[-(lookback + 2):-2]
+    if len(reference) != lookback:
+        return False
+    level = max(c.high for c in reference) if direction == "long" else min(c.low for c in reference)
+    return confirmation.close > level if direction == "long" else confirmation.close < level

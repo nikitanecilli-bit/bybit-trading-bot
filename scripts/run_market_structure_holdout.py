@@ -17,7 +17,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
 import Bybit_Trading_Engine_v14_research as engine_mod
-from market_structure import breakout_quality, trend_direction
+from market_structure import breakout_quality, previous_bar_breakout_confirmed, trend_direction
 from run_uploaded_dataset_backtests import read_zip_datasets
 from run_regime_analysis import summarize_trades
 
@@ -97,16 +97,9 @@ def run_variant(symbol, timeframe, candles, cutoff_ts, variant):
                                     min_volume_ratio=cfg_arg.min_volume_ratio):
                 return None
         if variant == "trend_plus_breakout_confirm":
-            # Require the preceding completed candle also to close beyond the current
-            # Donchian boundary. This is a delayed-entry confirmation, not hindsight.
-            prior = history[:-1]
-            if len(prior) < cfg_arg.donchian_period + 1:
-                return None
-            window = prior[-cfg_arg.donchian_period:]
-            level = max(c.high for c in window) if direction == "long" else min(c.low for c in window)
-            if direction == "long" and prior[-1].close <= level:
-                return None
-            if direction == "short" and prior[-1].close >= level:
+            # Require a previous closed candle to have broken its own prior
+            # Donchian boundary; current signal candle is never used to define it.
+            if not previous_bar_breakout_confirmed(history, direction, cfg_arg.donchian_period):
                 return None
         return signal
 

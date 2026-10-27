@@ -37,9 +37,11 @@ jobs:
                               print(f"    HEADER {line[:500]}")
           PY
       - name: Compile Python files
-        run: python -m py_compile Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py scripts/scan_secrets.py
+        run: python -m py_compile Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py scripts/scan_secrets.py scripts/run_uploaded_dataset_backtests.py
       - name: Scan for obvious secrets
         run: python scripts/scan_secrets.py .
+      - name: Backtest uploaded historical datasets
+        run: python scripts/run_uploaded_dataset_backtests.py
       - name: Test gap execution
         run: python test_gap_execution.py
       - name: Test time model

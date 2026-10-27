@@ -79,6 +79,24 @@ def test_funding_before_tp1_candle_close_uses_full_position():
     assert record.funding_cost_usdt == 10.0
 
 
+def test_funding_exactly_at_tp1_boundary_uses_full_position():
+    e, pos = make_engine("long", 0.01, tp1=True)
+    ts = pos.tp1_ts_ms
+    e.funding_by_symbol["BTCUSDT"][0]["ts"] = ts
+    e._funding_mark_prices["BTCUSDT"][ts] = 100.0
+    record = close(e, pos)
+    assert record.funding_cost_usdt == 10.0
+
+
+def test_funding_exactly_at_exit_boundary_is_included():
+    e, pos = make_engine("long", 0.01)
+    ts = 1_800_001_000_000
+    e.funding_by_symbol["BTCUSDT"][0]["ts"] = ts
+    e._funding_mark_prices["BTCUSDT"][ts] = 100.0
+    record = close(e, pos)
+    assert record.funding_cost_usdt == 10.0
+
+
 def test_funding_before_entry_is_not_charged():
     e, pos = make_engine("long", 0.01)
     e.funding_by_symbol["BTCUSDT"][0]["ts"] = pos.entry_ts

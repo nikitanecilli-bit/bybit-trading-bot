@@ -98,6 +98,7 @@ class BotConfig:
     emergency_kill_switch_pct: float = 30.0
     max_chase_limit_pct: float = 1.5
     max_concurrent_positions: int = 3
+    max_portfolio_risk_pct: float = 2.0
 
     timeframe: str = "15m"
     donchian_period: int = 20
@@ -139,6 +140,7 @@ class BotConfig:
             "leverage_val": self.leverage_val,
             "daily_stop_loss_pct": self.daily_stop_loss_pct,
             "emergency_kill_switch_pct": self.emergency_kill_switch_pct,
+            "max_portfolio_risk_pct": self.max_portfolio_risk_pct,
             "max_chase_limit_pct": self.max_chase_limit_pct,
             "stop_atr_mult": self.stop_atr_mult,
             "tp1_r_multiple": self.tp1_r_multiple,
@@ -151,6 +153,7 @@ class BotConfig:
                 errs.append(f"{name} must be finite")
         if self.capital_usdt <= 0: errs.append("capital_usdt <= 0")
         if not (0 < self.max_risk_trade_pct <= 5): errs.append("риск на сделку вне (0; 5]%")
+        if not (0 < self.max_portfolio_risk_pct <= 10): errs.append("max_portfolio_risk_pct вне (0; 10]%")
         if not (1 <= self.leverage_val <= 125): errs.append("плечо вне [1; 125]")
         if self.daily_stop_loss_pct <= 0: errs.append("daily_stop_loss_pct <= 0")
         if self.emergency_kill_switch_pct <= 0: errs.append("emergency_kill_switch_pct <= 0")
@@ -198,6 +201,7 @@ class BotConfig:
         allowed_risk = {
             "risk_per_trade_pct", "leverage_mode", "leverage_val", "daily_stop_loss_pct",
             "emergency_kill_switch_pct", "max_chase_limit_pct", "max_concurrent_positions",
+            "max_portfolio_risk_pct",
         }
         rm_check = data.get("risk_management", {}) or {}
         if not isinstance(rm_check, dict):
@@ -255,6 +259,8 @@ class BotConfig:
                 setattr(self, attr, float(rm[attr]))
         if "max_concurrent_positions" in rm:
             self.max_concurrent_positions = int(rm["max_concurrent_positions"])
+        if "max_portfolio_risk_pct" in rm:
+            self.max_portfolio_risk_pct = float(rm["max_portfolio_risk_pct"])
 
         st = data.get("strategy", data.get("strategy_params", {})) or {}
         for attr in ("donchian_period", "atr_period", "max_hold_bars"):
@@ -580,7 +586,8 @@ class AdaptiveRiskManager:
         return True, "OK"
 
     def calculate_position_size(
-        self, entry_price: float, stop_price: float, order_type: str = "market"
+        self, entry_price: float, stop_price: float, order_type: str = "market",
+        risk_budget_usdt: Optional[float] = None,
     ) -> Tuple[float, float]:
         """Размер позиции с учётом ожидаемого убытка на стопе И базовых издержек.
 
@@ -601,10 +608,16 @@ class AdaptiveRiskManager:
         if not math.isfinite(estimated_loss_rate) or estimated_loss_rate <= 0:
             return 0.0, 0.0
 
-        risk_budget = self.current_equity * (self.cfg.max_risk_trade_pct / 100.0)
-        raw_size_usdt = risk_budget / estimated_loss_rate
+        per_trade_budget = self.current_equity * (self.cfg.max_risk_trade_pct / 100.0)
+        if risk_budget_usdt is not None:
+            if not math.isfinite(risk_budget_usdt) or risk_budget_usdt <= 0:
+                return 0.0, 0.0
+            per_trade_budget = min(per_trade_budget, risk_budget_usdt)
+        raw_size_usdt = per_trade_budget / estimated_loss_rate
         max_notional = (self.current_equity * self.cfg.leverage_val) / max(1, self.cfg.max_concurrent_positions)
         capped_size = min(raw_size_usdt, max_notional * 0.95)
+        # Round size DOWN to cents so rounding cannot exceed the risk budget.
+        capped_size = math.floor(capped_size * 100.0) / 100.0
         actual_estimated_risk = capped_size * estimated_loss_rate
         return round(capped_size, 2), round(actual_estimated_risk, 4)
 
@@ -978,6 +991,11 @@ class UnifiedQuantEngine:
         self.pending[symbol] = sig        # исполнение — на СЛЕДУЮЩЕЙ свече
         self._persist()
 
+    def _open_portfolio_risk_usdt(self) -> float:
+        """Conservative sum of estimated stop risk on remaining open position sizes."""
+        return sum(max(0.0, pos.risk_usdt) * max(0.0, min(1.0, pos.remaining_fraction))
+                   for pos in self.open_positions.values())
+
     def _try_fill_pending(self, symbol: str, curr: Candle) -> bool:
         """Исполняет отложенный сигнал на свече, следующей за сигнальной. True если позиция открыта."""
         sig = self.pending.pop(symbol)
@@ -1003,8 +1021,11 @@ class UnifiedQuantEngine:
             fill = curr.open
 
         stop_price, tp1, tp2 = QuantStrategyCore.build_levels(direction, fill, sig["stop_dist"], self.cfg)
+        portfolio_risk_cap = self.risk_mgr.current_equity * (self.cfg.max_portfolio_risk_pct / 100.0)
+        remaining_portfolio_risk = max(0.0, portfolio_risk_cap - self._open_portfolio_risk_usdt())
         size_usdt, risk_usdt = self.risk_mgr.calculate_position_size(
-            fill, stop_price, order_type=sig["order_type"]
+            fill, stop_price, order_type=sig["order_type"],
+            risk_budget_usdt=remaining_portfolio_risk,
         )
         if size_usdt <= 0 or risk_usdt <= 0:
             self._persist()

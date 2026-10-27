@@ -1046,6 +1046,12 @@ class UnifiedQuantEngine:
             if self._try_fill_pending(symbol, curr):
                 self._manage_position(symbol, candles_history, fill_bar=True, exit_ts=bar_close_ts)
                 return
+            # A multi-bar execution policy may retain an unfilled order in
+            # self.pending. Do not evaluate a fresh signal for this symbol and
+            # overwrite that order on the same candle. The default one-bar
+            # policy removes the pending order on failure, so its behavior is unchanged.
+            if symbol in self.pending:
+                return
 
         can_open, _ = self.risk_mgr.can_open_new_trade(len(self.open_positions) + len(self.pending))
         if not can_open:

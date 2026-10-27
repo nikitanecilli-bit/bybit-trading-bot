@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile Python files
-        run: python -m py_compile Bybit_Trading_Engine_v14_research.py bybit_downloader.py prepare_backtest_data.py test_prepare_backtest_data.py test_time_model.py test_gap_execution.py scripts/scan_secrets.py scripts/run_uploaded_dataset_backtests.py
+        run: python -m py_compile Bybit_Trading_Engine_v14_research.py bybit_downloader.py bybit_funding_downloader.py test_bybit_funding_downloader.py prepare_backtest_data.py test_prepare_backtest_data.py test_time_model.py test_gap_execution.py scripts/scan_secrets.py scripts/run_uploaded_dataset_backtests.py
       - name: Scan for obvious secrets
         run: python scripts/scan_secrets.py .
       - name: Backtest uploaded historical datasets
@@ -30,6 +30,8 @@ jobs:
         run: python scripts/run_h1_walk_forward.py
       - name: Test data adapter
         run: python test_prepare_backtest_data.py
+      - name: Test funding history downloader
+        run: python test_bybit_funding_downloader.py
       - name: Test gap execution
         run: python test_gap_execution.py
       - name: Test time model

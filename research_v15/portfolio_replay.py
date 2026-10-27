@@ -118,6 +118,27 @@ def replay_portfolio(
         realize_positions(max(int(p["exit_ts"]) for p in open_positions), inclusive=True)
 
     total_candidates = len(candidates)
+    by_symbol = {}
+    for trade in candidates:
+        symbol = trade["symbol"]
+        stats = by_symbol.setdefault(symbol, {
+            "candidate_trades": 0, "accepted_trades": 0, "rejected_trades": 0,
+            "candidate_net_pnl": 0.0, "accepted_net_pnl": 0.0,
+        })
+        stats["candidate_trades"] += 1
+        stats["candidate_net_pnl"] += float(trade["net_pnl"])
+    for trade in accepted:
+        stats = by_symbol[trade["symbol"]]
+        stats["accepted_trades"] += 1
+        stats["accepted_net_pnl"] += float(trade["net_pnl"])
+    for trade in rejected:
+        by_symbol[trade["symbol"]]["rejected_trades"] += 1
+    symbol_summary = []
+    for symbol, stats in sorted(by_symbol.items()):
+        stats["candidate_net_pnl"] = round(stats["candidate_net_pnl"], 4)
+        stats["accepted_net_pnl"] = round(stats["accepted_net_pnl"], 4)
+        stats["acceptance_rate_pct"] = round(100 * stats["accepted_trades"] / stats["candidate_trades"], 4)
+        symbol_summary.append({"symbol": symbol, **stats})
     return {
         "starting_equity": round(starting_equity, 8),
         "ending_equity": round(equity, 8),
@@ -131,6 +152,7 @@ def replay_portfolio(
         "max_realized_drawdown_pct": round(max_drawdown * 100, 4),
         "max_portfolio_risk_pct": max_portfolio_risk_pct * 100,
         "risk_pct_per_position": risk_pct * 100,
+        "by_symbol": symbol_summary,
         "accepted": accepted,
         "rejected": rejected,
         "assumptions": {

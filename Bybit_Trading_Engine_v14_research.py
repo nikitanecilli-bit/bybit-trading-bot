@@ -169,7 +169,7 @@ class BotConfig:
 
     def _apply(self, data: Dict) -> None:
         allowed_top = {
-            "bot_version", "maintenance_gate_status", "capital_usdt", "goals_plan",
+            "_note", "bot_version", "maintenance_gate_status", "capital_usdt", "goals_plan",
             "risk_management", "strategy", "strategy_params", "execution_and_exits",
             "active_trading_pool", "disabled_instruments", "blocked_sessions_utc",
             "blocked_directions", "applied_patches_log",

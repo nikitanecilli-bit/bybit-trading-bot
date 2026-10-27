@@ -109,6 +109,12 @@ def main():
     print(f"starting_equity={portfolio['starting_equity']:.2f} ending_equity={portfolio['ending_equity']:.2f} net_pnl={portfolio['net_pnl']:.2f} USDT")
     print(f"candidate_trades={portfolio['candidate_trades']} accepted={portfolio['accepted_trades']} rejected={portfolio['rejected_trades']} acceptance={portfolio['acceptance_rate_pct']:.2f}%")
     print(f"max_realized_drawdown={portfolio['max_realized_drawdown_pct']:.2f}% reconciliation_error={portfolio['reconciliation_error']:.10f}")
+    print(f"accepted_gross_pnl={portfolio['accepted_gross_pnl']:.2f} fees={portfolio['accepted_fees']:.2f} slippage={portfolio['accepted_slippage']:.2f} USDT")
+    print("\nPORTFOLIO SYMBOL DIAGNOSTICS — ranked by accepted-trade net PnL")
+    print("symbol,candidates,accepted,rejected,acceptance_pct,candidate_net_pnl,accepted_net_pnl")
+    ranked = sorted(portfolio["by_symbol"], key=lambda item: item["accepted_net_pnl"])
+    for item in ranked:
+        print(f"{item['symbol']},{item['candidate_trades']},{item['accepted_trades']},{item['rejected_trades']},{item['acceptance_rate_pct']:.2f},{item['candidate_net_pnl']:.2f},{item['accepted_net_pnl']:.2f}")
     print("PORTFOLIO REPLAY LIMITATIONS: candidate signals come from independent per-symbol runs; rejected entries do not regenerate later signals; drawdown is realized-only; funding, correlation, gap risk and portfolio mark-to-market are excluded.")
 
 

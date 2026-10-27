@@ -153,8 +153,8 @@ class V15BacktestTests(unittest.TestCase):
         self.assertIsNone(breakeven_action(bar, "short", 100, 10, 0.95, False))
 
     def test_breakeven_moves_stop_when_threshold_reached_without_return(self):
-        long_bar = Bar(1, 100, 110, 102, 109)
-        short_bar = Bar(2, 100, 98, 90, 91)
+        long_bar = Bar(1, 102, 110, 101, 109)
+        short_bar = Bar(2, 98, 99, 90, 91)
         self.assertEqual(breakeven_action(long_bar, "long", 100, 10, 0.95, False), "move")
         self.assertEqual(breakeven_action(short_bar, "short", 100, 10, 0.95, False), "move")
 

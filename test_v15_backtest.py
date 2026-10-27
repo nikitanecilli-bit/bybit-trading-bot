@@ -1,7 +1,7 @@
 """Regression tests for the v15 simulator."""
 import unittest
 
-from research_v15.backtest import Bar, backtest_symbol, breakeven_action, limit_order_expired, limit_order_fill, resolve_stop_target, rolling_atr, stop_order_fill
+from research_v15.backtest import Bar, backtest_symbol, breakeven_action, limit_order_expired, limit_order_fill, resolve_stop_target, rolling_atr, stop_order_fill, trade_economics
 
 
 class V15BacktestTests(unittest.TestCase):
@@ -175,6 +175,35 @@ class V15BacktestTests(unittest.TestCase):
             breakeven_action(bar, "buy", 100, 10, 0.95, False)
         with self.assertRaises(ValueError):
             breakeven_action(bar, "long", 100, 0, 0.95, False)
+
+
+    def test_breakeven_exit_still_loses_to_fees_and_slippage(self):
+        for side in ("long", "short"):
+            with self.subTest(side=side):
+                result = trade_economics(side, 100, 100, 2, maker_entry=True, maker_exit=False)
+                self.assertEqual(result["gross_pnl"], 0)
+                self.assertGreater(result["fees"], 0)
+                self.assertGreater(result["slippage"], 0)
+                self.assertLess(result["net_pnl"], 0)
+                self.assertAlmostEqual(
+                    result["net_pnl"],
+                    result["gross_pnl"] - result["fees"] - result["slippage"],
+                )
+
+    def test_target_maker_exit_has_no_taker_slippage(self):
+        result = trade_economics("long", 100, 110, 2, maker_entry=True, maker_exit=True)
+        self.assertEqual(result["exit_price"], 110)
+        self.assertEqual(result["slippage"], 0)
+        self.assertAlmostEqual(
+            result["net_pnl"],
+            result["gross_pnl"] - result["fees"] - result["slippage"],
+        )
+
+    def test_trade_economics_rejects_invalid_inputs(self):
+        with self.assertRaises(ValueError):
+            trade_economics("buy", 100, 101, 1)
+        with self.assertRaises(ValueError):
+            trade_economics("long", 100, 101, 0)
 
 
 if __name__ == "__main__":

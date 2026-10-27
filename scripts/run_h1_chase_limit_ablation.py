@@ -370,3 +370,5 @@ def main():
             print(f"Wrote {path}: {len(rows)} rows")
     print("CAVEATS: Binance OHLCV proxy, modelled fees/slippage, OHLC limit penetration is not queue/fill simulation. This is a research ablation, not a live recommendation.")
 
+if __name__ == "__main__":
+    main()

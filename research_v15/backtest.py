@@ -209,23 +209,43 @@ def position_size(
     entry_price: float,
     stop_distance: float,
 ) -> dict[str, float]:
-    """Size position under risk and 1x-notional caps, before trading costs."""
+    """Size a position so modeled stop loss plus fees/slippage fits the risk budget.
+
+    This covers a stop filled at its trigger price, not a gap-through-stop loss.
+    Notional is capped at 1x equity; funding and portfolio-level exposure are
+    not included.
+    """
     if equity <= 0 or entry_price <= 0 or stop_distance <= 0 or not 0 < risk_pct <= 0.05:
         raise ValueError("invalid equity, risk percentage, entry price or stop distance")
+    stop_price = max(entry_price - stop_distance, entry_price * 1e-9)
     risk_budget = equity * risk_pct
-    qty_by_risk = risk_budget / stop_distance
+    price_loss_per_unit = stop_distance
+    entry_fee_per_unit = entry_price * MAKER_FEE
+    stop_exit_fee_per_unit = stop_price * TAKER_FEE
+    stop_slippage_per_unit = stop_price * TAKER_SLIPPAGE
+    total_stop_loss_per_unit = (
+        price_loss_per_unit + entry_fee_per_unit + stop_exit_fee_per_unit + stop_slippage_per_unit
+    )
+    qty_by_price_risk = risk_budget / price_loss_per_unit
+    qty_by_total_risk = risk_budget / total_stop_loss_per_unit
     qty_by_notional = equity / entry_price
-    qty = min(qty_by_risk, qty_by_notional)
+    qty = min(qty_by_total_risk, qty_by_notional)
+    planned_stop_loss = qty * price_loss_per_unit
+    estimated_stop_cost = qty * (entry_fee_per_unit + stop_exit_fee_per_unit + stop_slippage_per_unit)
+    total_estimated_stop_loss = planned_stop_loss + estimated_stop_cost
     return {
         "risk_budget": risk_budget,
-        "qty_by_risk": qty_by_risk,
+        "qty_by_price_risk": qty_by_price_risk,
+        "qty_by_total_risk": qty_by_total_risk,
         "qty_by_notional": qty_by_notional,
         "qty": qty,
         "notional": qty * entry_price,
-        "planned_stop_loss": qty * stop_distance,
-        "planned_stop_loss_pct_equity": qty * stop_distance / equity,
+        "planned_stop_loss": planned_stop_loss,
+        "estimated_stop_cost": estimated_stop_cost,
+        "total_estimated_stop_loss": total_estimated_stop_loss,
+        "planned_stop_loss_pct_equity": planned_stop_loss / equity,
+        "total_estimated_stop_loss_pct_equity": total_estimated_stop_loss / equity,
     }
-
 
 def backtest_symbol(
     bars: Sequence[Bar],

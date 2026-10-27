@@ -20,6 +20,22 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Inspect uploaded historical datasets
+        run: |
+          python - <<'PY'
+          import csv, glob, os, zipfile
+          for path in sorted(glob.glob("*.zip")):
+              print(f"ARCHIVE {path} bytes={os.path.getsize(path)}")
+              with zipfile.ZipFile(path) as z:
+                  for info in z.infolist():
+                      if info.is_dir():
+                          continue
+                      print(f"  FILE {info.filename} bytes={info.file_size}")
+                      if info.filename.lower().endswith(".csv"):
+                          with z.open(info) as raw:
+                              line = raw.readline().decode("utf-8-sig", "replace").strip()
+                              print(f"    HEADER {line[:500]}")
+          PY
       - name: Compile Python files
         run: python -m py_compile Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py scripts/scan_secrets.py
       - name: Scan for obvious secrets

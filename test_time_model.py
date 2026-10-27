@@ -711,6 +711,92 @@ def test_equity_reconciles_journal_and_remaining_open_positions_after_each_close
     assert e.risk_mgr.current_equity == round(cfg.capital_usdt + journal_net, 2)
 
 
+
+def test_tp1_partial_fill_keeps_equity_consistent_with_remaining_position():
+    cfg = engine_mod.BotConfig(
+        timeframe="15m", capital_usdt=10_000.0,
+        daily_stop_loss_pct=50.0, emergency_kill_switch_pct=90.0,
+    )
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.cfg = cfg
+    ts = 1_800_000_900_000
+    pos = engine_mod.OpenPositionState(
+        trade_id="tp1-equity", symbol="BTCUSDT", direction="long", strategy="test",
+        entry_ts=ts - 900_000, entry_price=100.0, stop_price=95.0,
+        tp1_price=110.0, tp2_price=120.0, initial_stop_dist=5.0,
+        size_usdt=1_000.0, risk_usdt=50.0, order_type="market",
+        equity_at_entry=10_000.0,
+    )
+    e.open_positions = {"BTCUSDT": pos}
+    e._last_mark_prices = {"BTCUSDT": 110.0}
+    e._intrabar_risk_marks = {"BTCUSDT": 110.0}
+    e._intrabar_risk_marks_ts = ts
+    e.closed_trades = []
+    e.risk_mgr = engine_mod.AdaptiveRiskManager(cfg)
+
+    engine_mod.UnifiedQuantEngine._apply_tp1(pos)
+    e.risk_mgr.mark_to_market(e._unrealized_pnl_at_marks(), ts)
+
+    # +50 realized gross at TP1 and +50 mark-to-market gross on the remaining half.
+    assert pos.tp1_hit is True
+    assert pos.remaining_fraction == 0.5
+    assert pos.realized_tp1_gross_usdt == 50.0
+    assert e.risk_mgr.unrealized_pnl == 98.45
+    assert e.risk_mgr.current_equity == 10_098.45
+
+    # Closing the remaining half at TP2 reconciles the conservative MTM estimate
+    # with the actual modeled maker take-profit execution and journal.
+    engine_mod.UnifiedQuantEngine._close_position(
+        e, pos, 120.0, "take_profit", ts, mae_r=0.0, mfe_r=4.0,
+    )
+    assert len(e.closed_trades) == 1
+    assert e.closed_trades[0].gross_pnl == 150.0
+    assert e.closed_trades[0].pnl_usdt == 149.60
+    assert e.risk_mgr.realized_equity == 10_149.60
+    assert e.risk_mgr.unrealized_pnl == 0.0
+    assert e.risk_mgr.current_equity == 10_149.60
+
+
+def test_finalize_open_positions_uses_bar_close_timestamp_across_utc_midnight():
+    cfg = engine_mod.BotConfig(timeframe="15m", capital_usdt=10_000.0)
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.cfg = cfg
+    # Candle opens at 23:45 UTC and closes at 00:00 UTC next day.
+    candle_open_ts = 1_800_000_000_000
+    candle_open_ts = (candle_open_ts // 86_400_000) * 86_400_000 + 23 * 3_600_000 + 45 * 60_000
+    pos = engine_mod.OpenPositionState(
+        trade_id="finalize-midnight", symbol="BTCUSDT", direction="long", strategy="test",
+        entry_ts=candle_open_ts - 900_000, entry_price=100.0, stop_price=90.0,
+        tp1_price=110.0, tp2_price=120.0, initial_stop_dist=10.0,
+        size_usdt=1_000.0, risk_usdt=100.0, order_type="market",
+        equity_at_entry=10_000.0,
+    )
+    e.open_positions = {"BTCUSDT": pos}
+    e._last_mark_prices = {}
+    e._intrabar_risk_marks = {}
+    e._intrabar_risk_marks_ts = None
+    e.closed_trades = []
+    e.risk_mgr = engine_mod.AdaptiveRiskManager(cfg)
+    e.tg = type("Notifier", (), {"send_message": lambda self, message: None})()
+    e._persist = lambda: None
+
+    engine_mod.UnifiedQuantEngine.finalize_open_positions(
+        e, {"BTCUSDT": engine_mod.Candle(
+            ts=candle_open_ts, open=100.0, high=101.0, low=99.0, close=100.0, volume=10.0,
+        )},
+    )
+
+    assert len(e.closed_trades) == 1
+    expected_close_ts = candle_open_ts + 900_000
+    assert e.closed_trades[0].exit_date == engine_mod.datetime.fromtimestamp(
+        expected_close_ts / 1000.0, tz=engine_mod.timezone.utc,
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    assert e.risk_mgr.current_day_str == engine_mod.datetime.fromtimestamp(
+        expected_close_ts / 1000.0, tz=engine_mod.timezone.utc,
+    ).strftime("%Y-%m-%d")
+
+
+
 def test_full_step_candle_kill_switch_flattens_portfolio_and_blocks_reentry():
     cfg = engine_mod.BotConfig(
         timeframe="15m", capital_usdt=10_000.0,
@@ -846,7 +932,9 @@ def test_daily_stop_keeps_managing_existing_positions_without_new_entries():
 
 
 if __name__ == "__main__":
-    tests = [test_equity_reconciles_journal_and_remaining_open_positions_after_each_close,
+    tests = [test_tp1_partial_fill_keeps_equity_consistent_with_remaining_position,
+             test_finalize_open_positions_uses_bar_close_timestamp_across_utc_midnight,
+             test_equity_reconciles_journal_and_remaining_open_positions_after_each_close,
              test_daily_stop_keeps_managing_existing_positions_without_new_entries,
              test_full_step_candle_kill_switch_flattens_portfolio_and_blocks_reentry,
              test_sequential_kill_switch_closes_do_not_double_count_unrealized_pnl,

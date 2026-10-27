@@ -68,6 +68,41 @@ class V15BacktestTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             limit_order_expired(1, 0)
 
+    def test_long_limit_intrabar_touch_fills_at_limit(self):
+        bar = Bar(1, 101, 103, 99, 102)
+        self.assertEqual(limit_order_fill(bar, "long", 100), 100)
+
+    def test_short_limit_intrabar_touch_fills_at_limit(self):
+        bar = Bar(1, 99, 101, 97, 98)
+        self.assertEqual(limit_order_fill(bar, "short", 100), 100)
+
+    def test_long_limit_gap_gets_better_open_price(self):
+        bar = Bar(1, 95, 99, 94, 97)
+        self.assertEqual(limit_order_fill(bar, "long", 100), 95)
+
+    def test_short_limit_gap_gets_better_open_price(self):
+        bar = Bar(1, 105, 107, 101, 103)
+        self.assertEqual(limit_order_fill(bar, "short", 100), 105)
+
+    def test_limit_not_touched_does_not_fill(self):
+        bar = Bar(1, 102, 104, 101, 103)
+        self.assertIsNone(limit_order_fill(bar, "long", 100))
+        self.assertIsNone(limit_order_fill(bar, "short", 105))
+
+    def test_limit_order_lifetime_counts_only_post_signal_bars(self):
+        self.assertFalse(limit_order_expired(1, 3))
+        self.assertFalse(limit_order_expired(3, 3))
+        self.assertTrue(limit_order_expired(4, 3))
+
+    def test_invalid_limit_order_inputs_rejected(self):
+        bar = Bar(1, 100, 101, 99, 100)
+        with self.assertRaises(ValueError):
+            limit_order_fill(bar, "buy", 100)
+        with self.assertRaises(ValueError):
+            limit_order_fill(bar, "long", 0)
+        with self.assertRaises(ValueError):
+            limit_order_expired(-1, 3)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -423,38 +423,6 @@ def test_limit_entry_uses_limit_price_when_bar_opens_above_and_trades_through():
     assert e.open_positions["BTCUSDT"].entry_price == 100.0
 
 
-if __name__ == "__main__":
-    tests = [test_intrabar_risk_mark_uses_adverse_extreme_when_stop_not_hit,
-             test_intrabar_risk_mark_uses_gap_adjusted_stop_fill_when_stop_crossed,
-             test_mtm_uses_close_timestamp_for_15m_bar,
-             test_daily_stop_blocks_entries_until_next_utc_day,
-             test_kill_switch_remains_latched_across_utc_day_change,
-             test_portfolio_risk_cap_limits_new_position_size,
-             test_position_size_respects_remaining_portfolio_risk_budget,
-             test_max_portfolio_risk_config_is_loaded_and_validated,
-             test_blocked_signal_hours_utc_suppresses_signal_and_validates_values,
-             test_blocked_weekdays_utc_suppresses_signal_and_validates_values,
-             test_blocked_weekdays_config_rejects_wrong_type,
-             test_config_rejects_unimplemented_strategy_keys,
-             test_config_rejects_unknown_top_level_keys,
-             test_config_rejects_extreme_tp2_and_non_finite_numbers,
-             test_h2_range_fade_is_disabled_by_default_and_enabled_explicitly,
-             test_h2_range_fade_config_is_read_from_strategy_section,
-             test_open_position_management_receives_bar_close_timestamp_across_utc_midnight,
-             test_mtm_respects_configured_1h_close_boundary,
-             test_unsupported_timeframe_fails_closed,
-             test_wick_above_donchian_without_close_does_not_trigger_long_breakout,
-             test_wick_below_donchian_without_close_does_not_trigger_short_breakout,
-             test_close_above_donchian_with_volume_confirms_long_breakout,
-             test_signal_is_not_filled_until_next_candle,
-             test_market_entry_rejected_when_next_open_gaps_beyond_chase_limit,
-             test_market_entry_fills_at_next_open_when_gap_is_within_limit,
-             test_limit_entry_uses_limit_price_when_bar_opens_above_and_trades_through]
-    for test in tests:
-        test()
-        print("PASS", test.__name__)
-    print(f"{len(tests)}/{len(tests)} tests passed")
-
 def test_intrabar_risk_mark_uses_adverse_extreme_when_stop_not_hit():
     e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
     e.cfg = engine_mod.BotConfig(timeframe="15m")
@@ -497,3 +465,37 @@ def test_intrabar_risk_mark_uses_gap_adjusted_stop_fill_when_stop_crossed():
     assert seen == [{"BTCUSDT": 90}], seen
 
 
+
+
+
+if __name__ == "__main__":
+    tests = [test_intrabar_risk_mark_uses_adverse_extreme_when_stop_not_hit,
+             test_intrabar_risk_mark_uses_gap_adjusted_stop_fill_when_stop_crossed,
+             test_mtm_uses_close_timestamp_for_15m_bar,
+             test_daily_stop_blocks_entries_until_next_utc_day,
+             test_kill_switch_remains_latched_across_utc_day_change,
+             test_portfolio_risk_cap_limits_new_position_size,
+             test_position_size_respects_remaining_portfolio_risk_budget,
+             test_max_portfolio_risk_config_is_loaded_and_validated,
+             test_blocked_signal_hours_utc_suppresses_signal_and_validates_values,
+             test_blocked_weekdays_utc_suppresses_signal_and_validates_values,
+             test_blocked_weekdays_config_rejects_wrong_type,
+             test_config_rejects_unimplemented_strategy_keys,
+             test_config_rejects_unknown_top_level_keys,
+             test_config_rejects_extreme_tp2_and_non_finite_numbers,
+             test_h2_range_fade_is_disabled_by_default_and_enabled_explicitly,
+             test_h2_range_fade_config_is_read_from_strategy_section,
+             test_open_position_management_receives_bar_close_timestamp_across_utc_midnight,
+             test_mtm_respects_configured_1h_close_boundary,
+             test_unsupported_timeframe_fails_closed,
+             test_wick_above_donchian_without_close_does_not_trigger_long_breakout,
+             test_wick_below_donchian_without_close_does_not_trigger_short_breakout,
+             test_close_above_donchian_with_volume_confirms_long_breakout,
+             test_signal_is_not_filled_until_next_candle,
+             test_market_entry_rejected_when_next_open_gaps_beyond_chase_limit,
+             test_market_entry_fills_at_next_open_when_gap_is_within_limit,
+             test_limit_entry_uses_limit_price_when_bar_opens_above_and_trades_through]
+    for test in tests:
+        test()
+        print("PASS", test.__name__)
+    print(f"{len(tests)}/{len(tests)} tests passed")

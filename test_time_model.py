@@ -513,8 +513,87 @@ def test_portfolio_intrabar_marks_prepared_for_all_open_symbols_before_risk_chec
 
 
 
+def test_combined_intrabar_losses_trigger_daily_stop_and_kill_switch():
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.cfg = engine_mod.BotConfig(
+        timeframe="15m", capital_usdt=10_000.0,
+        daily_stop_loss_pct=5.0, emergency_kill_switch_pct=30.0,
+    )
+    e._last_mark_prices = {}
+    e._intrabar_risk_marks = {}
+    e._intrabar_risk_marks_ts = None
+    e.open_positions = {
+        "BTCUSDT": engine_mod.OpenPositionState(
+            trade_id="btc", symbol="BTCUSDT", direction="long", strategy="test",
+            entry_ts=1_800_000_000_000, entry_price=100.0, stop_price=70.0,
+            tp1_price=110.0, tp2_price=120.0, initial_stop_dist=30.0,
+            size_usdt=10_000.0, risk_usdt=3_000.0, order_type="market",
+            equity_at_entry=10_000.0,
+        ),
+        "ETHUSDT": engine_mod.OpenPositionState(
+            trade_id="eth", symbol="ETHUSDT", direction="short", strategy="test",
+            entry_ts=1_800_000_000_000, entry_price=100.0, stop_price=130.0,
+            tp1_price=90.0, tp2_price=80.0, initial_stop_dist=30.0,
+            size_usdt=10_000.0, risk_usdt=3_000.0, order_type="market",
+            equity_at_entry=10_000.0,
+        ),
+    }
+    ts = 1_800_000_000_000
+    e._prepare_portfolio_intrabar_marks({
+        "BTCUSDT": engine_mod.Candle(ts=ts, open=100, high=102, low=70, close=100, volume=10),
+        "ETHUSDT": engine_mod.Candle(ts=ts, open=100, high=130, low=98, close=100, volume=10),
+    })
+    combined_unrealized = e._unrealized_pnl_at_marks()
+    rm = engine_mod.AdaptiveRiskManager(e.cfg)
+    alerts = rm.mark_to_market(combined_unrealized, ts + 900_000)
+    assert combined_unrealized < -3_000.0, combined_unrealized
+    assert alerts["daily_stop_hit"] is True, alerts
+    assert alerts["kill_switch_hit"] is True, alerts
+    assert rm.current_equity < 7_000.0, rm.current_equity
+
+
+def test_kill_switch_exit_price_is_written_to_closed_trade_journal():
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.cfg = engine_mod.BotConfig(
+        timeframe="15m", capital_usdt=10_000.0,
+        daily_stop_loss_pct=5.0, emergency_kill_switch_pct=30.0,
+    )
+    e._last_mark_prices = {"BTCUSDT": 100.0}
+    e._intrabar_risk_marks = {"BTCUSDT": 90.0}
+    e._intrabar_risk_marks_ts = 1_800_000_900_000
+    pos = engine_mod.OpenPositionState(
+        trade_id="btc-kill", symbol="BTCUSDT", direction="long", strategy="test",
+        entry_ts=1_800_000_000_000, entry_price=100.0, stop_price=80.0,
+        tp1_price=110.0, tp2_price=120.0, initial_stop_dist=20.0,
+        size_usdt=1_000.0, risk_usdt=200.0, order_type="market",
+        equity_at_entry=10_000.0,
+    )
+    e.open_positions = {"BTCUSDT": pos}
+    e.closed_trades = []
+    e.risk_mgr = engine_mod.AdaptiveRiskManager(e.cfg)
+    e.risk_mgr.kill_switch_triggered = True
+    e.risk_mgr.peak_equity = 10_000.0
+    e.tg = type("Notifier", (), {"send_message": lambda self, message: None})()
+    e._persist = lambda: None
+    exit_ts = 1_800_000_900_000
+    engine_mod.UnifiedQuantEngine._close_position(
+        e, pos, e._intrabar_risk_marks["BTCUSDT"], "kill_switch",
+        exit_ts, mae_r=0.5, mfe_r=0.0,
+    )
+    assert len(e.closed_trades) == 1
+    assert e.closed_trades[0].exit_price == 90.0, e.closed_trades[0].exit_price
+    assert e.closed_trades[0].exit_reason == "kill_switch"
+    assert e.closed_trades[0].exit_date == "2027-01-15T08:15:00Z"
+    assert "BTCUSDT" not in e.open_positions
+    assert e.risk_mgr.current_equity < 10_000.0
+
+
+
+
 if __name__ == "__main__":
-    tests = [test_portfolio_intrabar_marks_prepared_for_all_open_symbols_before_risk_check,
+    tests = [test_combined_intrabar_losses_trigger_daily_stop_and_kill_switch,
+             test_kill_switch_exit_price_is_written_to_closed_trade_journal,
+             test_portfolio_intrabar_marks_prepared_for_all_open_symbols_before_risk_check,
              test_intrabar_marks_accumulate_for_symbols_at_same_timestamp,
              test_intrabar_risk_mark_uses_adverse_extreme_when_stop_not_hit,
              test_intrabar_risk_mark_uses_gap_adjusted_stop_fill_when_stop_crossed,

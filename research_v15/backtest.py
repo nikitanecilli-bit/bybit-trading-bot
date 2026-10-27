@@ -208,6 +208,7 @@ def position_size(
     risk_pct: float,
     entry_price: float,
     stop_distance: float,
+    side: str = "long",
 ) -> dict[str, float]:
     """Size a position so modeled stop loss plus fees/slippage fits the risk budget.
 
@@ -215,9 +216,13 @@ def position_size(
     Notional is capped at 1x equity; funding and portfolio-level exposure are
     not included.
     """
+    if side not in ("long", "short"):
+        raise ValueError("side must be 'long' or 'short'")
     if equity <= 0 or entry_price <= 0 or stop_distance <= 0 or not 0 < risk_pct <= 0.05:
         raise ValueError("invalid equity, risk percentage, entry price or stop distance")
-    stop_price = max(entry_price - stop_distance, entry_price * 1e-9)
+    stop_price = entry_price - stop_distance if side == "long" else entry_price + stop_distance
+    if stop_price <= 0:
+        raise ValueError("stop price must be positive")
     risk_budget = equity * risk_pct
     price_loss_per_unit = stop_distance
     entry_fee_per_unit = entry_price * MAKER_FEE
@@ -325,7 +330,7 @@ def backtest_symbol(
                 if entry > 0:
                     stop_distance = max(entry * min_stop_pct, pending["atr"] * stop_atr_multiple)
                     stop = entry - stop_distance if side == "long" else entry + stop_distance
-                    sizing = position_size(equity, risk_pct, entry, stop_distance)
+                    sizing = position_size(equity, risk_pct, entry, stop_distance, side)
                     qty = sizing["qty"]
                     if qty > 0:
                         pos = {"side": side, "entry": entry, "entry_ts": bar.ts, "entry_index": i, "stop": stop, "initial_stop": stop, "risk_usdt": sizing["planned_stop_loss"], "risk_budget": sizing["risk_budget"], "qty": qty, "target": entry + target_r * stop_distance if side == "long" else entry - target_r * stop_distance, "be_moved": False}

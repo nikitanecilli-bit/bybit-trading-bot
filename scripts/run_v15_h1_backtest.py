@@ -22,6 +22,8 @@ from research_v15.backtest import Bar, backtest_symbol
 FILE_RE = re.compile(r"(?i)([a-z0-9]+usdt)_(1h)_.*\.csv$")
 ONE_HOUR_MS = 3_600_000
 MIN_BARS = 250
+COMMON_START_MS = 1777420800000  # 2026-04-29T00:00:00Z
+COMMON_END_MS = 1792972800000    # 2026-10-26T00:00:00Z
 
 
 def load_h1_datasets():
@@ -57,7 +59,14 @@ def load_h1_datasets():
                             raise ValueError("duplicate timestamps")
                         if any(b - a != ONE_HOUR_MS for a, b in zip(timestamps, timestamps[1:])):
                             raise ValueError("irregular H1 intervals")
-                        candidates[symbol].append((len(bars), archive, bars))
+                        if timestamps[0] > COMMON_START_MS or timestamps[-1] < COMMON_END_MS:
+                            print(f"SKIP {symbol}: does not cover common test window 2026-04-29..2026-10-26")
+                            continue
+                        common_bars = [b for b in bars if COMMON_START_MS <= b.ts <= COMMON_END_MS]
+                        if len(common_bars) != 4321:
+                            print(f"SKIP {symbol}: expected 4321 common-window bars, got {len(common_bars)}")
+                            continue
+                        candidates[symbol].append((len(common_bars), archive, common_bars))
                     except Exception as exc:
                         print(f"REJECT {symbol} {archive}: {exc}")
         except zipfile.BadZipFile:
@@ -91,7 +100,7 @@ def main():
     net_positive = sum(r["net_pnl"] > 0 for r in results)
     total_trades = sum(r["trades_count"] for r in results)
     print(f"SUMMARY symbols={len(results)} profitable_symbols={net_positive} total_trades={total_trades} sum_individual_net_pnl={sum(r['net_pnl'] for r in results):.2f} USDT")
-    print("LIMITATIONS: Binance OHLCV proxy; funding excluded; maker fill assumed on touch; conservative stop-first intrabar rule; each symbol starts with separate 10,000 USDT; no portfolio overlap/capital constraints.")
+    print("LIMITATIONS: Binance OHLCV proxy; funding excluded; maker fill assumed on touch; conservative stop-first intrabar rule; each symbol starts with separate 10,000 USDT; no portfolio overlap/capital constraints; first 200 bars are indicator warm-up.")
 
 
 if __name__ == "__main__":

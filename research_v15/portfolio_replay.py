@@ -157,12 +157,18 @@ def replay_portfolio(
         stats = by_symbol[trade["symbol"]]
         stats["accepted_trades"] += 1
         stats["accepted_net_pnl"] += float(trade["net_pnl"])
+        stats["accepted_gross_pnl"] += float(trade["gross_pnl"])
+        stats["accepted_fees"] += float(trade["fees"])
+        stats["accepted_slippage"] += float(trade["slippage"])
     for trade in rejected:
         by_symbol[trade["symbol"]]["rejected_trades"] += 1
     symbol_summary = []
     for symbol, stats in sorted(by_symbol.items()):
         stats["candidate_net_pnl"] = round(stats["candidate_net_pnl"], 4)
         stats["accepted_net_pnl"] = round(stats["accepted_net_pnl"], 4)
+        stats["accepted_gross_pnl"] = round(stats["accepted_gross_pnl"], 4)
+        stats["accepted_fees"] = round(stats["accepted_fees"], 4)
+        stats["accepted_slippage"] = round(stats["accepted_slippage"], 4)
         stats["acceptance_rate_pct"] = round(100 * stats["accepted_trades"] / stats["candidate_trades"], 4)
         symbol_summary.append({"symbol": symbol, **stats})
     return {

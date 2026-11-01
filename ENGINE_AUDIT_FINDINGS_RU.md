@@ -220,7 +220,7 @@ These are P1 limitations for claims about net profitability or exchange-executab
 
 ## 2026-11-02 — v14 funding cashflow integration
 
-Funding теперь опционально подключается к активному v14 через `--funding-dir` + `--mark-price-dir` (аргументы обязательны вместе). Один `accrued_funding_cost(position, events, marks, as_of_ts)` используется и для открытого MTM, и для финального close: funding попадает в equity до daily stop/kill-switch и ровно один раз в realized net PnL. TP1 candle-close timestamp хранится в позиции; settlements до/на этой границе используют full initial quantity, после — remaining fraction. Отсутствие CSV или точного settlement mark приводит к hard error.
+Funding теперь опционально подключается к активному v14 через `--funding-dir` + `--mark-price-dir` (аргументы обязательны вместе). Один `accrued_funding_cost(position, events, marks, as_of_ts)` используется и для открытого MTM, и для финального close: funding попадает в equity до daily stop/kill-switch и ровно один раз в realized net PnL. TP1 candle-close timestamp хранится в позиции; settlements до/на этой границе используют full initial quantity, после — remaining fraction. Отсутствие CSV или timestamp-aligned mark candle open proxy приводит к hard error. Это всё ещё proxy: он не гарантирует равенство фактической settlement mark price.
 
 `TradeRecord.funding_cost_usdt`, `total_costs` и `funding_cost_usdt` в summary учитывают cashflow отдельно. Добавлены `test_funding_accounting.py`, `test_funding_pnl.py`, `test_funding_mark_to_market.py`. CI run пока не подтверждён. Ограничение: mark-price loader требует точного совпадения funding timestamp с mark candle timestamp; текущий архив hourly mark candles не покрывает settlements вне этих границ.
 

@@ -1,4 +1,5 @@
 name: E09 H1 Gate Factorial
+# Re-run after correcting next-open gate isolation.
 
 on:
   push:

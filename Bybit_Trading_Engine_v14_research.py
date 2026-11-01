@@ -893,6 +893,7 @@ class UnifiedQuantEngine:
         self._last_mark_prices: Dict[str, float] = {}
         self._intrabar_risk_marks: Dict[str, float] = {}
         self._intrabar_risk_marks_ts: Optional[int] = None
+        self._bar_entry_risk_budgets: Dict[str, float] = {}
         self._state_restored = False
 
         if restore_plan_b:
@@ -909,6 +910,7 @@ class UnifiedQuantEngine:
         self._last_mark_prices.clear()
         self._intrabar_risk_marks.clear()
         self._intrabar_risk_marks_ts = None
+        self._bar_entry_risk_budgets.clear()
         self._state_restored = False
 
     @staticmethod
@@ -1067,6 +1069,31 @@ class UnifiedQuantEngine:
         return sum(max(0.0, pos.risk_usdt) * max(0.0, min(1.0, pos.remaining_fraction))
                    for pos in self.open_positions.values())
 
+    def _prepare_pending_entry_risk_budgets(self) -> Dict[str, float]:
+        """Allocate this bar's remaining risk budget as a deterministic batch.
+
+        Higher volume-ratio signals receive scarce position slots first; symbol
+        name is only a stable tie-breaker. Eligible pending signals share the
+        available portfolio risk equally, so iteration order cannot consume it.
+        """
+        self._bar_entry_risk_budgets = {}
+        pending_symbols = list(self.pending)
+        if not pending_symbols:
+            return self._bar_entry_risk_budgets
+
+        available_slots = max(0, self.cfg.max_concurrent_positions - len(self.open_positions))
+        ranked = sorted(
+            pending_symbols,
+            key=lambda sym: (-float(self.pending[sym].get("vol_ratio", 0.0)), sym),
+        )
+        eligible = ranked[:available_slots]
+        portfolio_cap = self.risk_mgr.current_equity * (self.cfg.max_portfolio_risk_pct / 100.0)
+        available_risk = max(0.0, portfolio_cap - self._open_portfolio_risk_usdt())
+        per_signal_budget = available_risk / len(eligible) if eligible else 0.0
+        for symbol in pending_symbols:
+            self._bar_entry_risk_budgets[symbol] = per_signal_budget if symbol in eligible else 0.0
+        return self._bar_entry_risk_budgets
+
     def _try_fill_pending(self, symbol: str, curr: Candle) -> bool:
         """Исполняет отложенный сигнал на свече, следующей за сигнальной. True если позиция открыта."""
         sig = self.pending.pop(symbol)
@@ -1094,6 +1121,9 @@ class UnifiedQuantEngine:
         stop_price, tp1, tp2 = QuantStrategyCore.build_levels(direction, fill, sig["stop_dist"], self.cfg)
         portfolio_risk_cap = self.risk_mgr.current_equity * (self.cfg.max_portfolio_risk_pct / 100.0)
         remaining_portfolio_risk = max(0.0, portfolio_risk_cap - self._open_portfolio_risk_usdt())
+        allocated_budget = self._bar_entry_risk_budgets.pop(symbol, None)
+        if allocated_budget is not None:
+            remaining_portfolio_risk = min(remaining_portfolio_risk, allocated_budget)
         size_usdt, risk_usdt = self.risk_mgr.calculate_position_size(
             fill, stop_price, order_type=sig["order_type"],
             risk_budget_usdt=remaining_portfolio_risk,
@@ -1486,8 +1516,13 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
         # Evaluate portfolio drawdown against all symbols' adverse marks for this
         # synchronized bar before any single symbol can trigger a risk decision.
         engine._prepare_portfolio_intrabar_marks({sym: candles[sym][bar] for sym in symbols})
+        timeframe_ms = _TIMEFRAME_MS[str(engine.cfg.timeframe).strip().lower()]
+        bar_close_ts = candles[symbols[0]][bar].ts + timeframe_ms
+        engine._update_mark_to_market(bar_close_ts)
+        engine._prepare_pending_entry_risk_budgets()
         for sym in symbols:
             engine.step_candle(sym, candles[sym][lo:bar + 1])
+        engine._bar_entry_risk_budgets.clear()
 
     # Не оставляем открытые позиции вне статистики: закрываем их по последнему close.
     engine.finalize_open_positions({sym: candles[sym][-1] for sym in symbols}, exit_reason="end_of_test")

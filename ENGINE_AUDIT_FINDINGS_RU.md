@@ -139,3 +139,17 @@ Current known issue remains: sequential simultaneous-entry allocation can be sym
 - Cause: `run_simulation_pass` processes `symbols` sequentially; `_try_fill_pending` immediately consumes remaining portfolio risk for each symbol. No batch allocation / pro-rata distribution exists.
 - Severity: P1 research-integrity defect for shared-capital backtests; it can change instrument selection and resulting PnL based solely on input list order.
 - No engine behavior has been changed yet. Next safe action: implement a deterministic batch allocation policy for all same-bar pending signals (e.g. equal pro-rata or explicit fixed ranking), then test invariance to input permutation and document the policy. Do not silently sort by symbol name: that would make results reproducible but still arbitrary.
+
+
+### Fix applied: deterministic batch allocation for simultaneous entries
+
+- Commit `15444377b5fcc56296ae5147e0a06cd8585d74a5` adds a per-bar allocation stage in `run_simulation_pass`.
+- All pending entries on the same bar receive a precomputed share of remaining portfolio risk; they no longer consume the budget in symbol iteration order.
+- When pending entries exceed available position slots, priority is descending `vol_ratio`; symbol name is used only as a deterministic tie-breaker. This policy is explicit and tested.
+- Budget is allocated conservatively before per-symbol position management; risk freed by a same-bar exit is not redistributed until the next bar. Unfilled or rejected entries do not cause mid-bar reallocation.
+- `_try_fill_pending` consumes the allocated budget if present; direct focused calls without a batch allocation retain the legacy remaining-budget fallback.
+- Regression tests now verify same selected portfolio and total risk under reversed symbol order, plus stable slot priority by signal strength.
+- CI run [41356881313](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356881313), commit `3246eb1df4b9d4cfbd109fa6e6a6316e44710200`: completed successfully, all technical checks passed.
+- Earlier intermediate CI runs failed because focused engine tests instantiate the engine with `__new__` and do not run `__init__`; compatibility fallback was added. Those failed runs are retained in history and are not treated as successful evidence.
+
+The previous P1 order-dependent allocation is considered fixed in the research engine subject to the limitations above. This is a new portfolio allocation policy; historical E01–E09 results must not be silently reinterpreted as if this policy had been active.

@@ -105,7 +105,7 @@ Do not treat old H1 PnL as exchange-executable net performance until these are i
 - `_close_position()` использует тот же helper на `exit_ts` и вычитает funding из realized net PnL;
 - `TradeRecord.funding_cost_usdt` и summary `total_costs`/`funding_cost_usdt` сохраняют раздельную видимость funding;
 - `OpenPositionState.tp1_ts_ms` фиксирует консервативную границу закрытия TP1; settlement на этой границе относится к полному исходному notional, более поздние settlements — к оставшемуся объёму;
-- CLI принимает `--funding-dir` и `--mark-price-dir`; оба аргумента обязательны парой, missing CSV/точный mark завершаются ошибкой, а не молча исключаются.
+- CLI принимает `--funding-dir` и `--mark-price-dir`; оба аргумента обязательны парой, missing CSV/timestamp-aligned mark-candle proxy завершаются ошибкой, а не молча исключаются.
 
 Добавлены тесты pure helper, realized close, mark-to-market risk и mark-price loader. Это первый интеграционный этап; перед любыми PnL-выводами требуется фактический CI run и отдельная проверка funding coverage/mark timestamp alignment для каждого инструмента. Funding не добавляет mark-price OHLC intrabar liquidation model и не моделирует funding, если архив неполный.
 

@@ -118,3 +118,14 @@ Workflow `.github/workflows/research-checks.yml` в одном job выполн�
 - частичный выход TP1 и остаточную долю риска;
 - reconciliation: стартовый equity + сумма net closed PnL + unrealized = current equity;
 - permutation test на одновременные сигналы, сначала зафиксировав ожидаемую политику распределения бюджета.
+
+
+### Regression evidence — 2026-11-02
+
+- CI run [41356694461](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356694461), commit `de748c505e515510b346d2ccefcb5fd4f21d4ac5`: completed successfully.
+- `test_portfolio_accounting.py` is included in compilation and executed successfully.
+- Covered: realized + unrealized equity identity; conservative TP1 partial-position mark accounting; risk-budget cap and zero-budget rejection; long/short mark sign; closed-trade gross PnL, fee, slippage, net PnL and realized-equity reconciliation.
+- This is focused deterministic unit coverage, not a full portfolio event simulation. It does not yet prove symbol-order invariance, exchange margin/liquidation behavior, funding, or real fill quality.
+- Earlier CI run [41356653378](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356653378), commit `4b662e2ea62460705dfd39e38e021b89ee57fd80`, also completed successfully with timeframe validation and the initial portfolio accounting tests.
+
+Current known issue remains: sequential simultaneous-entry allocation can be symbol-order-dependent under a binding portfolio risk cap. No behavior change has been made.

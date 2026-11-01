@@ -8,6 +8,7 @@ on:
       - 'Bybit_Trading_Engine_v14_research.py'
       - 'bybit_instrument_specs.py'
       - 'instrument_spec_history.py'
+      - 'exchange_order_sizing.py'
       - 'funding_accounting.py'
       - 'scripts/snapshot_bybit_instruments.py'
       - 'scripts/validate_funding_coverage.py'
@@ -28,13 +29,15 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile engine and deterministic tests
-        run: python -m py_compile market_regime.py market_structure.py test_market_regime.py test_market_structure.py test_regime_analysis.py test_regime_gate_holdout.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py test_timeframe_validation.py test_portfolio_accounting.py bybit_instrument_specs.py test_bybit_instrument_specs.py instrument_spec_history.py test_instrument_spec_history.py scripts/snapshot_bybit_instruments.py test_snapshot_bybit_instruments.py funding_accounting.py test_funding_accounting.py test_funding_pnl.py test_funding_mark_to_market.py scripts/validate_funding_coverage.py test_funding_coverage.py scripts/scan_secrets.py
+        run: python -m py_compile market_regime.py market_structure.py test_market_regime.py test_market_structure.py test_regime_analysis.py test_regime_gate_holdout.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py test_timeframe_validation.py test_portfolio_accounting.py bybit_instrument_specs.py test_bybit_instrument_specs.py instrument_spec_history.py test_instrument_spec_history.py exchange_order_sizing.py test_exchange_order_sizing.py scripts/snapshot_bybit_instruments.py test_snapshot_bybit_instruments.py funding_accounting.py test_funding_accounting.py test_funding_pnl.py test_funding_mark_to_market.py scripts/validate_funding_coverage.py test_funding_coverage.py scripts/scan_secrets.py
       - name: Test Bybit instrument constraints and Decimal rounding
         run: python test_bybit_instrument_specs.py
       - name: Test dated Bybit instrument snapshot collector
         run: python test_snapshot_bybit_instruments.py
       - name: Test as-of instrument spec history
         run: python test_instrument_spec_history.py
+      - name: Test exchange-valid quantity sizing
+        run: python test_exchange_order_sizing.py
       - name: Test cumulative funding accounting boundaries
         run: python test_funding_accounting.py
       - name: Test v14 realized funding accounting

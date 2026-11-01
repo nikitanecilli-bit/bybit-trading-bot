@@ -66,7 +66,11 @@ class InstrumentSpecHistory:
             rows = payload.get("instruments")
             if not isinstance(rows, list) or not rows:
                 raise ValueError(f"{path}: instruments must be a non-empty list")
-            specs: dict[str, InstrumentSpec] = {}
+            if payload.get("count") != len(rows):
+                raise ValueError(
+                    f"{path}: snapshot count {payload.get('count')!r} does not match {len(rows)} rows"
+                )
+            specs: dict[str, InstrumentSpec] = {};
             for row in rows:
                 spec = InstrumentSpec.from_snapshot({
                     "fetched_at": fetched_at,

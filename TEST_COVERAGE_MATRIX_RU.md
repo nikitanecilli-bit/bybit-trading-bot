@@ -11,9 +11,9 @@
 | Stop/TP внутри свечи | NOT_TESTED | Есть общие тесты времени и гэпов | Проверить collision и OHLC path assumptions |
 | Market gap execution | PARTIAL | `test_gap_execution.py` и gap report существуют | Повторить тесты, проверить точное покрытие |
 | Limit fills | PARTIAL | E03/E07/E09 моделируют лимитное касание | Нет queue/partial fill/spread/adverse selection |
-| Fees | PARTIAL | Моделируются maker/taker комиссии; E09 использует multiplier | Проверить round-trip, разные типы exit и фактические тарифы |
+| Fees | PARTIAL | В v14 есть maker/taker fees per leg; в v15 отдельная модель fee/slippage | Сопоставить тарифы, maker/taker по каждой ноге и rounding |
 | Slippage | PARTIAL | В движке есть модель slippage | Проверить применение к фактической цене и sizing |
-| Funding | NOT_TESTED | Отдельная funding-data ветка существует | Проверить point-in-time funding integration и влияние |
+| Funding | PARTIAL / UNVERIFIED IN CURRENT BRANCH | В отдельной diverged ветке есть downloader, mark-price loader, funding cashflow и synthetic tests; текущая ветка это не использует | Проверить exact mark price, settlement semantics и интегрировать отдельным патчем; старые результаты не funding-adjusted |
 | Position sizing / leverage | NOT_TESTED | Есть параметры риска и плеча в движке | Проверить формулы, округления, margin/liquidation |
 | Portfolio shared capital | PARTIAL | E07 портфельный тест | Проверить event ordering, simultaneous signals и capital accounting |
 | Concurrency / risk gates | PARTIAL | E07/E09 учитывают max positions и risk gates | Проверить последовательность символов и зависимость результата от порядка |
@@ -22,7 +22,7 @@
 | Universe screening | PARTIAL | E01/E02/holdout отчёты | Survivorship, delisted symbols, point-in-time universe |
 | Holdout integrity | PARTIAL | Holdout report существует; Bybit 403 noted | Проверить даты/данные и факт отсутствия повторного подбора |
 | Multiple testing / DSR/PBO | PARTIAL | В отчётах есть caveats | Текущие упрощённые расчёты не считать валидированными |
-| Reproducibility | PARTIAL | Есть GitHub workflows и артефакты | Сверить SHA, dataset hashes, configs, exact artifacts |
+| Reproducibility | PARTIAL | Есть GitHub workflows/artifacts; ветки diverged и несколько движков | Сверить E01–E09 SHA/artifacts и закрепить dataset hashes/manifests |
 | E09 factorial | PARTIAL | 24 клетки заявлены в журнале | Сверить run commit SHA, job logs, 3 CSV и фактические различия факторов |
 
 ## Ключевые непроверенные риски
@@ -32,3 +32,10 @@
 4. Look-ahead и leakage через market context / universe.
 5. Влияние порядка обработки символов на общий портфель.
 6. Реальная устойчивость edge по каждому fold, инструменту и независимому периоду.
+
+## Межветочный аудит (2026-11-02)
+
+- `research/bybit-funding-data-v1`: funding integration существует отдельно, не включена в текущую ветку; mark-price hourly open — proxy, не точный settlement tick.
+- `research/data-adapter-v1`: adapter проверяет ожидаемый interval и общий timestamp intersection; кандидат на точечное исправление P1.
+- `research/v15-donchian-signal`: isolated simulator и portfolio replay; replay overlay не является полноценной portfolio simulation.
+- Подробности: `BRANCH_COMPARISON_AUDIT_RU.md`.

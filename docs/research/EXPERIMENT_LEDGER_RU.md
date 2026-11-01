@@ -161,3 +161,14 @@ Net PnL in USDT. All 24 fold-cells are in `e09_gate_factorial_summary.csv`; trad
 - Decision: do not promote 2% body cap to production. No threshold sweep. Next inspect signal/trade funnel by fold to understand which trades the body cap removes and why fold 1 worsens; only then consider a frozen shared-capital portfolio replay and future untouched holdout.
 
 Detailed report: [E10_H1_BODY_GATE_CROSS_SECTIONAL_RU.md](../reports/E10_H1_BODY_GATE_CROSS_SECTIONAL_RU.md).
+
+
+### E10 — signal/trade funnel follow-up
+
+- Among base-filtered breakout candidates, absolute body >2% share varied by fold: 31.8% (438/1,376), 20.4% (218/1,070), 44.1% (930/2,111).
+- In body-gate-OFF realized trades, body >2% group net was +36.14 (240 trades) in fold 1, -2,856.12 (117) in fold 2, and -2,666.56 (481) in fold 3. Mean net R: +0.003 / -0.240 / -0.052.
+- Candidate forward outcomes show body >2% had worse 24h/48h follow-through in fold 2 and fold 3, but not fold 1. In fold 3, median 48h return was -0.753% for body >2% vs +0.295% for body <=2%.
+- Large-body candidates also had much larger 24h max-up and max-down excursions; the filter removes high-volatility opportunities and adverse excursions together. Do not treat this as a simple signal-quality monotonicity.
+- This supports the working hypothesis that candle-body gate value is regime-dependent: it filters poor follow-through in folds 2/3, but fold 1 had no comparable forward-return disadvantage for large-body candidates.
+- Caveat: candidate forward returns are not fills/PnL; realized bucket PnL is affected by position occupancy and changed trade sequence when the gate is toggled. This is diagnostic, not causal proof.
+

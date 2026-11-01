@@ -42,15 +42,15 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
 
     def test_uses_latest_snapshot_not_later_than_as_of(self):
         history = InstrumentSpecHistory.from_directory(self.root)
-        before = history.get_spec("BTCUSDT", 1_793_001_600_000)
-        after = history.get_spec("BTCUSDT", 1_793_088_000_000)
+        before = history.get_spec("BTCUSDT", 1_793_577_599_999)
+        after = history.get_spec("BTCUSDT", 1_793_577_600_000)
         self.assertEqual(str(before.tick_size), "0.1")
         self.assertEqual(str(after.tick_size), "0.01")
 
     def test_never_uses_future_snapshot(self):
         history = InstrumentSpecHistory.from_directory(self.root)
         with self.assertRaisesRegex(ValueError, "no linear instrument snapshot"):
-            history.get_spec("BTCUSDT", 1_793_000_000_000)
+            history.get_spec("BTCUSDT", 1_793_491_199_999)
 
     def test_staleness_limit_is_enforced(self):
         history = InstrumentSpecHistory.from_directory(self.root)
@@ -62,7 +62,7 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
         write_snapshot(self.root, "c.json", "2026-11-03T00:00:00Z", [row("ETHUSDT")])
         history = InstrumentSpecHistory.from_directory(self.root)
         with self.assertRaisesRegex(ValueError, "absent from latest"):
-            history.get_spec("BTCUSDT", 1_793_174_400_000)
+            history.get_spec("BTCUSDT", 1_793_664_000_000)
 
     def test_non_trading_status_fails_closed(self):
         write_snapshot(self.root, "c.json", "2026-11-03T00:00:00Z",

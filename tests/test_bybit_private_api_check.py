@@ -30,7 +30,7 @@ class BybitPrivateApiCheckTests(unittest.TestCase):
                 "result": {
                     "apiKey": "test-key",
                     "readOnly": 1,
-                    "permissions": {"ContractTrade": [], "Spot": []},
+                    "permissions": {"ContractTrade": ["Order", "Position"]},
                 },
             },
             "test-key",

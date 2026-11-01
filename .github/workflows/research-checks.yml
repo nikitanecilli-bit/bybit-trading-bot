@@ -3,8 +3,16 @@ name: Research engine checks
 on:
   push:
     branches: [main, research/market-regime-v1-main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "AGENTS.md"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "AGENTS.md"
   workflow_dispatch:
 
 permissions:

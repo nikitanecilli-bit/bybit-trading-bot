@@ -942,6 +942,8 @@ class UnifiedQuantEngine:
                     if row_symbol != symbol or ts <= 0 or not math.isfinite(rate):
                         raise ValueError(f"{path}:{line_no}: invalid symbol/timestamp/rate")
                     rows.append({"ts": ts, "rate": rate})
+            if not rows:
+                raise ValueError(f"{path}: no funding rows found")
             rows.sort(key=lambda row: row["ts"])
             if len({row["ts"] for row in rows}) != len(rows):
                 raise ValueError(f"{path}: duplicate funding timestamps")

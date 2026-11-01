@@ -124,7 +124,7 @@
 | `Audit` | 0 | 2 | behind |
 | `research/bybit-funding-data-v1` | 27 | 3 | diverged |
 | `research/data-adapter-v1` | 11 | 3 | diverged |
-| `research/market-regime-v1-main` | 176 | 3 | diverged |
+| `research/market-regime-v1-main` | 181 | 3 | diverged |
 | `research/market-regime-v1` | 30 | 3 | diverged |
 | `research/v15-donchian-signal` | 59 | 4 | diverged |
 

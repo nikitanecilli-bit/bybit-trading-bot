@@ -160,3 +160,12 @@ The previous P1 order-dependent allocation is considered fixed in the research e
 - Searched the engine copy in all six relevant branches (main, Audit, funding-data, data-adapter, market-regime, v15-donchian, plus active research branch) for `place_order`, `/v5/order/create`, `create_order`, `pybit.unified_trading`, `HTTP.post`, `requests.post`, `submit_order`, and `set_trading_stop`: no matches.
 - Searched all Python research scripts in `research/market-regime-v1-main` for the same terms: no matches.
 - Conclusion is limited to the inspected Python engine/scripts. It is not a proof about every non-Python file, installed package, or external runtime configuration. No live order endpoint was found in the audited research code.
+
+
+### P2 diagnostic defect fixed: MAE/MFE on stop candle
+
+- In `_manage_position`, the engine previously updated MAE/MFE from the entire candle high/low before applying the stop. If a long hit its stop and then printed a high wick, the trade journal could count that later high as favorable excursion; a deeper low wick could overstate MAE beyond the modeled stop fill. OHLC does not reveal the order of those extremes.
+- Fix: when stop is crossed, do not update favorable excursion from that candle; cap adverse excursion at the modeled stop fill (including gap-through-stop open). Apply symmetrically to long and short.
+- Tests: `test_stopped_long_mae_uses_stop_fill_and_does_not_count_later_wick_as_mfe` and short counterpart.
+- CI [41357102546](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41357102546), commit `4c5f26ccbd0a7861ac3da587ef20e4855952d152`: completed successfully.
+- Scope: fixes journal MAE/MFE diagnostics only; does not change modeled stop price or net PnL.

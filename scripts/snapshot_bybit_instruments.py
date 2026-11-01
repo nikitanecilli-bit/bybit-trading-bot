@@ -120,6 +120,8 @@ def main() -> None:
     parser.add_argument("--category", default="linear",
                         choices=["linear", "inverse", "spot", "option"])
     parser.add_argument("--output-dir", default="data/instrument_specs")
+    parser.add_argument("--base-url", default=DEFAULT_BASE_URL,
+                        help="Bybit public API base URL; supports regional hosts")
     parser.add_argument("--pause", type=float, default=0.1,
                         help="Pause between API pages in seconds")
     args = parser.parse_args()
@@ -127,7 +129,7 @@ def main() -> None:
         parser.error("--pause cannot be negative")
 
     def fetch(cursor: str | None):
-        page, next_cursor = _request_page(DEFAULT_BASE_URL, args.category, cursor)
+        page, next_cursor = _request_page(args.base_url, args.category, cursor)
         if next_cursor and args.pause:
             time.sleep(args.pause)
         return page, next_cursor

@@ -1421,6 +1421,36 @@ def load_candles_csv(data_dir: str, symbols: List[str]) -> Dict[str, List[Candle
     return out
 
 
+
+_TIMEFRAME_MS = {
+    "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
+    "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
+    "4h": 14_400_000, "6h": 21_600_000, "12h": 43_200_000,
+    "1d": 86_400_000,
+}
+
+
+def validate_candle_timeframe(candles: Dict[str, List[Candle]], timeframe: str) -> None:
+    """Reject CSV/replay candles whose timestamp step disagrees with cfg.timeframe."""
+    tf = str(timeframe).strip().lower()
+    expected_ms = _TIMEFRAME_MS.get(tf)
+    if expected_ms is None:
+        raise ValueError(f"Неподдерживаемый timeframe для проверки свечей: {timeframe!r}")
+    if not candles:
+        raise ValueError("Нет свечных данных для проверки timeframe")
+    for symbol, rows in candles.items():
+        if len(rows) < 2:
+            raise ValueError(f"{symbol}: для проверки timeframe нужно минимум 2 свечи")
+        deltas = [b.ts - a.ts for a, b in zip(rows, rows[1:])]
+        bad = sorted({delta for delta in deltas if delta != expected_ms})
+        if bad:
+            actual = sorted(set(deltas))
+            raise ValueError(
+                f"{symbol}: интервал CSV не соответствует cfg.timeframe={tf!r}; "
+                f"ожидается {expected_ms} ms, обнаружено {actual[:8]}"
+            )
+
+
 def check_alignment(candles: Dict[str, List[Candle]]) -> None:
     if not candles:
         raise ValueError("Нет свечных данных для проверки")
@@ -1443,6 +1473,11 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
         raise RuntimeError("Нельзя запускать backtest поверх восстановленного состояния. "
                            "Для live-resume нужен отдельный цикл с reconciliation по бирже.")
     engine.reset_state_for_new_run()
+    validate_candle_timeframe(candles, engine.cfg.timeframe)
+    check_alignment(candles)
+    missing = sorted(set(symbols) - set(candles))
+    if missing:
+        raise ValueError(f"Нет свечных данных для символов: {', '.join(missing)}")
     bars_total = len(candles[symbols[0]])
     for bar in range(25, bars_total):
         lo = max(0, bar + 1 - CALC_WINDOW)

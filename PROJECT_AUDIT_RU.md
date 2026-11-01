@@ -62,3 +62,5 @@ Run `41355263006` на commit `9271b0e4eac3d05db700f09cced255e25eb8f776` зав�
 - CI run [41356762102](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356762102) passed after adding a regression test that confirms the P1 symbol-order allocation defect. No behavior change has been made pending a documented batch-allocation policy.
 
 - После фикса пакетного распределения: [CI 41356881313](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356881313) completed success. Исторические E01–E09 не пересчитывались и не должны считаться выполненными с новой политикой.
+
+- P2 journal diagnostic fix: MAE/MFE on a stop candle now use modeled stop fill and do not count unknown post-stop wick ordering; long/short regression tests passed in CI 41357102546.

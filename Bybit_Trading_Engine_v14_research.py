@@ -1162,25 +1162,13 @@ class UnifiedQuantEngine:
         atr = QuantStrategyCore.compute_atr(hist[:-1], cfg.atr_period)
         stop_dist = max(1e-8, pos.initial_stop_dist)
 
-        # На свече исполнения учитываем только часть, которая заведомо после входа (консервативно):
-        # благоприятный экстремум не обновляем, неблагоприятный — да.
-        if is_long:
-            if not fill_bar:
-                pos.max_favorable_px = max(pos.max_favorable_px, curr.high)
-            pos.max_adverse_px = min(pos.max_adverse_px, curr.low)
-            mfe_r = (pos.max_favorable_px - pos.entry_price) / stop_dist
-            mae_r = (pos.entry_price - pos.max_adverse_px) / stop_dist
-        else:
-            if not fill_bar:
-                pos.max_favorable_px = min(pos.max_favorable_px, curr.low)
-            pos.max_adverse_px = max(pos.max_adverse_px, curr.high)
-            mfe_r = (pos.entry_price - pos.max_favorable_px) / stop_dist
-            mae_r = (pos.max_adverse_px - pos.entry_price) / stop_dist
-
         exit_price: Optional[float] = None
         exit_reason: Optional[str] = None
 
-        # 1) Стоп (приоритет над целями внутри одной свечи — консервативно)
+        # 1) Стоп (приоритет над целями внутри одной свечи — консервативно).
+        # Если стоп пересечён, OHLC не показывает порядок high/low: не засчитываем
+        # благоприятный экстремум этой свечи и ограничиваем MAE фактической модельной
+        # ценой стоп-исполнения, а не более глубоким последующим wick.
         stop_hit = (curr.low <= pos.stop_price) if is_long else (curr.high >= pos.stop_price)
         if stop_hit:
             if fill_bar:
@@ -1189,7 +1177,29 @@ class UnifiedQuantEngine:
                 exit_price = min(pos.stop_price, curr.open)    # гэп вниз -> худшая цена
             else:
                 exit_price = max(pos.stop_price, curr.open)    # гэп вверх -> худшая цена
+            if is_long:
+                pos.max_adverse_px = min(pos.max_adverse_px, exit_price)
+            else:
+                pos.max_adverse_px = max(pos.max_adverse_px, exit_price)
             exit_reason = "trailing_stop" if pos.tp1_hit else "stop_loss"
+        else:
+            # На свече исполнения благоприятный экстремум не обновляем: он мог быть
+            # до фактического входа. Неблагоприятный экстремум сохраняем консервативно.
+            if is_long:
+                if not fill_bar:
+                    pos.max_favorable_px = max(pos.max_favorable_px, curr.high)
+                pos.max_adverse_px = min(pos.max_adverse_px, curr.low)
+            else:
+                if not fill_bar:
+                    pos.max_favorable_px = min(pos.max_favorable_px, curr.low)
+                pos.max_adverse_px = max(pos.max_adverse_px, curr.high)
+
+        if is_long:
+            mfe_r = (pos.max_favorable_px - pos.entry_price) / stop_dist
+            mae_r = (pos.entry_price - pos.max_adverse_px) / stop_dist
+        else:
+            mfe_r = (pos.entry_price - pos.max_favorable_px) / stop_dist
+            mae_r = (pos.max_adverse_px - pos.entry_price) / stop_dist
 
         elif not fill_bar:
             tp2_hit = (curr.high >= pos.tp2_price) if is_long else (curr.low <= pos.tp2_price)

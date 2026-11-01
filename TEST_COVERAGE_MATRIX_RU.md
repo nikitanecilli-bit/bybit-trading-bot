@@ -78,6 +78,10 @@ Not yet modeled/tested in v14:
 - mark/index/premium price effects on PnL and liquidation.
 
 
+## 2026-11-02 — instrument spec helper coverage
+
+Added `test_bybit_instrument_specs.py` for versioned snapshot parsing, Decimal buy/sell tick rounding, quantity step flooring, min/max quantity, min notional, tick alignment, zero-rounded price, and missing required fields. `research-checks.yml` now compiles the helper/test and runs the dedicated test file. The workflow-run connector only exposes PR-triggered runs and returned no run for the relevant push; CI remains **unverified**. No v14 execution path imports the helper yet.
+
 ## v15 multi-bar pending integration coverage
 
 - Added end-to-end test: a pending limit order remains alive after the first untouched eligible bar and fills on the second valid bar.

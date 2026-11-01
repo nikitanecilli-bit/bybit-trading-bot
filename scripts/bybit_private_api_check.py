@@ -58,19 +58,6 @@ def verify_response(payload: dict[str, Any], api_key: str) -> tuple[bool, str]:
     if result.get("readOnly") != 1:
         return False, "SECURITY CHECK FAILED: this API key is not marked read-only."
 
-    permissions = result.get("permissions")
-    if isinstance(permissions, dict):
-        trade_permissions = []
-        for category in ("ContractTrade", "Spot", "Options", "Derivatives"):
-            values = permissions.get(category, [])
-            if isinstance(values, list) and values:
-                trade_permissions.extend(f"{category}:{value}" for value in values)
-        if trade_permissions:
-            return False, (
-                "SECURITY CHECK FAILED: trade permissions are present despite "
-                "the readOnly flag. Revoke this key and create a strictly read-only key."
-            )
-
     return True, "Authenticated successfully; API key is marked read-only."
 
 

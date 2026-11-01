@@ -97,6 +97,6 @@ Do not treat old H1 PnL as exchange-executable net performance until these are i
 Перед переносом funding из `research/bybit-funding-data-v1` сначала исправить его mark-to-market accounting: начисленный funding должен уменьшать unrealized equity и учитываться daily stop / kill-switch до закрытия позиции. Расчёт должен быть единым helper с as-of timestamp и одинаковыми правилами partial TP1, без повторного вычитания при финальном close. Затем добавить тесты на funding settlement между барами, на границе UTC-day reset, при частичном TP1 и на открытой позиции. Только после этого cherry-pick isolated funding patch в активную ветку.
 
 
-## v15 execution-ablation blocker
+## v15 execution-ablation coverage
 
-Перед использованием v15 результатов по `limit_valid_bars > 1` исправить фактическое удаление pending после первой нетронутой свечи. Добавить end-to-end тест `backtest_symbol()` с лимиткой, не затронутой на первой допустимой свече, но исполненной на второй; также тест expiry ровно после N валидных свечей. Перезапускать только v15 tests/ablation, не трогая v14 results.
+Multi-bar pending logic в `research_v15/backtest.py` при статической проверке сохраняет заявку, если лимитка не исполнилась; предыдущая гипотеза об unconditional deletion отозвана. Добавить end-to-end тест `backtest_symbol()` с лимиткой, не затронутой на первой допустимой свече, но исполненной на второй, и тест expiry после N валидных свечей. Это пробел тестового покрытия, не подтверждённый дефект. Не менять реализацию без failing test.

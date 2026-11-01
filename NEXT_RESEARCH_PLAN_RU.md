@@ -98,9 +98,16 @@ Do not treat old H1 PnL as exchange-executable net performance until these are i
 - `funding_accounting.py` provides a single cumulative as-of calculation with exact settlement marks and conservative TP1 boundary semantics; offline tests cover long/short sign, settlement inclusivity, missing marks, duplicates and partial TP1.
 - Neither module is yet wired into v14. Do not claim exchange-realistic PnL until engine integration and end-to-end tests pass. First verify the workflow output and unit-test CI; then integrate funding into both mark-to-market and final close through the same helper.
 
-## Funding integration blocker
+## Funding integration — first isolated pass implemented
 
-Перед переносом funding из `research/bybit-funding-data-v1` сначала исправить его mark-to-market accounting: начисленный funding должен уменьшать unrealized equity и учитываться daily stop / kill-switch до закрытия позиции. Расчёт должен быть единым helper с as-of timestamp и одинаковыми правилами partial TP1, без повторного вычитания при финальном close. Затем добавить тесты на funding settlement между барами, на границе UTC-day reset, при частичном TP1 и на открытой позиции. Только после этого cherry-pick isolated funding patch в активную ветку.
+В активной ветке добавлен `funding_accounting.py` и подключён к v14 через один cumulative as-of helper:
+- `_unrealized_pnl_at_marks(as_of_ts)` вычитает accrued funding с открытых позиций до проверки daily stop / kill-switch;
+- `_close_position()` использует тот же helper на `exit_ts` и вычитает funding из realized net PnL;
+- `TradeRecord.funding_cost_usdt` и summary `total_costs`/`funding_cost_usdt` сохраняют раздельную видимость funding;
+- `OpenPositionState.tp1_ts_ms` фиксирует консервативную границу закрытия TP1; settlement на этой границе относится к полному исходному notional, более поздние settlements — к оставшемуся объёму;
+- CLI принимает `--funding-dir` и `--mark-price-dir`; оба аргумента обязательны парой, missing CSV/точный mark завершаются ошибкой, а не молча исключаются.
+
+Добавлены тесты pure helper, realized close, mark-to-market risk и mark-price loader. Это первый интеграционный этап; перед любыми PnL-выводами требуется фактический CI run и отдельная проверка funding coverage/mark timestamp alignment для каждого инструмента. Funding не добавляет mark-price OHLC intrabar liquidation model и не моделирует funding, если архив неполный.
 
 
 ## v15 execution-ablation coverage

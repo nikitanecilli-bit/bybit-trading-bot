@@ -92,6 +92,12 @@ Static review confirms that v14 sizing is a notional approximation, not a Bybit 
 Do not treat old H1 PnL as exchange-executable net performance until these are implemented. **Completed as an isolated, non-invasive groundwork module:** `bybit_instrument_specs.py` parses versioned Bybit instrument snapshots and applies Decimal tick/lot/min-notional constraints; `test_bybit_instrument_specs.py` covers rounding and boundaries. It is not yet wired into v14, and no historical spec archive exists. Next: verify CI, add date-versioned instrument-spec collection, then funding cashflow accounting; margin/liquidation follows once the spec/data schema is stable.
 
 
+## Completed groundwork — dated specs and pure funding accounting
+
+- `scripts/snapshot_bybit_instruments.py` archives raw Bybit V5 instrument-info responses with UTC timestamped filenames and pagination/duplicate guards; a dedicated Actions workflow is configured to populate `data/instrument_specs/linear/`.
+- `funding_accounting.py` provides a single cumulative as-of calculation with exact settlement marks and conservative TP1 boundary semantics; offline tests cover long/short sign, settlement inclusivity, missing marks, duplicates and partial TP1.
+- Neither module is yet wired into v14. Do not claim exchange-realistic PnL until engine integration and end-to-end tests pass. First verify the workflow output and unit-test CI; then integrate funding into both mark-to-market and final close through the same helper.
+
 ## Funding integration blocker
 
 Перед переносом funding из `research/bybit-funding-data-v1` сначала исправить его mark-to-market accounting: начисленный funding должен уменьшать unrealized equity и учитываться daily stop / kill-switch до закрытия позиции. Расчёт должен быть единым helper с as-of timestamp и одинаковыми правилами partial TP1, без повторного вычитания при финальном close. Затем добавить тесты на funding settlement между барами, на границе UTC-day reset, при частичном TP1 и на открытой позиции. Только после этого cherry-pick isolated funding patch в активную ветку.

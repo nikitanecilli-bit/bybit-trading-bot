@@ -64,3 +64,28 @@ Run `41355263006` на commit `9271b0e4eac3d05db700f09cced255e25eb8f776` зав�
 - После фикса пакетного распределения: [CI 41356881313](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356881313) completed success. Исторические E01–E09 не пересчитывались и не должны считаться выполненными с новой политикой.
 
 - P2 journal diagnostic fix: MAE/MFE on a stop candle now use modeled stop fill and do not count unknown post-stop wick ordering; long/short regression tests passed in CI 41357102546.
+
+
+## Обновление 2026-11-02 — первичный lifecycle review (v14)
+
+Проверены `step_candle`, `_try_fill_pending`, `_manage_position`, `run_simulation_pass` и `test_gap_execution.py` в текущем HEAD после обновления branch inventory.
+
+### Подтверждено кодом
+- Сигнал, рассчитанный на закрытии свечи, помещается в `self.pending` и проверяется на следующей свече.
+- `_try_fill_pending` сразу удаляет pending-сигнал через `pop`. Если лимитная цена не затронута, market gap превышает max-chase или risk gate запрещает вход, сигнал теряется; автоматического retry/TTL нет. Это фактическая one-next-bar policy, а не многобарная заявка.
+- Limit fill определяется только касанием OHLC: long — `low <= ref`, short — `high >= ref`. При гэпе используется open, если он выгоднее лимитной цены. Очередь, spread, partial fills и adverse selection не моделируются.
+- Market fill происходит по следующему open; max-chase сравнивает его с reference entry.
+- На свече входа вызывается `_manage_position(..., fill_bar=True)`. Благоприятный экстремум этой свечи не засчитывается, но stop crossing проверяется. Поскольку OHLC не раскрывает порядок входа и low/high, это консервативное допущение, которое может дать stop-out по экстремуму, сформированному до фактического входа.
+- Для уже открытой позиции stop проверяется раньше TP1/TP2. Если одна свеча задела stop и target, выбирается stop. Это консервативно, но не восстанавливает реальный внутрисвечной путь.
+- Trailing stop пересчитывается после проверки текущего stop/targets. Новый stop не применяется задним числом к той же свече; фактически начинает участвовать в проверке со следующей свечи.
+
+### Тестовое покрытие и пробелы
+`test_gap_execution.py` покрывает гэпы market/limit, stop gaps, stop-vs-TP1/TP2 для long/short, частичный TP1 с последующим trailing stop и арифметику комиссий/проскальзывания. Это полезное покрытие, но отдельные контракты ниже явно не зафиксированы тестами:
+1. one-bar pending expiry при нетронутой лимитке и отсутствие повторной попытки;
+2. pending removal при отказе risk gate / превышении chase;
+3. stop crossing на fill bar при игнорировании favourable MFE;
+4. новый trailing stop после TP1 не срабатывает ретроспективно в той же свече;
+5. отдельные граничные сценарии одновременного TP1 + TP2 и экстремумов на точной цене уровня.
+
+### Оценка
+Пока не подтверждён дефект, который оправдывает изменение торговой логики. Подтверждены существенные модельные допущения исполнения, влияющие на частоту сделок и PnL. Следующий безопасный шаг — добавить deterministic regression tests на уже существующее поведение и отдельно оценить, соответствует ли one-bar expiry политике maker-входа в исследовательских runners. До этого не менять TTL, fill model, stop/target order или trailing semantics и не запускать новые market backtests.

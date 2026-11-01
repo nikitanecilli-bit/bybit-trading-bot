@@ -250,25 +250,36 @@ def run_fold(data, stamps, context_data, context_index, market_universe_data, ma
         if sym not in engine.pending: return original_fill(sym,candle)
         sig=engine.pending[sym]
         signal_ts=int(sig.get("signal_ts",0)); row=signal_lookup.get((sym,signal_ts))
+        meta=order_age.get(sym)
         original_ref=float(sig.get("entry_price",0.0))
         gap_pct=abs(float(candle.open)-original_ref)/original_ref*100.0 if original_ref>0 else 0.0
-        if row:
+        # The gap gate is explicitly NEXT-open only. Limit orders may remain pending
+        # for later bars; later opens must not be re-tested against the original signal.
+        first_attempt = execution_mode == "market" or meta is None
+        if row and first_attempt:
             row["next_open_gap_pct"]=round(gap_pct,6)
             row["body_gate"]=int(body_gate); row["gap_gate"]=int(gap_gate)
-        if gap_gate and gap_pct > gap_threshold:
+        if gap_gate and first_attempt and gap_pct > gap_threshold:
             engine.pending.pop(sym,None); order_age.pop(sym,None)
             if row:
                 row["fill_status"]="gap_rejected"; row["signal_status"]="gap_rejected"; row["cancel_ts"]=candle.ts
             return False
         if execution_mode == "market":
-            filled=original_fill(sym,candle)
+            # Engine's own market fill gate shares the candle-body config field.
+            # Disable that internal check here; the independently toggled gap gate
+            # above is the sole authority for next-open rejection.
+            saved_cap=engine.cfg.max_chase_limit_pct
+            engine.cfg.max_chase_limit_pct=100.0
+            try:
+                filled=original_fill(sym,candle)
+            finally:
+                engine.cfg.max_chase_limit_pct=saved_cap
             if row:
                 row["fill_status"]="market_filled" if filled else "market_not_filled_risk_or_capacity"
                 row["signal_status"]="filled" if filled else "not_filled"
                 if filled:
                     row["fill_ts"]=candle.ts; row["fill_time_utc"]=iso(candle.ts)
             return filled
-        meta=order_age.get(sym)
         if meta is None:
             sig["entry_price"]=original_ref*(1-ENTRY_OFFSET_BPS/10000)
             sig["order_type"]="limit"; meta={"age":0}; order_age[sym]=meta

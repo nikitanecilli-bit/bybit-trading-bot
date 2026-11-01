@@ -370,6 +370,89 @@ def test_financial_rounding_uses_half_up_at_half_cent():
 
 
 
+def test_pending_signal_is_removed_when_risk_gate_rejects_entry():
+    e = make_engine()
+    e.pending["BTCUSDT"] = pending_signal("market", 100.0)
+
+    class RejectingRiskSpy:
+        current_equity = 10_000.0
+        kill_switch_triggered = False
+
+        @staticmethod
+        def can_open_new_trade(count):
+            return False, "risk limit"
+
+    e.risk_mgr = RejectingRiskSpy()
+    opened = e._try_fill_pending("BTCUSDT", candle(100.0, 101.0, 99.0, 100.5))
+    assert opened is False
+    assert "BTCUSDT" not in e.open_positions
+    assert "BTCUSDT" not in e.pending
+
+
+def test_fill_bar_long_stop_does_not_count_pre_entry_or_later_favorable_wick():
+    e = make_engine()
+    pos = make_position("long", entry=100.0, stop=95.0)
+    e.open_positions["BTCUSDT"] = pos
+    captured = {}
+    e._close_position = lambda p, px, reason, ts, mae, mfe: captured.update(
+        exit_price=px, reason=reason, mae=mae, mfe=mfe
+    )
+    history = [
+        candle(100, 101, 99, 100, ts=1_799_999_100_000),
+        candle(100, 120, 90, 110),
+    ]
+    e._manage_position("BTCUSDT", history, fill_bar=True, exit_ts=history[-1].ts + 900_000)
+    assert captured["exit_price"] == 95.0
+    assert captured["reason"] == "stop_loss"
+    assert captured["mae"] == 1.0
+    assert captured["mfe"] == 0.0
+
+
+def test_fill_bar_short_stop_does_not_count_pre_entry_or_later_favorable_wick():
+    e = make_engine()
+    pos = make_position("short", entry=100.0, stop=105.0)
+    e.open_positions["BTCUSDT"] = pos
+    captured = {}
+    e._close_position = lambda p, px, reason, ts, mae, mfe: captured.update(
+        exit_price=px, reason=reason, mae=mae, mfe=mfe
+    )
+    history = [
+        candle(100, 101, 99, 100, ts=1_799_999_100_000),
+        candle(100, 110, 80, 90),
+    ]
+    e._manage_position("BTCUSDT", history, fill_bar=True, exit_ts=history[-1].ts + 900_000)
+    assert captured["exit_price"] == 105.0
+    assert captured["reason"] == "stop_loss"
+    assert captured["mae"] == 1.0
+    assert captured["mfe"] == 0.0
+
+
+def test_new_trailing_stop_is_not_applied_retroactively_to_same_candle():
+    e = make_engine()
+    pos = make_position("long", entry=100.0, stop=95.0)
+    pos.tp1_hit = True
+    pos.remaining_fraction = 0.5
+    pos.tp1_price = 105.0
+    pos.tp2_price = 130.0
+    pos.max_favorable_px = 100.0
+    e.open_positions["BTCUSDT"] = pos
+    captured = []
+    e._close_position = lambda *args: captured.append(args)
+    history = [
+        candle(100, 101, 99, 100, ts=1_799_998_200_000),
+        candle(100, 102, 98, 100, ts=1_799_999_100_000),
+        # Low is above the old stop (95) but below the new trail computed
+        # from this candle's high. The new stop must only apply next candle.
+        candle(100, 111, 98, 105),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(
+        e, "BTCUSDT", history, fill_bar=False, exit_ts=history[-1].ts + 900_000
+    )
+    assert captured == []
+    assert pos.stop_price > history[-1].low
+    assert "BTCUSDT" in e.open_positions
+
+
 if __name__ == "__main__":
     tests = [
         test_market_long_gap_above_chase_limit_is_cancelled,
@@ -390,6 +473,10 @@ if __name__ == "__main__":
         test_market_short_stop_journal_matches_independent_fee_and_slippage_math,
         test_long_gap_stop_journal_uses_actual_gap_fill_price,
         test_financial_rounding_uses_half_up_at_half_cent,
+        test_pending_signal_is_removed_when_risk_gate_rejects_entry,
+        test_fill_bar_long_stop_does_not_count_pre_entry_or_later_favorable_wick,
+        test_fill_bar_short_stop_does_not_count_pre_entry_or_later_favorable_wick,
+        test_new_trailing_stop_is_not_applied_retroactively_to_same_candle,
     ]
     for test in tests:
         test()

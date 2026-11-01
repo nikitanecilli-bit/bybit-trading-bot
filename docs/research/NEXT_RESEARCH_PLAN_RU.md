@@ -125,3 +125,29 @@ Multi-bar pending logic в `research_v15/backtest.py` при статическ�
 ## Exchange quantity sizing groundwork
 
 `exchange_order_sizing.py` now converts target notional into Bybit-valid quantity using the spec helper, tick-rounds limit prices, floors quantity, enforces separate market/limit max quantity and min constraints, and scales estimated risk down with actual rounded notional. It is tested but not wired into v14. Next integration must store actual qty in each position and use the same qty for PnL/funding; no order splitting is modeled. Wait for verified timestamped specs before applying this to historical bars.
+
+
+## 2026-11-02 — E10/E11 update and next research action
+
+### Completed
+- E10 broad cross-sectional replication: 47 H1 symbols, per-symbol independent accounts, body gate OFF/2%, market execution. Gate reduced the summed independent loss but did not create positive expectancy; fold 1 worsened, folds 2/3 improved. See `docs/reports/E10_H1_BODY_GATE_CROSS_SECTIONAL_RU.md`.
+- E11 shared-capital replay: same 47-symbol universe, one 10,000 USDT account per fold, max 5 concurrent positions. Body gate changed summed fold net from -3,178.61 to -2,774.00 USDT only; PF 0.859 -> 0.862. It reduced trade count but increased total fees+slippage. Strategy remains negative in folds 1 and 2. See `docs/reports/E11_H1_SHARED_CAPITAL_PORTFOLIO_RU.md`.
+- Body gate 2% is NOT approved for production. No threshold sweep.
+
+### Next action — regime-context diagnostics, no threshold optimization
+
+Use the E11 shared-capital signal/trade timestamps and calculate only causal, completed-bar market context at each signal:
+1. broad-universe positive breadth over 24h and 72h;
+2. broad-universe median 24h/72h return;
+3. broad-universe median 24h path efficiency;
+4. BTC/ETH 24h/72h returns and efficiency as secondary context.
+
+Stratify the existing shared-capital results by these features and by fold. First ask whether losing trades in fold 2, and replacement trades that helped/hurt body gate, were distinguishable before entry. Do not choose thresholds from the same PnL sample. If context separation is stable across symbols and folds, freeze one simple regime rule and test it once in the same shared-capital replay; retain a later untouched period for holdout.
+
+### Guardrails
+- No more body threshold sweeps.
+- Do not sum per-symbol independent PnL and call it portfolio return.
+- Keep one shared-capital replay as the decision metric.
+- Preserve the three historical folds for diagnosis only; they are not blind holdout.
+- Binance OHLCV proxy, funding omission, and Bybit execution-model limitations must remain explicit.
+- No real orders.

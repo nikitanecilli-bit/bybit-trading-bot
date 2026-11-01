@@ -206,6 +206,12 @@ These are P1 limitations for claims about net profitability or exchange-executab
 **Классификация:** подтверждённый P1 пробел риск-учёта в funding-ветке. Не переносить этот патч целиком. При интеграции нужен единый pure helper accrued_funding(position, as_of_ts), используемый одновременно в mark-to-market и final close, с тестом отсутствия двойного учёта и TP1 partial notional.
 
 
+## 2026-11-02 — Bybit instrument constraints groundwork
+
+Добавлен независимый модуль `bybit_instrument_specs.py` (schema version 1), который читает сохранённый `instruments-info` snapshot и fail-closed проверяет обязательные `tickSize`, `qtyStep`, `minOrderQty`, `minNotionalValue`. Опционально сохраняются `maxOrderQty` и leverage filter. Все значения переводятся в `Decimal`; buy limit округляется вниз, sell limit вверх, quantity — вниз. Проверка ордера отвергает несоответствие tick size, min/max quantity и min notional.
+
+Модуль пока **не подключён к v14 engine** и не меняет поведение бэктеста. Нет исторического архива instrument specs; текущие snapshots нельзя задним числом считать историческими. Следующий этап — версионированный сбор спецификаций по датам и интеграция в sizing/fill только после тестов.
+
 ## 2026-11-02 — correction: v15 multi-bar limit TTL
 
 Повторная проверка вложенности `pending = None` в `research_v15/backtest.py` показала, что удаление заявки находится внутри `if entry > 0`. Если лимитка не коснулась цены (`entry is None` → `entry = 0`), `pending` сохраняется, а на следующем баре возраст снова проверяется через `limit_order_expired(age, limit_valid_bars)`. Поэтому утверждение, что v15 безусловно удаляет pending после первой свечи, было ошибочным и отозвано.

@@ -129,3 +129,13 @@ Workflow `.github/workflows/research-checks.yml` в одном job выполн�
 - Earlier CI run [41356653378](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356653378), commit `4b662e2ea62460705dfd39e38e021b89ee57fd80`, also completed successfully with timeframe validation and the initial portfolio accounting tests.
 
 Current known issue remains: sequential simultaneous-entry allocation can be symbol-order-dependent under a binding portfolio risk cap. No behavior change has been made.
+
+
+### Confirmed defect: simultaneous-entry allocation depends on symbol order
+
+- Regression: `test_simultaneous_entry_selection_is_order_dependent_under_binding_risk_cap` in `test_portfolio_accounting.py`.
+- CI run [41356762102](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356762102), commit `36bd4b8f8a448207d9d74f439d39bdc345853624`: passed.
+- Fixture: 3 simultaneous symbols, $10,000 equity, 1% per-trade risk and 2% total portfolio risk cap. Processing BTC, ETH, SOL opens BTC+ETH; reversing order to SOL, ETH, BTC opens SOL+ETH. The same signals and prices select a different portfolio.
+- Cause: `run_simulation_pass` processes `symbols` sequentially; `_try_fill_pending` immediately consumes remaining portfolio risk for each symbol. No batch allocation / pro-rata distribution exists.
+- Severity: P1 research-integrity defect for shared-capital backtests; it can change instrument selection and resulting PnL based solely on input list order.
+- No engine behavior has been changed yet. Next safe action: implement a deterministic batch allocation policy for all same-bar pending signals (e.g. equal pro-rata or explicit fixed ranking), then test invariance to input permutation and document the policy. Do not silently sort by symbol name: that would make results reproducible but still arbitrary.

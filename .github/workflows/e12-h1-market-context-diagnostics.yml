@@ -1,0 +1,42 @@
+name: E12 H1 Broad-Market Context Diagnostics
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/market-regime-v1-main]
+    paths:
+      - 'scripts/run_e12_h1_market_context_diagnostics.py'
+      - '.github/workflows/e12-h1-market-context-diagnostics.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Record archive hashes
+        run: |
+          find data/archives/cryptofetch -maxdepth 1 -type f -name '*.zip' -print0 | sort -z | xargs -0 sha256sum | tee e12_h1_market_context_archive_sha256.txt
+      - name: Compile diagnostics
+        run: python -m py_compile scripts/run_e12_h1_market_context_diagnostics.py
+      - name: Calculate causal broad-market context
+        run: python scripts/run_e12_h1_market_context_diagnostics.py
+      - name: Upload context and universe manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: e12-h1-market-context-diagnostics
+          path: |
+            e12_h1_market_context_by_hour.csv
+            e12_h1_market_context_universe_manifest.csv
+            e12_h1_market_context_archive_sha256.txt
+          if-no-files-found: error

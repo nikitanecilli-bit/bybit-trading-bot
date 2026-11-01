@@ -2,6 +2,7 @@
 import importlib.util
 import sys
 import tempfile
+from decimal import Decimal
 from pathlib import Path
 
 ENGINE_PATH = Path(__file__).with_name("Bybit_Trading_Engine_v14_research.py")
@@ -165,3 +166,17 @@ def test_funding_history_loader_rejects_empty_symbol_file():
             assert "no funding rows found" in str(exc)
         else:
             raise AssertionError("Empty funding history must be rejected")
+
+
+def test_funding_history_loader_preserves_decimal_rate_precision():
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.funding_by_symbol = {}
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "BTCUSDT.csv"
+        path.write_text(
+            "symbol,funding_timestamp_ms,funding_rate\n"
+            "BTCUSDT,1800000000000,0.0001234567890123456789\n",
+            encoding="utf-8",
+        )
+        e._load_funding_history(directory)
+    assert e.funding_by_symbol["BTCUSDT"][0]["rate"] == Decimal("0.0001234567890123456789")

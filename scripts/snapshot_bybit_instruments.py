@@ -126,11 +126,8 @@ def main() -> None:
     if args.pause < 0:
         parser.error("--pause cannot be negative")
 
-    rows: list[dict[str, Any]] = []
     def fetch(cursor: str | None):
-        nonlocal rows
         page, next_cursor = _request_page(DEFAULT_BASE_URL, args.category, cursor)
-        rows.extend(page)
         if next_cursor and args.pause:
             time.sleep(args.pause)
         return page, next_cursor

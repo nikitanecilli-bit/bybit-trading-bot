@@ -90,3 +90,8 @@ Static review confirms that v14 sizing is a notional approximation, not a Bybit 
 - mark/index/premium datasets can be downloaded, but mark-price liquidation and basis effects are not modeled.
 
 Do not treat old H1 PnL as exchange-executable net performance until these are implemented. Next coding task after lifecycle tests: pure Decimal-based instrument rounding helpers + boundary tests. Then funding cashflow accounting; margin/liquidation model comes after the data/spec schema is stable.
+
+
+## Funding integration blocker
+
+Перед переносом funding из `research/bybit-funding-data-v1` сначала исправить его mark-to-market accounting: начисленный funding должен уменьшать unrealized equity и учитываться daily stop / kill-switch до закрытия позиции. Расчёт должен быть единым helper с as-of timestamp и одинаковыми правилами partial TP1, без повторного вычитания при финальном close. Затем добавить тесты на funding settlement между барами, на границе UTC-day reset, при частичном TP1 и на открытой позиции. Только после этого cherry-pick isolated funding patch в активную ветку.

@@ -1,0 +1,13 @@
+name: E09 H1 Gate Factorial
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'E09 workflow pending script validation'

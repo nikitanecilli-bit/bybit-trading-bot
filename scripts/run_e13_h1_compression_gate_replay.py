@@ -398,7 +398,7 @@ def run_fold(data, stamps, context_data, context_index, market_universe_data, ma
             "signal_ret_24h_pct":feat["ret_24h_pct"] if feat else "",
             "signal_efficiency_24h":feat["efficiency_24h"] if feat else "",
             **{k:v for k,v in (signal_lookup.get((t.token,matched[0]),{}).items() if matched else [])
-               if k.startswith(("btc_","eth_","universe_","broad_"))},
+               if k.startswith(("btc_","eth_","universe_","broad_","compression_"))},
         })
     for row in signal_rows:
         row.setdefault("execution_mode",execution_mode)

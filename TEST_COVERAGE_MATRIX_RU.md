@@ -39,3 +39,16 @@
 - `research/data-adapter-v1`: adapter проверяет ожидаемый interval и общий timestamp intersection; кандидат на точечное исправление P1.
 - `research/v15-donchian-signal`: isolated simulator и portfolio replay; replay overlay не является полноценной portfolio simulation.
 - Подробности: `BRANCH_COMPARISON_AUDIT_RU.md`.
+
+
+## Regression tests added — 2026-11-02
+
+| Area | Status | Evidence | Limits |
+|---|---|---|---|
+| Configured candle timeframe | TESTED | `test_timeframe_validation.py`; CI 41356694461 | Does not validate exchange candle source correctness |
+| Portfolio MTM equity identity | TESTED | `test_portfolio_accounting.py`; CI 41356694461 | Focused unit test, not full multi-event simulation |
+| TP1 partial-position mark accounting | TESTED | `test_portfolio_accounting.py`; CI 41356694461 | Does not test every stop/trailing path |
+| Risk-budget cap and zero-budget rejection | TESTED | `test_portfolio_accounting.py`; CI 41356694461 | Does not prove fair allocation across simultaneous symbols |
+| Closed trade PnL/fees/slippage/equity reconciliation | TESTED | `test_portfolio_accounting.py`; CI 41356694461 | Uses deterministic fixture and modeled fee constants |
+| Symbol-order invariance | NOT_TESTED | Known sequential allocation behavior | Requires explicit allocation policy before behavior changes |
+| Funding, margin tiers, liquidation | NOT_TESTED | No complete exchange model in active engine | Must not infer safety from backtest risk budget |

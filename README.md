@@ -60,3 +60,23 @@ The scanner is heuristic and is not a guarantee. Review staged changes manually 
 3. Do not use `git add .` without checking `git status`.
 4. Never commit real API keys, tokens, passwords, private keys, live journals, runtime state, or raw personal data.
 5. If a credential was ever pushed, revoke/rotate it first; `.gitignore` does not erase Git history.
+
+
+## Ветки и актуальная исследовательская работа
+
+`main` — default branch и базовая точка входа. Она не содержит весь текущий исследовательский слой.
+
+Текущая рабочая ветка исследований: [research/market-regime-v1-main](https://github.com/nikitanecilli-bit/bybit-trading-bot/tree/research/market-regime-v1-main). Перед изменением кода прочитайте в ней `AGENTS.md`, `PROJECT_WORKING_RULES_RU.md` и `docs/README_RU.md`.
+
+| Ветка | Назначение | Правило |
+|---|---|---|
+| `research/market-regime-v1-main` | Основная линия H1/regime исследований, аудит, журнал | Продолжать работу здесь |
+| `research/market-regime-v1` | Более ранняя линия regime/data work | Сохранять как историческую |
+| `research/bybit-funding-data-v1` | Funding и mark-price загрузчики/интеграция | Не сливать целиком; переносить только проверенные компоненты |
+| `research/data-adapter-v1` | Bybit kline adapter и валидация данных | Кандидат на точечное переиспользование |
+| `research/v15-donchian-signal` | Изолированный v15 прототип и тесты | Сохранять отдельно для сравнения |
+| `Audit` | Почти дублирующая базовую ветку линия | Не использовать для новой работы |
+
+Ветки имеют расходящуюся историю. Не выполнять массовый merge, rebase, force-push или удаление веток ради косметической чистоты. Текущие сравнения и список полезных компонентов ведутся в `BRANCH_COMPARISON_AUDIT_RU.md` рабочей ветки.
+
+**Правило сохранности:** `cryptofetch_*.zip`, исходные CSV, holdout и результаты экспериментов не перезаписывать и не удалять. Физические перемещения файлов делать только после проверки всех ссылок из workflow, импортов и исторических инструкций.

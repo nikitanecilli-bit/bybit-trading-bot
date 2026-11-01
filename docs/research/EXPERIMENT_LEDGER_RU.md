@@ -223,3 +223,18 @@ Detailed report: [E12_BROAD_MARKET_CONTEXT_DIAGNOSTICS_RU.md](../reports/E12_BRO
 - E12 feasibility check: a single causal compression flag (current broad median ATR% AND cross-sectional IQR72 below expanding 25th percentiles of all prior hourly observations; minimum 336 prior hours) activated on 3.2% / 23.3% / 6.0% of hourly bars in folds 1/2/3. At candidate signal hours: 5.0% / 25.5% / 7.0%; at filled trade hours: 4.9% / 26.9% / 8.0%.
 - Existing trade PnL inside compression is worse in fold 2 but not uniformly bad in fold 3. Because trade sequence changes when entries are blocked, this is only feasibility evidence; proceed with one frozen shared-capital replay, no threshold sweep.
 
+
+
+## E13 — causal compression gate shared-capital replay (2026-11-02)
+
+- Workflow: [41362217727](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41362217727), success.
+- Artifact: [e13-h1-compression-gate-shared-capital](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41362217727/artifacts/13105403824), SHA-256 `9930d6f3651305ef9dcf254c85bc0b50b24cb098b6b367accbaaae4bbad6f601`.
+- Commit: `f4da3cca0c0dc79cee86350ba6a680fc461e47fc`; script: `scripts/run_e13_h1_compression_gate_replay.py`.
+- Rule: current broad median ATR% AND cross-sectional IQR72 below expanding q25 of all prior completed context hours; min 336 prior hours; no gate before warm-up. One frozen rule, no sweep.
+- Shared 10k account per fold, 47 aligned symbols, max 5 concurrent positions, market execution, body/gap gate OFF, costs ×2.
+- Baseline OFF exactly reproduced E11 body-gate-OFF metrics. Compression ON net by fold: -294.93 / -2,614.55 / +167.76 vs OFF -617.62 / -2,970.05 / +409.06.
+- Sum of separate fold net: -2,741.72 ON vs -3,178.61 OFF (+436.89); trades 724 vs772; fees+slippage 4,844.57 vs5,167.70; PF 0.870 vs0.859. Still negative; fold 2 remains materially negative and fold 3 profit is reduced.
+- Paired trade identity comparison shows gate removed losing trades in folds 1/2, but removed profitable trades in fold 3. It changes replacement sequence, not only the rejected set.
+- Decision: promising diagnostic, not production-ready. No threshold sweep. Need untouched future holdout before considering deployment.
+
+Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPRESSION_GATE_RU.md).

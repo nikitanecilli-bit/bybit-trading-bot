@@ -65,6 +65,15 @@ class FundingCoverageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duplicate mark timestamp"):
             validate_coverage(self.funding, self.marks)
 
+    def test_row_symbol_must_match_filename(self):
+        (self.funding / "BTCUSDT.csv").write_text(
+            "symbol,funding_timestamp_ms,funding_rate\nETHUSDT,1000,0.001\n",
+            encoding="utf-8",
+        )
+        self.write_marks([(1000, 100)])
+        with self.assertRaisesRegex(ValueError, "symbol does not match filename"):
+            validate_coverage(self.funding, self.marks)
+
     def test_empty_funding_events_fail(self):
         self.write_funding([])
         self.write_marks([(1000, 100)])

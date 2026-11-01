@@ -2,15 +2,6 @@ name: H1 Signal and Trade Diagnostics
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - research/market-regime-v1-main
-    paths:
-      - "scripts/run_h1_signal_trade_diagnostics.py"
-      - "scripts/run_h1_market_context_diagnostics.py"
-      - "Bybit_Trading_Engine_v14_research.py"
-      - "scripts/run_uploaded_dataset_backtests.py"
-      - ".github/workflows/h1-signal-trade-diagnostics.yml"
 
 permissions:
   contents: read

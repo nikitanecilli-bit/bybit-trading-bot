@@ -78,3 +78,15 @@
 3. Продолжить аудит TP/stop/trailing и portfolio event ordering; отдельно проверить long/short симметрию.
 4. Затем margin/leverage/quantity-tick и funding timestamp semantics.
 5. Только после завершения аудита — воспроизводимость E01–E09 и data archive integrity. Новые market backtests и parameter search пока запрещены.
+
+
+## 2026-11-02 — exchange realism gate before profitability claims
+
+Static review confirms that v14 sizing is a notional approximation, not a Bybit margin/contract execution model:
+- no quantity conversion to `qtyStep` / `minOrderQty` / `minNotionalValue`;
+- no price tick rounding;
+- no initial/maintenance margin, risk tiers or liquidation;
+- historical funding files can be downloaded, but funding cashflows are not charged;
+- mark/index/premium datasets can be downloaded, but mark-price liquidation and basis effects are not modeled.
+
+Do not treat old H1 PnL as exchange-executable net performance until these are implemented. Next coding task after lifecycle tests: pure Decimal-based instrument rounding helpers + boundary tests. Then funding cashflow accounting; margin/liquidation model comes after the data/spec schema is stable.

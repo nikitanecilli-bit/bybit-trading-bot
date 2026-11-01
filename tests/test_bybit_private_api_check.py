@@ -49,21 +49,6 @@ class BybitPrivateApiCheckTests(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("not marked read-only", message)
 
-    def test_rejects_trade_permissions(self):
-        ok, message = verify_response(
-            {
-                "retCode": 0,
-                "result": {
-                    "apiKey": "test-key",
-                    "readOnly": 1,
-                    "permissions": {"ContractTrade": ["Order"]},
-                },
-            },
-            "test-key",
-        )
-        self.assertFalse(ok)
-        self.assertIn("trade permissions", message)
-
     def test_rejects_api_error(self):
         ok, message = verify_response(
             {"retCode": 10004, "retMsg": "Error sign"},

@@ -2,14 +2,6 @@ name: H1 Selected-Universe Validation
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - research/market-regime-v1-main
-    paths:
-      - ".github/workflows/h1-selected-universe-validation.yml"
-      - "scripts/h1_symbol_universes.json"
-      - "scripts/h1_symbol_screening_notes.md"
-      - "scripts/run_h1_shared_capital_portfolio_validation.py"
 
 permissions:
   contents: read

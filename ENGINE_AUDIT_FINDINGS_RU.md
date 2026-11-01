@@ -216,7 +216,7 @@ These are P1 limitations for claims about net profitability or exchange-executab
 
 Добавлен `scripts/snapshot_bybit_instruments.py`: постранично выгружает полный публичный Bybit V5 instruments-info universe, проверяет пагинацию/дубликаты и сохраняет исходные строки с provenance (`schema_version`, category, fetched_at, count). Имя файла содержит UTC timestamp, чтобы повторный запуск в тот же день не перезаписывал предыдущий snapshot. Workflow `bybit-instrument-snapshots.yml` запускает архивирование при изменении сборщика/самого workflow; он пишет только в `data/instrument_specs/linear/`.
 
-Добавлен pure helper `funding_accounting.py`: единый cumulative funding calculation с as-of timestamp, точным mark на settlement, положительным cost для long при положительной ставке и обратным знаком для short, полным notional до TP1 candle-close boundary и remaining fraction после неё. Добавлены unit tests. **Оба компонента пока не интегрированы в v14 engine**: это безопасный этап изоляции логики. CI и фактическое появление первого snapshot пока не подтверждены.
+Добавлен pure helper `funding_accounting.py`: единый cumulative funding calculation с as-of timestamp, timestamp-aligned open mark-price candle proxy, положительным cost для long при положительной ставке и обратным знаком для short, полным notional до TP1 candle-close boundary и remaining fraction после неё. Добавлены unit tests. Helper позднее подключён к v14 MTM и final close (см. следующий раздел). CI и фактическое появление первого snapshot пока не подтверждены.
 
 ## 2026-11-02 — v14 funding cashflow integration
 

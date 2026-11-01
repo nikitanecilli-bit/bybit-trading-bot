@@ -106,10 +106,14 @@ class InstrumentSpec:
         """Round a buy limit down and a sell limit up, never making it more aggressive."""
         value = _positive(price, "price")
         if side == "buy":
-            return _floor_step(value, self.tick_size)
-        if side == "sell":
-            return _ceil_step(value, self.tick_size)
-        raise ValueError("side must be 'buy' or 'sell'")
+            rounded = _floor_step(value, self.tick_size)
+        elif side == "sell":
+            rounded = _ceil_step(value, self.tick_size)
+        else:
+            raise ValueError("side must be 'buy' or 'sell'")
+        if rounded <= 0:
+            raise ValueError("price rounds to zero at tickSize")
+        return rounded
 
     def round_qty(self, qty: Any) -> Decimal:
         """Round quantity down to qtyStep; never round risk upward."""
@@ -120,6 +124,8 @@ class InstrumentSpec:
         """Return rounded quantity or reject exchange minimum/maximum constraints."""
         rounded_qty = self.round_qty(qty)
         px = _positive(price, "price")
+        if px % self.tick_size != 0:
+            raise ValueError("price must be aligned to tickSize; call round_price first")
         if rounded_qty < self.min_order_qty:
             raise ValueError("quantity is below minOrderQty after qtyStep rounding")
         if self.max_order_qty is not None and rounded_qty > self.max_order_qty:

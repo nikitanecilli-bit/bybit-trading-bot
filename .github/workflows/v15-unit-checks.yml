@@ -1,0 +1,28 @@
+name: v15 deterministic unit checks
+
+on:
+  push:
+    branches: [research/v15-donchian-signal]
+    paths:
+      - 'research_v15/**'
+      - 'test_v15_backtest.py'
+      - '.github/workflows/v15-unit-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile v15 simulator and tests
+        run: python -m py_compile research_v15/backtest.py test_v15_backtest.py
+      - name: Run v15 simulator unit tests
+        run: python test_v15_backtest.py

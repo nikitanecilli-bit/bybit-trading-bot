@@ -107,7 +107,7 @@ Do not treat old H1 PnL as exchange-executable net performance until these are i
 - `OpenPositionState.tp1_ts_ms` фиксирует консервативную границу закрытия TP1; settlement на этой границе относится к полному исходному notional, более поздние settlements — к оставшемуся объёму;
 - CLI принимает `--funding-dir` и `--mark-price-dir`; оба аргумента обязательны парой, missing CSV/timestamp-aligned mark-candle proxy завершаются ошибкой, а не молча исключаются.
 
-Добавлены тесты pure helper, realized close, mark-to-market risk и mark-price loader. Это первый интеграционный этап; перед любыми PnL-выводами требуется фактический CI run и отдельная проверка funding coverage/mark timestamp alignment для каждого инструмента. Funding не добавляет mark-price OHLC intrabar liquidation model и не моделирует funding, если архив неполный.
+Добавлены тесты pure helper, realized close, mark-to-market risk и mark-price loader. Это первый интеграционный этап; перед любыми PnL-выводами требуется фактический CI run и отдельная проверка funding coverage/mark timestamp alignment для каждого инструмента. Funding не добавляет mark-price OHLC intrabar liquidation model. Добавлен preflight `scripts/validate_funding_coverage.py`, который проверяет для каждого символа наличие funding/mark CSV, уникальность timestamp и полное совпадение funding settlements с timestamp mark-candle open. Запуск перед funding-adjusted backtest: `python scripts/validate_funding_coverage.py --funding-dir data/funding --mark-dir data/mark_price --symbols BTCUSDT,ETHUSDT,...`. Если coverage неполный, скрипт завершается с ошибкой; не запускать PnL-анализ на неполном архиве.
 
 
 ## v15 execution-ablation coverage

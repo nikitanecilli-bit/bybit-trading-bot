@@ -218,6 +218,12 @@ These are P1 limitations for claims about net profitability or exchange-executab
 
 Добавлен pure helper `funding_accounting.py`: единый cumulative funding calculation с as-of timestamp, точным mark на settlement, положительным cost для long при положительной ставке и обратным знаком для short, полным notional до TP1 candle-close boundary и remaining fraction после неё. Добавлены unit tests. **Оба компонента пока не интегрированы в v14 engine**: это безопасный этап изоляции логики. CI и фактическое появление первого snapshot пока не подтверждены.
 
+## 2026-11-02 — v14 funding cashflow integration
+
+Funding теперь опционально подключается к активному v14 через `--funding-dir` + `--mark-price-dir` (аргументы обязательны вместе). Один `accrued_funding_cost(position, events, marks, as_of_ts)` используется и для открытого MTM, и для финального close: funding попадает в equity до daily stop/kill-switch и ровно один раз в realized net PnL. TP1 candle-close timestamp хранится в позиции; settlements до/на этой границе используют full initial quantity, после — remaining fraction. Отсутствие CSV или точного settlement mark приводит к hard error.
+
+`TradeRecord.funding_cost_usdt`, `total_costs` и `funding_cost_usdt` в summary учитывают cashflow отдельно. Добавлены `test_funding_accounting.py`, `test_funding_pnl.py`, `test_funding_mark_to_market.py`. CI run пока не подтверждён. Ограничение: mark-price loader требует точного совпадения funding timestamp с mark candle timestamp; текущий архив hourly mark candles не покрывает settlements вне этих границ.
+
 ## 2026-11-02 — correction: v15 multi-bar limit TTL
 
 Повторная проверка вложенности `pending = None` в `research_v15/backtest.py` показала, что удаление заявки находится внутри `if entry > 0`. Если лимитка не коснулась цены (`entry is None` → `entry = 0`), `pending` сохраняется, а на следующем баре возраст снова проверяется через `limit_order_expired(age, limit_valid_bars)`. Поэтому утверждение, что v15 безусловно удаляет pending после первой свечи, было ошибочным и отозвано.

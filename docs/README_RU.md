@@ -26,6 +26,11 @@
 - [E12 — broad-market context diagnostics](reports/E12_BROAD_MARKET_CONTEXT_DIAGNOSTICS_RU.md): breadth, momentum, ATR и cross-sectional dispersion.
 - [E13 — causal compression gate](reports/E13_CAUSAL_COMPRESSION_GATE_RU.md): один фиксированный фильтр на shared capital.
 
+
+## Технические блокеры перед execution-aware replay
+
+- [Execution realism readiness audit](audits/EXECUTION_REALISM_READINESS_RU.md): отсутствие Bybit snapshot на GitHub runner, неподключённый exchange sizing, funding/mark proxy и ограничения модели издержек.
+
 ## Методологические правила
 
 - CI подтверждает только выполнение перечисленных технических проверок.

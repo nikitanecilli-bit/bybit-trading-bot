@@ -2,15 +2,6 @@ name: H1 Long Execution Sensitivity
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - research/market-regime-v1-main
-    paths:
-      - "scripts/run_h1_long_execution_sensitivity.py"
-      - "scripts/run_h1_limit_fill_stress.py"
-      - "Bybit_Trading_Engine_v14_research.py"
-      - "scripts/run_uploaded_dataset_backtests.py"
-      - ".github/workflows/h1-long-execution-sensitivity.yml"
 
 permissions:
   contents: read

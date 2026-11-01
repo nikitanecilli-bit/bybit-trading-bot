@@ -133,8 +133,8 @@ class InstrumentSpec:
             raise ValueError("order_type must be 'limit' or 'market'")
         rounded_qty = self.round_qty(qty)
         px = _positive(price, "price")
-        if px % self.tick_size != 0:
-            raise ValueError("price must be aligned to tickSize; call round_price first")
+        if order_type == "limit" and px % self.tick_size != 0:
+            raise ValueError("limit price must be aligned to tickSize; call round_price first")
         if rounded_qty < self.min_order_qty:
             raise ValueError("quantity is below minOrderQty after qtyStep rounding")
         maximum = self.max_order_qty if order_type == "limit" else self.max_market_order_qty

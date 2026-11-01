@@ -54,7 +54,7 @@ class ExchangeSizingTests(unittest.TestCase):
     def test_minimum_notional_rejection(self):
         with self.assertRaisesRegex(ValueError, "minNotionalValue"):
             size_to_exchange_constraints(
-                self.spec, "5", "100", "1",
+                self.spec, "4.99", "100", "1",
                 order_type="market", side="buy",
             )
 

@@ -1,4 +1,8 @@
 """Unit tests for per-regime baseline report helpers."""
+from pathlib import Path as _Path
+import sys as _sys
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+
 from types import SimpleNamespace
 
 from scripts.run_regime_analysis import summarize_trades, trade_signal_regime

@@ -1,4 +1,8 @@
 """Tests for the frozen regime-gate holdout experiment."""
+from pathlib import Path as _Path
+import sys as _sys
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+
 from scripts.run_regime_gate_holdout import gate_allows
 
 

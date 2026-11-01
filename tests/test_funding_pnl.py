@@ -1,11 +1,15 @@
 """Regression tests for funding cashflows included in net trade PnL."""
+from pathlib import Path as _Path
+import sys as _sys
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+
 import importlib.util
 import sys
 import tempfile
 from decimal import Decimal
 from pathlib import Path
 
-ENGINE_PATH = Path(__file__).with_name("Bybit_Trading_Engine_v14_research.py")
+ENGINE_PATH = Path(__file__).resolve().parent.parent / "Bybit_Trading_Engine_v14_research.py"
 spec = importlib.util.spec_from_file_location("research_engine_funding", ENGINE_PATH)
 engine_mod = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = engine_mod

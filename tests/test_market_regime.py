@@ -1,4 +1,8 @@
 """Regression tests for causal market-regime classification."""
+from pathlib import Path as _Path
+import sys as _sys
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+
 from market_regime import RegimeConfig, classify_candles
 
 

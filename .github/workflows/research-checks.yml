@@ -12,7 +12,7 @@ on:
       - 'funding_accounting.py'
       - 'scripts/snapshot_bybit_instruments.py'
       - 'scripts/validate_funding_coverage.py'
-      - 'test_*.py'
+      - 'tests/**'
       - '.github/workflows/research-checks.yml'
 
 permissions:
@@ -29,38 +29,38 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile engine and deterministic tests
-        run: python -m py_compile market_regime.py market_structure.py test_market_regime.py test_market_structure.py test_regime_analysis.py test_regime_gate_holdout.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py test_timeframe_validation.py test_portfolio_accounting.py bybit_instrument_specs.py test_bybit_instrument_specs.py instrument_spec_history.py test_instrument_spec_history.py exchange_order_sizing.py test_exchange_order_sizing.py scripts/snapshot_bybit_instruments.py test_snapshot_bybit_instruments.py funding_accounting.py test_funding_accounting.py test_funding_pnl.py test_funding_mark_to_market.py scripts/validate_funding_coverage.py test_funding_coverage.py scripts/scan_secrets.py
+        run: python -m py_compile market_regime.py market_structure.py tests/test_market_regime.py tests/test_market_structure.py tests/test_regime_analysis.py tests/test_regime_gate_holdout.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py tests/test_time_model.py tests/test_gap_execution.py tests/test_timeframe_validation.py tests/test_portfolio_accounting.py bybit_instrument_specs.py tests/test_bybit_instrument_specs.py instrument_spec_history.py tests/test_instrument_spec_history.py exchange_order_sizing.py tests/test_exchange_order_sizing.py scripts/snapshot_bybit_instruments.py tests/test_snapshot_bybit_instruments.py funding_accounting.py tests/test_funding_accounting.py tests/test_funding_pnl.py tests/test_funding_mark_to_market.py scripts/validate_funding_coverage.py tests/test_funding_coverage.py scripts/scan_secrets.py
       - name: Test Bybit instrument constraints and Decimal rounding
-        run: python test_bybit_instrument_specs.py
+        run: python tests/test_bybit_instrument_specs.py
       - name: Test dated Bybit instrument snapshot collector
-        run: python test_snapshot_bybit_instruments.py
+        run: python tests/test_snapshot_bybit_instruments.py
       - name: Test as-of instrument spec history
-        run: python test_instrument_spec_history.py
+        run: python tests/test_instrument_spec_history.py
       - name: Test exchange-valid quantity sizing
-        run: python test_exchange_order_sizing.py
+        run: python tests/test_exchange_order_sizing.py
       - name: Test cumulative funding accounting boundaries
-        run: python test_funding_accounting.py
+        run: python tests/test_funding_accounting.py
       - name: Test v14 realized funding accounting
-        run: python test_funding_pnl.py
+        run: python tests/test_funding_pnl.py
       - name: Test v14 mark-to-market funding risk
-        run: python test_funding_mark_to_market.py
+        run: python tests/test_funding_mark_to_market.py
       - name: Test funding/mark coverage preflight
-        run: python test_funding_coverage.py
+        run: python tests/test_funding_coverage.py
       - name: Scan for obvious secrets
         run: python scripts/scan_secrets.py .
       - name: Test causal market-regime classifier
-        run: python test_market_regime.py
+        run: python tests/test_market_regime.py
       - name: Test causal trend and breakout filters
-        run: python test_market_structure.py
+        run: python tests/test_market_structure.py
       - name: Test regime analysis report helpers
-        run: python test_regime_analysis.py
+        run: python tests/test_regime_analysis.py
       - name: Test frozen regime gate
-        run: python test_regime_gate_holdout.py
+        run: python tests/test_regime_gate_holdout.py
       - name: Test gap execution
-        run: python test_gap_execution.py
+        run: python tests/test_gap_execution.py
       - name: Test time model
-        run: python test_time_model.py
+        run: python tests/test_time_model.py
       - name: Test configured candle timeframe validation
-        run: python test_timeframe_validation.py
+        run: python tests/test_timeframe_validation.py
       - name: Test portfolio accounting and risk budget
-        run: python test_portfolio_accounting.py
+        run: python tests/test_portfolio_accounting.py

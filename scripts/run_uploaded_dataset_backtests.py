@@ -28,7 +28,7 @@ MIN_BARS = 200
 def read_zip_datasets() -> Dict[Tuple[str, str], tuple]:
     """Pick the longest valid file for each symbol/timeframe across ZIP archives."""
     candidates = defaultdict(list)
-    for archive in sorted(glob.glob("*.zip")):
+    for archive in sorted(glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "archives", "cryptofetch", "*.zip"))):
         with zipfile.ZipFile(archive) as zf:
             for info in zf.infolist():
                 match = FILE_RE.fullmatch(os.path.basename(info.filename))

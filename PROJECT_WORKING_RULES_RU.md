@@ -29,7 +29,7 @@
 
 ## Обязательный стандарт каждого эксперимента
 
-Фиксировать в `EXPERIMENT_LEDGER_RU.md`:
+Фиксировать в `docs/research/EXPERIMENT_LEDGER_RU.md`:
 - ID эксперимента, дату, Git commit SHA и workflow run ID;
 - гипотезу и заранее сформулированный критерий успеха/отказа;
 - инструменты, таймфрейм, временные границы, train/validation/holdout;

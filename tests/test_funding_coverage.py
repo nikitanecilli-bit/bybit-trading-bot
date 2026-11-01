@@ -1,4 +1,8 @@
 """Offline tests for funding/mark-price coverage preflight."""
+from pathlib import Path as _Path
+import sys as _sys
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+
 import tempfile
 import unittest
 from pathlib import Path

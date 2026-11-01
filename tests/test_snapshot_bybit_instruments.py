@@ -1,4 +1,8 @@
 """Offline tests for the dated Bybit instrument snapshot collector."""
+from pathlib import Path as _Path
+import sys as _sys
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+
 import json
 import tempfile
 import unittest

@@ -113,3 +113,10 @@ Do not treat old H1 PnL as exchange-executable net performance until these are i
 ## v15 execution-ablation coverage
 
 Multi-bar pending logic в `research_v15/backtest.py` при статической проверке сохраняет заявку, если лимитка не исполнилась; предыдущая гипотеза об unconditional deletion отозвана. Добавить end-to-end тест `backtest_symbol()` с лимиткой, не затронутой на первой допустимой свече, но исполненной на второй, и тест expiry после N валидных свечей. Это пробел тестового покрытия, не подтверждённый дефект. Не менять реализацию без failing test.
+
+
+## Operational caveats — branch and snapshot automation
+
+- `research/market-regime-v1-main` is currently diverged from `main`: 3 commits behind and more than 200 research commits ahead. Do not merge/rebase automatically; first review the three incoming main commits and branch-wide workflow changes.
+- The snapshot workflow has push/manual triggers on the research branch. Its daily cron is only activated by GitHub after the workflow file is present on the repository's default branch; until then, the daily schedule is dormant. The first committed snapshot is not yet verified.
+- GitHub connector status lookup returned no check statuses for recent push commits; this is **unverified**, not a passing CI result.

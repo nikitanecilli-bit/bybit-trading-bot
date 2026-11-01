@@ -186,3 +186,20 @@ Detailed report: [E10_H1_BODY_GATE_CROSS_SECTIONAL_RU.md](../reports/E10_H1_BODY
 
 
 - Replacement trades that appear only with body gate ON had lower median breakout/ATR and higher prior 24h momentum/efficiency than removed large-body trades. Their aggregate net was -623.49 (76 trades) in fold 1, -351.92 (30) in fold 2, and +2,311.53 (115) in fold 3. Fold 3 replacement set had median prior 24h return +8.06% and efficiency 0.410; this is a descriptive candidate interaction, not proof of a predictive filter.
+
+
+## E11 — shared-capital H1 portfolio replay (2026-11-02)
+
+- Workflow (optimized run): [41361376448](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41361376448), success.
+- Artifact: [e11-h1-shared-capital-portfolio](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41361376448/artifacts/13105661683), SHA-256 `441e518a683435e47327cb85bb741c8fcb24e734ded1ab720722dc50dd588765`.
+- Commit: `ae6f7b4c99b79cbe31fdfeded8780a058b118049`; script: `scripts/run_e11_h1_shared_capital_replay.py`.
+- Universe: 47 symbols, common aligned coverage 4,321 H1 bars (2026-04-29 00:00 to 2026-10-26 00:00 UTC); AERO, GRAM, HYPE excluded for fold-1 coverage.
+- One shared 10,000 USDT account per fold, 1% risk/trade, 2% portfolio risk cap, max 5 concurrent positions, market execution, costs ×2, gap gate OFF; body gate OFF vs fixed 2%.
+- Results by fold: OFF net -617.62 / -2,970.05 / +409.06; ON -1,227.64 / -2,560.32 / +1,013.96.
+- Sum of separate fold results: OFF -3,178.61; ON -2,774.00 (improvement +404.61 only). This is not one continuous account because each fold restarts at 10k.
+- Body gate reduced trades 772 -> 680, but fees+slippage increased 5,167.70 -> 5,553.73; PF nearly unchanged 0.859 -> 0.862. No robust edge established.
+- The shared-capital effect is much smaller than E10 per-symbol independent sum improvement (+404.61 vs +6,945.12), showing that independent symbol runs overstate the apparent value when portfolio slots/risk are shared.
+- Fold 1 worsened, folds 2/3 improved; strategy still materially negative in folds 1 and 2. Funding absent; Binance OHLCV proxy; not blind holdout.
+- Decision: do not promote 2% body gate. Next step is descriptive stratification of shared-capital signals/trades by causal broad-market breadth and 24–72h momentum/efficiency, without optimizing thresholds.
+
+Detailed report: [E11_H1_SHARED_CAPITAL_PORTFOLIO_RU.md](../reports/E11_H1_SHARED_CAPITAL_PORTFOLIO_RU.md).

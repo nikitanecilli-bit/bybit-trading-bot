@@ -27,7 +27,7 @@ Run `41355263006` на commit `9271b0e4eac3d05db700f09cced255e25eb8f776` зав�
 - Лимитный fill по касанию high/low не моделирует очередь, спред, частичные исполнения, latency и adverse selection.
 - **P1:** CSV interval не сверяется с `cfg.timeframe`, хотя временные границы движка вычисляются из конфига. Это может неверно трактовать все свечные времена и длительности.
 - Session/hour/weekday фильтры применяются к open timestamp сигнальной свечи, хотя сигнал известен на close; семантику требуется закрепить.
-- Порядок обработки символов в portfolio simulation ещё не доказан инвариантным.
+- **Подтверждён P1:** распределение портфельного риск-бюджета между одновременными сигналами зависит от порядка symbols. Тест `test_simultaneous_entry_selection_is_order_dependent_under_binding_risk_cap` воспроизводит разные наборы открытых инструментов при перестановке списка. CI 41356762102 passed; см. `ENGINE_AUDIT_FINDINGS_RU.md`.
 
 ## 4. Методологические ограничения
 - Binance OHLCV proxy не доказывает качество Bybit исполнения; запрос Bybit data ранее вернул HTTP 403.
@@ -58,3 +58,5 @@ Run `41355263006` на commit `9271b0e4eac3d05db700f09cced255e25eb8f776` зав�
 - Изменение CI: исследовательские рыночные workflow теперь ручные; технический CI запускается при изменениях движка и тестов, не выполняя рыночные backtests.
 - Остаточный риск: последовательное распределение ограниченного портфельного бюджета между одновременными сигналами может зависеть от порядка symbols. Не меняли без согласованной спецификации; нужно сначала формализовать приоритет или pro-rata allocation.
 - Проверки реального funding, Bybit fill quality, liquidation/margin tiers, full symbol permutation and full portfolio event reconciliation остаются открытыми.
+
+- CI run [41356762102](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356762102) passed after adding a regression test that confirms the P1 symbol-order allocation defect. No behavior change has been made pending a documented batch-allocation policy.

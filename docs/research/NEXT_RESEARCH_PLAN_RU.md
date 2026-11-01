@@ -162,3 +162,17 @@ The fixed 47-symbol completed-bar context snapshot distinguishes three historica
 
 Do not use a one-sided broad-market trend filter: it risks rejecting fold-1 winners. Next define a single causal compression classifier using rolling ATR + cross-sectional dispersion; keep local opportunities available in weak broad markets. No threshold sweep and no PnL replay until the rule is frozen. Full diagnostic: `docs/reports/E12_BROAD_MARKET_CONTEXT_DIAGNOSTICS_RU.md`.
 
+
+
+### E13 compression gate result — 2026-11-02
+
+A single causal rule (both broad median ATR% and cross-sectional IQR72 below expanding q25 of all prior completed hours; 336h warm-up) improved the sum of separate shared-capital folds from -3,178.61 to -2,741.72 USDT. Fold 1 and 2 improved; fold 3 lost part of its profit. PF 0.859 -> 0.870. The strategy remains negative in folds 1 and 2; this is not production-ready and not an untouched holdout.
+
+Next:
+1. Keep this exact rule frozen; do not sweep percentiles/window lengths.
+2. Verify it on a genuinely later, untouched data period when available.
+3. In parallel, audit execution realism (Bybit-specific spread/slippage/funding and instrument qty) before interpreting the modest PnL change.
+4. Do not deploy or alter production configuration based on E13.
+
+Full report: `docs/reports/E13_CAUSAL_COMPRESSION_GATE_RU.md`.
+

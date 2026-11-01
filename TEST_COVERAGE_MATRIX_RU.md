@@ -57,3 +57,22 @@
 
 
 | Stop-candle MAE/MFE | TESTED / FIXED | Long+short wick-order regression tests; CI 41357102546 | OHLC still cannot reconstruct the true intrabar path; favorable excursion on stop candle is intentionally not credited |
+
+
+## 2026-11-02 — lifecycle regression additions
+
+`test_gap_execution.py` now includes four additional deterministic cases:
+- pending entry is removed when the risk gate rejects it;
+- fill-bar stop handling for long and short does not count favorable wick as MFE and caps MAE at modeled stop fill;
+- a newly calculated trailing stop is not applied retroactively to the same OHLC candle.
+
+Commit: `c46178d624fa441ee2c5bd684beb42f5c5db3dbd`.
+Workflow `research-checks.yml` is configured to run on pushes touching `test_*.py` in the active research branch. The available workflow-run lookup did not return a run for this push commit; therefore execution status is **pending/unverified**, not passed. Do not count these tests as CI evidence until a completed run is inspected.
+
+## 2026-11-02 — exchange realism coverage gaps
+
+Not yet modeled/tested in v14:
+- instrument quantity/price tick constraints (`qtyStep`, `minOrderQty`, `minNotionalValue`, `tickSize`);
+- initial/maintenance margin, risk tiers, liquidation price/fees;
+- funding settlement cashflows;
+- mark/index/premium price effects on PnL and liquidation.

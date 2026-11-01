@@ -17,6 +17,15 @@
 - `reports/` — исторические backtest, holdout и диагностические отчёты.
 - `research/` — журнал экспериментов, матрица тестового покрытия и исследовательский план.
 
+
+## Последние исследовательские результаты
+
+- [E09 — различия трёх периодов](reports/E09_FOLD_DIFFERENCES_RU.md): body gate и рыночный фон.
+- [E10 — cross-sectional body gate, 47 инструментов](reports/E10_H1_BODY_GATE_CROSS_SECTIONAL_RU.md): per-symbol независимые прогоны.
+- [E11 — shared-capital портфель, 47 инструментов](reports/E11_H1_SHARED_CAPITAL_PORTFOLIO_RU.md): единый капитал и конкуренция за позиции.
+- [E12 — broad-market context diagnostics](reports/E12_BROAD_MARKET_CONTEXT_DIAGNOSTICS_RU.md): breadth, momentum, ATR и cross-sectional dispersion.
+- [E13 — causal compression gate](reports/E13_CAUSAL_COMPRESSION_GATE_RU.md): один фиксированный фильтр на shared capital.
+
 ## Методологические правила
 
 - CI подтверждает только выполнение перечисленных технических проверок.

@@ -195,3 +195,12 @@ These are P1 limitations for claims about net profitability or exchange-executab
 3. Add funding settlement cashflows using exact exchange settlement timestamps and position notional at each funding event; test long/short sign and entry/exit exactly on settlement boundaries.
 4. Only then model mark-price liquidation and margin tiers from versioned contract data.
 5. Re-run historical validations as new, versioned experiments; never overwrite E01–E09.
+
+
+## 2026-11-02 — funding-ветка: дополнительный риск mark-to-market
+
+В `research/bybit-funding-data-v1` funding учитывается только внутри `_close_position()`. Метод `_unrealized_pnl_at_marks()` считает unrealized gross PnL и торговые комиссии/проскальзывание, но не добавляет accrued funding по settlement events, уже прошедшим для открытых позиций.
+
+**Следствие:** ежедневный стоп и kill-switch в funding-ветке могут не увидеть часть текущей просадки до закрытия позиции. При закрытии итоговый net PnL funding вычитает, но риск-контроль в ходе удержания работает по неполному equity.
+
+**Классификация:** подтверждённый P1 пробел риск-учёта в funding-ветке. Не переносить этот патч целиком. При интеграции нужен единый pure helper accrued_funding(position, as_of_ts), используемый одновременно в mark-to-market и final close, с тестом отсутствия двойного учёта и TP1 partial notional.

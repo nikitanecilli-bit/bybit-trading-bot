@@ -6,6 +6,10 @@ on:
     branches: [research/market-regime-v1-main]
     paths:
       - 'Bybit_Trading_Engine_v14_research.py'
+      - 'bybit_instrument_specs.py'
+      - 'funding_accounting.py'
+      - 'scripts/snapshot_bybit_instruments.py'
+      - 'scripts/validate_funding_coverage.py'
       - 'test_*.py'
       - '.github/workflows/research-checks.yml'
 

@@ -1,12 +1,7 @@
 name: H1 Gate Decoupling
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - research/market-regime-v1-main
-    paths:
-      - ".github/workflows/h1-chase-gate-decoupling.yml"
-      - "scripts/run_h1_chase_gate_decoupling.py"
+
 permissions:
   contents: read
 jobs:

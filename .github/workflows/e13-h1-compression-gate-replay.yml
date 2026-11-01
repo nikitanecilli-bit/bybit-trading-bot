@@ -40,6 +40,6 @@ jobs:
             e13_h1_compression_trades.csv
             e13_h1_compression_signals.csv
             e13_h1_compression_per_symbol.csv
-            e13_h1_compression_universe_manifest.csv
+            e13_h1_compression_gate_universe_manifest.csv
             e13_h1_compression_archive_sha256.txt
           if-no-files-found: error

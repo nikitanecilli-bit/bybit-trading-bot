@@ -55,7 +55,7 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
     def test_staleness_limit_is_enforced(self):
         history = InstrumentSpecHistory.from_directory(self.root)
         with self.assertRaisesRegex(ValueError, "stale"):
-            history.get_spec("BTCUSDT", 1_793_088_000_000 + 10_000,
+            history.get_spec("BTCUSDT", 1_793_577_600_000 + 10_000,
                              max_age_ms=1_000)
 
     def test_missing_symbol_in_latest_full_snapshot_fails_closed(self):
@@ -69,7 +69,7 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
                        [row(status="PreLaunch")])
         history = InstrumentSpecHistory.from_directory(self.root)
         with self.assertRaisesRegex(ValueError, "not Trading"):
-            history.get_spec("BTCUSDT", 1_793_174_400_000)
+            history.get_spec("BTCUSDT", 1_793_664_000_000)
 
     def test_duplicate_timestamp_and_wrong_category_rejected(self):
         write_snapshot(self.root, "duplicate.json", "2026-11-02T00:00:00Z", [row()])

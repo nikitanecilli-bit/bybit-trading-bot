@@ -1,0 +1,22 @@
+name: Manual historical market backtests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  uploaded-dataset-backtests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run per-symbol uploaded-dataset backtests
+        run: python scripts/run_uploaded_dataset_backtests.py
+      - name: Run chronological H1 holdout
+        run: python scripts/run_h1_walk_forward.py

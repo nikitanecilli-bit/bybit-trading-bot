@@ -53,6 +53,8 @@ python bybit_downloader.py --symbols BTCUSDT ETHUSDT --intervals 60 --start 2026
 
 ## Проверки
 
+Технический CI выполняет только compilation, secret scan и регрессионные тесты. Исторические рыночные backtest/walk-forward отделены в workflow `Manual historical market backtests` и запускаются только вручную через GitHub Actions → Run workflow.
+
 ```bash
 python tests/test_gap_execution.py
 python tests/test_time_model.py

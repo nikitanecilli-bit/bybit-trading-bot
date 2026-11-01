@@ -65,7 +65,7 @@ class InstrumentSpecTests(unittest.TestCase):
     def test_market_order_uses_its_own_maximum_quantity(self):
         with self.assertRaisesRegex(ValueError, "maxMktOrderQty"):
             self.spec.validate_order("800.001", "100", order_type="market")
-        self.assertEqual(self.spec.validate_order("800", "100", order_type="market"),
+        self.assertEqual(self.spec.validate_order("800", "100.03", order_type="market"),
                          Decimal("800"))
         with self.assertRaisesRegex(ValueError, "order_type"):
             self.spec.validate_order("1", "100", order_type="stop")

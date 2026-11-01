@@ -99,3 +99,33 @@
 - P1: full portfolio simulator vs v15 replay overlay.
 - P2: v14/v15 signal, fill, stop, TP, fee and sizing parity.
 - P2: unify data adapters only after provenance and path checks.
+
+
+## Дополнение: полезные компоненты из расходящихся веток (2026-11-02)
+
+### `research/bybit-funding-data-v1`
+- Добавлены `bybit_funding_downloader.py`, `bybit_mark_price_downloader.py`, `prepare_backtest_data.py` и тесты, включая `test_funding_pnl.py` (10 тестов).
+- В этой ветке есть интеграция funding cashflows в PnL, строгий отказ при отсутствующих funding/mark rows и временная семантика TP1 для settlement.
+- **Не переносить engine целиком:** ветка содержит старую копию движка. Переносить funding как отдельный патч после проверки на актуальном engine. Mark candle open на settlement timestamp — proxy, не tick-level settlement mark; fallback к traded-price OHLC ещё слабее.
+
+### `research/data-adapter-v1`
+- Содержит адаптер Bybit klines → engine CSV, поиск linear universe и per-symbol backtest/report scripts.
+- `prepare_backtest_data.py` из funding-ветки и `scripts/adapt_bybit_klines.py` выполняют близкую роль; выбрать один канонический адаптер после тестов, не держать два расходящихся формата.
+- Адаптер проверяет формат/интервалы и не заполняет пропуски. Это полезная основа для reproducible Bybit data pipeline.
+
+### `research/v15-donchian-signal`
+- Отдельный `research_v15/` модуль содержит pure backtest, portfolio replay и тесты для limit expiry, stop/target, breakeven, economics и risk sizing.
+- Это независимая исследовательская реализация, не drop-in replacement v14. Использовать для cross-check execution semantics и portfolio replay, сохраняя обе модели отдельно.
+- У v15 есть явная функция expiry многобарной лимитки; в v14 pending entry сейчас одно-свечный. Сравнение TTL должно быть отдельным экспериментом, а не молчаливым изменением.
+
+### Обновлённый GitHub Compare snapshot (относительно `main`)
+| Ветка | Ahead | Behind | Статус |
+|---|---:|---:|---|
+| `Audit` | 0 | 2 | behind |
+| `research/bybit-funding-data-v1` | 27 | 3 | diverged |
+| `research/data-adapter-v1` | 11 | 3 | diverged |
+| `research/market-regime-v1-main` | 176 | 3 | diverged |
+| `research/market-regime-v1` | 30 | 3 | diverged |
+| `research/v15-donchian-signal` | 59 | 4 | diverged |
+
+Counts обновляются при каждом коммите в `main` или исследовательских ветках; это навигационный снимок, не оценка качества.

@@ -101,3 +101,29 @@ def test_long_and_short_unrealized_pnl_have_opposite_signs():
     long_only = e._unrealized_pnl_at_marks()
     assert both < long_only
     assert long_only > 0
+
+
+def test_close_trade_reconciles_net_pnl_fees_slippage_and_realized_equity():
+    e = make_engine()
+    pos = make_position(size=1_000.0, order_type="market", maker_exits=False)
+    e.open_positions["BTCUSDT"] = pos
+    e._last_mark_prices["BTCUSDT"] = 110.0
+    gross = 1_000.0 * (110.0 - 100.0) / 100.0
+    expected_fees = 1_000.0 * engine_mod.TAKER_FEE + 1_000.0 * engine_mod.TAKER_FEE
+    expected_slippage = 1_000.0 * engine_mod.TAKER_SLIP + 1_000.0 * engine_mod.TAKER_SLIP
+
+    e._close_position(
+        pos, exit_price=110.0, exit_reason="take_profit",
+        exit_ts=1_800_003_600_000, mae_r=0.0, mfe_r=2.0,
+    )
+
+    trade = e.closed_trades[-1]
+    assert trade.gross_pnl == round(gross, 2)
+    assert trade.exchange_fees_usdt == round(expected_fees, 2)
+    assert trade.slippage_cost_usdt == round(expected_slippage, 2)
+    assert trade.pnl_usdt == round(gross - expected_fees - expected_slippage, 2)
+    assert e.risk_mgr.realized_equity == round(10_000.0 + trade.pnl_usdt, 4)
+    assert e.risk_mgr.current_equity == round(
+        e.risk_mgr.realized_equity + e.risk_mgr.unrealized_pnl, 4
+    )
+    assert "BTCUSDT" not in e.open_positions

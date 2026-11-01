@@ -107,8 +107,12 @@ def synchronized_data():
     print(f"Valid H1 symbols={len(selected)}; fold-eligible symbols={len(SYMBOLS)}; common aligned bars={len(stamps)}")
     if len(stamps) < 3000:
         raise SystemExit(f"Insufficient common aligned history for shared-capital portfolio: {len(stamps)} bars")
+    timestamp_index = {
+        sym: {c.ts: c for c in eligible[sym][2]}
+        for sym in SYMBOLS
+    }
     data = {
-        sym: [{c.ts: c for c in eligible[sym][2]}[ts] for ts in stamps]
+        sym: [timestamp_index[sym][ts] for ts in stamps]
         for sym in SYMBOLS
     }
     em.check_alignment(data)

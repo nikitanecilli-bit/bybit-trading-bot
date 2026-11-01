@@ -68,88 +68,51 @@ def features(candles, i):
 def synchronized_data():
     global SYMBOLS
     all_data = read_zip_datasets()
-    SYMBOLS = sorted(sym for (sym, tf), item in all_data.items() if tf == "1h" and len(item[2]) >= 500)
+    selected = {
+        sym: item for (sym, tf), item in all_data.items()
+        if tf == "1h" and len(item[2]) >= 500
+    }
+    SYMBOLS = sorted(selected)
     if len(SYMBOLS) < 10:
         raise SystemExit(f"Refusing broad-universe test: only {len(SYMBOLS)} valid H1 symbols found")
-    print(f"Discovered valid H1 universe: {len(SYMBOLS)} symbols")
-    targets = set(SYMBOLS + CONTEXT_SYMBOLS)
-    raw = {sym: item for (sym, tf), item in all_data.items()
-           if tf == "1h" and sym in targets and len(item[2]) >= 500}
-    missing = sorted(set(SYMBOLS)-set(raw))
-    if missing:
-        raise SystemExit(f"Missing selected H1 datasets: {missing}")
-    missing_context = sorted(set(CONTEXT_SYMBOLS)-set(raw))
-    if missing_context:
-        print(f"WARNING: market context unavailable for: {missing_context}")
-    # Use the common timestamp intersection so the shared-capital portfolio is
-    # synchronized across every traded symbol. Context-only data cannot shorten it.
-    common = None
+    manifest = []
+    eligible = {}
+    fold_bounds = [
+        (int(datetime.strptime(a, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()*1000),
+         int(datetime.strptime(b, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()*1000))
+        for _, a, b in FOLDS
+    ]
     for sym in SYMBOLS:
-        stamps_set = {c.ts for c in raw[sym][2]}
-        common = stamps_set if common is None else common.intersection(stamps_set)
-    stamps = sorted(common or [])
-    if len(stamps) < 3000:
-        raise SystemExit(f"Insufficient synchronized broad-universe history: {len(stamps)} bars")
-    data = {s: [dict_by_ts[t] for t in stamps]
-            for s in SYMBOLS
-            for dict_by_ts in [{c.ts:c for c in raw[s][2]}]}
-    context_data = {s: raw[s][2] for s in CONTEXT_SYMBOLS if s in raw}
-    context_index = {s: {c.ts:i for i,c in enumerate(candles)}
-                     for s,candles in context_data.items()}
-    # Broad market breadth uses every valid H1 symbol available in the uploaded archives.
-    market_universe_data = {sym: item[2] for (sym, tf), item in all_data.items()
-                            if tf == "1h" and len(item[2]) >= 500}
-    market_universe_index = {sym: {c.ts:i for i,c in enumerate(candles)}
-                             for sym,candles in market_universe_data.items()}
-    em.check_alignment(data)
-    print(f"Traded symbols={len(data)}; broad H1 context symbols={len(market_universe_data)}; synchronized bars={len(stamps)}")
+        count, archive, candles = selected[sym]
+        stamps = [c.ts for c in candles]
+        fold_counts = [sum(lo <= ts <= hi for ts in stamps) for lo, hi in fold_bounds]
+        covers = all(n >= 100 for n in fold_counts)
+        manifest.append({
+            "symbol": sym, "bars": count, "start_utc": iso(stamps[0]),
+            "end_utc": iso(stamps[-1]), "source_archive": os.path.basename(archive),
+            "fold1_bars": fold_counts[0], "fold2_bars": fold_counts[1],
+            "fold3_bars": fold_counts[2], "included": int(covers),
+            "exclusion_reason": "" if covers else "less_than_100_bars_in_one_or_more_folds",
+        })
+        if covers:
+            eligible[sym] = (count, archive, candles)
+    SYMBOLS = sorted(eligible)
+    if len(SYMBOLS) < 10:
+        raise SystemExit(f"Refusing broad-universe test: only {len(SYMBOLS)} symbols cover all folds")
+    print(f"Valid H1 symbols={len(selected)}; included across all three folds={len(SYMBOLS)}")
+    for row in manifest:
+        if row["included"]:
+            print(f"UNIVERSE {row['symbol']} bars={row['bars']} folds={row['fold1_bars']}/{row['fold2_bars']}/{row['fold3_bars']}")
     with open("e10_h1_body_gate_universe_manifest.csv", "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f); w.writerow(["symbol", "bars", "start_utc", "end_utc", "source_archive"])
-        for sym in sorted(data):
-            count, archive, candles = next(item for (s, tf), item in all_data.items() if s == sym and tf == "1h")
-            w.writerow([sym, count, iso(candles[0].ts), iso(candles[-1].ts), archive])
-    return data, stamps, context_data, context_index, market_universe_data, market_universe_index
+        w = csv.DictWriter(f, fieldnames=list(manifest[0].keys()))
+        w.writeheader(); w.writerows(manifest)
+    return eligible
 
-def market_context(data, context_data, context_index, market_universe_data, market_universe_index, i):
-    """Completed-bar BTC/ETH and broad cross-sectional context; no lookahead."""
-    out = {}
-    ts = data[SYMBOLS[0]][i].ts
-    for sym, prefix in (("BTCUSDT", "btc"), ("ETHUSDT", "eth")):
-        ctx_i = context_index.get(sym, {}).get(ts)
-        f = features(context_data[sym], ctx_i) if ctx_i is not None else None
-        for src, dst in (
-            ("ret_24h_pct", "ret_24h_pct"), ("ret_72h_pct", "ret_72h_pct"),
-            ("atr_pct", "atr_pct"), ("efficiency_24h", "efficiency_24h"),
-            ("efficiency_72h", "efficiency_72h"),
-        ):
-            out[f"{prefix}_{dst}"] = f[src] if f else ""
-    cross = [features(data[sym], i) for sym in SYMBOLS]
-    r24 = [f["ret_24h_pct"] for f in cross if f and f["ret_24h_pct"] != ""]
-    r72 = [f["ret_72h_pct"] for f in cross if f and f["ret_72h_pct"] != ""]
-    e24 = [f["efficiency_24h"] for f in cross if f and f["efficiency_24h"] != ""]
-    out["universe_positive_24h_share"] = sum(x > 0 for x in r24) / len(r24) if r24 else ""
-    out["universe_median_ret_24h_pct"] = float(__import__("statistics").median(r24)) if r24 else ""
-    out["universe_median_ret_72h_pct"] = float(__import__("statistics").median(r72)) if r72 else ""
-    out["universe_median_efficiency_24h"] = float(__import__("statistics").median(e24)) if e24 else ""
 
-    broad_r24, broad_r72, broad_e24 = [], [], []
-    for sym, candles in market_universe_data.items():
-        j = market_universe_index[sym].get(ts)
-        if j is None or j < 72:
-            continue
-        close = candles[j].close
-        r24_value = (close / candles[j-24].close - 1.0) * 100.0
-        r72_value = (close / candles[j-72].close - 1.0) * 100.0
-        path24 = sum(abs(candles[k].close-candles[k-1].close) for k in range(j-23, j+1))
-        eff24_value = abs(close-candles[j-24].close) / path24 if path24 else 0.0
-        broad_r24.append(r24_value); broad_r72.append(r72_value); broad_e24.append(eff24_value)
-    out["broad_universe_coverage_count"] = len(broad_r24)
-    out["broad_positive_24h_share"] = sum(x > 0 for x in broad_r24) / len(broad_r24) if broad_r24 else ""
-    out["broad_positive_72h_share"] = sum(x > 0 for x in broad_r72) / len(broad_r72) if broad_r72 else ""
-    out["broad_median_ret_24h_pct"] = float(__import__("statistics").median(broad_r24)) if broad_r24 else ""
-    out["broad_median_ret_72h_pct"] = float(__import__("statistics").median(broad_r72)) if broad_r72 else ""
-    out["broad_median_efficiency_24h"] = float(__import__("statistics").median(broad_e24)) if broad_e24 else ""
-    return out
+def market_context(*_args, **_kwargs):
+    # This experiment isolates the body gate only; no cross-asset filter is applied.
+    return {}
+
 
 def run_fold(data, stamps, context_data, context_index, market_universe_data, market_universe_index, fold, start_time, end_time, gap_threshold, execution_mode, body_gate, gap_gate):
     requested_start = int(datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()*1000)
@@ -202,7 +165,7 @@ def run_fold(data, stamps, context_data, context_index, market_universe_data, ma
     cfg=engine.cfg
     cfg.bot_version=f"gate-decoupling-{execution_mode}-v{VOL_MIN:g}-b{BREAKOUT_ATR_MIN:g}-cost{COST_MULTIPLIER:g}"
     cfg.timeframe="1h"; cfg.active_trading_pool=sorted(data); cfg.capital_usdt=10000.0
-    cfg.max_risk_trade_pct=1.0; cfg.max_portfolio_risk_pct=2.0; cfg.max_concurrent_positions=5
+    cfg.max_risk_trade_pct=1.0; cfg.max_portfolio_risk_pct=2.0; cfg.max_concurrent_positions=1
     cfg.daily_stop_loss_pct=5.0; cfg.emergency_kill_switch_pct=30.0; cfg.max_chase_limit_pct=gap_threshold if body_gate else 100.0
     cfg.donchian_period=20; cfg.atr_period=14; cfg.min_volume_ratio=VOL_MIN
     cfg.stop_atr_mult=2.5; cfg.tp1_r_multiple=2.0; cfg.tp2_r_multiple=5.0
@@ -317,7 +280,7 @@ def run_fold(data, stamps, context_data, context_index, market_universe_data, ma
     try:
         em.check_alignment(fold_data)
         em.run_simulation_pass(engine,fold_data,sorted(data),
-            data_label=f"BINANCE_PROXY H1 selected universe diagnostic fold={fold}")
+            data_label=f"BINANCE_PROXY H1 {sorted(data)[0]} independent diagnostic fold={fold}")
     finally:
         core.evaluate_signal=staticmethod(original_eval)
         engine.step_candle=original_step
@@ -366,47 +329,81 @@ def run_fold(data, stamps, context_data, context_index, market_universe_data, ma
     return signal_rows,trades_out
 
 def main():
-    data,stamps,context_data,context_index,market_universe_data,market_universe_index=synchronized_data()
-    signals=[]; trades=[]; summaries=[]
-    for execution_mode in ("market",):
-      for body_gate in (False, True):
-       for gap_gate in (False,):
-        for fold,a,b in FOLDS:
-            sr,tr=run_fold(data,stamps,context_data,context_index,market_universe_data,market_universe_index,fold,a,b,gap_threshold=GAP_THRESHOLD_PCT,execution_mode=execution_mode,body_gate=body_gate,gap_gate=gap_gate)
-            signals.extend(sr); trades.extend(tr)
-            pnl=sum(float(t["pnl_net_usdt"]) for t in tr)
-            wins=sum(float(t["pnl_net_usdt"])>0 for t in tr)
-            gross=sum(float(t["pnl_gross_usdt"]) for t in tr)
-            fees=sum(float(t["fees_usdt"]) for t in tr)
-            slip=sum(float(t["slippage_usdt"]) for t in tr)
-            pos=sum(max(0.0,float(t["pnl_net_usdt"])) for t in tr)
-            neg=-sum(min(0.0,float(t["pnl_net_usdt"])) for t in tr)
-            summaries.append({
-                "execution_mode":execution_mode,"body_gate":int(body_gate),"gap_gate":int(gap_gate),
-                "gap_threshold_pct":GAP_THRESHOLD_PCT,"fold":fold,"trades":len(tr),"net_pnl_usdt":round(pnl,2),
-                "gross_pnl_usdt":round(gross,2),"fees_usdt":round(fees,2),"slippage_usdt":round(slip,2),
-                "win_rate_pct":round(100*wins/len(tr),2) if tr else 0,
-                "profit_factor":round(pos/neg,3) if neg else "",
-                "mean_net_R":round(statistics.mean([float(t["net_R"]) for t in tr]),4) if tr else "",
-                "median_MFE_R":round(float(statistics.median([float(t["MFE_R"]) for t in tr])),3) if tr else "",
-                "median_MAE_R":round(float(statistics.median([float(t["MAE_R"]) for t in tr])),3) if tr else "",
-                "max_abs_body_filled_pct":round(max([abs(float(t.get("signal_candle_body_pct",0) or 0)) for t in tr],default=0),3)
-            })
-            print(f"mode={execution_mode} body={int(body_gate)} gap={int(gap_gate)} fold={fold}: trades={len(tr)}, net={pnl:+.2f}, PF={pos/neg if neg else 0:.2f}")
-    for path,rows in [
-        ("e10_h1_body_gate_summary.csv",summaries),
-        ("e10_h1_body_gate_trades.csv",trades),
-        ("e10_h1_body_gate_signals.csv",signals)
+    datasets = synchronized_data()
+    signals = []
+    trades = []
+    summaries = []
+    for symbol in SYMBOLS:
+        _, archive, candles = datasets[symbol]
+        data = {symbol: candles}
+        stamps = [c.ts for c in candles]
+        for body_gate in (False, True):
+            for fold, a, b in FOLDS:
+                sr, tr = run_fold(
+                    data, stamps, {}, {}, {}, {}, fold, a, b,
+                    gap_threshold=GAP_THRESHOLD_PCT,
+                    execution_mode="market", body_gate=body_gate, gap_gate=False,
+                )
+                signals.extend(sr)
+                trades.extend(tr)
+                pnl = sum(float(t["pnl_net_usdt"]) for t in tr)
+                gross = sum(float(t["pnl_gross_usdt"]) for t in tr)
+                fees = sum(float(t["fees_usdt"]) for t in tr)
+                slip = sum(float(t["slippage_usdt"]) for t in tr)
+                wins = sum(float(t["pnl_net_usdt"]) > 0 for t in tr)
+                pos = sum(max(0.0, float(t["pnl_net_usdt"])) for t in tr)
+                neg = -sum(min(0.0, float(t["pnl_net_usdt"])) for t in tr)
+                summaries.append({
+                    "symbol": symbol, "fold": fold, "execution_mode": "market",
+                    "body_gate": int(body_gate), "body_threshold_pct": GAP_THRESHOLD_PCT,
+                    "gap_gate": 0, "trades": len(tr), "net_pnl_usdt": round(pnl, 2),
+                    "gross_pnl_usdt": round(gross, 2), "fees_usdt": round(fees, 2),
+                    "slippage_usdt": round(slip, 2),
+                    "win_rate_pct": round(100*wins/len(tr), 2) if tr else 0,
+                    "profit_factor": round(pos/neg, 3) if neg else "",
+                    "mean_net_R": round(statistics.mean([float(t["net_R"]) for t in tr]), 4) if tr else "",
+                    "median_MFE_R": round(float(statistics.median([float(t["MFE_R"]) for t in tr])), 3) if tr else "",
+                    "median_MAE_R": round(float(statistics.median([float(t["MAE_R"]) for t in tr])), 3) if tr else "",
+                    "max_abs_body_filled_pct": round(max([abs(float(t.get("signal_candle_body_pct", 0) or 0)) for t in tr], default=0), 3),
+                    "source_archive": os.path.basename(archive),
+                })
+                print(f"symbol={symbol} body={int(body_gate)} fold={fold}: trades={len(tr)} net={pnl:+.2f} PF={pos/neg if neg else 0:.2f}")
+    for path, rows in [
+        ("e10_h1_body_gate_summary.csv", summaries),
+        ("e10_h1_body_gate_trades.csv", trades),
+        ("e10_h1_body_gate_signals.csv", signals),
     ]:
         if rows:
-            fields=[]
+            fields = []
             for row in rows:
-                for k in row:
-                    if k not in fields: fields.append(k)
-            with open(path,"w",newline="",encoding="utf-8") as f:
-                w=csv.DictWriter(f,fieldnames=fields); w.writeheader(); w.writerows(rows)
+                for key in row:
+                    if key not in fields:
+                        fields.append(key)
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fields)
+                writer.writeheader(); writer.writerows(rows)
             print(f"Wrote {path}: {len(rows)} rows")
-    print("CAVEATS: Binance OHLCV proxy and modelled costs. Market execution only; next-open gap gate disabled; only the fixed 2.0% candle-body gate changes. Shared capital across all discovered symbols. No production changes.")
+    print("\\nAGGREGATE — independent per-symbol $10,000 runs; sums are NOT shared-capital portfolio PnL")
+    for fold, _, _ in FOLDS:
+        for body_gate in (0, 1):
+            group = [r for r in summaries if r["fold"] == fold and r["body_gate"] == body_gate]
+            print(
+                f"fold={fold} body={body_gate}: symbols={len(group)} "
+                f"positive_symbols={sum(float(r['net_pnl_usdt']) > 0 for r in group)} "
+                f"trades={sum(int(r['trades']) for r in group)} "
+                f"sum_independent_net={sum(float(r['net_pnl_usdt']) for r in group):+.2f} "
+                f"median_symbol_net={statistics.median([float(r['net_pnl_usdt']) for r in group]):+.2f}"
+            )
+    for body_gate in (0, 1):
+        group = [r for r in summaries if r["body_gate"] == body_gate]
+        print(
+            f"ALL_FOLDS body={body_gate}: positive_symbol_folds="
+            f"{sum(float(r['net_pnl_usdt']) > 0 for r in group)}/{len(group)} "
+            f"trades={sum(int(r['trades']) for r in group)} "
+            f"sum_independent_net={sum(float(r['net_pnl_usdt']) for r in group):+.2f}"
+        )
+    print("CAVEATS: Binance OHLCV proxy and modelled costs. Market execution only; gap gate disabled; fixed 2.0% candle-body gate is the sole changed factor. Each symbol is an independent $10,000 run; sums are not a shared-capital portfolio. No production changes.")
+
 
 if __name__ == "__main__":
     main()

@@ -30,7 +30,18 @@ jobs:
         with:
           python-version: "3.11"
       - name: Download dated linear instrument snapshot
-        run: python scripts/snapshot_bybit_instruments.py --category linear
+        run: |
+          SUCCESS=0
+          for BASE_URL in https://api.bybit.com https://api.bytick.com https://api.bybit.kz https://api.bybit.nl https://api.bybit.ae https://api.bybit-tr.com; do
+            echo "Trying Bybit public API endpoint: $BASE_URL"
+            if python scripts/snapshot_bybit_instruments.py --category linear --base-url "$BASE_URL"; then
+              echo "BYBIT_API_BASE_URL=$BASE_URL" >> "$GITHUB_ENV"
+              SUCCESS=1
+              break
+            fi
+            echo "Endpoint failed; trying next supported regional host."
+          done
+          test "$SUCCESS" -eq 1
       - name: Commit snapshot if changed
         run: |
           if [[ -n "$(git status --porcelain data/instrument_specs/linear)" ]]; then

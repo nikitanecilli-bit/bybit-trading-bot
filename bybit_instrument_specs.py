@@ -54,6 +54,7 @@ class InstrumentSpec:
     min_order_qty: Decimal
     min_notional_value: Decimal
     max_order_qty: Decimal | None = None
+    max_market_order_qty: Decimal | None = None
     min_leverage: Decimal | None = None
     max_leverage: Decimal | None = None
     leverage_step: Decimal | None = None
@@ -79,11 +80,16 @@ class InstrumentSpec:
             lot_filter.get("minNotionalValue"), "lotSizeFilter.minNotionalValue"
         )
         max_qty = _positive(lot_filter.get("maxOrderQty"), "lotSizeFilter.maxOrderQty", optional=True)
+        max_market_qty = _positive(
+            lot_filter.get("maxMktOrderQty"), "lotSizeFilter.maxMktOrderQty", optional=True
+        )
         min_lev = _positive(leverage_filter.get("minLeverage"), "leverageFilter.minLeverage", optional=True)
         max_lev = _positive(leverage_filter.get("maxLeverage"), "leverageFilter.maxLeverage", optional=True)
         lev_step = _positive(leverage_filter.get("leverageStep"), "leverageFilter.leverageStep", optional=True)
         if max_qty is not None and max_qty < min_qty:
             raise ValueError("maxOrderQty cannot be below minOrderQty")
+        if max_market_qty is not None and max_market_qty < min_qty:
+            raise ValueError("maxMktOrderQty cannot be below minOrderQty")
         if min_lev is not None and max_lev is not None and max_lev < min_lev:
             raise ValueError("maxLeverage cannot be below minLeverage")
         return cls(
@@ -97,6 +103,7 @@ class InstrumentSpec:
             min_order_qty=min_qty,
             min_notional_value=min_notional,
             max_order_qty=max_qty,
+            max_market_order_qty=max_market_qty,
             min_leverage=min_lev,
             max_leverage=max_lev,
             leverage_step=lev_step,
@@ -120,16 +127,20 @@ class InstrumentSpec:
         value = _positive(qty, "qty")
         return _floor_step(value, self.qty_step)
 
-    def validate_order(self, qty: Any, price: Any) -> Decimal:
+    def validate_order(self, qty: Any, price: Any, *, order_type: str = "limit") -> Decimal:
         """Return rounded quantity or reject exchange minimum/maximum constraints."""
+        if order_type not in {"limit", "market"}:
+            raise ValueError("order_type must be 'limit' or 'market'")
         rounded_qty = self.round_qty(qty)
         px = _positive(price, "price")
         if px % self.tick_size != 0:
             raise ValueError("price must be aligned to tickSize; call round_price first")
         if rounded_qty < self.min_order_qty:
             raise ValueError("quantity is below minOrderQty after qtyStep rounding")
-        if self.max_order_qty is not None and rounded_qty > self.max_order_qty:
-            raise ValueError("quantity exceeds maxOrderQty")
+        maximum = self.max_order_qty if order_type == "limit" else self.max_market_order_qty
+        maximum_name = "maxOrderQty" if order_type == "limit" else "maxMktOrderQty"
+        if maximum is not None and rounded_qty > maximum:
+            raise ValueError(f"quantity exceeds {maximum_name}")
         if rounded_qty * px < self.min_notional_value:
             raise ValueError("order notional is below minNotionalValue")
         return rounded_qty

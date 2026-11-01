@@ -61,3 +61,20 @@
 7. Только после закрытия этих пунктов — решить, какие исторические результаты нужно воспроизвести на исправленном engine. Не начинать parameter search.
 
 Последний подтверждённый технический CI: [41356881313](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356881313), commit `3246eb1df4b9d4cfbd109fa6e6a6316e44710200` — success.
+
+
+## Обновление 2026-11-02 — lifecycle review
+
+Завершён первичный статический просмотр `step_candle` / `_try_fill_pending` / `_manage_position`:
+- Pending сигнал живёт одну следующую свечу; no-touch, chase reject и risk reject удаляют его без retry.
+- Limit touch fill не моделирует очередь, спред, partial fill или adverse selection.
+- Stop имеет приоритет над TP при неоднозначном OHLC same-bar событии.
+- Fill-bar stop может учитывать экстремум, который был до фактического входа; favourable excursion на fill bar исключён.
+- Trailing stop, рассчитанный по текущей свече, применяется только к последующим свечам.
+
+Следующий безопасный порядок:
+1. Добавить тесты, фиксирующие фактические one-bar pending semantics и fill-bar/trailing timing (без изменения поведения).
+2. Проверить, одинаково ли runners интерпретируют лимитную заявку и TTL; расхождения описать, не исправляя молча.
+3. Продолжить аудит TP/stop/trailing и portfolio event ordering; отдельно проверить long/short симметрию.
+4. Затем margin/leverage/quantity-tick и funding timestamp semantics.
+5. Только после завершения аудита — воспроизводимость E01–E09 и data archive integrity. Новые market backtests и parameter search пока запрещены.

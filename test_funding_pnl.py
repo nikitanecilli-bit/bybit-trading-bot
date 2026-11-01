@@ -180,3 +180,17 @@ def test_funding_history_loader_preserves_decimal_rate_precision():
         )
         e._load_funding_history(directory)
     assert e.funding_by_symbol["BTCUSDT"][0]["rate"] == Decimal("0.0001234567890123456789")
+
+
+def test_mark_price_history_loader_preserves_decimal_precision():
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e._funding_mark_prices = {}
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "BTCUSDT.csv"
+        path.write_text(
+            "symbol,timestamp_ms,open\n"
+            "BTCUSDT,1800000000000,101.1234567890123456789\n",
+            encoding="utf-8",
+        )
+        e._load_mark_price_history(directory)
+    assert e._funding_mark_prices["BTCUSDT"][1_800_000_000_000] == Decimal("101.1234567890123456789")

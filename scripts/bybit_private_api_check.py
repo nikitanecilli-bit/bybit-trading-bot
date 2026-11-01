@@ -75,18 +75,18 @@ def verify_response(payload: dict[str, Any], api_key: str) -> tuple[bool, str]:
 
 
 def main() -> int:
-    api_key = os.environ.get("BYBIT_API_KEY", "")
-    api_secret = os.environ.get("BYBIT_API_SECRET", "")
+    key_from_env = os.environ.get("BYBIT_API_KEY", "")
+    secret_from_env = os.environ.get("BYBIT_API_SECRET", "")
     base_url = os.environ.get("BYBIT_API_BASE_URL", "https://api.bybit.kz").rstrip("/")
 
-    if not api_key or not api_secret:
+    if not key_from_env or not secret_from_env:
         print("Missing required GitHub Secrets: BYBIT_API_KEY and/or BYBIT_API_SECRET.")
         return 2
     if not base_url.startswith("https://"):
         print("Invalid API base URL: HTTPS is required.")
         return 2
 
-    headers = build_headers(api_key, api_secret)
+    headers = build_headers(key_from_env, secret_from_env)
     request = urllib.request.Request(
         f"{base_url}{ENDPOINT}",
         headers=headers,
@@ -109,7 +109,7 @@ def main() -> int:
         print("Bybit request timed out or returned an invalid response; response body was suppressed.")
         return 1
 
-    ok, message = verify_response(payload, api_key)
+    ok, message = verify_response(payload, key_from_env)
     print(message)
     if not ok:
         return 1

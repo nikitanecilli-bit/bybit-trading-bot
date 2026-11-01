@@ -50,5 +50,7 @@
 | TP1 partial-position mark accounting | TESTED | `test_portfolio_accounting.py`; CI 41356694461 | Does not test every stop/trailing path |
 | Risk-budget cap and zero-budget rejection | TESTED | `test_portfolio_accounting.py`; CI 41356694461 | Does not prove fair allocation across simultaneous symbols |
 | Closed trade PnL/fees/slippage/equity reconciliation | TESTED | `test_portfolio_accounting.py`; CI 41356694461 | Uses deterministic fixture and modeled fee constants |
-| Symbol-order invariance | NOT_TESTED | Known sequential allocation behavior | Requires explicit allocation policy before behavior changes |
+| Symbol-order invariance | FAIL / CONFIRMED DEFECT | `test_simultaneous_entry_selection_is_order_dependent_under_binding_risk_cap`; CI 41356762102 | Batch allocation policy must be designed and implemented; no silent symbol sorting |
 | Funding, margin tiers, liquidation | NOT_TESTED | No complete exchange model in active engine | Must not infer safety from backtest risk budget |
+
+- Latest portfolio accounting CI: [41356762102](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356762102), commit `36bd4b8f8a448207d9d74f439d39bdc345853624` — passed, including the test that reproduces symbol-order dependence.

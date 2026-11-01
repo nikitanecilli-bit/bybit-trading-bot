@@ -1201,7 +1201,7 @@ class UnifiedQuantEngine:
             mfe_r = (pos.entry_price - pos.max_favorable_px) / stop_dist
             mae_r = (pos.max_adverse_px - pos.entry_price) / stop_dist
 
-        elif not fill_bar:
+        if not stop_hit and not fill_bar:
             tp2_hit = (curr.high >= pos.tp2_price) if is_long else (curr.low <= pos.tp2_price)
             if tp2_hit:
                 if not pos.tp1_hit:

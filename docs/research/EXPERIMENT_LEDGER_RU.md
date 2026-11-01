@@ -183,3 +183,6 @@ Detailed report: [E10_H1_BODY_GATE_CROSS_SECTIONAL_RU.md](../reports/E10_H1_BODY
   - Fold 3: 484 removed (481 body>2%, net -2,698.00), 115 new (net +2,311.53), 625 shared (delta -31.33); total ON-OFF +4,978.20.
 - Interpretation: body gate changes the subsequent trade sequence. Fold 1 replacements were worse than removed trades; fold 2 replacements were less bad; fold 3 replacements were profitable. Gate value depends on the quality of signals that become available after skipping large-body entries, not only on the rejected candle itself.
 
+
+
+- Replacement trades that appear only with body gate ON had lower median breakout/ATR and higher prior 24h momentum/efficiency than removed large-body trades. Their aggregate net was -623.49 (76 trades) in fold 1, -351.92 (30) in fold 2, and +2,311.53 (115) in fold 3. Fold 3 replacement set had median prior 24h return +8.06% and efficiency 0.410; this is a descriptive candidate interaction, not proof of a predictive filter.

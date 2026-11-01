@@ -127,3 +127,31 @@ def test_close_trade_reconciles_net_pnl_fees_slippage_and_realized_equity():
         e.risk_mgr.realized_equity + e.risk_mgr.unrealized_pnl, 4
     )
     assert "BTCUSDT" not in e.open_positions
+
+
+def run_simultaneous_entries(order):
+    e = make_engine()
+    e.cfg.max_portfolio_risk_pct = 2.0
+    e.cfg.max_risk_trade_pct = 1.0
+    e.cfg.max_concurrent_positions = 3
+    e.risk_mgr.cfg = e.cfg
+    for symbol in order:
+        e.pending[symbol] = {
+            "direction": "long", "entry_price": 100.0, "order_type": "market",
+            "strategy": "simultaneous-test", "stop_dist": 5.0,
+        }
+    bar = engine_mod.Candle(
+        ts=1_800_000_000_000, open=100.0, high=101.0,
+        low=99.0, close=100.5, volume=10.0,
+    )
+    for symbol in order:
+        e._try_fill_pending(symbol, bar)
+    return set(e.open_positions)
+
+
+def test_simultaneous_entry_selection_is_order_dependent_under_binding_risk_cap():
+    first_order = run_simultaneous_entries(["BTCUSDT", "ETHUSDT", "SOLUSDT"])
+    reversed_order = run_simultaneous_entries(["SOLUSDT", "ETHUSDT", "BTCUSDT"])
+    assert first_order == {"BTCUSDT", "ETHUSDT"}
+    assert reversed_order == {"SOLUSDT", "ETHUSDT"}
+    assert first_order != reversed_order

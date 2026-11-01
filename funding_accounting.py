@@ -1,8 +1,8 @@
 """Pure, cumulative funding cashflow calculation for a single open position.
 
 The returned amount is positive when paid and negative when received. The
-function is intentionally independent from the trading engine so mark-to-
-market and final-close paths can call the exact same calculation.
+supplied mark is an exact-timestamp mark-candle open proxy, not necessarily
+the exchange's final settlement mark. MTM and final close share this helper.
 """
 from __future__ import annotations
 

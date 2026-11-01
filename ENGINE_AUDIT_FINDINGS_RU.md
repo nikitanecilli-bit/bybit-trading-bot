@@ -153,3 +153,10 @@ Current known issue remains: sequential simultaneous-entry allocation can be sym
 - Earlier intermediate CI runs failed because focused engine tests instantiate the engine with `__new__` and do not run `__init__`; compatibility fallback was added. Those failed runs are retained in history and are not treated as successful evidence.
 
 The previous P1 order-dependent allocation is considered fixed in the research engine subject to the limitations above. This is a new portfolio allocation policy; historical E01–E09 results must not be silently reinterpreted as if this policy had been active.
+
+
+### Static scan: live order endpoints — 2026-11-02
+
+- Searched the engine copy in all six relevant branches (main, Audit, funding-data, data-adapter, market-regime, v15-donchian, plus active research branch) for `place_order`, `/v5/order/create`, `create_order`, `pybit.unified_trading`, `HTTP.post`, `requests.post`, `submit_order`, and `set_trading_stop`: no matches.
+- Searched all Python research scripts in `research/market-regime-v1-main` for the same terms: no matches.
+- Conclusion is limited to the inspected Python engine/scripts. It is not a proof about every non-Python file, installed package, or external runtime configuration. No live order endpoint was found in the audited research code.

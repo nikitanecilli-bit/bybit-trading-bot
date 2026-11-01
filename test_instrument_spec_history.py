@@ -82,6 +82,13 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "expected category"):
             InstrumentSpecHistory.from_directory(self.root)
 
+    def test_snapshot_count_must_match_rows(self):
+        payload = json.loads((self.root / "a.json").read_text())
+        payload["count"] = 999
+        (self.root / "a.json").write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            InstrumentSpecHistory.from_directory(self.root)
+
     def test_missing_or_malformed_required_snapshot_fields_rejected(self):
         (self.root / "b.json").write_text("not-json", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "cannot read"):

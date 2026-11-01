@@ -96,7 +96,7 @@ Do not treat old H1 PnL as exchange-executable net performance until these are i
 
 - `scripts/snapshot_bybit_instruments.py` archives raw Bybit V5 instrument-info responses with UTC timestamped filenames and pagination/duplicate guards; a dedicated Actions workflow is configured to populate `data/instrument_specs/linear/`.
 - `funding_accounting.py` provides a single cumulative as-of calculation with timestamp-aligned hourly mark-candle-open proxies (not guaranteed to equal the exchange settlement mark) and conservative TP1 boundary semantics; offline tests cover long/short sign, settlement inclusivity, missing marks, duplicates and partial TP1.
-- Neither module is yet wired into v14. Do not claim exchange-realistic PnL until engine integration and end-to-end tests pass. First verify the workflow output and unit-test CI; then integrate funding into both mark-to-market and final close through the same helper.
+- The instrument collector is not yet confirmed to have produced its first artifact. Funding helper is now wired into v14 mark-to-market and final close; do not claim exchange-realistic PnL until CI passes and funding/mark data coverage is validated for every symbol and settlement.
 
 ## Funding integration — first isolated pass implemented
 

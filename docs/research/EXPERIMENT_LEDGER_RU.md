@@ -144,3 +144,20 @@ Net PnL in USDT. All 24 fold-cells are in `e09_gate_factorial_summary.csv`; trad
 Подробные таблицы, ограничения и следующий эксперимент: [E09_FOLD_DIFFERENCES_RU.md](../reports/E09_FOLD_DIFFERENCES_RU.md).
 
 **Следующий эксперимент:** один cross-sectional replication body gate ON/OFF при фиксированном пороге 2%, только market execution, все валидные H1 ряды загруженного universe (ориентир — 50 символов; точный список/исключения зафиксировать в manifest), те же три даты fold. Предыдущая 50-symbol signal-quality matrix варьировала volume/breakout пороги при фиксированном default body cap, но не сравнивала body gate ON/OFF. Не перебирать порог. До запуска закрепить состав universe, archive/blob SHA и полноту рядов. Цель — проверить переносимость эффекта за пределы пяти отобранных инструментов.
+
+
+## E10 — cross-sectional H1 body-gate replication (2026-11-02)
+
+- Workflow: [41360728294](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41360728294), success.
+- Artifact: [e10-h1-body-gate-cross-sectional](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41360728294/artifacts/13104981517), SHA-256 `64832db93e5912c877debcfd4548cbf9a6fb2beb71ca647c39762e1321b963fa`.
+- Commit: `483278f51d99d402215a1f26a690ea2661e28939`; script: `scripts/run_e10_h1_body_gate_replication.py`.
+- Universe: 50 valid H1 symbols discovered; 47 included across all three fold (AERO, GRAM, HYPE excluded for insufficient coverage); 282 symbol-fold runs.
+- Design: per-symbol independent 10,000 USDT runs; market execution only; body cap OFF vs fixed 2.0%; gap gate disabled; volume ratio >=1.6; breakout/ATR >=0.25; costs ×2. 2,422 trades OFF vs 1,797 ON.
+- Sum of independent symbol net results: OFF -22,857.66 USDT; ON -15,912.54 USDT. This is not shared-capital portfolio PnL. Gate reduced trade count 25.8%, fees+slippage by 5,700.40 USDT and improved summed independent net by 6,945.12 USDT, but the overall result remained negative.
+- Fold effect: fold 1 worsened by 492.79; fold 2 improved by 2,459.71; fold 3 improved by 4,978.20. Per-symbol response is mixed, so body gate is regime-dependent, not a universal fix.
+- Positive symbol-fold counts 49/141 OFF vs 59/141 ON; median PF 0.81 OFF vs 0.78 ON; mean expectancy R -0.11 vs -0.08.
+- Data: Binance OHLCV proxy, six CryptoFetch archives, uneven coverage; exact per-symbol coverage and archive SHA-256 values are in the artifact manifest. Funding not included. Not blind holdout.
+- First attempt run 41360651282 failed before simulation because intersection of timestamps across all 50 symbols was only 758 bars. Corrected E10 runs each symbol independently on its own timestamps; failed attempt excluded from results.
+- Decision: do not promote 2% body cap to production. No threshold sweep. Next inspect signal/trade funnel by fold to understand which trades the body cap removes and why fold 1 worsens; only then consider a frozen shared-capital portfolio replay and future untouched holdout.
+
+Detailed report: [E10_H1_BODY_GATE_CROSS_SECTIONAL_RU.md](../reports/E10_H1_BODY_GATE_CROSS_SECTIONAL_RU.md).

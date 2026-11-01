@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile engine and deterministic tests
-        run: python -m py_compile market_regime.py market_structure.py test_market_regime.py test_market_structure.py test_regime_analysis.py test_regime_gate_holdout.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py test_timeframe_validation.py scripts/scan_secrets.py
+        run: python -m py_compile market_regime.py market_structure.py test_market_regime.py test_market_structure.py test_regime_analysis.py test_regime_gate_holdout.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py test_timeframe_validation.py test_portfolio_accounting.py scripts/scan_secrets.py
       - name: Scan for obvious secrets
         run: python scripts/scan_secrets.py .
       - name: Test causal market-regime classifier
@@ -34,3 +34,5 @@ jobs:
         run: python test_time_model.py
       - name: Test configured candle timeframe validation
         run: python test_timeframe_validation.py
+      - name: Test portfolio accounting and risk budget
+        run: python test_portfolio_accounting.py

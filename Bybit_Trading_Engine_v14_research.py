@@ -1121,7 +1121,7 @@ class UnifiedQuantEngine:
         stop_price, tp1, tp2 = QuantStrategyCore.build_levels(direction, fill, sig["stop_dist"], self.cfg)
         portfolio_risk_cap = self.risk_mgr.current_equity * (self.cfg.max_portfolio_risk_pct / 100.0)
         remaining_portfolio_risk = max(0.0, portfolio_risk_cap - self._open_portfolio_risk_usdt())
-        allocated_budget = self._bar_entry_risk_budgets.pop(symbol, None)
+        allocated_budget = getattr(self, "_bar_entry_risk_budgets", {}).pop(symbol, None)
         if allocated_budget is not None:
             remaining_portfolio_risk = min(remaining_portfolio_risk, allocated_budget)
         size_usdt, risk_usdt = self.risk_mgr.calculate_position_size(

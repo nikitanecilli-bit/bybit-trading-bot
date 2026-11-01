@@ -54,3 +54,6 @@
 | Funding, margin tiers, liquidation | NOT_TESTED | No complete exchange model in active engine | Must not infer safety from backtest risk budget |
 
 - Latest portfolio accounting CI: [41356762102](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356762102), commit `36bd4b8f8a448207d9d74f439d39bdc345853624` — passed, including the test that reproduces symbol-order dependence.
+
+
+| Stop-candle MAE/MFE | TESTED / FIXED | Long+short wick-order regression tests; CI 41357102546 | OHLC still cannot reconstruct the true intrabar path; favorable excursion on stop candle is intentionally not credited |

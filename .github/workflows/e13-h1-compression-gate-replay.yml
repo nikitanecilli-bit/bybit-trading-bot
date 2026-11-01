@@ -1,0 +1,45 @@
+name: E13 H1 Causal Compression Gate Shared-Capital Replay
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/market-regime-v1-main]
+    paths:
+      - 'scripts/run_e13_h1_compression_gate_replay.py'
+      - '.github/workflows/e13-h1-compression-gate-replay.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Record archive hashes
+        run: |
+          find data/archives/cryptofetch -maxdepth 1 -type f -name '*.zip' -print0 | sort -z | xargs -0 sha256sum | tee e13_h1_compression_archive_sha256.txt
+      - name: Compile replay
+        run: python -m py_compile scripts/run_e13_h1_compression_gate_replay.py
+      - name: Run shared-capital replay
+        run: python scripts/run_e13_h1_compression_gate_replay.py
+      - name: Upload E13 outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: e13-h1-compression-gate-shared-capital
+          path: |
+            e13_h1_compression_summary.csv
+            e13_h1_compression_trades.csv
+            e13_h1_compression_signals.csv
+            e13_h1_compression_per_symbol.csv
+            e13_h1_compression_universe_manifest.csv
+            e13_h1_compression_archive_sha256.txt
+          if-no-files-found: error

@@ -148,3 +148,20 @@ def test_mark_price_history_loader_rejects_duplicate_timestamps():
             assert "duplicate mark-price timestamp" in str(exc)
         else:
             raise AssertionError("Duplicate mark-price timestamps must be rejected")
+
+
+def test_funding_history_loader_rejects_empty_symbol_file():
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.funding_by_symbol = {}
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "BTCUSDT.csv"
+        path.write_text(
+            "symbol,funding_timestamp_ms,funding_rate\n",
+            encoding="utf-8",
+        )
+        try:
+            e._load_funding_history(directory)
+        except ValueError as exc:
+            assert "no funding rows found" in str(exc)
+        else:
+            raise AssertionError("Empty funding history must be rejected")

@@ -143,4 +143,4 @@ Net PnL in USDT. All 24 fold-cells are in `e09_gate_factorial_summary.csv`; trad
 
 Подробные таблицы, ограничения и следующий эксперимент: [E09_FOLD_DIFFERENCES_RU.md](../reports/E09_FOLD_DIFFERENCES_RU.md).
 
-**Следующий эксперимент:** один cross-sectional replication body gate ON/OFF при фиксированном пороге 2%, только market execution, полный доступный H1 universe из 25 символов, те же три даты fold. Не перебирать порог. До запуска закрепить состав universe, archive/blob SHA и полноту рядов. Цель — проверить переносимость эффекта за пределы пяти отобранных инструментов.
+**Следующий эксперимент:** один cross-sectional replication body gate ON/OFF при фиксированном пороге 2%, только market execution, все валидные H1 ряды загруженного universe (ориентир — 50 символов; точный список/исключения зафиксировать в manifest), те же три даты fold. Предыдущая 50-symbol signal-quality matrix варьировала volume/breakout пороги при фиксированном default body cap, но не сравнивала body gate ON/OFF. Не перебирать порог. До запуска закрепить состав universe, archive/blob SHA и полноту рядов. Цель — проверить переносимость эффекта за пределы пяти отобранных инструментов.

@@ -218,3 +218,8 @@ Detailed report: [E11_H1_SHARED_CAPITAL_PORTFOLIO_RU.md](../reports/E11_H1_SHARE
 - Decision: no one-sided market-trend gate and no threshold sweep. Next define one causal compression classifier from rolling ATR + cross-sectional dispersion while preserving local opportunities in weak broad markets; only then one frozen shared-capital replay.
 
 Detailed report: [E12_BROAD_MARKET_CONTEXT_DIAGNOSTICS_RU.md](../reports/E12_BROAD_MARKET_CONTEXT_DIAGNOSTICS_RU.md).
+
+
+- E12 feasibility check: a single causal compression flag (current broad median ATR% AND cross-sectional IQR72 below expanding 25th percentiles of all prior hourly observations; minimum 336 prior hours) activated on 3.2% / 23.3% / 6.0% of hourly bars in folds 1/2/3. At candidate signal hours: 5.0% / 25.5% / 7.0%; at filled trade hours: 4.9% / 26.9% / 8.0%.
+- Existing trade PnL inside compression is worse in fold 2 but not uniformly bad in fold 3. Because trade sequence changes when entries are blocked, this is only feasibility evidence; proceed with one frozen shared-capital replay, no threshold sweep.
+

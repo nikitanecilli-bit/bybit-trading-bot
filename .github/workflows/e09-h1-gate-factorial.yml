@@ -2,13 +2,6 @@ name: E09 H1 Gate Factorial
 # Re-run after correcting next-open gate isolation.
 
 on:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - "scripts/run_e09_h1_gate_factorial.py"
-      - ".github/workflows/e09-h1-gate-factorial.yml"
-      - "tests/test_gap_execution.py"
-      - "Bybit_Trading_Engine_v14_research.py"
   workflow_dispatch:
 
 permissions:

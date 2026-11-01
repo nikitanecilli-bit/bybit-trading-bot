@@ -6,8 +6,8 @@
 |---|---|---|---|
 | Архитектура репозитория | PARTIAL | Найдены engine, downloader, scripts, workflows, reports, tests | Сверить все ветки и зависимости |
 | Live execution / безопасность | PARTIAL | README утверждает, что v14 research engine не отправляет ордера | Проверить весь репозиторий/ветки на API order endpoints |
-| Свечи и временные метки | PARTIAL | Есть `test_time_model.py`, синхронизация проверяется в скриптах | Проверить semantics каждого источника и boundary cases |
-| Look-ahead | NOT_TESTED | E09 заявляет completed-bar context | Статический аудит всех сигналов/фич/выходов |
+| Свечи и временные метки | PARTIAL / P1 | Есть `test_time_model.py`; обнаружено, что CSV равномерность проверяет, но интервал не сравнивает с `cfg.timeframe` | Добавить тесты mismatch и уточнить open/close timestamp semantics |
+| Look-ahead | PARTIAL | Основной signal core использует только предыдущие бары для Donchian/ATR; полный аудит scripts/features/folds не завершён | Статический аудит всех сигналов/фич/выходов и fold construction |
 | Stop/TP внутри свечи | NOT_TESTED | Есть общие тесты времени и гэпов | Проверить collision и OHLC path assumptions |
 | Market gap execution | PARTIAL | `test_gap_execution.py` и gap report существуют | Повторить тесты, проверить точное покрытие |
 | Limit fills | PARTIAL | E03/E07/E09 моделируют лимитное касание | Нет queue/partial fill/spread/adverse selection |

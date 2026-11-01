@@ -203,3 +203,18 @@ Detailed report: [E10_H1_BODY_GATE_CROSS_SECTIONAL_RU.md](../reports/E10_H1_BODY
 - Decision: do not promote 2% body gate. Next step is descriptive stratification of shared-capital signals/trades by causal broad-market breadth and 24–72h momentum/efficiency, without optimizing thresholds.
 
 Detailed report: [E11_H1_SHARED_CAPITAL_PORTFOLIO_RU.md](../reports/E11_H1_SHARED_CAPITAL_PORTFOLIO_RU.md).
+
+
+## E12 — causal broad-market context diagnostics (2026-11-02)
+
+- Workflow: [41361856404](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41361856404), success.
+- Artifact: [e12-h1-market-context-diagnostics](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41361856404/artifacts/13105721458), SHA-256 `5ac82041680ea6bcbb90561a6da11687c15c171885dd66034db321ce63bd8854`.
+- Commit: `4100d800761983d9de148f368d2402280b3dc6be`; script: `scripts/run_e12_h1_market_context_diagnostics.py`.
+- Calculated completed-bar broad breadth, median 24h/72h returns, efficiency, ATR, cross-sectional IQR/std and BTC/ETH context for 4,249 hourly timestamps over the fixed 47-symbol E11 universe. No backtest or threshold optimization.
+- At unique base signal timestamps, fold 2 had the lowest 72h breadth (48.9%), median 72h return (-0.043%), median ATR (0.761%) and IQR72 (3.669%). Fold 3 was strongest; fold 1 was intermediate.
+- At actual trade timestamps, fold 2 again had lowest breadth72 (44.7%), median return72 (-0.344%), ATR (0.768%) and IQR72 (3.611%).
+- Winner/loser context changes sign by fold: fold 1 winners had weaker broad breadth/72h momentum than losers; fold 3 winners had stronger breadth/72h momentum; fold 2 winners and losers barely separated and all 72h momentum terciles were negative.
+- Working regimes: fold 1 weak/mixed market with selective local opportunities; fold 2 compression/chop with poor breakout follow-through; fold 3 broad trend expansion. This is descriptive, not a validated classifier.
+- Decision: no one-sided market-trend gate and no threshold sweep. Next define one causal compression classifier from rolling ATR + cross-sectional dispersion while preserving local opportunities in weak broad markets; only then one frozen shared-capital replay.
+
+Detailed report: [E12_BROAD_MARKET_CONTEXT_DIAGNOSTICS_RU.md](../reports/E12_BROAD_MARKET_CONTEXT_DIAGNOSTICS_RU.md).

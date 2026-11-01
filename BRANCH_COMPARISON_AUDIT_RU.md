@@ -12,16 +12,16 @@
 | `research/data-adapter-v1` | Адаптер Bybit klines с проверкой interval, общей временной сетки и пропусков | НЕ интегрировано; безопасный кандидат на перенос после тестов |
 | `research/v15-donchian-signal` | Изолированный signal module, H1 backtester, portfolio replay и регрессионные тесты | НЕ интегрировано; отдельная экспериментальная реализация |
 
-Ветки не являются последовательными чистыми патчами: GitHub compare показывает diverged history. Снимок GitHub Compare на 2026-11-02 относительно `main`:
+Ветки не являются последовательными чистыми патчами: GitHub compare показывает diverged history. Снимок GitHub Compare на 2026-11-02 после обновления навигации `main` относительно `main`:
 
 | Ветка | Ahead | Behind | Статус |
 |---|---:|---:|---|
-| `Audit` | 0 | 1 | behind |
-| `research/bybit-funding-data-v1` | 27 | 2 | diverged |
-| `research/data-adapter-v1` | 11 | 2 | diverged |
-| `research/market-regime-v1-main` | 168 | 2 | diverged |
-| `research/market-regime-v1` | 30 | 2 | diverged |
-| `research/v15-donchian-signal` | 59 | 3 | diverged |
+| `Audit` | 0 | 2 | behind |
+| `research/bybit-funding-data-v1` | 27 | 3 | diverged |
+| `research/data-adapter-v1` | 11 | 3 | diverged |
+| `research/market-regime-v1-main` | 171 | 3 | diverged |
+| `research/market-regime-v1` | 30 | 3 | diverged |
+| `research/v15-donchian-signal` | 59 | 4 | diverged |
 
 `main` — default branch, но не содержит актуальный исследовательский слой. `research/market-regime-v1-main` — текущая рабочая ветка с документацией, аудитом и основной серией экспериментов. `Audit` почти совпадает с `main` и не содержит отдельной исследовательской ценности, подтверждённой этим сравнением.
 

@@ -34,7 +34,7 @@ Run `41355263006` на commit `9271b0e4eac3d05db700f09cced255e25eb8f776` зав�
 - Funding не моделировался в ряде прогонов.
 - Maker fills optimistic OHLC touch.
 - Selection/multiple testing: E07/E08/E09 выбраны на пяти инструментах и имеют зависимые итерации; результаты не являются независимыми подтверждениями.
-- Успешный CI workflow содержит и технические проверки, и рыночные прогоны; это разные уровни доказательности.
+- Технические проверки отделены от рыночных экспериментов: `research-checks.yml` запускает только compile, secret scan и deterministic tests; рыночные workflow переведены на `workflow_dispatch`.
 
 ## 5. Статус
 - [x] Инвентаризация веток и дерева текущей ветки.
@@ -50,3 +50,11 @@ Run `41355263006` на commit `9271b0e4eac3d05db700f09cced255e25eb8f776` зав�
 - [ ] Финальный перечень P0/P1/P2 и разрешение на следующий этап.
 
 Новые рыночные эксперименты не запускать до завершения аудита. Разрешены проверки кода, воспроизводимости и корректности расчётов.
+
+## Обновление аудита 2026-11-02
+
+- P1 timeframe mismatch исправлен и покрыт regression tests; CI run 41356694461 passed.
+- Добавлен `test_portfolio_accounting.py`: MTM equity identity, TP1 partial mark, risk budget, long/short PnL signs, closed trade fee/slippage/net PnL reconciliation. CI run 41356694461 passed.
+- Изменение CI: исследовательские рыночные workflow теперь ручные; технический CI запускается при изменениях движка и тестов, не выполняя рыночные backtests.
+- Остаточный риск: последовательное распределение ограниченного портфельного бюджета между одновременными сигналами может зависеть от порядка symbols. Не меняли без согласованной спецификации; нужно сначала формализовать приоритет или pro-rata allocation.
+- Проверки реального funding, Bybit fill quality, liquidation/margin tiers, full symbol permutation and full portfolio event reconciliation остаются открытыми.

@@ -95,6 +95,10 @@ Added `test_bybit_instrument_specs.py` for versioned snapshot parsing, Decimal b
 - `test_funding_mark_to_market.py`: accrued funding reduces open-position unrealized PnL before close, future settlements excluded, missing marks fail closed, TP1 timestamp captured.
 - All three are added to `research-checks.yml`; CI status is **unverified** until a completed Actions run is inspected.
 
+## 2026-11-02 — as-of instrument specification history
+
+`test_instrument_spec_history.py` covers UTC as-of selection, refusal to use future snapshots, max-age enforcement, full-universe missing-symbol handling, non-Trading status, duplicate timestamps and invalid snapshots. `test_bybit_instrument_specs.py` additionally covers separate `maxOrderQty`/`maxMktOrderQty` and permits non-tick-aligned market reference prices while requiring tick alignment for limit prices. Added to `research-checks.yml`.
+
 ## 2026-11-02 — funding data coverage preflight
 
 `test_funding_coverage.py` проверяет полное timestamp совпадение funding settlements с mark-candle opens, отсутствующие symbol-файлы, пустые события и дубликаты. Добавлен в `research-checks.yml`. Это проверка completeness/temporal alignment, не подтверждение того, что mark-candle open равен фактической settlement mark price.

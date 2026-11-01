@@ -1,5 +1,8 @@
 """Regression tests for the v15 simulator."""
 import unittest
+from unittest.mock import patch
+
+import research_v15.backtest as backtest_mod
 
 from research_v15.backtest import Bar, backtest_symbol, breakeven_action, limit_order_expired, limit_order_fill, resolve_stop_target, rolling_atr, stop_order_fill, trade_economics, position_size, mark_to_market_equity
 
@@ -258,6 +261,58 @@ class V15BacktestTests(unittest.TestCase):
         for args in ((0, 0.01, 100, 5), (1000, 0, 100, 5), (1000, 0.01, 0, 5), (1000, 0.01, 100, 0)):
             with self.subTest(args=args), self.assertRaises(ValueError):
                 position_size(*args)
+
+
+    def _run_multibar_limit_case(self, fill_on_second_valid_bar):
+        bars = [
+            backtest_mod.Bar(
+                ts=i * 3_600_000 + 1,
+                open=100.0, high=100.5, low=99.9, close=100.0,
+            )
+            for i in range(8)
+        ]
+        # Signal at i=2 creates a long pullback limit at 99.85.
+        # The first eligible candle (i=3) does not touch it.
+        # Optionally touch on the second eligible candle (i=4).
+        if fill_on_second_valid_bar:
+            bars[4] = backtest_mod.Bar(
+                ts=4 * 3_600_000 + 1,
+                open=100.0, high=100.5, low=99.8, close=100.0,
+            )
+
+        def fake_ema(values, period):
+            level = 101.0 if period == 1 else 100.0
+            return [level] * len(values)
+
+        def fake_breakout(candles, index, period):
+            return "long" if index == 2 else None
+
+        with (
+            patch.object(backtest_mod, "rolling_atr", return_value=[1.0] * len(bars)),
+            patch.object(backtest_mod, "ema", side_effect=fake_ema),
+            patch.object(backtest_mod, "donchian_breakout", side_effect=fake_breakout),
+        ):
+            return backtest_mod.backtest_symbol(
+                bars,
+                symbol="TTLTEST",
+                donchian_period=2,
+                ema_fast_period=1,
+                ema_slow_period=2,
+                atr_period=1,
+                entry_pullback_atr=0.15,
+                limit_valid_bars=2,
+                max_hold_bars=20,
+            )
+
+    def test_pending_limit_survives_first_miss_and_fills_on_second_valid_bar(self):
+        result = self._run_multibar_limit_case(fill_on_second_valid_bar=True)
+        self.assertEqual(result["trades_count"], 1)
+        self.assertEqual(result["trades"][0]["entry_ts"], 4 * 3_600_000 + 1)
+
+    def test_pending_limit_expires_after_last_valid_bar_without_fill(self):
+        result = self._run_multibar_limit_case(fill_on_second_valid_bar=False)
+        self.assertEqual(result["trades_count"], 0)
+        self.assertEqual(result["net_pnl"], 0.0)
 
 
 if __name__ == "__main__":

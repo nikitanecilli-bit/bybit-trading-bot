@@ -83,7 +83,7 @@ class InstrumentSpecTests(unittest.TestCase):
     def test_invalid_side_and_nonpositive_values_rejected(self):
         with self.assertRaisesRegex(ValueError, "side"):
             self.spec.round_price("100", side="long")
-        with self.assertRaisesRegex(ValueError, "positive"):
+        with self.assertRaisesRegex(ValueError, r"> 0"):
             self.spec.round_qty("0")
 
     def test_invalid_min_max_relationship_rejected(self):

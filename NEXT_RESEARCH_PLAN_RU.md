@@ -89,7 +89,7 @@ Static review confirms that v14 sizing is a notional approximation, not a Bybit 
 - historical funding files can be downloaded, but funding cashflows are not charged;
 - mark/index/premium datasets can be downloaded, but mark-price liquidation and basis effects are not modeled.
 
-Do not treat old H1 PnL as exchange-executable net performance until these are implemented. Next coding task after lifecycle tests: pure Decimal-based instrument rounding helpers + boundary tests. Then funding cashflow accounting; margin/liquidation model comes after the data/spec schema is stable.
+Do not treat old H1 PnL as exchange-executable net performance until these are implemented. **Completed as an isolated, non-invasive groundwork module:** `bybit_instrument_specs.py` parses versioned Bybit instrument snapshots and applies Decimal tick/lot/min-notional constraints; `test_bybit_instrument_specs.py` covers rounding and boundaries. It is not yet wired into v14, and no historical spec archive exists. Next: verify CI, add date-versioned instrument-spec collection, then funding cashflow accounting; margin/liquidation follows once the spec/data schema is stable.
 
 
 ## Funding integration blocker

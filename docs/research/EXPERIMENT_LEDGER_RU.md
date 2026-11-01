@@ -129,3 +129,18 @@ Net PnL in USDT. All 24 fold-cells are in `e09_gate_factorial_summary.csv`; trad
 - Первый запуск E09 упал из-за неверного пути к тестовому модулю (`tests/` не существует; файл лежит в корне). Второй запуск использовал `unittest` и фактически выполнил 0 тестов; его не считать тестовой валидацией. Финальный workflow `41355171678` исправлен: установлен pytest, выполнено **18/18 gap execution tests**, py_compile успешен, factorial успешно завершён, загружены все три CSV. Предыдущие промежуточные CI-запуски не включать в статистику эксперимента.
 
 **Следующий эксперимент:** не перебирать gap threshold без причины. Проверить body gate на расширенной, заранее определённой выборке символов и на независимом последующем периоде; отдельно провести стресс limit-fill модели (haircut/очередь/спред) и сравнить fold 2 с fold 1/3. До этого body gate остаётся кандидатом для дальнейшей проверки, не утверждённым параметром стратегии.
+
+
+## E09 — forensic fold analysis (2026-11-02)
+
+Повторно разобран первичный artifact `e09-h1-gate-factorial` (run 41355171678, artifact 13103031404; SHA-256 `503aa4ef24f6f7ef5adef0a63297e0deeeb7298c55b4d3254df1be7dd274416f`). Это анализ сохранённых CSV, не новый backtest.
+
+- Период 2 имеет более слабый broad-market breadth/momentum: медианная доля universe с положительной доходностью за 72h — 53.1% против 66.0% / 73.5% в периодах 1/3; медианная доходность broad universe за 72h — +0.222% против +1.044% / +2.008%.
+- Локальные breakout признаки в периоде 2 не хуже по объёму и breakout/ATR: median volume ratio 3.219, breakout/ATR 0.889. ATR/close ниже: 0.925% против 0.994% / 1.313%.
+- При body gate 2% market fold 2 gross +265.70 USDT не покрывает fees+slippage 623.55 USDT: net -357.85. Потери сконцентрированы в AAVE (-508), CAKE (-231), TAO (-711); PUMP дал +999, RAY +93.
+- Limit fold 2 net +742.75, но OHLC fill с offset/penetration не моделирует очередь, spread и adverse selection; не считать это подтверждённым maker edge.
+- Gap gate 2% не менял ни одной сделки; threshold sweep не нужен.
+
+Подробные таблицы, ограничения и следующий эксперимент: [E09_FOLD_DIFFERENCES_RU.md](../reports/E09_FOLD_DIFFERENCES_RU.md).
+
+**Следующий эксперимент:** один cross-sectional replication body gate ON/OFF при фиксированном пороге 2%, только market execution, полный доступный H1 universe из 25 символов, те же три даты fold. Не перебирать порог. До запуска закрепить состав universe, archive/blob SHA и полноту рядов. Цель — проверить переносимость эффекта за пределы пяти отобранных инструментов.

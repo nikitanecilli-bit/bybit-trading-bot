@@ -10,10 +10,10 @@
 - `test_*.py` — регрессионные тесты в корне.
 
 ## scripts/
-Содержит сценарии E01–E09, диагностику режимов рынка, screening символов, holdout и вспомогательные проверки. Имена файлов сохраняются до проверки импортов и workflow references.
+Содержит 21 Python-скрипт и один markdown-файл с screening notes: сценарии E01–E09, диагностику режимов рынка, screening символов, holdout и вспомогательные проверки. Имена файлов сохраняются до проверки импортов и workflow references.
 
 ## .github/workflows/
-Содержит workflow для проверки данных Bybit, E09, execution ablation/walk-forward, gap/chase, H1 screening, portfolio validation, signal diagnostics и общие research checks.
+Содержит 14 workflow: проверка данных Bybit, E09, execution ablation/walk-forward, gap/chase, H1 screening, portfolio validation, signal diagnostics, regime/market-structure holdout и общие research checks. Общий research-checks workflow объединяет технические проверки и рыночные расчёты; это отмечено как организационный риск.
 
 ## Правило будущей реорганизации
 Переносить тесты в `tests/`, отчёты в `reports/`, данные в `data/` можно только отдельной серией атомарных коммитов после:

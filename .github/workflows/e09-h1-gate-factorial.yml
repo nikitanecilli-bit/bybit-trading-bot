@@ -30,7 +30,7 @@ jobs:
       - name: Compile research script
         run: python -m py_compile scripts/run_e09_h1_gate_factorial.py
       - name: Run engine gap tests
-        run: python -m unittest test_gap_execution -v
+        run: python -m pytest -q test_gap_execution.py
       - name: Run E09 factorial
         run: python scripts/run_e09_h1_gate_factorial.py
       - name: Upload E09 results

@@ -212,6 +212,12 @@ These are P1 limitations for claims about net profitability or exchange-executab
 
 Модуль пока **не подключён к v14 engine** и не меняет поведение бэктеста. Нет исторического архива instrument specs; текущие snapshots нельзя задним числом считать историческими. Следующий этап — версионированный сбор спецификаций по датам и интеграция в sizing/fill только после тестов.
 
+## 2026-11-02 — dated instrument snapshots and funding helper groundwork
+
+Добавлен `scripts/snapshot_bybit_instruments.py`: постранично выгружает полный публичный Bybit V5 instruments-info universe, проверяет пагинацию/дубликаты и сохраняет исходные строки с provenance (`schema_version`, category, fetched_at, count). Имя файла содержит UTC timestamp, чтобы повторный запуск в тот же день не перезаписывал предыдущий snapshot. Workflow `bybit-instrument-snapshots.yml` запускает архивирование при изменении сборщика/самого workflow; он пишет только в `data/instrument_specs/linear/`.
+
+Добавлен pure helper `funding_accounting.py`: единый cumulative funding calculation с as-of timestamp, точным mark на settlement, положительным cost для long при положительной ставке и обратным знаком для short, полным notional до TP1 candle-close boundary и remaining fraction после неё. Добавлены unit tests. **Оба компонента пока не интегрированы в v14 engine**: это безопасный этап изоляции логики. CI и фактическое появление первого snapshot пока не подтверждены.
+
 ## 2026-11-02 — correction: v15 multi-bar limit TTL
 
 Повторная проверка вложенности `pending = None` в `research_v15/backtest.py` показала, что удаление заявки находится внутри `if entry > 0`. Если лимитка не коснулась цены (`entry is None` → `entry = 0`), `pending` сохраняется, а на следующем баре возраст снова проверяется через `limit_order_expired(age, limit_valid_bars)`. Поэтому утверждение, что v15 безусловно удаляет pending после первой свечи, было ошибочным и отозвано.

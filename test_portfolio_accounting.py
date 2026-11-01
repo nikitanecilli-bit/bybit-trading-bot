@@ -178,3 +178,39 @@ def test_position_slot_priority_uses_signal_strength_not_iteration_order():
         return set(e.open_positions)
     assert selected(["BTCUSDT", "ETHUSDT", "SOLUSDT"]) == {"ETHUSDT", "SOLUSDT"}
     assert selected(["SOLUSDT", "ETHUSDT", "BTCUSDT"]) == {"ETHUSDT", "SOLUSDT"}
+
+
+def test_stopped_long_mae_uses_stop_fill_and_does_not_count_later_wick_as_mfe():
+    e = make_engine()
+    pos = make_position(direction="long", entry=100.0, size=1_000.0)
+    e.open_positions["BTCUSDT"] = pos
+    captured = {}
+    e._close_position = lambda p, px, reason, ts, mae, mfe: captured.update(
+        exit_price=px, reason=reason, mae=mae, mfe=mfe
+    )
+    history = [
+        engine_mod.Candle(ts=1_800_000_000_000, open=100, high=101, low=99, close=100, volume=10),
+        engine_mod.Candle(ts=1_800_003_600_000, open=100, high=120, low=90, close=110, volume=10),
+    ]
+    e._manage_position("BTCUSDT", history, fill_bar=False, exit_ts=1_800_007_200_000)
+    assert captured["exit_price"] == 95.0
+    assert captured["mae"] == 1.0
+    assert captured["mfe"] == 0.0
+
+
+def test_stopped_short_mae_uses_stop_fill_and_does_not_count_later_wick_as_mfe():
+    e = make_engine()
+    pos = make_position(symbol="ETHUSDT", direction="short", entry=100.0, size=1_000.0)
+    e.open_positions["ETHUSDT"] = pos
+    captured = {}
+    e._close_position = lambda p, px, reason, ts, mae, mfe: captured.update(
+        exit_price=px, reason=reason, mae=mae, mfe=mfe
+    )
+    history = [
+        engine_mod.Candle(ts=1_800_000_000_000, open=100, high=101, low=99, close=100, volume=10),
+        engine_mod.Candle(ts=1_800_003_600_000, open=100, high=110, low=80, close=90, volume=10),
+    ]
+    e._manage_position("ETHUSDT", history, fill_bar=False, exit_ts=1_800_007_200_000)
+    assert captured["exit_price"] == 105.0
+    assert captured["mae"] == 1.0
+    assert captured["mfe"] == 0.0

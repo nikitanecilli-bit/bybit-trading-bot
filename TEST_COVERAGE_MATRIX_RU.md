@@ -76,3 +76,12 @@ Not yet modeled/tested in v14:
 - initial/maintenance margin, risk tiers, liquidation price/fees;
 - funding settlement cashflows;
 - mark/index/premium price effects on PnL and liquidation.
+
+
+## v15 multi-bar pending integration coverage
+
+- Added end-to-end test: a pending limit order remains alive after the first untouched eligible bar and fills on the second valid bar.
+- Added end-to-end test: an unfilled pending limit expires after the configured number of valid bars.
+- Added focused workflow `.github/workflows/v15-unit-checks.yml` on `research/v15-donchian-signal` pushes touching v15 code/tests.
+- Commits: test `4d9f6f4274d95ded88c67cb563e42cd73baa3c92`; workflow `0305c8229329b56f7c374adce33601ad08b803f5`.
+- CI execution is not yet verified; do not treat tests as passed until run result is inspected.

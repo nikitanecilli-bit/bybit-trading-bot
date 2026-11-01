@@ -238,3 +238,16 @@ Detailed report: [E12_BROAD_MARKET_CONTEXT_DIAGNOSTICS_RU.md](../reports/E12_BRO
 - Decision: promising diagnostic, not production-ready. No threshold sweep. Need untouched future holdout before considering deployment.
 
 Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPRESSION_GATE_RU.md).
+
+
+## Engineering gate — Bybit execution realism readiness audit (2026-11-02)
+
+- Audit: [EXECUTION_REALISM_READINESS_RU.md](../audits/EXECUTION_REALISM_READINESS_RU.md).
+- No market backtest was run.
+- Research CI [41362633014](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41362633014) passed deterministic tests for instrument spec parsing/history, exchange sizing, funding accounting/MTM/coverage, and portfolio/time/gap logic.
+- Bybit instrument snapshot attempts failed: runs [41358634175](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41358634175) and [41362639497](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41362639497). The latter tried six regional hosts; each returned HTTP 403. No dated snapshot is present in `data/instrument_specs/linear/`.
+- Engine uses notional-based sizing and does not call `exchange_order_sizing.py` or `InstrumentSpecHistory`; exact contract quantity is not represented in position state.
+- Funding helper uses `size_usdt / entry_price` quantity and timestamp-aligned mark-candle open proxy; E13 omitted funding.
+- Fee/slippage constants are 0.055% taker, 0.020% maker, 0.0225% taker slippage per leg; E13 stress multiplier ×2 is not a measured spread/impact model.
+- Decision: freeze strategy parameter research until Bybit data and dated specs can be captured and validated. No production change.
+

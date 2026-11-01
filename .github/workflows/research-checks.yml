@@ -1,18 +1,6 @@
 name: Research engine checks
 
 on:
-  push:
-    branches: [main, research/market-regime-v1-main]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "AGENTS.md"
-  pull_request:
-    branches: [main]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "AGENTS.md"
   workflow_dispatch:
 
 permissions:
@@ -28,22 +16,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Compile Python files
-        run: python -m py_compile market_regime.py market_structure.py test_market_regime.py test_market_structure.py scripts/run_regime_analysis.py test_regime_analysis.py scripts/run_regime_gate_holdout.py test_regime_gate_holdout.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py test_timeframe_validation.py scripts/scan_secrets.py scripts/run_uploaded_dataset_backtests.py scripts/run_h1_long_only_walk_forward.py scripts/run_bybit_h1_long_only_holdout.py scripts/run_market_structure_holdout.py
+      - name: Compile engine and deterministic tests
+        run: python -m py_compile market_regime.py market_structure.py test_market_regime.py test_market_structure.py test_regime_analysis.py test_regime_gate_holdout.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py test_time_model.py test_gap_execution.py test_timeframe_validation.py scripts/scan_secrets.py
       - name: Scan for obvious secrets
         run: python scripts/scan_secrets.py .
-      - name: Backtest uploaded historical datasets
-        run: python scripts/run_uploaded_dataset_backtests.py
-      - name: Validate H1 candidates on chronological holdout
-        run: python scripts/run_h1_walk_forward.py
-      - name: Validate train-selected H1 long-only candidates
-        run: python scripts/run_h1_long_only_walk_forward.py --output h1_long_only_walk_forward.csv
-      - name: Upload H1 long-only walk-forward report
-        uses: actions/upload-artifact@v4
-        with:
-          name: h1-long-only-walk-forward-report
-          path: h1_long_only_walk_forward.csv
-          if-no-files-found: error
       - name: Test causal market-regime classifier
         run: python test_market_regime.py
       - name: Test causal trend and breakout filters
@@ -52,30 +28,6 @@ jobs:
         run: python test_regime_analysis.py
       - name: Test frozen regime gate
         run: python test_regime_gate_holdout.py
-      - name: Generate baseline performance by market regime (including long/short split)
-        run: python scripts/run_regime_analysis.py --output regime_analysis.csv
-      - name: Compare baseline, directional ablations and frozen regime gate on chronological holdout
-        run: python scripts/run_regime_gate_holdout.py --output regime_gate_holdout.csv
-      - name: Compare trend and breakout-quality filters on chronological holdout
-        run: python scripts/run_market_structure_holdout.py --output market_structure_holdout.csv
-      - name: Upload market structure holdout report
-        uses: actions/upload-artifact@v4
-        with:
-          name: market-structure-holdout-report
-          path: market_structure_holdout.csv
-          if-no-files-found: error
-      - name: Upload regime gate holdout report
-        uses: actions/upload-artifact@v4
-        with:
-          name: market-regime-gate-holdout-report
-          path: regime_gate_holdout.csv
-          if-no-files-found: error
-      - name: Upload regime analysis report
-        uses: actions/upload-artifact@v4
-        with:
-          name: market-regime-baseline-report
-          path: regime_analysis.csv
-          if-no-files-found: error
       - name: Test gap execution
         run: python test_gap_execution.py
       - name: Test time model

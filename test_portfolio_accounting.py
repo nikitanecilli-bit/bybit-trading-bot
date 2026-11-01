@@ -144,14 +144,37 @@ def run_simultaneous_entries(order):
         ts=1_800_000_000_000, open=100.0, high=101.0,
         low=99.0, close=100.5, volume=10.0,
     )
+    e._prepare_pending_entry_risk_budgets()
     for symbol in order:
         e._try_fill_pending(symbol, bar)
-    return set(e.open_positions)
+    return e
 
 
-def test_simultaneous_entry_selection_is_order_dependent_under_binding_risk_cap():
+def test_simultaneous_entries_share_risk_budget_independent_of_symbol_order():
     first_order = run_simultaneous_entries(["BTCUSDT", "ETHUSDT", "SOLUSDT"])
     reversed_order = run_simultaneous_entries(["SOLUSDT", "ETHUSDT", "BTCUSDT"])
-    assert first_order == {"BTCUSDT", "ETHUSDT"}
-    assert reversed_order == {"SOLUSDT", "ETHUSDT"}
-    assert first_order != reversed_order
+    assert set(first_order.open_positions) == {"BTCUSDT", "ETHUSDT", "SOLUSDT"}
+    assert set(reversed_order.open_positions) == {"BTCUSDT", "ETHUSDT", "SOLUSDT"}
+    first_risk = sum(p.risk_usdt for p in first_order.open_positions.values())
+    reverse_risk = sum(p.risk_usdt for p in reversed_order.open_positions.values())
+    assert first_risk <= 200.0
+    assert reverse_risk <= 200.0
+    assert abs(first_risk - reverse_risk) < 0.01
+
+
+def test_position_slot_priority_uses_signal_strength_not_iteration_order():
+    def selected(order):
+        e = make_engine()
+        e.cfg.max_concurrent_positions = 2
+        e.pending = {
+            "BTCUSDT": {"direction": "long", "entry_price": 100.0, "order_type": "market", "strategy": "test", "stop_dist": 5.0, "vol_ratio": 1.8},
+            "ETHUSDT": {"direction": "long", "entry_price": 100.0, "order_type": "market", "strategy": "test", "stop_dist": 5.0, "vol_ratio": 2.4},
+            "SOLUSDT": {"direction": "long", "entry_price": 100.0, "order_type": "market", "strategy": "test", "stop_dist": 5.0, "vol_ratio": 2.1},
+        }
+        bar = engine_mod.Candle(ts=1_800_000_000_000, open=100.0, high=101.0, low=99.0, close=100.5, volume=10.0)
+        e._prepare_pending_entry_risk_budgets()
+        for symbol in order:
+            e._try_fill_pending(symbol, bar)
+        return set(e.open_positions)
+    assert selected(["BTCUSDT", "ETHUSDT", "SOLUSDT"]) == {"ETHUSDT", "SOLUSDT"}
+    assert selected(["SOLUSDT", "ETHUSDT", "BTCUSDT"]) == {"ETHUSDT", "SOLUSDT"}

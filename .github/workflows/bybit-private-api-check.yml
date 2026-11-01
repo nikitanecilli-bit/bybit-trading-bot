@@ -1,0 +1,39 @@
+name: Bybit private API credential check (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Bybit API region endpoint
+        required: true
+        type: choice
+        default: https://api.bybit.kz
+        options:
+          - https://api.bybit.kz
+          - https://api.bybit.com
+          - https://api.bytick.com
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bybit-private-api-check
+  cancel-in-progress: false
+
+jobs:
+  verify-readonly-credentials:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out research implementation without persisted Git credentials
+        uses: actions/checkout@v4
+        with:
+          ref: research/market-regime-v1-main
+          persist-credentials: false
+
+      - name: Verify Bybit V5 read-only API credentials
+        env:
+          BYBIT_API_KEY: ${{ secrets.BYBIT_API_KEY }}
+          BYBIT_API_SECRET: ${{ secrets.BYBIT_API_SECRET }}
+          BYBIT_API_BASE_URL: ${{ inputs.base_url }}
+        run: python scripts/bybit_private_api_check.py

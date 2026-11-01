@@ -2,6 +2,12 @@ name: Research engine checks
 
 on:
   workflow_dispatch:
+  push:
+    branches: [research/market-regime-v1-main]
+    paths:
+      - 'Bybit_Trading_Engine_v14_research.py'
+      - 'test_*.py'
+      - '.github/workflows/research-checks.yml'
 
 permissions:
   contents: read

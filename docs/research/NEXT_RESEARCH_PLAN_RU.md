@@ -151,3 +151,14 @@ Stratify the existing shared-capital results by these features and by fold. Firs
 - Preserve the three historical folds for diagnosis only; they are not blind holdout.
 - Binance OHLCV proxy, funding omission, and Bybit execution-model limitations must remain explicit.
 - No real orders.
+
+
+### E12 diagnostic result — 2026-11-02
+
+The fixed 47-symbol completed-bar context snapshot distinguishes three historical states:
+- Fold 1: weak/mixed broad market, but winners often occurred at lower broad breadth/72h momentum than losers.
+- Fold 2: lowest signal-time breadth, 72h median return, ATR and cross-sectional dispersion; winners/losers barely separated and all 72h-return terciles remained negative.
+- Fold 3: broad trend expansion; winners clustered with higher breadth and positive 72h momentum.
+
+Do not use a one-sided broad-market trend filter: it risks rejecting fold-1 winners. Next define a single causal compression classifier using rolling ATR + cross-sectional dispersion; keep local opportunities available in weak broad markets. No threshold sweep and no PnL replay until the rule is frozen. Full diagnostic: `docs/reports/E12_BROAD_MARKET_CONTEXT_DIAGNOSTICS_RU.md`.
+

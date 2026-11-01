@@ -176,3 +176,20 @@ Next:
 
 Full report: `docs/reports/E13_CAUSAL_COMPRESSION_GATE_RU.md`.
 
+
+
+## Execution realism gate — audit 2026-11-02
+
+Before any further strategy optimization, close the execution-data gaps documented in `docs/audits/EXECUTION_REALISM_READINESS_RU.md`.
+
+Confirmed blockers:
+- No dated `data/instrument_specs/linear` snapshot exists. GitHub Actions received HTTP 403 from all six tested Bybit regional API hosts, including after adding `--base-url` fallback.
+- `exchange_order_sizing.py` and `instrument_spec_history.py` are not integrated into the research engine; engine positions store notional, not exchange-valid contract qty.
+- Funding uses `size_usdt / entry_price` and timestamp-aligned mark-candle open proxy; E13 has funding disabled.
+- Fee/slippage are constants stressed ×2, not measured symbol/time/size-specific spread or market impact. No order-book queue/partial-fill model.
+- Bybit recent-data validation has no successful run in the available Actions history; E11/E13 use Binance OHLCV proxy.
+
+Decision: do not launch another PnL sweep or promote E13. Next step is to obtain one dated full linear instrument snapshot and Bybit H1/mark/funding dataset through an accessible public-data route, validate coverage and hashes, then integrate exact qty into a research-only execution model. No API trading credentials are needed or should be used.
+
+The snapshot collector now supports regional `--base-url` fallback; current runner access remains blocked (HTTP 403). No market data or snapshots were written.
+

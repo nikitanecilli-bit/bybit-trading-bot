@@ -1472,12 +1472,14 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
     if engine._state_restored:
         raise RuntimeError("Нельзя запускать backtest поверх восстановленного состояния. "
                            "Для live-resume нужен отдельный цикл с reconciliation по бирже.")
-    engine.reset_state_for_new_run()
-    validate_candle_timeframe(candles, engine.cfg.timeframe)
-    check_alignment(candles)
+    if not symbols:
+        raise ValueError("Список символов для симуляции пуст")
     missing = sorted(set(symbols) - set(candles))
     if missing:
         raise ValueError(f"Нет свечных данных для символов: {', '.join(missing)}")
+    validate_candle_timeframe(candles, engine.cfg.timeframe)
+    check_alignment(candles)
+    engine.reset_state_for_new_run()
     bars_total = len(candles[symbols[0]])
     for bar in range(25, bars_total):
         lo = max(0, bar + 1 - CALC_WINDOW)

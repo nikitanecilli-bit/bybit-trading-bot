@@ -1,0 +1,45 @@
+name: E11 H1 Shared-Capital Body Gate Portfolio Replay
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/market-regime-v1-main]
+    paths:
+      - 'scripts/run_e11_h1_shared_capital_replay.py'
+      - '.github/workflows/e11-h1-shared-capital-replay.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  portfolio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Record immutable dataset archive hashes
+        run: |
+          find data/archives/cryptofetch -maxdepth 1 -type f -name '*.zip' -print0 | sort -z | xargs -0 sha256sum | tee e11_h1_shared_capital_archive_sha256.txt
+      - name: Compile portfolio replay
+        run: python -m py_compile scripts/run_e11_h1_shared_capital_replay.py
+      - name: Run shared-capital replay
+        run: python scripts/run_e11_h1_shared_capital_replay.py
+      - name: Upload E11 portfolio outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: e11-h1-shared-capital-portfolio
+          path: |
+            e11_h1_shared_capital_summary.csv
+            e11_h1_shared_capital_trades.csv
+            e11_h1_shared_capital_signals.csv
+            e11_h1_shared_capital_per_symbol.csv
+            e11_h1_shared_capital_universe_manifest.csv
+            e11_h1_shared_capital_archive_sha256.txt
+          if-no-files-found: error

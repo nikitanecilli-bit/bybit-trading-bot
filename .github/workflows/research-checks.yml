@@ -10,7 +10,7 @@ on:
       - 'instrument_spec_history.py'
       - 'exchange_order_sizing.py'
       - 'funding_accounting.py'
-      - 'scripts/snapshot_bybit_instruments.py'
+      - 'scripts/snapshot_bybit_instruments.py'\n      - 'scripts/bybit_private_api_check.py'\n      - '.github/workflows/bybit-private-api-check.yml'
       - 'scripts/validate_funding_coverage.py'
       - 'tests/**'
       - '.github/workflows/research-checks.yml'
@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile engine and deterministic tests
-        run: python -m py_compile market_regime.py market_structure.py tests/test_market_regime.py tests/test_market_structure.py tests/test_regime_analysis.py tests/test_regime_gate_holdout.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py tests/test_time_model.py tests/test_gap_execution.py tests/test_timeframe_validation.py tests/test_portfolio_accounting.py bybit_instrument_specs.py tests/test_bybit_instrument_specs.py instrument_spec_history.py tests/test_instrument_spec_history.py exchange_order_sizing.py tests/test_exchange_order_sizing.py scripts/snapshot_bybit_instruments.py tests/test_snapshot_bybit_instruments.py funding_accounting.py tests/test_funding_accounting.py tests/test_funding_pnl.py tests/test_funding_mark_to_market.py scripts/validate_funding_coverage.py tests/test_funding_coverage.py scripts/scan_secrets.py
+        run: python -m py_compile market_regime.py market_structure.py tests/test_market_regime.py tests/test_market_structure.py tests/test_regime_analysis.py tests/test_regime_gate_holdout.py Bybit_Trading_Engine_v14_research.py bybit_downloader.py tests/test_time_model.py tests/test_gap_execution.py tests/test_timeframe_validation.py tests/test_portfolio_accounting.py bybit_instrument_specs.py tests/test_bybit_instrument_specs.py instrument_spec_history.py tests/test_instrument_spec_history.py exchange_order_sizing.py tests/test_exchange_order_sizing.py scripts/snapshot_bybit_instruments.py tests/test_snapshot_bybit_instruments.py funding_accounting.py tests/test_funding_accounting.py tests/test_funding_pnl.py tests/test_funding_mark_to_market.py scripts/validate_funding_coverage.py tests/test_funding_coverage.py scripts/bybit_private_api_check.py tests/test_bybit_private_api_check.py scripts/scan_secrets.py
       - name: Test Bybit instrument constraints and Decimal rounding
         run: python tests/test_bybit_instrument_specs.py
       - name: Test dated Bybit instrument snapshot collector
@@ -46,7 +46,7 @@ jobs:
         run: python tests/test_funding_mark_to_market.py
       - name: Test funding/mark coverage preflight
         run: python tests/test_funding_coverage.py
-      - name: Scan for obvious secrets
+      - name: Test Bybit private API signature and read-only checks\n        run: python tests/test_bybit_private_api_check.py\n      - name: Scan for obvious secrets
         run: python scripts/scan_secrets.py .
       - name: Test causal market-regime classifier
         run: python tests/test_market_regime.py

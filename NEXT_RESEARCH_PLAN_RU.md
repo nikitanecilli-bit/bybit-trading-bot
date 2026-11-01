@@ -40,3 +40,24 @@
 
 ## Критерий завершения аудита
 Аудит завершён, когда у каждого исторического эксперимента есть воспроизводимая ссылка на commit/run/artifact либо явная метка UNVERIFIED; ключевые торговые механики движка покрыты проверками; критические ограничения исполнения и данных документированы; следующий тест отвечает на новый вопрос и не дублирует предыдущий.
+
+
+## Обновление 2026-11-02 — автономный аудит
+
+Завершено:
+- Timeframe CSV validation исправлена и regression-tested.
+- Portfolio MTM, TP1 partial mark, risk sizing budget и close PnL/fee/slippage reconciliation покрыты deterministic tests.
+- Подтверждённая зависимость одновременного распределения риска от порядка symbols исправлена пакетным распределением: equal risk share among eligible signals; slot priority = vol_ratio descending, symbol tie-break.
+- Технический CI отделён от рыночных backtests; market experiment workflows переведены на ручной запуск.
+- Static scan не нашёл live order endpoints в Python engine copies и active research scripts.
+
+Следующие задачи (без новых market backtests):
+1. Полный audit lifecycle: pending-order expiry/retry, stop/TP collision, trailing-stop update timing, same-bar fills.
+2. Margin/leverage/liquidation approximation and exchange quantity/tick constraints.
+3. Funding integration review and timestamp semantics.
+4. Проверка journal metrics: net R denominator, MAE/MFE, drawdown and per-period aggregation.
+5. Reconcile E01–E09: run SHA, script SHA, config, data manifest, folds, costs, artifacts. Missing evidence => UNVERIFIED.
+6. Check archive/CSV integrity and data provenance.
+7. Только после закрытия этих пунктов — решить, какие исторические результаты нужно воспроизвести на исправленном engine. Не начинать parameter search.
+
+Последний подтверждённый технический CI: [41356881313](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356881313), commit `3246eb1df4b9d4cfbd109fa6e6a6316e44710200` — success.

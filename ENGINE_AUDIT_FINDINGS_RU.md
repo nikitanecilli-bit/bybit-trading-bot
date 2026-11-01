@@ -204,3 +204,16 @@ These are P1 limitations for claims about net profitability or exchange-executab
 **Следствие:** ежедневный стоп и kill-switch в funding-ветке могут не увидеть часть текущей просадки до закрытия позиции. При закрытии итоговый net PnL funding вычитает, но риск-контроль в ходе удержания работает по неполному equity.
 
 **Классификация:** подтверждённый P1 пробел риск-учёта в funding-ветке. Не переносить этот патч целиком. При интеграции нужен единый pure helper accrued_funding(position, as_of_ts), используемый одновременно в mark-to-market и final close, с тестом отсутствия двойного учёта и TP1 partial notional.
+
+
+## 2026-11-02 — v15: multi-bar limit TTL не применяется
+
+В `research_v15/backtest.py`, `backtest_symbol()`, pending execution block:
+- вычисляется `age = i - pending["signal_index"]`;
+- `limit_order_expired(age, limit_valid_bars)` удаляет заявку только при превышении TTL;
+- если лимитка не коснулась цены, `entry` становится 0;
+- затем `pending = None` выполняется безусловно после первой попытки.
+
+Итог: фактическая заявка удаляется после первой следующей свечи, даже при `limit_valid_bars > 1`. Unit tests `limit_order_expired()` не обнаруживают это, потому что тестируют helper, а не цикл исполнения.
+
+**Severity P1 для достоверности v15 execution ablation.** Любые выводы о влиянии TTL 2+ свечей невалидны до исправления и end-to-end regression test. Это не затрагивает текущий v14 engine, где одно-свечный pending является явной политикой.

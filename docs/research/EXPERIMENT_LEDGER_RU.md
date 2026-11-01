@@ -172,3 +172,6 @@ Detailed report: [E10_H1_BODY_GATE_CROSS_SECTIONAL_RU.md](../reports/E10_H1_BODY
 - This supports the working hypothesis that candle-body gate value is regime-dependent: it filters poor follow-through in folds 2/3, but fold 1 had no comparable forward-return disadvantage for large-body candidates.
 - Caveat: candidate forward returns are not fills/PnL; realized bucket PnL is affected by position occupancy and changed trade sequence when the gate is toggled. This is diagnostic, not causal proof.
 
+
+
+- Symbol-clustered forward-return check (minimum 3 signals per body bucket per symbol): median 24h return difference (body >2% minus <=2%) was -0.118 percentage points in fold 1 (20/39 symbols worse), -0.811 pp in fold 2 (20/30 worse), and -0.792 pp in fold 3 (28/44 worse). This avoids treating all overlapping signals as independent; fold 1 shows little cross-sectional separation, folds 2/3 show clearer weak follow-through for large candles.

@@ -169,3 +169,29 @@ The previous P1 order-dependent allocation is considered fixed in the research e
 - Tests: `test_stopped_long_mae_uses_stop_fill_and_does_not_count_later_wick_as_mfe` and short counterpart.
 - CI [41357102546](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41357102546), commit `4c5f26ccbd0a7861ac3da587ef20e4855952d152`: completed successfully.
 - Scope: fixes journal MAE/MFE diagnostics only; does not change modeled stop price or net PnL.
+
+
+## 2026-11-02 — margin, exchange constraints and funding review
+
+### Confirmed model limitations (no code changes made)
+
+1. **No exchange lot/tick enforcement in the research engine.** `calculate_position_size()` returns a USDT notional rounded to cents. It does not convert notional to contract quantity and does not apply `qtyStep`, `minOrderQty`, `minNotionalValue` or `tickSize`. The Bybit downloader can fetch a current instrument-info JSON, but this specification is not consumed by the engine and is not a historical spec archive. P1 limitation for executable fill/quantity validation; not a live-order bug in the audited engine.
+2. **Leverage is a sizing cap, not a margin/liquidation model.** The engine caps an individual position notional using `equity * leverage / max_concurrent_positions * 0.95`. It does not track initial/maintenance margin, risk tiers, isolated/cross collateral, liquidation fees, bankruptcy price or mark-price liquidation triggers. It therefore cannot estimate liquidation events or guarantee that a modeled position is margin-feasible on Bybit.
+3. **Funding is downloaded but not charged in PnL.** `bybit_downloader.py` supports historical funding-rate collection and parses the exchange `fundingRateTimestamp`, but the v14 research engine has no funding cashflow integration. Any multi-hour/day hold backtest omitting funding is incomplete for instruments/periods with material funding.
+4. **Mark-price/basis data are not used in position PnL or liquidation.** Downloader supports mark, index and premium-index candles, but the engine's stop/TP replay uses one OHLC candle stream. Mark/index divergence and mark-triggered liquidation are absent.
+5. **Current instrument info is not historical.** A newly downloaded instrument JSON represents the specification at fetch time; it must not be assumed to describe prior contract limits or leverage tiers across the entire historical test.
+
+### Confirmed positive scope
+- `bybit_downloader.py` has datasets for kline, mark, index, premium, funding, OI and instrument info.
+- The downloader is public-data only and does not place orders.
+- The engine position-size calculation includes modeled entry/stop fees and taker slippage, but that does not replace the missing exchange margin, quantity and funding mechanics.
+
+### Severity and decision
+These are P1 limitations for claims about net profitability or exchange-executable performance. They are not proof that the signal itself is unprofitable, nor evidence of a code path placing live orders. Keep historical strategy results labeled as model-level until these costs/constraints are incorporated and validated.
+
+### Next safe implementation sequence
+1. Define a versioned instrument-spec schema and capture `qtyStep`, `minOrderQty`, `minNotionalValue`, `tickSize`, leverage/risk-limit fields with fetched-at timestamps.
+2. Add pure notional-to-quantity and price-to-tick rounding helpers, using Decimal and direction-aware rounding; unit-test boundaries without changing old runs.
+3. Add funding settlement cashflows using exact exchange settlement timestamps and position notional at each funding event; test long/short sign and entry/exit exactly on settlement boundaries.
+4. Only then model mark-price liquidation and margin tiers from versioned contract data.
+5. Re-run historical validations as new, versioned experiments; never overwrite E01–E09.

@@ -206,14 +206,8 @@ These are P1 limitations for claims about net profitability or exchange-executab
 **Классификация:** подтверждённый P1 пробел риск-учёта в funding-ветке. Не переносить этот патч целиком. При интеграции нужен единый pure helper accrued_funding(position, as_of_ts), используемый одновременно в mark-to-market и final close, с тестом отсутствия двойного учёта и TP1 partial notional.
 
 
-## 2026-11-02 — v15: multi-bar limit TTL не применяется
+## 2026-11-02 — correction: v15 multi-bar limit TTL
 
-В `research_v15/backtest.py`, `backtest_symbol()`, pending execution block:
-- вычисляется `age = i - pending["signal_index"]`;
-- `limit_order_expired(age, limit_valid_bars)` удаляет заявку только при превышении TTL;
-- если лимитка не коснулась цены, `entry` становится 0;
-- затем `pending = None` выполняется безусловно после первой попытки.
+Повторная проверка вложенности `pending = None` в `research_v15/backtest.py` показала, что удаление заявки находится внутри `if entry > 0`. Если лимитка не коснулась цены (`entry is None` → `entry = 0`), `pending` сохраняется, а на следующем баре возраст снова проверяется через `limit_order_expired(age, limit_valid_bars)`. Поэтому утверждение, что v15 безусловно удаляет pending после первой свечи, было ошибочным и отозвано.
 
-Итог: фактическая заявка удаляется после первой следующей свечи, даже при `limit_valid_bars > 1`. Unit tests `limit_order_expired()` не обнаруживают это, потому что тестируют helper, а не цикл исполнения.
-
-**Severity P1 для достоверности v15 execution ablation.** Любые выводы о влиянии TTL 2+ свечей невалидны до исправления и end-to-end regression test. Это не затрагивает текущий v14 engine, где одно-свечный pending является явной политикой.
+Открытый вопрос — только покрытие: существующие тесты helper-функции и fill helper не доказывают end-to-end удержание заявки внутри `backtest_symbol()`. Нужен интеграционный тест на fill во второй/последней допустимой свече и expiry после TTL. Дефект реализации пока не подтверждён.

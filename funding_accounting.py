@@ -32,7 +32,8 @@ def accrued_funding_cost(
     """Return cumulative funding paid/received in [entry_ts, as_of_ts].
 
     Funding settlement at entry timestamp is excluded; settlement at the
-    as-of timestamp is included. A settlement at or before the conservative
+    as-of timestamp is included. mark_prices contains timestamp-aligned
+    mark-candle open proxies. A settlement at or before the conservative
     TP1 candle-close boundary uses full initial quantity; later settlements
     use the remaining position fraction.
     """

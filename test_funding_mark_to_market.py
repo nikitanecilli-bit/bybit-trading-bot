@@ -60,6 +60,28 @@ def test_mark_to_market_fails_closed_without_exact_settlement_mark():
         raise AssertionError("Missing settlement mark must not silently omit funding")
 
 
+def test_funding_can_trigger_daily_stop_before_position_close():
+    engine = make_engine(True)
+    engine.cfg = engine_mod.BotConfig(
+        timeframe="1h", capital_usdt=10_000.0, daily_stop_loss_pct=0.05
+    )
+    engine.risk_mgr = engine_mod.AdaptiveRiskManager(engine.cfg)
+    engine.tg = type("Notifier", (), {"send_message": lambda self, message: None})()
+    engine_mod.UnifiedQuantEngine._update_mark_to_market(engine, 2_000)
+    assert engine.risk_mgr.daily_stop_triggered is True
+
+
+def test_without_funding_the_same_position_does_not_hit_tight_daily_stop():
+    engine = make_engine(False)
+    engine.cfg = engine_mod.BotConfig(
+        timeframe="1h", capital_usdt=10_000.0, daily_stop_loss_pct=0.05
+    )
+    engine.risk_mgr = engine_mod.AdaptiveRiskManager(engine.cfg)
+    engine.tg = type("Notifier", (), {"send_message": lambda self, message: None})()
+    engine_mod.UnifiedQuantEngine._update_mark_to_market(engine, 2_000)
+    assert engine.risk_mgr.daily_stop_triggered is False
+
+
 def test_tp1_application_records_conservative_candle_close_boundary():
     pos = engine_mod.OpenPositionState(
         trade_id="tp1-ts", symbol="BTCUSDT", direction="long",

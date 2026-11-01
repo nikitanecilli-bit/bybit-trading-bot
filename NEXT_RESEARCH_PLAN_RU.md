@@ -120,3 +120,8 @@ Multi-bar pending logic в `research_v15/backtest.py` при статическ�
 - `research/market-regime-v1-main` is currently diverged from `main`: 3 commits behind and more than 200 research commits ahead. Do not merge/rebase automatically; first review the three incoming main commits and branch-wide workflow changes.
 - The snapshot workflow has push/manual triggers on the research branch. Its daily cron is only activated by GitHub after the workflow file is present on the repository's default branch; until then, the daily schedule is dormant. The first committed snapshot is not yet verified.
 - GitHub connector status lookup returned no check statuses for recent push commits; this is **unverified**, not a passing CI result.
+
+
+## Exchange quantity sizing groundwork
+
+`exchange_order_sizing.py` now converts target notional into Bybit-valid quantity using the spec helper, tick-rounds limit prices, floors quantity, enforces separate market/limit max quantity and min constraints, and scales estimated risk down with actual rounded notional. It is tested but not wired into v14. Next integration must store actual qty in each position and use the same qty for PnL/funding; no order splitting is modeled. Wait for verified timestamped specs before applying this to historical bars.

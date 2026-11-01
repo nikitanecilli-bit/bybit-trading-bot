@@ -16,7 +16,8 @@ import zipfile
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
 import Bybit_Trading_Engine_v14_research as engine_mod
 
 
@@ -28,7 +29,7 @@ MIN_BARS = 200
 def read_zip_datasets() -> Dict[Tuple[str, str], tuple]:
     """Pick the longest valid file for each symbol/timeframe across ZIP archives."""
     candidates = defaultdict(list)
-    for archive in sorted(glob.glob("*.zip")):
+    for archive in sorted(glob.glob(os.path.join(ROOT, "data", "archives", "cryptofetch", "*.zip"))):
         with zipfile.ZipFile(archive) as zf:
             for info in zf.infolist():
                 match = FILE_RE.fullmatch(os.path.basename(info.filename))

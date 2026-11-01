@@ -37,7 +37,7 @@ import json
 import logging
 import math
 import os
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import re
 import time
 import urllib.parse
@@ -892,8 +892,8 @@ class UnifiedQuantEngine:
         self.mark_price_dir = mark_price_dir
         if bool(funding_dir) != bool(mark_price_dir):
             raise ValueError("--funding-dir and --mark-price-dir must be provided together")
-        self.funding_by_symbol: Dict[str, List[Dict[str, float]]] = {}
-        self._funding_mark_prices: Dict[str, Dict[int, float]] = {}
+        self.funding_by_symbol: Dict[str, List[Dict[str, Any]]] = {}
+        self._funding_mark_prices: Dict[str, Dict[int, Decimal]] = {}
         if funding_dir:
             self._load_funding_history(funding_dir)
         if mark_price_dir:
@@ -936,10 +936,10 @@ class UnifiedQuantEngine:
                     try:
                         row_symbol = str(row.get("symbol") or symbol).upper()
                         ts = int(row["funding_timestamp_ms"])
-                        rate = float(row["funding_rate"])
-                    except (TypeError, ValueError, KeyError) as exc:
+                        rate = Decimal(str(row["funding_rate"]))
+                    except (TypeError, ValueError, KeyError, InvalidOperation) as exc:
                         raise ValueError(f"{path}:{line_no}: invalid funding row") from exc
-                    if row_symbol != symbol or ts <= 0 or not math.isfinite(rate):
+                    if row_symbol != symbol or ts <= 0 or not rate.is_finite():
                         raise ValueError(f"{path}:{line_no}: invalid symbol/timestamp/rate")
                     rows.append({"ts": ts, "rate": rate})
             if not rows:
@@ -957,7 +957,7 @@ class UnifiedQuantEngine:
             raise ValueError(f"Mark-price directory does not exist: {directory}")
         for path in glob.glob(os.path.join(directory, "*.csv")):
             symbol = os.path.splitext(os.path.basename(path))[0].upper()
-            marks: Dict[int, float] = {}
+            marks: Dict[int, Decimal] = {}
             with open(path, "r", encoding="utf-8-sig", newline="") as handle:
                 reader = csv.DictReader(handle)
                 if not reader.fieldnames or not {"timestamp_ms", "open"}.issubset(reader.fieldnames):
@@ -966,10 +966,10 @@ class UnifiedQuantEngine:
                     try:
                         row_symbol = str(row.get("symbol") or symbol).upper()
                         ts = int(row["timestamp_ms"])
-                        mark = float(row["open"])
-                    except (TypeError, ValueError, KeyError) as exc:
+                        mark = Decimal(str(row["open"]))
+                    except (TypeError, ValueError, KeyError, InvalidOperation) as exc:
                         raise ValueError(f"{path}:{line_no}: invalid mark-price row") from exc
-                    if row_symbol != symbol or ts <= 0 or not math.isfinite(mark) or mark <= 0:
+                    if row_symbol != symbol or ts <= 0 or not mark.is_finite() or mark <= 0:
                         raise ValueError(f"{path}:{line_no}: invalid symbol/timestamp/mark price")
                     if ts in marks:
                         raise ValueError(f"{path}:{line_no}: duplicate mark-price timestamp {ts}")

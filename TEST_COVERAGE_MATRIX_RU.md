@@ -88,6 +88,13 @@ Added `test_bybit_instrument_specs.py` for versioned snapshot parsing, Decimal b
 - `test_funding_accounting.py`: cumulative as-of boundary, long/short sign, TP1 close-boundary quantity, missing exact marks, duplicate settlements and invalid position state.
 - Both are included in `research-checks.yml`; workflow execution remains unverified because the available GitHub Actions connector does not expose push-triggered run listings.
 
+## 2026-11-02 — funding integration regression coverage
+
+- `test_funding_accounting.py`: pure cumulative helper, settlement inclusivity, long/short sign, partial TP1, missing mark and duplicate protection.
+- `test_funding_pnl.py`: realized close net PnL, TP1 quantity boundary, exit boundary, missing mark and mark loader validation.
+- `test_funding_mark_to_market.py`: accrued funding reduces open-position unrealized PnL before close, future settlements excluded, missing marks fail closed, TP1 timestamp captured.
+- All three are added to `research-checks.yml`; CI status is **unverified** until a completed Actions run is inspected.
+
 ## v15 multi-bar pending integration coverage
 
 - Added end-to-end test: a pending limit order remains alive after the first untouched eligible bar and fills on the second valid bar.

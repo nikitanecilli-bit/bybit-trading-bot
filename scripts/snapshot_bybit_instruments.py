@@ -137,8 +137,9 @@ def main() -> None:
 
     rows = fetch_all_instruments(args.category, fetch)
     snapshot = build_snapshot(rows, args.category)
-    day = snapshot["fetched_at"][:10]
-    output = Path(args.output_dir) / args.category / f"{day}.json"
+    fetched = datetime.fromisoformat(snapshot["fetched_at"].replace("Z", "+00:00"))
+    stamp = fetched.astimezone(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+    output = Path(args.output_dir) / args.category / f"{stamp}.json"
     write_snapshot(snapshot, output)
     print(f"Saved {len(rows)} {args.category} instruments to {output}")
 

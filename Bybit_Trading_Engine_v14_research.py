@@ -425,6 +425,7 @@ class TradeRecord:
     gross_r_multiple: float = 0.0
     risk_usdt: float = 0.0
     risk_pct: float = 0.0        # фактический риск в % от эквити на входе
+    funding_cost_usdt: float = 0.0  # positive=paid, negative=received
 
 
 # =====================================================================
@@ -767,7 +768,8 @@ class MaintenanceGateAuditor:
         n = len(trades)
         if n == 0:
             return {
-                "total_trades": 0, "net_pnl": 0.0, "ret_pct": 0.0, "win_rate": 0.0,
+                "total_trades": 0, "net_pnl": 0.0, "total_costs": 0.0, "funding_cost_usdt": 0.0,
+                "ret_pct": 0.0, "win_rate": 0.0,
                 "pf": 0.0, "expectancy_r": 0.0,
                 "max_dd_pct": max(0.0, float(mark_to_market_max_dd_pct or 0.0)), "avg_risk_pct": 0.0,
                 "cost_drag_pct": 0.0, "passed_count": 0, "all_ok": False, "checks": {},
@@ -776,7 +778,8 @@ class MaintenanceGateAuditor:
 
         net_pnl = sum(t.pnl_usdt for t in trades)
         gross_pnl = sum(t.gross_pnl for t in trades)
-        total_costs = sum(t.exchange_fees_usdt + t.slippage_cost_usdt for t in trades)
+        total_costs = sum(t.exchange_fees_usdt + t.slippage_cost_usdt + t.funding_cost_usdt for t in trades)
+        total_funding_cost = sum(t.funding_cost_usdt for t in trades)
         ret_pct = (net_pnl / cfg.capital_usdt) * 100.0
 
         wins = [t for t in trades if t.pnl_usdt > 0]
@@ -858,7 +861,8 @@ class MaintenanceGateAuditor:
 
         return {
             "total_trades": n, "net_pnl": round(net_pnl, 2), "gross_pnl": round(gross_pnl, 2),
-            "total_costs": round(total_costs, 2), "ret_pct": round(ret_pct, 2),
+            "total_costs": round(total_costs, 2), "funding_cost_usdt": round(total_funding_cost, 2),
+            "ret_pct": round(ret_pct, 2),
             "win_rate": round(win_rate, 1), "pf": round(pf, 2),
             "expectancy_r": expectancy_r, "max_dd_pct": round(max_dd_pct, 2),
             "avg_risk_pct": round(avg_risk_pct, 2), "cost_drag_pct": round(cost_drag_pct, 1),
@@ -886,8 +890,8 @@ class UnifiedQuantEngine:
         self._explicit_config = config_path
         self.funding_dir = funding_dir
         self.mark_price_dir = mark_price_dir
-        if mark_price_dir and not funding_dir:
-            raise ValueError("--mark-price-dir requires --funding-dir")
+        if bool(funding_dir) != bool(mark_price_dir):
+            raise ValueError("--funding-dir and --mark-price-dir must be provided together")
         self.funding_by_symbol: Dict[str, List[Dict[str, float]]] = {}
         self._funding_mark_prices: Dict[str, Dict[int, float]] = {}
         if funding_dir:
@@ -1326,6 +1330,14 @@ class UnifiedQuantEngine:
         rem_chg = sign * (exit_price - pos.entry_price) / pos.entry_price
         rem_gross = pos.size_usdt * pos.remaining_fraction * rem_chg
         gross_pnl = _money_round(pos.realized_tp1_gross_usdt + rem_gross)
+        funding_cost = 0.0
+        if getattr(self, "funding_dir", None):
+            if pos.symbol not in self.funding_by_symbol:
+                raise RuntimeError(f"Funding enabled but no CSV for traded symbol {pos.symbol}")
+            funding_cost = float(accrued_funding_cost(
+                pos, self.funding_by_symbol[pos.symbol],
+                self._funding_mark_prices.get(pos.symbol, {}), exit_ts,
+            ))
 
         # Издержки по ногам. Сначала суммируем точные значения всех ног,
         # затем округляем итог в денежном формате (half-up), а не каждую ногу отдельно.
@@ -1342,7 +1354,7 @@ class UnifiedQuantEngine:
         fees += f; slip += s
         fees, slip = _money_round(fees), _money_round(slip)
 
-        net_pnl = _money_round(gross_pnl - fees - slip)
+        net_pnl = _money_round(gross_pnl - fees - slip - funding_cost)
         risk = max(1e-6, pos.risk_usdt)
         eq0 = pos.equity_at_entry if pos.equity_at_entry > 0 else self.cfg.capital_usdt
 
@@ -1362,6 +1374,7 @@ class UnifiedQuantEngine:
             gross_r_multiple=gross_pnl / risk,
             risk_usdt=round(pos.risk_usdt, 4),
             risk_pct=round(pos.risk_usdt / eq0 * 100.0, 3),
+            funding_cost_usdt=funding_cost,
         )
         self.closed_trades.append(record)
         del self.open_positions[pos.symbol]

@@ -175,3 +175,11 @@ Detailed report: [E10_H1_BODY_GATE_CROSS_SECTIONAL_RU.md](../reports/E10_H1_BODY
 
 
 - Symbol-clustered forward-return check (minimum 3 signals per body bucket per symbol): median 24h return difference (body >2% minus <=2%) was -0.118 percentage points in fold 1 (20/39 symbols worse), -0.811 pp in fold 2 (20/30 worse), and -0.792 pp in fold 3 (28/44 worse). This avoids treating all overlapping signals as independent; fold 1 shows little cross-sectional separation, folds 2/3 show clearer weak follow-through for large candles.
+
+
+- Paired trade identity comparison by `(symbol, signal_ts)` explains fold interaction:
+  - Fold 1: 244 trades removed (240 body>2%, net -121.64), 76 new body<=2% trades (net -623.49), 449 shared trades (shared net +9.06); total ON-OFF -492.79.
+  - Fold 2: 118 removed (117 body>2%, net -2,749.72), 30 new (net -351.92), 502 shared (delta +61.91); total ON-OFF +2,459.71.
+  - Fold 3: 484 removed (481 body>2%, net -2,698.00), 115 new (net +2,311.53), 625 shared (delta -31.33); total ON-OFF +4,978.20.
+- Interpretation: body gate changes the subsequent trade sequence. Fold 1 replacements were worse than removed trades; fold 2 replacements were less bad; fold 3 replacements were profitable. Gate value depends on the quality of signals that become available after skipping large-body entries, not only on the rejected candle itself.
+

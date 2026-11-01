@@ -2,14 +2,6 @@ name: Execution Cost Ablation
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - research/market-regime-v1-main
-    paths:
-      - "scripts/run_execution_cost_ablation.py"
-      - "Bybit_Trading_Engine_v14_research.py"
-      - "scripts/run_uploaded_dataset_backtests.py"
-      - ".github/workflows/execution-cost-ablation.yml"
 
 permissions:
   contents: read

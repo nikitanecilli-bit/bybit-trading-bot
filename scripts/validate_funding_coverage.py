@@ -20,10 +20,13 @@ def _read_funding(path: Path) -> set[int]:
             raise ValueError(f"{path}: required columns funding_timestamp_ms,funding_rate")
         for line, row in enumerate(reader, start=2):
             try:
+                row_symbol = str(row.get("symbol") or path.stem).upper()
                 ts = int(row["funding_timestamp_ms"])
                 rate = float(row["funding_rate"])
             except (TypeError, ValueError, KeyError) as exc:
                 raise ValueError(f"{path}:{line}: invalid funding row") from exc
+            if row_symbol != path.stem.upper():
+                raise ValueError(f"{path}:{line}: symbol does not match filename")
             if ts <= 0 or not math.isfinite(rate):
                 raise ValueError(f"{path}:{line}: invalid funding timestamp/rate")
             if ts in timestamps:
@@ -41,10 +44,13 @@ def _read_marks(path: Path) -> set[int]:
             raise ValueError(f"{path}: required columns timestamp_ms,open")
         for line, row in enumerate(reader, start=2):
             try:
+                row_symbol = str(row.get("symbol") or path.stem).upper()
                 ts = int(row["timestamp_ms"])
                 mark = float(row["open"])
             except (TypeError, ValueError, KeyError) as exc:
                 raise ValueError(f"{path}:{line}: invalid mark row") from exc
+            if row_symbol != path.stem.upper():
+                raise ValueError(f"{path}:{line}: symbol does not match filename")
             if ts <= 0 or not math.isfinite(mark) or mark <= 0:
                 raise ValueError(f"{path}:{line}: invalid mark timestamp/price")
             if ts in timestamps:

@@ -16,6 +16,7 @@ SNAPSHOT = {
             "qtyStep": "0.001",
             "minOrderQty": "0.01",
             "maxOrderQty": "1000",
+            "maxMktOrderQty": "800",
             "minNotionalValue": "5",
         },
         "leverageFilter": {
@@ -60,6 +61,14 @@ class InstrumentSpecTests(unittest.TestCase):
     def test_order_validates_max_qty(self):
         with self.assertRaisesRegex(ValueError, "maxOrderQty"):
             self.spec.validate_order("1000.001", "100")
+
+    def test_market_order_uses_its_own_maximum_quantity(self):
+        with self.assertRaisesRegex(ValueError, "maxMktOrderQty"):
+            self.spec.validate_order("800.001", "100", order_type="market")
+        self.assertEqual(self.spec.validate_order("800", "100", order_type="market"),
+                         Decimal("800"))
+        with self.assertRaisesRegex(ValueError, "order_type"):
+            self.spec.validate_order("1", "100", order_type="stop")
 
     def test_missing_required_exchange_fields_fail_closed(self):
         broken = {"instrument": dict(SNAPSHOT["instrument"])}

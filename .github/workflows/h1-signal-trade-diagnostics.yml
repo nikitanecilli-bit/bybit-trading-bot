@@ -1,0 +1,34 @@
+name: H1 Signal and Trade Diagnostics
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install diagnostic dependency
+        run: python -m pip install numpy
+      - name: Compile
+        run: python -m py_compile Bybit_Trading_Engine_v14_research.py scripts/run_uploaded_dataset_backtests.py scripts/run_h1_signal_trade_diagnostics.py scripts/run_h1_market_context_diagnostics.py
+      - name: Run signal and trade diagnostics
+        run: python scripts/run_h1_signal_trade_diagnostics.py
+      - name: Run BTC ETH and altcoin market context diagnostics
+        run: python scripts/run_h1_market_context_diagnostics.py
+      - name: Upload diagnostic tables
+        uses: actions/upload-artifact@v4
+        with:
+          name: h1-signal-trade-diagnostics
+          path: |
+            h1_signal_diagnostics.csv
+            h1_trade_diagnostics.csv
+            h1_market_context_by_symbol.csv
+          if-no-files-found: error

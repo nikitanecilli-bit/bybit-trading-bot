@@ -1,0 +1,8 @@
+{
+  "source": "Existing H1 signal-quality ablation results; 50 symbols, 12 parameter combinations, 3 chronological folds; Binance OHLCV proxy and modeled costs.",
+  "ranking_method": "Robust screening score using median per-symbol-run net PnL, positive run percentage, median profit factor, inverse median drawdown, number of parameter configurations positive in all three folds, and number positive in the final fold. For the primary/reserve shared-capital comparison, symbols also need common history covering the June–August regime under investigation.",
+  "primary": ["RAYUSDT", "PUMPUSDT", "TAOUSDT", "AAVEUSDT", "CAKEUSDT"],
+  "reserve": ["DASHUSDT", "HBARUSDT", "ENAUSDT", "GMXUSDT", "ONDOUSDT"],
+  "short_history_watchlist": ["LINKUSDT", "APTUSDT", "POLUSDT", "ATOMUSDT", "DOGEUSDT"],
+  "caution": "The reserve set is an exploratory hybrid shortlist intended to balance the strong first/last-fold behavior of DASH and HBAR with candidates showing some strength in the June–August middle fold (ENA, GMX, ONDO). This is not a profitability claim. Same historical archive was already inspected; reruns are focused validation, not an independent blind holdout. Require future untouched data and realistic Bybit fills before production."
+}

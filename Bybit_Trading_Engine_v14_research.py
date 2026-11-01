@@ -117,6 +117,8 @@ class BotConfig:
     max_hold_bars: int = 16
 
     maker_entry_and_tp1: bool = False
+    # None preserves legacy coupling to maker_entry_and_tp1; explicit False isolates maker entry.
+    maker_tp1_and_target: Optional[bool] = None
     accelerated_atr_trail_after_1_5r: bool = False
     enable_h2_range_fade: bool = False
 
@@ -228,7 +230,7 @@ class BotConfig:
         if unknown_strategy:
             raise ValueError(f"unsupported strategy keys (not implemented): {', '.join(unknown_strategy)}")
 
-        allowed_execution = {"maker_entry_and_tp1", "accelerated_atr_trail_after_1_5r"}
+        allowed_execution = {"maker_entry_and_tp1", "maker_tp1_and_target", "accelerated_atr_trail_after_1_5r"}
         ex_check = data.get("execution_and_exits", {}) or {}
         if not isinstance(ex_check, dict):
             raise ValueError("execution_and_exits must be an object")
@@ -281,6 +283,7 @@ class BotConfig:
 
         ex = data.get("execution_and_exits", {}) or {}
         self.maker_entry_and_tp1 = _as_bool(ex.get("maker_entry_and_tp1", False))
+        self.maker_tp1_and_target = (_as_bool(ex.get("maker_tp1_and_target", False)) if "maker_tp1_and_target" in ex else None)
         self.accelerated_atr_trail_after_1_5r = _as_bool(ex.get("accelerated_atr_trail_after_1_5r", False))
 
         if isinstance(data.get("active_trading_pool"), list):
@@ -378,6 +381,7 @@ class OpenPositionState:
     size_usdt: float
     risk_usdt: float
     order_type: str
+    maker_exits: Optional[bool] = None
     tp1_hit: bool = False
     realized_tp1_gross_usdt: float = 0.0
     remaining_fraction: float = 1.0
@@ -889,6 +893,7 @@ class UnifiedQuantEngine:
         self._last_mark_prices: Dict[str, float] = {}
         self._intrabar_risk_marks: Dict[str, float] = {}
         self._intrabar_risk_marks_ts: Optional[int] = None
+        self._bar_entry_risk_budgets: Dict[str, float] = {}
         self._state_restored = False
 
         if restore_plan_b:
@@ -905,6 +910,7 @@ class UnifiedQuantEngine:
         self._last_mark_prices.clear()
         self._intrabar_risk_marks.clear()
         self._intrabar_risk_marks_ts = None
+        self._bar_entry_risk_budgets.clear()
         self._state_restored = False
 
     @staticmethod
@@ -952,10 +958,10 @@ class UnifiedQuantEngine:
             gross = pos.realized_tp1_gross_usdt + remaining_gross
             entry_cost = pos.size_usdt * (MAKER_FEE if pos.order_type == "limit" else TAKER_FEE)
             entry_slip = 0.0 if pos.order_type == "limit" else pos.size_usdt * TAKER_SLIP
-            tp1_cost = (pos.size_usdt * TP1_FRACTION * (MAKER_FEE if pos.order_type == "limit" else TAKER_FEE)) if pos.tp1_hit else 0.0
-            # TP1 is already an executed leg: include its slippage for market orders too.
+            tp1_cost = (pos.size_usdt * TP1_FRACTION * (MAKER_FEE if pos.maker_exits else TAKER_FEE)) if pos.tp1_hit else 0.0
+            # TP1 is already an executed leg: account for slippage only when it was taker.
             tp1_slip = (pos.size_usdt * TP1_FRACTION * TAKER_SLIP
-                        if pos.tp1_hit and pos.order_type != "limit" else 0.0)
+                        if pos.tp1_hit and not pos.maker_exits else 0.0)
             # Предполагаем taker на оставшемся выходе для консервативной оценки плавающего equity.
             exit_cost = pos.size_usdt * pos.remaining_fraction * (TAKER_FEE + TAKER_SLIP)
             total += gross - entry_cost - entry_slip - tp1_cost - tp1_slip - exit_cost
@@ -1042,6 +1048,12 @@ class UnifiedQuantEngine:
             if self._try_fill_pending(symbol, curr):
                 self._manage_position(symbol, candles_history, fill_bar=True, exit_ts=bar_close_ts)
                 return
+            # A multi-bar execution policy may retain an unfilled order in
+            # self.pending. Do not evaluate a fresh signal for this symbol and
+            # overwrite that order on the same candle. The default one-bar
+            # policy removes the pending order on failure, so its behavior is unchanged.
+            if symbol in self.pending:
+                return
 
         can_open, _ = self.risk_mgr.can_open_new_trade(len(self.open_positions) + len(self.pending))
         if not can_open:
@@ -1056,6 +1068,31 @@ class UnifiedQuantEngine:
         """Conservative sum of estimated stop risk on remaining open position sizes."""
         return sum(max(0.0, pos.risk_usdt) * max(0.0, min(1.0, pos.remaining_fraction))
                    for pos in self.open_positions.values())
+
+    def _prepare_pending_entry_risk_budgets(self) -> Dict[str, float]:
+        """Allocate this bar's remaining risk budget as a deterministic batch.
+
+        Higher volume-ratio signals receive scarce position slots first; symbol
+        name is only a stable tie-breaker. Eligible pending signals share the
+        available portfolio risk equally, so iteration order cannot consume it.
+        """
+        self._bar_entry_risk_budgets = {}
+        pending_symbols = list(self.pending)
+        if not pending_symbols:
+            return self._bar_entry_risk_budgets
+
+        available_slots = max(0, self.cfg.max_concurrent_positions - len(self.open_positions))
+        ranked = sorted(
+            pending_symbols,
+            key=lambda sym: (-float(self.pending[sym].get("vol_ratio", 0.0)), sym),
+        )
+        eligible = ranked[:available_slots]
+        portfolio_cap = self.risk_mgr.current_equity * (self.cfg.max_portfolio_risk_pct / 100.0)
+        available_risk = max(0.0, portfolio_cap - self._open_portfolio_risk_usdt())
+        per_signal_budget = available_risk / len(eligible) if eligible else 0.0
+        for symbol in pending_symbols:
+            self._bar_entry_risk_budgets[symbol] = per_signal_budget if symbol in eligible else 0.0
+        return self._bar_entry_risk_budgets
 
     def _try_fill_pending(self, symbol: str, curr: Candle) -> bool:
         """Исполняет отложенный сигнал на свече, следующей за сигнальной. True если позиция открыта."""
@@ -1084,6 +1121,9 @@ class UnifiedQuantEngine:
         stop_price, tp1, tp2 = QuantStrategyCore.build_levels(direction, fill, sig["stop_dist"], self.cfg)
         portfolio_risk_cap = self.risk_mgr.current_equity * (self.cfg.max_portfolio_risk_pct / 100.0)
         remaining_portfolio_risk = max(0.0, portfolio_risk_cap - self._open_portfolio_risk_usdt())
+        allocated_budget = getattr(self, "_bar_entry_risk_budgets", {}).pop(symbol, None)
+        if allocated_budget is not None:
+            remaining_portfolio_risk = min(remaining_portfolio_risk, allocated_budget)
         size_usdt, risk_usdt = self.risk_mgr.calculate_position_size(
             fill, stop_price, order_type=sig["order_type"],
             risk_budget_usdt=remaining_portfolio_risk,
@@ -1098,7 +1138,9 @@ class UnifiedQuantEngine:
             strategy=sig["strategy"], entry_ts=curr.ts, entry_price=fill,
             stop_price=stop_price, tp1_price=tp1, tp2_price=tp2,
             initial_stop_dist=sig["stop_dist"], size_usdt=size_usdt, risk_usdt=risk_usdt,
-            order_type=sig["order_type"], max_favorable_px=fill, max_adverse_px=fill,
+            order_type=sig["order_type"],
+            maker_exits=(self.cfg.maker_entry_and_tp1 if self.cfg.maker_tp1_and_target is None else self.cfg.maker_tp1_and_target),
+            max_favorable_px=fill, max_adverse_px=fill,
             equity_at_entry=self.risk_mgr.current_equity,
         )
         self._persist()
@@ -1120,25 +1162,13 @@ class UnifiedQuantEngine:
         atr = QuantStrategyCore.compute_atr(hist[:-1], cfg.atr_period)
         stop_dist = max(1e-8, pos.initial_stop_dist)
 
-        # На свече исполнения учитываем только часть, которая заведомо после входа (консервативно):
-        # благоприятный экстремум не обновляем, неблагоприятный — да.
-        if is_long:
-            if not fill_bar:
-                pos.max_favorable_px = max(pos.max_favorable_px, curr.high)
-            pos.max_adverse_px = min(pos.max_adverse_px, curr.low)
-            mfe_r = (pos.max_favorable_px - pos.entry_price) / stop_dist
-            mae_r = (pos.entry_price - pos.max_adverse_px) / stop_dist
-        else:
-            if not fill_bar:
-                pos.max_favorable_px = min(pos.max_favorable_px, curr.low)
-            pos.max_adverse_px = max(pos.max_adverse_px, curr.high)
-            mfe_r = (pos.entry_price - pos.max_favorable_px) / stop_dist
-            mae_r = (pos.max_adverse_px - pos.entry_price) / stop_dist
-
         exit_price: Optional[float] = None
         exit_reason: Optional[str] = None
 
-        # 1) Стоп (приоритет над целями внутри одной свечи — консервативно)
+        # 1) Стоп (приоритет над целями внутри одной свечи — консервативно).
+        # Если стоп пересечён, OHLC не показывает порядок high/low: не засчитываем
+        # благоприятный экстремум этой свечи и ограничиваем MAE фактической модельной
+        # ценой стоп-исполнения, а не более глубоким последующим wick.
         stop_hit = (curr.low <= pos.stop_price) if is_long else (curr.high >= pos.stop_price)
         if stop_hit:
             if fill_bar:
@@ -1147,9 +1177,31 @@ class UnifiedQuantEngine:
                 exit_price = min(pos.stop_price, curr.open)    # гэп вниз -> худшая цена
             else:
                 exit_price = max(pos.stop_price, curr.open)    # гэп вверх -> худшая цена
+            if is_long:
+                pos.max_adverse_px = min(pos.max_adverse_px, exit_price)
+            else:
+                pos.max_adverse_px = max(pos.max_adverse_px, exit_price)
             exit_reason = "trailing_stop" if pos.tp1_hit else "stop_loss"
+        else:
+            # На свече исполнения благоприятный экстремум не обновляем: он мог быть
+            # до фактического входа. Неблагоприятный экстремум сохраняем консервативно.
+            if is_long:
+                if not fill_bar:
+                    pos.max_favorable_px = max(pos.max_favorable_px, curr.high)
+                pos.max_adverse_px = min(pos.max_adverse_px, curr.low)
+            else:
+                if not fill_bar:
+                    pos.max_favorable_px = min(pos.max_favorable_px, curr.low)
+                pos.max_adverse_px = max(pos.max_adverse_px, curr.high)
 
-        elif not fill_bar:
+        if is_long:
+            mfe_r = (pos.max_favorable_px - pos.entry_price) / stop_dist
+            mae_r = (pos.entry_price - pos.max_adverse_px) / stop_dist
+        else:
+            mfe_r = (pos.entry_price - pos.max_favorable_px) / stop_dist
+            mae_r = (pos.max_adverse_px - pos.entry_price) / stop_dist
+
+        if not stop_hit and not fill_bar:
             tp2_hit = (curr.high >= pos.tp2_price) if is_long else (curr.low <= pos.tp2_price)
             if tp2_hit:
                 if not pos.tp1_hit:
@@ -1195,14 +1247,15 @@ class UnifiedQuantEngine:
 
         # Издержки по ногам. Сначала суммируем точные значения всех ног,
         # затем округляем итог в денежном формате (half-up), а не каждую ногу отдельно.
-        maker_mode = pos.order_type == "limit"
+        entry_maker = pos.order_type == "limit"
         fees = slip = 0.0
-        f, s = self._leg_cost(pos.size_usdt, maker_mode)                      # вход
+        f, s = self._leg_cost(pos.size_usdt, entry_maker)                     # вход
         fees += f; slip += s
+        maker_exits = (pos.order_type == "limit") if pos.maker_exits is None else pos.maker_exits
         if pos.tp1_hit:                                                        # TP1-нога
-            f, s = self._leg_cost(pos.size_usdt * TP1_FRACTION, maker_mode)
+            f, s = self._leg_cost(pos.size_usdt * TP1_FRACTION, maker_exits)
             fees += f; slip += s
-        final_maker = maker_mode and exit_reason == "take_profit"              # финальная нога
+        final_maker = maker_exits and exit_reason == "take_profit"             # финальная нога
         f, s = self._leg_cost(pos.size_usdt * pos.remaining_fraction, final_maker)
         fees += f; slip += s
         fees, slip = _money_round(fees), _money_round(slip)
@@ -1408,6 +1461,36 @@ def load_candles_csv(data_dir: str, symbols: List[str]) -> Dict[str, List[Candle
     return out
 
 
+
+_TIMEFRAME_MS = {
+    "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
+    "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
+    "4h": 14_400_000, "6h": 21_600_000, "12h": 43_200_000,
+    "1d": 86_400_000,
+}
+
+
+def validate_candle_timeframe(candles: Dict[str, List[Candle]], timeframe: str) -> None:
+    """Reject CSV/replay candles whose timestamp step disagrees with cfg.timeframe."""
+    tf = str(timeframe).strip().lower()
+    expected_ms = _TIMEFRAME_MS.get(tf)
+    if expected_ms is None:
+        raise ValueError(f"Неподдерживаемый timeframe для проверки свечей: {timeframe!r}")
+    if not candles:
+        raise ValueError("Нет свечных данных для проверки timeframe")
+    for symbol, rows in candles.items():
+        if len(rows) < 2:
+            raise ValueError(f"{symbol}: для проверки timeframe нужно минимум 2 свечи")
+        deltas = [b.ts - a.ts for a, b in zip(rows, rows[1:])]
+        bad = sorted({delta for delta in deltas if delta != expected_ms})
+        if bad:
+            actual = sorted(set(deltas))
+            raise ValueError(
+                f"{symbol}: интервал CSV не соответствует cfg.timeframe={tf!r}; "
+                f"ожидается {expected_ms} ms, обнаружено {actual[:8]}"
+            )
+
+
 def check_alignment(candles: Dict[str, List[Candle]]) -> None:
     if not candles:
         raise ValueError("Нет свечных данных для проверки")
@@ -1429,6 +1512,13 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
     if engine._state_restored:
         raise RuntimeError("Нельзя запускать backtest поверх восстановленного состояния. "
                            "Для live-resume нужен отдельный цикл с reconciliation по бирже.")
+    if not symbols:
+        raise ValueError("Список символов для симуляции пуст")
+    missing = sorted(set(symbols) - set(candles))
+    if missing:
+        raise ValueError(f"Нет свечных данных для символов: {', '.join(missing)}")
+    validate_candle_timeframe(candles, engine.cfg.timeframe)
+    check_alignment(candles)
     engine.reset_state_for_new_run()
     bars_total = len(candles[symbols[0]])
     for bar in range(25, bars_total):
@@ -1436,8 +1526,13 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
         # Evaluate portfolio drawdown against all symbols' adverse marks for this
         # synchronized bar before any single symbol can trigger a risk decision.
         engine._prepare_portfolio_intrabar_marks({sym: candles[sym][bar] for sym in symbols})
+        timeframe_ms = _TIMEFRAME_MS[str(engine.cfg.timeframe).strip().lower()]
+        bar_close_ts = candles[symbols[0]][bar].ts + timeframe_ms
+        engine._update_mark_to_market(bar_close_ts)
+        engine._prepare_pending_entry_risk_budgets()
         for sym in symbols:
             engine.step_candle(sym, candles[sym][lo:bar + 1])
+        engine._bar_entry_risk_budgets.clear()
 
     # Не оставляем открытые позиции вне статистики: закрываем их по последнему close.
     engine.finalize_open_positions({sym: candles[sym][-1] for sym in symbols}, exit_reason="end_of_test")

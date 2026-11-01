@@ -1,0 +1,80 @@
+# План аудита и исследований (без новых рыночных тестов)
+
+## Фаза 0 — организация
+- [x] Создать единый вход `docs/README_RU.md`.
+- [x] Создать `AGENTS.md` с правилами работы.
+- [x] Создать первичную матрицу покрытия и аудит-реестр.
+- [ ] Проверить ссылки, workflow path dependencies и secret hygiene.
+
+## Фаза 1 — воспроизводимость экспериментов
+1. Собрать для E01–E09: run ID, workflow, commit SHA, dataset, конфиг, folds, costs, artifacts.
+2. Сопоставить run SHA с версиями скрипта и движка.
+3. Проверить завершение каждого job, ошибки, тестовые counts, artifact contents.
+4. Пометить старые результаты без первичных данных как UNVERIFIED.
+5. Выявить дублирующие эксперименты и причинно зависимые результаты.
+
+## Фаза 2 — аудит движка
+Проверять в таком порядке:
+1. Candle/time model и отсутствие look-ahead.
+2. Сигналы, warm-up, индикаторы и контекст.
+3. Pending orders и fills.
+4. Stops, targets, trailing, break-even и intra-bar collision.
+5. Fees/slippage/funding.
+6. Sizing, leverage, margin и liquidation.
+7. Portfolio shared capital, risk gates, concurrency.
+8. Trade journal и метрики.
+
+Для каждого дефекта: severity, file/function, минимальный reproduction, влияние на результаты, regression test. Не менять поведение без теста и записи.
+
+## Фаза 3 — качество данных
+- Инвентаризировать все ZIP и внутренние CSV: symbols, timeframe, date range, row count, duplicate/missing candles.
+- Определить источник данных и стабильность формата.
+- Проверить Bybit vs Binance proxy; не заявлять Bybit holdout при HTTP 403.
+- Проверить universe survivorship и исключённые инструменты.
+
+## Фаза 4 — исследовательские выводы
+- Пересчитать только то, что нужно для проверки целостности существующих результатов; новые сетки параметров запрещены до закрытия аудита.
+- Отдельно оценить устойчивость по fold и symbol, concentration, drawdown, trade count.
+- Не подгонять стратегию по holdout.
+- Вернуться к market-regime / false-breakout / maker execution только после устранения критических методологических рисков.
+
+## Критерий завершения аудита
+Аудит завершён, когда у каждого исторического эксперимента есть воспроизводимая ссылка на commit/run/artifact либо явная метка UNVERIFIED; ключевые торговые механики движка покрыты проверками; критические ограничения исполнения и данных документированы; следующий тест отвечает на новый вопрос и не дублирует предыдущий.
+
+
+## Обновление 2026-11-02 — автономный аудит
+
+Завершено:
+- Timeframe CSV validation исправлена и regression-tested.
+- Portfolio MTM, TP1 partial mark, risk sizing budget и close PnL/fee/slippage reconciliation покрыты deterministic tests.
+- Подтверждённая зависимость одновременного распределения риска от порядка symbols исправлена пакетным распределением: equal risk share among eligible signals; slot priority = vol_ratio descending, symbol tie-break.
+- Технический CI отделён от рыночных backtests; market experiment workflows переведены на ручной запуск.
+- Static scan не нашёл live order endpoints в Python engine copies и active research scripts.
+
+Следующие задачи (без новых market backtests):
+1. Полный audit lifecycle: pending-order expiry/retry, stop/TP collision, trailing-stop update timing, same-bar fills.
+2. Margin/leverage/liquidation approximation and exchange quantity/tick constraints.
+3. Funding integration review and timestamp semantics.
+4. Проверка journal metrics: net R denominator, MAE/MFE, drawdown and per-period aggregation.
+5. Reconcile E01–E09: run SHA, script SHA, config, data manifest, folds, costs, artifacts. Missing evidence => UNVERIFIED.
+6. Check archive/CSV integrity and data provenance.
+7. Только после закрытия этих пунктов — решить, какие исторические результаты нужно воспроизвести на исправленном engine. Не начинать parameter search.
+
+Последний подтверждённый технический CI: [41356881313](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41356881313), commit `3246eb1df4b9d4cfbd109fa6e6a6316e44710200` — success.
+
+
+## Обновление 2026-11-02 — lifecycle review
+
+Завершён первичный статический просмотр `step_candle` / `_try_fill_pending` / `_manage_position`:
+- Pending сигнал живёт одну следующую свечу; no-touch, chase reject и risk reject удаляют его без retry.
+- Limit touch fill не моделирует очередь, спред, partial fill или adverse selection.
+- Stop имеет приоритет над TP при неоднозначном OHLC same-bar событии.
+- Fill-bar stop может учитывать экстремум, который был до фактического входа; favourable excursion на fill bar исключён.
+- Trailing stop, рассчитанный по текущей свече, применяется только к последующим свечам.
+
+Следующий безопасный порядок:
+1. Добавить тесты, фиксирующие фактические one-bar pending semantics и fill-bar/trailing timing (без изменения поведения).
+2. Проверить, одинаково ли runners интерпретируют лимитную заявку и TTL; расхождения описать, не исправляя молча.
+3. Продолжить аудит TP/stop/trailing и portfolio event ordering; отдельно проверить long/short симметрию.
+4. Затем margin/leverage/quantity-tick и funding timestamp semantics.
+5. Только после завершения аудита — воспроизводимость E01–E09 и data archive integrity. Новые market backtests и parameter search пока запрещены.

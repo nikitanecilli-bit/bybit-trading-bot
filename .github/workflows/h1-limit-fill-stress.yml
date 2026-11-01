@@ -1,0 +1,27 @@
+name: H1 Limit Fill Stress Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile
+        run: python -m py_compile Bybit_Trading_Engine_v14_research.py scripts/run_uploaded_dataset_backtests.py scripts/run_h1_limit_fill_stress.py
+      - name: Run conservative fill stress matrix
+        run: python scripts/run_h1_limit_fill_stress.py
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: h1-limit-fill-stress
+          path: h1_limit_fill_stress.csv
+          if-no-files-found: error

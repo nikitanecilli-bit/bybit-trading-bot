@@ -10,7 +10,9 @@ on:
       - 'instrument_spec_history.py'
       - 'exchange_order_sizing.py'
       - 'funding_accounting.py'
-      - 'scripts/snapshot_bybit_instruments.py'\n      - 'scripts/bybit_private_api_check.py'\n      - '.github/workflows/bybit-private-api-check.yml'
+      - 'scripts/snapshot_bybit_instruments.py'
+      - 'scripts/bybit_private_api_check.py'
+      - '.github/workflows/bybit-private-api-check.yml'
       - 'scripts/validate_funding_coverage.py'
       - 'tests/**'
       - '.github/workflows/research-checks.yml'
@@ -46,7 +48,9 @@ jobs:
         run: python tests/test_funding_mark_to_market.py
       - name: Test funding/mark coverage preflight
         run: python tests/test_funding_coverage.py
-      - name: Test Bybit private API signature and read-only checks\n        run: python tests/test_bybit_private_api_check.py\n      - name: Scan for obvious secrets
+      - name: Test Bybit private API signature and read-only checks
+        run: python tests/test_bybit_private_api_check.py
+      - name: Scan for obvious secrets
         run: python scripts/scan_secrets.py .
       - name: Test causal market-regime classifier
         run: python tests/test_market_regime.py

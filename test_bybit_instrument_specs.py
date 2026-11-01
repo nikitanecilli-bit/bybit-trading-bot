@@ -42,6 +42,8 @@ class InstrumentSpecTests(unittest.TestCase):
     def test_buy_price_rounds_down_and_sell_price_rounds_up(self):
         self.assertEqual(self.spec.round_price("100.079", side="buy"), Decimal("100.05"))
         self.assertEqual(self.spec.round_price("100.051", side="sell"), Decimal("100.10"))
+        with self.assertRaisesRegex(ValueError, "rounds to zero"):
+            self.spec.round_price("0.01", side="buy")
 
     def test_quantity_rounds_down_not_up(self):
         self.assertEqual(self.spec.round_qty("1.2349"), Decimal("1.234"))
@@ -52,6 +54,8 @@ class InstrumentSpecTests(unittest.TestCase):
             self.spec.validate_order("0.0099", "100")
         with self.assertRaisesRegex(ValueError, "minNotionalValue"):
             self.spec.validate_order("0.01", "100")
+        with self.assertRaisesRegex(ValueError, "tickSize"):
+            self.spec.validate_order("0.051", "100.01")
 
     def test_order_validates_max_qty(self):
         with self.assertRaisesRegex(ValueError, "maxOrderQty"):

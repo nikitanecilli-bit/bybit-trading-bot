@@ -89,3 +89,11 @@ Workflow `.github/workflows/bybit-recent-validation.yml` существует, m
 - Fallback проверен в GitHub Actions; все шесть hosts вернули 403. Никакие данные не записаны и исходные архивы не затронуты.
 
 **Решение:** execution realism gate пока не пройден. Следующий стратегический backtest отложить до появления проверяемого Bybit data + dated instrument snapshot.
+
+
+## Exchange state reconciliation — hard pre-live gate
+
+- Added [EXCHANGE_RECONCILIATION_READINESS_RU.md](EXCHANGE_RECONCILIATION_READINESS_RU.md) with a read-only V5 contract for positions, active orders, executions and order history.
+- Current verdict: `UNSUPPORTED_LOCAL_MODEL / BLOCKED`. Local `OpenPositionState` stores notional `size_usdt`, not exact contract qty; no `positionIdx`, exchange order IDs/link IDs or execution ledger. A read-only API key-info check is not state reconciliation.
+- Official endpoints are read-only: `/v5/position/list`, `/v5/order/realtime`, `/v5/execution/list`, `/v5/order/history`. Pagination must be complete; any API error, HTTP 403, incomplete cursor or inconsistent snapshot is UNKNOWN/BLOCKED, never an empty account.
+- No automatic create/cancel/amend/close behavior is permitted in reconciliation. First implementation should be parser + fixture tests + report-only comparator.

@@ -69,7 +69,7 @@ def _page_tuples(pages: Any, field: str) -> list[tuple[str, dict[str, Any]]]:
     return result
 
 
-def _parse_exchange_snapshot(snapshot: dict[str, Any]) -> tuple[tuple, tuple, tuple]:
+def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tuple[tuple, tuple, tuple]:
     if snapshot.get("status") != "CAPTURED_READ_ONLY_NOT_RECONCILED":
         raise ReportError("snapshot status is not CAPTURED_READ_ONLY_NOT_RECONCILED")
     raw = snapshot.get("raw")
@@ -135,8 +135,16 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any]) -> tuple[tuple, tuple, tu
                          ("capture_now_ms", capture_now)):
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise ReportError(f"snapshot {field} is invalid")
-    if before > after or after - before > 120_000 or capture_now != before:
-        raise ReportError("snapshot server-time bounds are inconsistent")
+    if before <= saved_at_ms or before > after or after - before > 120_000 or capture_now != before:
+        raise ReportError("snapshot server-time bounds are inconsistent with backup time")
+    interval_keys = sorted(grouped)
+    expected_start = saved_at_ms
+    for start, end in interval_keys:
+        if start != expected_start or end - start > 7 * 24 * 60 * 60 * 1000:
+            raise ReportError("execution intervals are not contiguous or exceed seven days")
+        expected_start = end
+    if expected_start != capture_now:
+        raise ReportError("execution intervals do not reach the capture boundary")
     return positions, orders, executions
 
 
@@ -150,7 +158,8 @@ def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict
     missing = required.difference(local_backup)
     if missing:
         raise ReportError(f"local backup missing required fields: {sorted(missing)}")
-    _utc_timestamp(local_backup["saved_at_utc"], "local backup saved_at_utc")
+    saved_dt = _utc_timestamp(local_backup["saved_at_utc"], "local backup saved_at_utc")
+    saved_at_ms = int(saved_dt.timestamp() * 1000)
     if snapshot.get("saved_at_utc") != local_backup["saved_at_utc"]:
         raise ReportError("snapshot saved_at_utc does not match local backup")
     if not isinstance(local_backup["open_positions"], dict):
@@ -165,7 +174,7 @@ def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict
     if isinstance(seq, bool) or not isinstance(seq, int) or seq < 0:
         raise ReportError("local backup trade_seq must be a non-negative integer")
 
-    positions, orders, executions = _parse_exchange_snapshot(snapshot)
+    positions, orders, executions = _parse_exchange_snapshot(snapshot, saved_at_ms)
     local_positions = local_backup["open_positions"]
     pending = local_backup["pending_orders"]
 

@@ -126,3 +126,32 @@ Run metadata was re-read from GitHub Actions and compared with the experiment le
 - E09's gap gate at 2% did not change any trades in its sample; body gate was the active factor. This does not prove all gap protection is useless, only that this threshold never fired in those data.
 - Artifact existence and run success establish reproducibility inputs, not profitability or correctness of the execution model. Artifact SHA-256 is recorded in the E09–E13 reports where available; older E01–E08 report entries do not consistently include hashes or a complete dataset manifest.
 - This cross-check is run-level provenance only. It does not yet verify that every artifact's embedded CSV/config hashes match the report's numbers. That remains the next artifact-level audit.
+
+
+### Artifact-level verification completed for E01–E09
+
+Downloaded the eight available E01–E04/E06–E08 artifacts plus E09. ZIP hashes below were calculated from the downloaded bytes; E09's computed hash exactly matches the SHA-256 already recorded in its report.
+
+| Experiment | Artifact ID | SHA-256 of downloaded ZIP | Content-level check |
+|---|---:|---|---|
+| E01 | 12768870777 | `a61dfb45f41792ae4dbfb2e0f09975b389e6b0aa1c6d89c64824087065823ebc` | 600 rows; aggregate H1 variants reproduce ledger totals exactly |
+| E02 | 12767913281 | `66483e95ece78e773dd47494bbbdfd8bd2a738f7f6be1e28958463d622122c83` | 174 rows; H1 and 15m selected-policy sums reproduce ledger exactly |
+| E03 | 12768457441 | `880e4408f2d8ee2bd3e054ef76b43f06d089843da7086a2282999858645bfd66` | 754 rows; H1/15m execution-cost variants reproduce ledger totals exactly |
+| E04 | 12773465436 | `e4061b3f49637e725730fe966bad000dc4a4f80d67733f8beca8fe5e15a206f7` | 15 rows; 1.5/2.0/2.5/3.0/100% chase totals reproduce ledger exactly |
+| E06 | 12772483348 | `d52b42bc8e39f00f088f2d43d08647aabf9408789d4e92c6008271691e2dad27` | 5,060 signal rows, 910 trade rows, 21 market-context rows; diagnostic artifact |
+| E07 primary | 12764160379 | `28b0275b4feee893b77f3b37ef66ba9fa07dde58ebcc2f431c7b216f5c41ccc7` | 108 shared-capital configurations; ledger example vol1.6 / breakoutATR0.25 / cost×1.5 matches all three fold values |
+| E07 reserve | 12764110430 | `ae6f71dec3923f692cf98ac0a35fb1ebbcb97bf61fff7734db4e9cbe1e67b494` | Reserve artifact downloaded; separate universe output, not merged with primary |
+| E08 | 12799089180 | `05e8aaa9b18c4509059c7db8eb2114fb1da6e76da1d3c9850832bbf669496c5b` | 30 summary rows, 2,160 trades, 10,120 signals; totals reproduce ledger and expose body/chase confound |
+| E09 | 13103031404 | `503aa4ef24f6f7ef5adef0a63297e0deeeb7298c55b4d3254df1be7dd274416f` | 24 summary rows; exact hash match to E09 report; gap gate ON/OFF rows are identical in all cells |
+
+### Artifact reconciliation findings
+
+- E01 independently recomputed H1 sums: both_market -16,911.93 (2,699 trades), long_market +1,056.65 (1,458), both_limit20 -261.36 (2,395), long_limit20 +9,823.41 (1,308). This matches the ledger.
+- E02 recomputed selected-policy totals: 1h -5,999.65 vs market -16,911.93; 15m -11,470.98 vs market -24,039.44. This matches the ledger.
+- E03 recomputed 1h market -5,923.64, limit 5bps/3 bars +457.46, 10bps/3 +1,204.81, 10bps/5 +1,565.78, 20bps/3 +3,143.13; all 15m tested variants remain negative. This matches the ledger.
+- E04 recomputed sums by chase cap: +3,799.40 / +4,030.24 / +4,899.37 / +3,400.55 / +1,428.39 USDT for 1.5 / 2.0 / 2.5 / 3.0 / 100%. This matches the ledger.
+- E07 selected example recomputed exactly: fold 1 +984.67, fold 2 +262.97, fold 3 +2,699.68. This is one selected row family from a 36-configuration × 3-fold search, so it is subject to selection bias.
+- E08 recomputed limit totals match the ledger (+3,799.40 to +4,899.37 for 1.5–2.5% caps); market result is -436.83 at every cap because market mode does not apply that same body gate. This confirms the ledger's warning that E08 is not a clean one-factor causal comparison.
+- E09 summary reproduces the report. At 2% gap threshold, all gap ON/OFF pairs are identical; the threshold never fired in this sample.
+
+E01–E04/E06–E08 did not have artifact ZIP SHA-256 values consistently recorded in their original reports; the hashes above now provide a downloaded-byte identity for these archived files. This verifies artifact identity and report arithmetic, not the underlying data's exchange provenance or fill realism.

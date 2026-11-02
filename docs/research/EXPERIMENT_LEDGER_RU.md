@@ -637,3 +637,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Full Research CI [#41502251992](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41502251992), SUCCESS; funding, realized PnL, MTM, portfolio и остальные configured suites прошли.
 - Решение: ACCEPT для realized PnL. Не является доказательством рыночной доходности.
 - Оставшийся риск pre-exit MTM вынесен в ENG-FUND-003: до определения исхода свечи MTM может временно зачесть receipt на текущей границе.
+
+
+## ENG-FUND-003 — funding receipt на pre-exit MTM boundary (2026-11-02)
+
+- Карточка: [ENG-FUND-003](experiment_cards/ENG-FUND-003_MTM_BOUNDARY_RECEIPT_RU.md).
+- Подтверждён порядок событий: adverse intrabar mark и portfolio MTM выполняются до разрешения stop/TP в `_manage_position()`. При совпадении funding settlement с текущей MTM-границей OHLC не задаёт порядок событий.
+- Риск: receipt мог временно увеличить equity до определения исхода свечи и частично скрыть adverse mark при daily-stop / kill-switch проверке.
+- Исправление: `accrued_funding_cost(..., defer_boundary_receipts=True)` откладывает receipt на точной текущей MTM-границе до следующего mark; payment продолжает учитываться немедленно. Если позиция остаётся открытой, receipt начисляется на фактический остаток объёма; полное закрытие на этой границе обработано ENG-FUND-002.
+- Проверки: long/short receipt, TP1 reduced quantity и payment boundary. Полный Research CI [#41503287534](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41503287534), SUCCESS, commit `037aabd80769be88ea6ed99b05855665da92230d`.
+- Отдельно проверен CI harness: все 21 тестовых файла, вызываемых workflow напрямую через `python tests/...`, имеют исполняемый `__main__`; plain-function suites имеют явные runners, unittest suites запускают `unittest.main()`. В логах подтверждены 27/27 gap, 38/38 time model, 5/5 timeframe, 16/16 portfolio accounting и 54 persistence tests.
+- Решение: ACCEPT только для консервативного funding/MTM учёта. Не доказывает рыночную доходность; backtest и live execution не запускались.

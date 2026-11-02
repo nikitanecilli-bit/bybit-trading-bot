@@ -20,7 +20,9 @@ Added `scripts/bybit_reconciliation_snapshot.py`.
 
 ## Tests
 
-`tests/test_bybit_reconciliation_snapshot.py`: 12 deterministic tests passed for:
+Report-only comparator: 17 deterministic tests passed in the same CI run. It rejects malformed/tampered snapshots, incomplete order-history metadata, interval gaps and conflicting execution identities; it always returns `BLOCKED_UNSUPPORTED_LOCAL_MODEL` and `live_resume_allowed=false`.
+
+`tests/test_bybit_reconciliation_snapshot.py`: 15 deterministic collector tests passed for:
 - signature construction;
 - seven-day execution interval limits;
 - read-only verification before account calls;

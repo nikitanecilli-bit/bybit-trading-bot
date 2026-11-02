@@ -8,6 +8,8 @@ from scripts.bybit_private_api_check import (
     build_headers,
     make_signature,
     verify_response,
+    validate_base_url,
+    _NoRedirectHandler,
 )
 
 
@@ -48,6 +50,38 @@ class BybitPrivateApiCheckTests(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertIn("not marked read-only", message)
+
+    def test_rejects_boolean_false_retcode(self):
+        ok, message = verify_response(
+            {"retCode": False, "result": {"apiKey": "test-key", "readOnly": 1}},
+            "test-key",
+        )
+        self.assertFalse(ok)
+        self.assertIn("invalid retCode", message)
+
+    def test_rejects_boolean_true_readonly_flag(self):
+        ok, message = verify_response(
+            {"retCode": 0, "result": {"apiKey": "test-key", "readOnly": True}},
+            "test-key",
+        )
+        self.assertFalse(ok)
+        self.assertIn("not marked read-only", message)
+
+    def test_rejects_non_bybit_host(self):
+        with self.assertRaisesRegex(ValueError, "official HTTPS Bybit host"):
+            validate_base_url("https://attacker.example")
+
+    def test_rejects_non_https_and_url_credentials(self):
+        with self.assertRaisesRegex(ValueError, "official HTTPS Bybit host"):
+            validate_base_url("http://api.bybit.com")
+        with self.assertRaisesRegex(ValueError, "official HTTPS Bybit host"):
+            validate_base_url("https://user:pass@api.bybit.com")
+
+    def test_redirect_handler_refuses_redirects(self):
+        handler = _NoRedirectHandler()
+        self.assertIsNone(handler.redirect_request(
+            None, None, 302, "Found", {}, "https://attacker.example/"
+        ))
 
     def test_rejects_api_error(self):
         ok, message = verify_response(

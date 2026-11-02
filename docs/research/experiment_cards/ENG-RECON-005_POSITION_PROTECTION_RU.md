@@ -17,7 +17,7 @@ This reports configuration visible in the position response only. It does not pr
 
 ## Tests and CI
 
-- Parser tests: 15/15.
+- Parser tests: 16/16.
 - Comparator tests: 17/17.
 - Collector tests: 15/15.
 - Full workflow: [Research engine checks #41468327832](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468327832), SUCCESS.

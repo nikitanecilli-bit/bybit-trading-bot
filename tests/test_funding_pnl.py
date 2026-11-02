@@ -198,3 +198,12 @@ def test_mark_price_history_loader_preserves_decimal_precision():
         )
         e._load_mark_price_history(directory)
     assert e._funding_mark_prices["BTCUSDT"][1_800_000_000_000] == Decimal("101.1234567890123456789")
+
+
+if __name__ == "__main__":
+    tests = [(name, value) for name, value in sorted(globals().items())
+             if name.startswith("test_") and callable(value)]
+    for name, test in tests:
+        test()
+        print("PASS", name)
+    print(f"{len(tests)}/{len(tests)} tests passed")

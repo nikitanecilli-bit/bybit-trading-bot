@@ -569,3 +569,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Added parser tests for exact and conflicting duplicates, plus comparator-level tampered cross-interval fixture.
 - CI: [#41467807857](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41467807857), SUCCESS — parser 15/15, collector 15/15, comparator 17/17; full workflow passed.
 - Status: ACCEPT for code/fixture coverage only. No live exchange capture. Reconciliation/live resume remains BLOCKED.
+
+
+## ENG-DATA-001 — public instrument snapshot collector hardening (2026-11-02)
+
+- Card: [ENG-DATA-001](experiment_cards/ENG-DATA-001_INSTRUMENT_SNAPSHOT_COLLECTOR_RU.md).
+- Hardened public `instruments-info` collector with official host allowlist, redirect refusal, strict integer `retCode`, cursor type validation and 1,000-page cap.
+- 13 deterministic tests passed in full Research checks [#41468327832](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468327832).
+- Actual public fetch attempt [#41468304134](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468304134) ended in HTTP 403. No snapshot created; do not interpret as an empty universe or invent substitute specs.
+- Snapshot workflow now runs weekly/manual only. The historical instrument-spec gate remains BLOCKED pending a real dated snapshot.

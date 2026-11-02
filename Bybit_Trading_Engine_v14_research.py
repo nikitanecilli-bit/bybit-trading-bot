@@ -732,6 +732,30 @@ class PlanBStatePersistence:
                     raise ValueError(f"ключ позиции {sym!r} не совпадает с pos.symbol {pos.symbol!r}")
                 restored[sym] = pos
 
+            required_pending = {"symbol", "direction", "strategy", "entry_price", "stop_dist", "order_type"}
+            for sym, signal in pending.items():
+                if not isinstance(sym, str) or not sym or not isinstance(signal, dict):
+                    raise ValueError("каждый pending signal должен быть объектом с непустым symbol key")
+                missing = required_pending.difference(signal)
+                if missing:
+                    raise ValueError(f"pending signal {sym}: отсутствуют поля {sorted(missing)}")
+                if signal["symbol"] != sym:
+                    raise ValueError(f"ключ pending {sym!r} не совпадает с signal.symbol {signal['symbol']!r}")
+                if signal["direction"] not in {"long", "short"}:
+                    raise ValueError(f"pending signal {sym}: direction должен быть long/short")
+                if signal["order_type"] not in {"market", "limit"}:
+                    raise ValueError(f"pending signal {sym}: order_type должен быть market/limit")
+                if not isinstance(signal["strategy"], str) or not signal["strategy"]:
+                    raise ValueError(f"pending signal {sym}: strategy должен быть непустой строкой")
+                for field_name in ("entry_price", "stop_dist"):
+                    value = signal[field_name]
+                    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                        raise ValueError(f"pending signal {sym}: {field_name} должен быть конечным числом > 0")
+                if "vol_ratio" in signal:
+                    value = signal["vol_ratio"]
+                    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                        raise ValueError(f"pending signal {sym}: vol_ratio должен быть конечным числом >= 0")
+
             seq = raw_seq
             # не даём новым ID совпасть с восстановленными
             for p in restored.values():

@@ -1536,6 +1536,7 @@ class UnifiedQuantEngine:
 
     def _manage_position(self, symbol: str, hist: List[Candle], fill_bar: bool, exit_ts: int) -> None:
         pos = self.open_positions[symbol]
+        tp1_was_hit = pos.tp1_hit
         curr = hist[-1]
         cfg = self.cfg
         is_long = pos.direction == "long"
@@ -1621,7 +1622,19 @@ class UnifiedQuantEngine:
                 if pos.bars_held >= cfg.max_hold_bars:
                     exit_price, exit_reason = curr.close, "time_stop"
 
-        if exit_price is None and self.risk_mgr.kill_switch_triggered:            exit_price, exit_reason = self._intrabar_risk_marks.get(symbol, curr.close), "kill_switch"
+        if exit_price is None and symbol in self.open_positions:
+            # TP1 changes realized/unrealized decomposition and the modeled exit
+            # legs. Re-mark only after that state transition; otherwise the MTM
+            # snapshot would still describe the pre-TP1 position.
+            if pos.tp1_hit and not tp1_was_hit:
+                self._update_mark_to_market(exit_ts)
+            if self.risk_mgr.kill_switch_triggered:
+                exit_price, exit_reason = self._intrabar_risk_marks.get(symbol, curr.close), "kill_switch"
+            else:
+                # Persist per-candle position evolution (bars held, MFE/MAE,
+                # trailing stop and TP1 state) so a restart cannot restore an
+                # obsolete protective stop or stale position lifecycle.
+                self._persist()
 
         if exit_price is not None and exit_reason is not None:
             self._close_position(pos, exit_price, exit_reason, exit_ts, mae_r, mfe_r)

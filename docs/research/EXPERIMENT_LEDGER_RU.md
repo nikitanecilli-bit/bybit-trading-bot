@@ -425,3 +425,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Engine commit: `1a354260945ed34a0be466d790fa24254cd5d472`; test commit: `87a483a4fd9a2a2518bc1ca3fcdc9c4df5301c70`.
 - CI: [Research engine checks #41436653943](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41436653943), SUCCESS; compile, configured deterministic suites and secret scan passed.
 - Decision: ACCEPT. No market backtest, parameter sweep, production deployment or live order.
+
+
+## ENG-STATE-009 — risk snapshot cross-field invariants (2026-11-02)
+
+- Preregistered card: [ENG-STATE-009](experiment_cards/ENG-STATE-009_RISK_SNAPSHOT_INVARIANTS_RU.md).
+- Confirmed gap: independently valid fields could contradict each other. Restore now requires current equity = rounded realized equity + unrealized PnL; peak equity >= current equity; and max drawdown >= the drawdown implied by peak/current equity.
+- Historical max drawdown above current drawdown remains valid.
+- Tests: `tests/test_state_persistence.py` 39/39; covers all three invalid identities, valid historical max DD and restore atomicity.
+- Commits: engine `70b7b01fa6f549956e9be7ca19990e3724ee9416`; tests `23b3aa3f4af24b5d4b45f9a79eec0cf0be4f225a`.
+- CI: [Research engine checks #41444495022](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41444495022), SUCCESS; compile, configured deterministic suites and secret scan passed.
+- Decision: ACCEPT as local risk snapshot integrity. No market backtest, parameter sweep, production deployment or live order.
+- Limitation: internally consistent backup can still be stale vs Bybit; exchange reconciliation remains a hard pre-live gate.

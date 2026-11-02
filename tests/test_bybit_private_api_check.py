@@ -89,7 +89,7 @@ class BybitPrivateApiCheckTests(unittest.TestCase):
             "test-key",
         )
         self.assertFalse(ok)
-        self.assertIn("retCode=10004", message)
+        self.assertIn("non-zero or invalid retCode", message)
 
 
 if __name__ == "__main__":

@@ -52,7 +52,7 @@ jobs:
           SUCCESS=0
           for BASE_URL in https://api.bybit.com https://api.bytick.com https://api.bybit.kz https://api.bybit.nl https://api.bybit.ae https://api.bybit-tr.com; do
             echo "Trying official Bybit public API endpoint: $BASE_URL"
-            if python scripts/archive_bybit_market_history.py --symbols "$SYMBOLS" --start-ms "$START_MS" --end-ms "$END_MS" --interval "$INTERVAL" --base-url "$BASE_URL"; then
+            if python scripts/archive_bybit_market_history.py --symbols "$SYMBOLS" --start-ms "$START_MS" --end-ms "$END_MS" --interval "$INTERVAL" --base-url "$BASE_URL" --output-root "data/archives/bybit/${START_MS}_${END_MS}_${GITHUB_RUN_ID}"; then
               SUCCESS=1
               break
             fi
@@ -63,7 +63,7 @@ jobs:
         env:
           SYMBOLS: ${{ inputs.symbols }}
         run: |
-          python scripts/validate_funding_coverage.py --funding-dir data/archives/bybit/funding --mark-dir data/archives/bybit/mark_price --symbols "$SYMBOLS"
+          python scripts/validate_funding_coverage.py --funding-dir "data/archives/bybit/${{ inputs.start_ms }}_${{ inputs.end_ms }}_${GITHUB_RUN_ID}/funding" --mark-dir "data/archives/bybit/${{ inputs.start_ms }}_${{ inputs.end_ms }}_${GITHUB_RUN_ID}/mark_price" --symbols "$SYMBOLS"
       - name: Commit verified archive
         run: |
           if [[ -n "$(git status --porcelain data/archives/bybit)" ]]; then

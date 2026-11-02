@@ -1,5 +1,6 @@
 """Fail-closed tests for Plan B state persistence."""
 from pathlib import Path
+import os
 import json
 import sys
 import tempfile
@@ -82,6 +83,34 @@ class StatePersistenceTests(unittest.TestCase):
                 {}, {}, 0,
             )
             self.assertFalse(path.exists())
+
+    def test_successful_save_fsyncs_file_and_parent_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            writer = engine.PlanBStatePersistence(str(path), enabled=True)
+            real_fsync = os.fsync
+            with patch("os.fsync", wraps=real_fsync) as fsync_mock:
+                writer.save_state(
+                    engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
+                    {}, {}, 0,
+                )
+            self.assertEqual(fsync_mock.call_count, 2 if os.name == "posix" else 1)
+            self.assertTrue(path.exists())
+
+    def test_file_fsync_failure_preserves_previous_backup_and_cleans_temp(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            previous = '{"previous": "durable"}'
+            path.write_text(previous, encoding="utf-8")
+            writer = engine.PlanBStatePersistence(str(path), enabled=True)
+            with patch("os.fsync", side_effect=OSError("simulated fsync failure")):
+                with self.assertRaisesRegex(RuntimeError, "Не удалось сохранить"):
+                    writer.save_state(
+                        engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
+                        {}, {}, 0,
+                    )
+            self.assertEqual(path.read_text(encoding="utf-8"), previous)
+            self.assertFalse(Path(str(path) + ".tmp").exists())
 
     def test_atomic_replace_failure_raises_and_cleans_temporary_file(self):
         with tempfile.TemporaryDirectory() as tmp:

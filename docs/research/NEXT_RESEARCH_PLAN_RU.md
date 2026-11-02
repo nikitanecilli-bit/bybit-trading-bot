@@ -409,3 +409,5 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Следующий шаг: выполнить ручной архив на 1-2 ликвидных инструментах и небольшом диапазоне, подтвердить фактический API доступ/форматы/coverage. Только после этого расширять на полный 50-symbol universe и 180-day период.
 - После получения реальных данных сверить funding timestamps против mark candle opens; помнить, что H1 open — proxy, не settlement mark. Не переписывать funding accounting или исторические результаты до отдельной проверки event-time semantics.
 - Только после успешной data validation подключать funding + mark data к воспроизводимым shared-capital H1 backtests, затем отдельным этапом — исторические risk tiers и maintenance-margin/liquidation model.
+
+- CI update: 12/12 tests for the Bybit history collector passed in Research CI #41518947460 (SUCCESS), including the guard against incomplete current H1 candles.

@@ -284,9 +284,14 @@ def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict
 
     active_order_rows = [order_row(item) for item in orders]
     historical_order_rows = [order_row(item) for item in historical_orders]
+    conditional_by_id = {}
+    for item in list(orders) + list(historical_orders):
+        previous = conditional_by_id.get(item.order_id)
+        if previous is None or item.updated_time_ms > previous.updated_time_ms:
+            conditional_by_id[item.order_id] = item
     conditional_order_rows = [
         order_row(item)
-        for item in list(orders) + list(historical_orders)
+        for item in conditional_by_id.values()
         if (item.stop_order_type not in (None, "", "UNKNOWN")
             or (item.trigger_price is not None and item.trigger_price > 0)
             or (item.take_profit is not None and item.take_profit > 0)

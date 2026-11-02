@@ -130,6 +130,31 @@ class StatePersistenceTests(unittest.TestCase):
                     engine.AdaptiveRiskManager(cfg)
                 )
 
+
+    def test_save_open_position_requires_last_mark(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "missing-save-mark.json"
+            writer = engine.PlanBStatePersistence(str(path), enabled=True)
+            with self.assertRaisesRegex(RuntimeError, "last marks"):
+                writer.save_state(
+                    engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
+                    {"BTCUSDT": sample_position()}, {}, 42,
+                )
+            self.assertFalse(path.exists())
+
+    def test_save_rejects_non_positive_or_non_finite_last_mark(self):
+        for invalid_mark in (0.0, -1.0, float("nan"), float("inf"), True):
+            with self.subTest(mark=invalid_mark), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "invalid-mark.json"
+                writer = engine.PlanBStatePersistence(str(path), enabled=True)
+                with self.assertRaisesRegex(RuntimeError, "last mark"):
+                    writer.save_state(
+                        engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
+                        {"BTCUSDT": sample_position()}, {}, 42,
+                        last_mark_prices={"BTCUSDT": invalid_mark},
+                    )
+                self.assertFalse(path.exists())
+
     def test_disabled_persistence_is_a_noop(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "disabled.json"

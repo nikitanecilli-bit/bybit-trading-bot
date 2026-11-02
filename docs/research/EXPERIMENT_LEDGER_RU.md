@@ -601,3 +601,17 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Found a scope mismatch: positions and order-history calls used `settleCoin=USDT`, but `/v5/execution/list` did not. For `category=linear`, that could mix settlement universes.
 - Added `settleCoin=USDT` to execution-history requests and asserted the query parameter on every history/execution call in the mocked collector test.
 - CI: [#41470373006](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41470373006), SUCCESS; full Research workflow passed.
+
+
+## E10 / E11 / E13 — уточнение сопоставимости временного покрытия (2026-11-02 audit)
+
+Проверка ZIP-артефактов и исходных скриптов выявила важное ограничение при сравнении E10 с E11:
+
+- E10 запускает каждый символ на его собственной временной последовательности свечей в фиксированных UTC fold bounds.
+- E11 и E13 строят пересечение timestamps всех 47 включённых символов и используют общий синхронизированный replay из 4,321 бара.
+- В manifest 25 символов имеют fold counts 1,314 / 1,314 / 1,753 (4,381 бар в сумме по fold windows), а 22 символа — 1,278 / 1,314 / 1,729 (4,321 бар). У 25 длинноисторических символов E10 включает дополнительно 36 часов в fold 1 и 24 часа в fold 3 на каждый символ, которых нет в common intersection E11/E13.
+- Manifest E11/E13 сохраняет per-symbol source coverage до пересечения timestamps; фактическое синхронизированное покрытие отражено в summary как common_bars=4,321.
+
+Следствие: E10 per-symbol aggregate PnL и E11 shared-capital PnL — разные estimands. Их разница не может быть приписана только переходу от независимых счетов к общему капиталу; влияет и разное фактическое временное покрытие. Для строгого сравнения E10 и E11 потребовался бы повтор E10 на том же 4,321-bar common timestamp set. Рыночные результаты старых fold windows уже просмотрены, поэтому такой повтор был бы диагностическим, а не новым holdout.
+
+Сравнение E11 baseline с E13 compression-OFF baseline остаётся валидным: одинаковые шесть source archive hashes, одинаковое common timestamp set, точное совпадение per-fold baseline metrics. E13 compression-ON улучшает суммарный PnL на 436.89 USDT, но общий результат остаётся отрицательным.

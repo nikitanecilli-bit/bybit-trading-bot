@@ -775,3 +775,16 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Added regression tests for adaptive subdivision and minimum-width saturation. Research CI run #41520724088 completed SUCCESS on commit 77fee281686a2ca29bdf295e3b8dcc011ea856e4; all 23 test steps succeeded. Run #41520495668 remained in progress during runner cleanup when last checked; do not treat it as terminal success.
 - Previous intermediate run #41520465851 failed only because it ran against the old test expecting immediate failure on a saturated page. The test was replaced with adaptive-pagination coverage and the subsequent full CI #41520724088 passed.
 - The API archive workflow still requires a manual dispatch. This GitHub connection has no workflow-dispatch action; no Bybit API data has been fetched or claimed. No main-branch change and no live orders.
+
+
+
+## ENG-DATA-006 — point-in-time linear universe collector (2026-11-03)
+
+- Официальный Bybit V5 API Explorer указывает статусы `PreLaunch`, `Trading`, `Settling`, `Delivering`, `Closed`; документация инструмента содержит `launchTime` и `deliveryTime`. Основной instruments-info collector ранее не передавал `status` и получал default Trading/PendingOpen.
+- Добавлен `scripts/snapshot_bybit_linear_universe.py`: запрашивает default Trading/PendingOpen плюс все документированные status filters, обходит pagination, валидирует status/symbol/launch/delivery и конфликтующие дубликаты, сохраняет датированный immutable snapshot в `data/universe_history/linear/`.
+- Добавлен lifecycle predicate только для LinearPerpetual USDT-settled. Он использует launch/delivery bounds; Closed/Settling/Delivering без deliveryTime fail closed. Это границы жизненного цикла, а не доказательство отсутствия временных suspension или фактической доступности новых ордеров.
+- Добавлены offline regression tests и manual-only workflow `.github/workflows/bybit-linear-universe-history.yml`. Существующий instrument-spec snapshot workflow переведён на schedule/manual-only, чтобы обычный push к collector code не инициировал сетевой запрос.
+- Research CI [#41540392254](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41540392254), SUCCESS, commit `041b7eb2f26d65ff26242e56163529174de538df`, 33/33 job steps completed without failures. Новый collector test step прошёл.
+- Параллельный автоматический запуск старого instrument-spec snapshot workflow [#41540268697](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41540268697) завершился HTTP 403 на `api.bybit.com`; snapshot step failed, commit step skipped. После этого push-trigger удалён; новый point-in-time workflow вручную не dispatch-ился. Никакого нового Bybit snapshot не создано и не заявляется.
+- Ограничение: status=Closed retention и соответствие launch/delivery историческому факту торговой доступности ещё не подтверждены реальным capture. Перед использованием universe для бэктеста требуется успешный non-empty capture и cross-check с официальными listing/delisting announcements. E01–E13 не пересчитаны; market backtests не запускались.
+- Code commits: `b424fdae1d2db583b00cce7c3fd47443c8bb44f8` (collector/workflow/CI wiring), `af47dca34628d8556dedbc1712c89508236912a0` (strict lifecycle bounds), `041b7eb2f26d65ff26242e56163529174de538df` (tests); latest docs commit at this note: `ad8bdae12a71472c979f98b576053756051e99d8`.

@@ -265,3 +265,12 @@ This is code-path verification with synthetic specs only. It does not establish 
 The strict path currently validates and floors the **opening order quantity** only. It does not yet validate the modeled TP1 partial close, final close, or any future reduce-only order quantity against qtyStep/minOrderQty/minNotionalValue. The engine still models TP1 as a 50% fractional reduction and reconstructs linear quantity downstream from `size_usdt / entry_price` (stored as float notional), rather than persisting the Decimal contract quantity as first-class position state.
 
 Therefore this change closes the entry sizing integration gap, but **does not make the entire position lifecycle exchange-quantity exact**. Before claiming contract-accurate replay, add persisted contract quantity and dated lot constraints to position state; quantize partial and final reduce-only quantities; reconcile any residual dust; and test minimum-close behavior. Liquidation/margin remains a separate open gate.
+
+
+## 19. Retired Bybit API host allowlist defect
+
+A cross-repository allowlist scan found that `scripts/archive_bybit_market_history.py` still accepted the retired/unofficial hosts `api.bybit.nl` and `api.bybit-tr.com`, despite the instrument and risk-limit collectors already using the current official host set. Both hosts have been removed. The market-history collector tests now positively enumerate current official hosts and reject both retired hosts.
+
+Research CI run [#41544092796](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41544092796), on code commit `2a0e0b958148f1bd69d43e4386c0487166eaa6d6`, shows compilation and every functional test step completed successfully, including the revised market-history host allowlist tests. At the last status check, GitHub was still executing the `Post Check out repository` cleanup step; no functional test remained pending. The subsequent documentation-only commit does not alter tested code.
+
+No request was sent to either retired host.

@@ -100,3 +100,34 @@ MAE/MFE рассчитываются в ценовых R от initial_stop_dist,
 The earlier audit verified that closed net PnL reconciled as gross PnL minus modeled fees, slippage and funding, but did not verify the notional basis used for each execution leg. A subsequent Bybit fee-formula audit found a confirmed defect: TP1/final exit fee and slippage were calculated from entry notional rather than actual modeled exit notional. This has now been corrected in v14; see `EXCHANGE_SIZING_INTEGRATION_AND_BYBIT_SCHEMA_2026-11-03.md` section 15.
 
 The earlier reconciliation conclusion remains true algebraically, but the historical fee amounts and net PnL values produced by the old formula were not exchange-price accurate. The regression suite now checks long/short stops, gaps, TP1/TP2 and MTM with execution-price notionals. CI #41536540759 passed.
+
+
+
+## E11/E13 artifact sensitivity — exit-notional fee correction (2026-11-03)
+
+Downloaded and inspected the archived E11 artifact `13105661683` and E13 artifact `13105403824`. Both use market execution and a 2× cost multiplier; E13 baseline reproduces E11 baseline. The trade CSVs retain gross PnL and the summary retains fold-level gross/net PnL.
+
+A fixed-trade, cost-only sensitivity can be calculated without changing trade sequence:
+
+- For each completed position, total exit notional across all exit legs equals entry notional plus gross PnL for linear USDT quantity accounting.
+- Old exit costs used entry notional; corrected exit costs use execution notional.
+- For all-taker exits with the same rate on every leg, aggregate exit-cost delta = gross PnL × 2 × (0.055% taker fee + 0.0225% taker slippage).
+- Therefore adjusted net for the *same historical trades* = old net − gross PnL × 0.00155.
+
+| Replay | Old sum of fold net | Cost-only adjusted estimate | Fold sums remain |
+|---|---:|---:|---|
+| E11 body gate OFF | -3,178.61 | -3,181.69 | -618.82 / -2,967.89 / +405.02 |
+| E11 body gate ON | -2,774.00 | -2,778.31 | -1,228.07 / -2,558.93 / +1,008.69 |
+| E13 compression OFF | -3,178.61 | -3,181.69 | -618.82 / -2,967.89 / +405.02 |
+| E13 compression ON | -2,741.72 | -2,744.98 | -296.65 / -2,612.60 / +164.27 |
+
+The cost-only correction changes the E11 body-gate improvement from +404.61 to approximately +403.38 USDT, and the E13 compression-gate improvement from +436.89 to approximately +436.71 USDT. Both variants remain materially negative, especially fold 2.
+
+**Important scope limitation:** this is not a rerun on the corrected engine. It holds the archived fills, sizes, and trade sequence fixed and estimates only the exit-notional cost delta from rounded aggregate gross PnL. The fee fix also changes stop-risk cost estimates used by position sizing; changed position sizes can affect portfolio capacity, fills and subsequent trade sequence. Per-leg cent rounding can also create small differences. Thus the table is a sensitivity estimate, not replacement ledger PnL and not a profitability claim.
+
+Source artifacts and commits:
+- E11 run 41361376448, artifact 13105661683, commit `ae6f7b4c99b79cbe31fdfeded8780a058b118049`.
+- E13 run 41362217727, artifact 13105403824, commit `f4da3cca0c0dc79cee86350ba6a680fc461e47fc`.
+- Fee correction CI run 41536540759, commit `4eb9a2e7d7fc6a198937ef028dec32a5f723e22d`.
+
+Decision: keep E11/E13 historical PnL marked provisional. No strategy conclusion changes; no market backtest or parameter sweep was run.

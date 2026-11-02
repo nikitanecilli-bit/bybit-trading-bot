@@ -32,9 +32,10 @@
 28. [ENG-RECON-003 — read-only V5 collector](research/experiment_cards/ENG-RECON-003_READONLY_COLLECTOR_RU.md) — read-only capture implementation; mocked CI passed, no real Bybit snapshot captured.
 29. [ENG-RECON-004 — report-only comparator](research/experiment_cards/ENG-RECON-004_REPORT_ONLY_COMPARATOR_RU.md) — validates snapshot integrity and reports differences; always blocks live resume.
 30. [ENG-RECON-005 — position protection visibility](research/experiment_cards/ENG-RECON-005_POSITION_PROTECTION_RU.md) — preserves exchange TP/SL/trailing-stop fields; does not verify trigger execution.
-31. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
-32. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
-33. [Карта репозитория](REPOSITORY_MAP_RU.md).
+31. [ENG-RECON-006 — historical order capture](research/experiment_cards/ENG-RECON-006_ORDER_HISTORY_RU.md) — paginated order history with explicit Bybit retention limits; not a complete event journal.
+32. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
+33. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
+34. [Карта репозитория](REPOSITORY_MAP_RU.md).
 
 ## Разделы
 

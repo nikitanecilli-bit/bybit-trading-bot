@@ -88,6 +88,13 @@ def accrued_funding_cost(
         fraction = Decimal("1")
         if tp1_ts is not None and ts > tp1_ts:
             fraction = remaining_fraction
+        elif tp1_ts is not None and ts == tp1_ts:
+            # TP1 and funding share an OHLC candle-close boundary. Event ordering
+            # is unknowable, so choose the quantity that is less favorable to PnL:
+            # full size for a payment, remaining size for a funding receipt.
+            full_position_cost = sign * quantity * mark * rate
+            if full_position_cost < 0:
+                fraction = remaining_fraction
         total += sign * quantity * mark * fraction * rate
 
     return total.quantize(CENT, rounding=ROUND_HALF_UP)

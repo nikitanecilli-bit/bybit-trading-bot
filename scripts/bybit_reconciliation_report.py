@@ -155,6 +155,8 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tupl
 
 
 def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(snapshot, dict):
+        raise ReportError("exchange snapshot root must be an object")
     if not isinstance(local_backup, dict):
         raise ReportError("local backup root must be an object")
     required = {

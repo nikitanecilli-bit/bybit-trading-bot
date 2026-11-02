@@ -48,17 +48,10 @@ jobs:
           START_MS: ${{ inputs.start_ms }}
           END_MS: ${{ inputs.end_ms }}
           INTERVAL: ${{ inputs.interval }}
+          BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}
         run: |
-          SUCCESS=0
-          for BASE_URL in https://api.bybit.com https://api.bytick.com https://api.bybit.kz https://api.bybit.tr https://api.bybitgeorgia.ge https://api.bybit.ae https://api.bybit.id; do
-            echo "Trying official Bybit public API endpoint: $BASE_URL"
-            if python scripts/archive_bybit_market_history.py --symbols "$SYMBOLS" --start-ms "$START_MS" --end-ms "$END_MS" --interval "$INTERVAL" --base-url "$BASE_URL" --output-root "data/archives/bybit/${START_MS}_${END_MS}_${GITHUB_RUN_ID}"; then
-              SUCCESS=1
-              break
-            fi
-            echo "Endpoint failed; trying next supported official host."
-          done
-          test "$SUCCESS" -eq 1
+          echo "Using configured official Bybit API base URL: $BYBIT_API_BASE_URL"
+          python scripts/archive_bybit_market_history.py --symbols "$SYMBOLS" --start-ms "$START_MS" --end-ms "$END_MS" --interval "$INTERVAL" --base-url "$BYBIT_API_BASE_URL" --output-root "data/archives/bybit/${START_MS}_${END_MS}_${GITHUB_RUN_ID}"
       - name: Require exact funding-settlement mark coverage
         env:
           SYMBOLS: ${{ inputs.symbols }}

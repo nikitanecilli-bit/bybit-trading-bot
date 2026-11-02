@@ -34,6 +34,9 @@ def make_engine():
     e.cfg = engine_mod.BotConfig(capital_usdt=10_000.0, timeframe="1h")
     e.risk_mgr = engine_mod.AdaptiveRiskManager(e.cfg)
     e.open_positions = {}
+    e.pending = {}
+    e.trade_seq = 0
+    e._bar_entry_risk_budgets = {}
     e._last_mark_prices = {}
     e._intrabar_risk_marks = {}
     e.closed_trades = []

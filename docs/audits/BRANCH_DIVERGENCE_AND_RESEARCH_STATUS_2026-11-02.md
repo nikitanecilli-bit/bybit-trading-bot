@@ -7,9 +7,9 @@
 - `main`: `e86b1bfd6d086684c32e395e0dc383802665d59f`
 - `research/market-regime-v1-main`: `df3b1ed1c37b5895aadb3636c088123e963bec73`
 - merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`
-- GitHub Compare (`main...research`): status `diverged`, research ahead 705, behind 13.
+- GitHub Compare (`main...research`): status `diverged`, research ahead 715, behind 13.
 - Pull Request #4: open, draft, not merged, `mergeable=false`, `mergeable_state=dirty`; head is current research HEAD.
-- PR reports 161 changed files, +17,196 / -116 lines.
+- PR reports 163 changed files, +17,550 / -116 lines.
 
 **Interpretation:** 705 commits is not 705 independent strategy changes; the branch has a long divergent history since the common ancestor. The count is a graph relationship, not a measure of code quality. The PR is not safe to merge as-is.
 
@@ -214,3 +214,11 @@ The pre-entry mark was calculated while the symbol had no open position, so its 
 ### Remaining boundary
 
 For intrabar limit fills, OHLC cannot prove whether the adverse extreme happened before or after the fill. The full adverse wick is intentionally conservative and consistent with the existing fill-bar MAE convention. This fix makes risk accounting safer; it does not make OHLC execution realistic or establish profitability. No market backtests were run.
+
+
+### Latest Git snapshot after ENG-RISK-001 (15:54 UTC)
+
+- Research HEAD: `6fbcc22693fce38ec699b42257a628bf390d1a09` (documentation update after the passing code/test commit).
+- Compare status remains `diverged`: 715 commits ahead, 13 behind main.
+- PR #4 now reports 163 changed files, +17,550 / -116 lines; it remains open and unmerged. GitHub's mergeability field is currently unknown, so do not treat it as merge-ready.
+- Latest code-changing commit `f65c08bec78b179a9a89832ce31b574740f4dce3` passed Research engine checks #41475941543. The two commits after it update documentation only; the current docs HEAD does not have a separate new CI run.

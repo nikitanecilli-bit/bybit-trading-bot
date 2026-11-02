@@ -285,11 +285,12 @@ def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict
     active_order_rows = [order_row(item) for item in orders]
     historical_order_rows = [order_row(item) for item in historical_orders]
     conditional_order_rows = [
-        row for row in active_order_rows + historical_order_rows
-        if (row["stop_order_type"] not in (None, "", "UNKNOWN")
-            or (row["trigger_price"] is not None and float(row["trigger_price"]) > 0)
-            or (row["take_profit"] is not None and float(row["take_profit"]) > 0)
-            or (row["stop_loss"] is not None and float(row["stop_loss"]) > 0))
+        order_row(item)
+        for item in list(orders) + list(historical_orders)
+        if (item.stop_order_type not in (None, "", "UNKNOWN")
+            or (item.trigger_price is not None and item.trigger_price > 0)
+            or (item.take_profit is not None and item.take_profit > 0)
+            or (item.stop_loss is not None and item.stop_loss > 0))
     ]
 
     exchange_by_symbol = {}

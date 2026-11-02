@@ -35,9 +35,9 @@ def inspect_csv(zf: zipfile.ZipFile, name: str) -> dict:
         low = (name + " " + ",".join(fields)).lower()
         if "funding_timestamp_ms" in fields or "funding_rate" in fields or "funding" in low:
             kind = "funding"
-        elif "mark" in low or ("timestamp_ms" in fields and "open" in fields and "close" in fields):
+        elif "mark" in low:
             kind = "mark_or_price"
-        elif NAME_RE.fullmatch(base):
+        elif NAME_RE.fullmatch(base) and {"open_time_ms", "open", "high", "low", "close", "volume"}.issubset(fields):
             kind = "ohlcv"
         return {"name": name, "kind": kind, "rows": count, "fields": fields,
                 "timestamp_field": ts_field, "first_timestamp": first_ts,

@@ -330,12 +330,18 @@ No production/live changes and no market backtests were performed in these corre
 - Parser 14/14, collector 12/12, comparator 14/14; full workflow #41459486381 SUCCESS.
 - Position-level fields are not proof of conditional-order health or stop trigger execution. No real position snapshot was captured.
 
+## ENG-RECON-006 — historical order capture (2026-11-02)
+
+- Added paginated `GET /v5/order/history` capture in <=7-day windows, orderId deduplication and explicit partial-coverage metadata.
+- 15 collector tests and 16 comparator tests passed; full configured workflow [#41460727701](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41460727701) SUCCESS.
+- Bybit's documented history retention means the endpoint is not a complete event journal: Cancelled/Rejected/Deactivated statuses are queryable only within 24h; beyond 7 days only orders with fills are queryable; endpoint may be delayed.
+
 ## Next technical gates
 
-1. Extend read-only capture with order history and document the endpoint's coverage limits. Bybit's official contract: per-request interval <= 7 days; cancelled/rejected/deactivated statuses are queryable only in the last 24 hours; beyond 7 days only orders with fills are available. Therefore history is not a complete event journal for arbitrary downtime.
-2. Add report-only diagnostics for historical orders and conditional/TP/SL order identities without ever returning a PASS.
-3. Design local exchange execution ledger and state schema: exact exchange qty, positionIdx/account mode, orderId/orderLinkId, execId, partial fills, stop/TP identifiers and status.
-4. Keep all network capture out of CI. Any live capture must use a Bybit-confirmed read-only key and must remain a manual, separately audited operation.
+1. Review and add conditional/TP/SL order identities from open orders and history where returned; position-level stop fields alone do not prove trigger-order health.
+2. Design a complete local exchange execution ledger and state schema: exact exchange qty, positionIdx/account mode, orderId/orderLinkId, execId, partial fills, stop/TP identifiers and status.
+3. Review account mode, margin mode and position-mode metadata needed to interpret positions and positionIdx; don't infer from row data alone.
+4. Keep all network capture out of CI. Any live capture must use a Bybit-confirmed read-only key and remain a separately audited manual operation.
 5. No PnL sweeps, live resume, order mutations or production deployment until execution/data gates are closed.
 
 Do not infer exchange qty from `size_usdt / entry_price`.

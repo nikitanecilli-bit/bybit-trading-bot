@@ -1086,10 +1086,24 @@ class MaintenanceGateAuditor:
         else:
             cost_drag_pct = 100.0 if total_costs > 0 else 0.0
 
+        # Closed trades sharing one exit timestamp are a single portfolio
+        # equity event. Iterating them individually makes max drawdown depend
+        # on symbol/list order (e.g. a same-bar win before a stop loss).
+        pnl_by_exit_ts: Dict[datetime, float] = {}
+        for trade in trades:
+            try:
+                exit_dt = datetime.fromisoformat(trade.exit_date.replace("Z", "+00:00"))
+            except (AttributeError, TypeError, ValueError) as exc:
+                raise ValueError(f"invalid trade exit_date for drawdown calculation: {trade.exit_date!r}") from exc
+            if exit_dt.tzinfo is None or exit_dt.utcoffset() is None:
+                raise ValueError(f"trade exit_date must include timezone: {trade.exit_date!r}")
+            exit_dt = exit_dt.astimezone(timezone.utc)
+            pnl_by_exit_ts[exit_dt] = pnl_by_exit_ts.get(exit_dt, 0.0) + trade.pnl_usdt
+
         eq = peak = cfg.capital_usdt
         max_dd_pct = 0.0
-        for t in trades:
-            eq += t.pnl_usdt
+        for exit_dt in sorted(pnl_by_exit_ts):
+            eq += pnl_by_exit_ts[exit_dt]
             peak = max(peak, eq)
             if peak > 0:
                 max_dd_pct = max(max_dd_pct, (peak - eq) / peak * 100.0)

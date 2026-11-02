@@ -485,3 +485,5 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Проверка root/scripts подтверждает, что текущий репозиторий — research-only: не найден live order submission adapter (`/v5/order/create`, `place_order`, `create_order`, pybit отсутствуют в engine). Не планировать интеграцию live orders до отдельного создания и аудита execution adapter. Текущий P1 — contract-accurate research sizing; production order lifecycle — отдельный этап.
 
 - После проверки всех official regional hosts fallback-loop удалён: workflows используют один `BYBIT_API_BASE_URL` repository variable (default `https://api.bybit.com`), без перебора юрисдикций. Новый single-host run #41534141800 (instrument) и #41534156659 (risk-limit) также получил HTTP 403; архивы не созданы. При необходимости владелец задаёт variable на официальный host своего региона; не использовать cross-region fallback для обхода отказа.
+
+- Дополнительно закрыт fail-open в parser: `maxOrderQty` и `maxMktOrderQty` больше не optional для Linear; оба обязательны. Тест удаления каждого поля проходит. CI #41534399745 и #41534426284 — success. Exact qty integration в engine остаётся не сделана.

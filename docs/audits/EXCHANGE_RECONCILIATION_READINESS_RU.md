@@ -134,3 +134,22 @@ The official [Get Order History](https://bybit-exchange.github.io/docs/v5/order/
 Therefore order history cannot be treated as a complete event journal for a long outage. It can supplement executions and current active orders, but it cannot prove that every cancelled/rejected/deactivated unfilled order has been captured across arbitrary downtime. The next collector extension must preserve this coverage limitation explicitly, not report an exhaustive order history.
 
 Final state remains `UNSUPPORTED_LOCAL_MODEL / BLOCKED`: no exact local exchange qty, `positionIdx`, order ID/link-ID map, full execution ledger, or complete historical order journal. No live resume or PnL sweep.
+
+
+## ENG-RECON-006 — historical order capture
+
+Collector now fetches `GET /v5/order/history` in cursor-paginated intervals of no more than seven days. Raw pages and interval boundaries are hashed into the snapshot. Duplicate `orderId` rows across windows are reduced to the newest `updatedTime`; conflicting same-time records fail closed.
+
+The snapshot records `QUERYABLE_WINDOW_ONLY_NOT_COMPLETE`. This is intentional and required by the official endpoint contract:
+- closed statuses except Cancelled/Rejected/Deactivated are queryable in the last 7 days;
+- Cancelled/Rejected/Deactivated are queryable only in the last 24 hours;
+- beyond 7 days, only orders with fills are queryable;
+- order creation/cancellation data may be delayed.
+
+Official source: [Bybit Get Order History](https://bybit-exchange.github.io/docs/v5/order/order-list). This endpoint cannot reconstruct every unfilled cancellation/rejection across an arbitrary outage and is not a complete event journal.
+
+Comparator validates the historical-order pages, coverage interval and metadata, reports IDs/statuses, but still never returns PASS.
+
+CI: [Research engine checks #41460727701](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41460727701), SUCCESS; parser 14/14, collector 15/15, comparator 16/16, persistence 54/54, configured suites and secret scan passed.
+
+No real Bybit snapshot was captured. Final reconciliation remains `UNSUPPORTED_LOCAL_MODEL / BLOCKED`: no exact local exchange qty, positionIdx, order identity map or full local execution ledger. No live resume or PnL sweep.

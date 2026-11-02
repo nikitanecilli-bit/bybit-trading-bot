@@ -105,7 +105,8 @@ def _http_json(url: str, headers: dict[str, str] | None = None,
                timeout: float = TIMEOUT_SECONDS) -> dict[str, Any]:
     request = urllib.request.Request(url, headers=headers or {}, method="GET")
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        opener = urllib.request.build_opener(_NoRedirectHandler())
+        with opener.open(request, timeout=timeout) as response:
             raw = response.read()
     except urllib.error.HTTPError as exc:
         raise CollectorError(
@@ -234,8 +235,7 @@ def collect_snapshot(
 ) -> dict[str, Any]:
     if not api_key or not secret:
         raise CollectorError("API credentials are missing")
-    if not base_url.startswith("https://"):
-        raise ValueError("HTTPS is required")
+    _validate_base_url(base_url)
     saved_ms = _parse_utc_ms(saved_at_utc)
     capture_started_ms = _utc_ms()
     _read_only_key_check(base_url, api_key, secret, request_json)

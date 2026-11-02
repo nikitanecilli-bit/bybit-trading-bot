@@ -503,6 +503,79 @@ def test_new_trailing_stop_is_not_applied_retroactively_to_same_candle():
     assert "BTCUSDT" in e.open_positions
 
 
+def _fill_bar_mtm_case(direction):
+    e = make_engine()
+    ts = 1_800_000_000_000
+    signal = pending_signal("market", 100.0, direction)
+    signal["stop_dist"] = 20.0
+    e.pending["BTCUSDT"] = signal
+    e._last_mark_prices = {}
+    e._intrabar_risk_marks = {}
+    e._intrabar_risk_marks_ts = None
+    e._bar_entry_risk_budgets = {}
+    marks = []
+
+    class FillBarRiskSpy:
+        current_equity = 10_000.0
+        kill_switch_triggered = False
+
+        @staticmethod
+        def on_new_timestamp(_ts):
+            return None
+
+        @staticmethod
+        def can_open_new_trade(_count):
+            return True, "OK"
+
+        @staticmethod
+        def calculate_position_size(_entry, _stop, order_type="market", risk_budget_usdt=None):
+            return 1_000.0, 10.0
+
+        def mark_to_market(self, unrealized_pnl, mark_ts):
+            marks.append((unrealized_pnl, mark_ts))
+            hit = unrealized_pnl <= -50.0
+            if hit:
+                self.kill_switch_triggered = True
+            return {"kill_switch_hit": hit, "daily_stop_hit": False}
+
+    e.risk_mgr = FillBarRiskSpy()
+    e._unrealized_pnl_at_marks = lambda _as_of_ts=None: sum(
+        pos.size_usdt
+        * (1.0 if pos.direction == "long" else -1.0)
+        * (e._intrabar_risk_marks.get(sym, pos.entry_price) - pos.entry_price)
+        / pos.entry_price
+        for sym, pos in e.open_positions.items()
+    )
+    e._update_mark_to_market = engine_mod.UnifiedQuantEngine._update_mark_to_market.__get__(
+        e, engine_mod.UnifiedQuantEngine
+    )
+    e._manage_position = lambda *_args, **_kwargs: None
+    e._persist = lambda: None
+    e.tg = type("Notifier", (), {"send_message": lambda self, _message: None})()
+
+    if direction == "long":
+        curr = candle(100.0, 102.0, 90.0, 100.5, ts=ts)
+    else:
+        curr = candle(100.0, 110.0, 98.0, 99.5, ts=ts)
+
+    e.step_candle("BTCUSDT", [curr])
+    return e, marks, ts + 900_000
+
+
+def test_new_long_fill_bar_adverse_mark_triggers_portfolio_kill_switch():
+    e, marks, close_ts = _fill_bar_mtm_case("long")
+    assert marks == [(0.0, close_ts), (-100.0, close_ts)], marks
+    assert e.risk_mgr.kill_switch_triggered is True
+    assert "BTCUSDT" in e.open_positions
+
+
+def test_new_short_fill_bar_adverse_mark_triggers_portfolio_kill_switch():
+    e, marks, close_ts = _fill_bar_mtm_case("short")
+    assert marks == [(0.0, close_ts), (-100.0, close_ts)], marks
+    assert e.risk_mgr.kill_switch_triggered is True
+    assert "BTCUSDT" in e.open_positions
+
+
 if __name__ == "__main__":
     tests = [
         test_market_long_gap_above_chase_limit_is_cancelled,
@@ -530,6 +603,8 @@ if __name__ == "__main__":
         test_fill_bar_long_stop_does_not_count_pre_entry_or_later_favorable_wick,
         test_fill_bar_short_stop_does_not_count_pre_entry_or_later_favorable_wick,
         test_new_trailing_stop_is_not_applied_retroactively_to_same_candle,
+        test_new_long_fill_bar_adverse_mark_triggers_portfolio_kill_switch,
+        test_new_short_fill_bar_adverse_mark_triggers_portfolio_kill_switch,
     ]
     for test in tests:
         test()

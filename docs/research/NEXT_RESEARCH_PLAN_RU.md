@@ -467,3 +467,11 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Дополнительная проверка показала, что weekly snapshot workflows и оба downloader script уже существуют. Ожидаемые output dirs `data/instrument_specs/linear` и `data/instrument_specs/risk_limits` на момент проверки отсутствуют (GitHub contents 404); свежий snapshot/run не подтверждён. Не создавать дублирующие workflow/scripts. Следующий шаг — получить результат уже существующего scheduled/manual workflow; dispatch через подключённые инструменты в этой сессии недоступен.
 
 - Дополнительно скорректирован cron `.github/workflows/bybit-instrument-snapshots.yml`: теперь snapshot запускается 3-го и 17-го числа в 02:17 UTC, после указанного Bybit обновления лимитов в 08:00 UTC+8. Ручной dispatch сохранён. Commit `747862d`; сам workflow не запускался в этой сессии.
+
+
+## Дополнение 2026-11-03 — fail-closed sizing и workflow evidence
+
+- Повторная проверка InstrumentSpec выявила отсутствие `minPrice/maxPrice`, отсутствие запрета на явно не-linear category и отсутствие запрета на sizing инструмента в статусе `PendingOpen`/unknown. Внесено fail-closed исправление в `bybit_instrument_specs.py`, регрессионные тесты добавлены в parser/sizing tests. Коммиты: `924e7da`, `7e94b3d`, `95e74cc`.
+- GitHub Actions #631/#632 были запущены push-ами автоматически. Результаты на момент записи ещё проверяются; не объявлять тесты успешными до completed conclusion.
+- Через Actions REST удалось получить историю и логи Bybit instrument snapshot workflow #7–#10. Все три доступных run IDs (#7–#10) завершились failure на Download step; logs явно показывают HTTP 403 на API endpoints, после чего job exit code 1. Это сетевой/API access blocker. Не пробовать обходить гео/сетевые ограничения.
+- Приоритет: дождаться CI новых fail-closed тестов; затем отдельно проверить risk-limit snapshot workflow runs и его job logs. Только после реального официального snapshot реализовывать margin/liquidation calculator. Exact qty engine integration остаётся отдельным P1/P0 execution realism blocker.

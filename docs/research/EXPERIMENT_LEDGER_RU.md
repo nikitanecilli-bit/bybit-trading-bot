@@ -521,3 +521,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Parser now rejects boolean `retCode=False` even though Python considers `False == 0`; only an actual integer zero is accepted as API success.
 - Tests: 13/13. Test commit `9fdaa02d764495a59747f0930e89fa677d03b890`.
 - CI: [Research engine checks #41448898597](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41448898597), SUCCESS; parser 13/13 and persistence 54/54.
+
+
+## ENG-RECON-003 — read-only Bybit V5 snapshot collector (2026-11-02)
+
+- Card: [ENG-RECON-003](experiment_cards/ENG-RECON-003_READONLY_COLLECTOR_RU.md).
+- Added `scripts/bybit_reconciliation_snapshot.py`: read-only API-key verification, official-host allowlist, redirects disabled, server-time bounds, cursor pagination, seven-day execution windows, execId deduplication, raw SHA-256 and atomic fsync artifact write.
+- Added 10 mocked deterministic tests and wired compile/test steps into `research-checks.yml`.
+- Commits: collector/hardening `bc62ee0d2de849bd8742fa67ec13a8f3fd0c1338`, `49ea05fb32b73b4f3fde41d16b19bd04d5357a78`, `8a6b5efc0199b1b707d12ac95eeb508e900e53e7`, `4f6470ee0955de0beafba25d010f2266ba25dc5d`; test/workflow/docs follow-ups include `423e7fb3f15c5674aa8f99f44e2f448dbc52db03`, `1098d6ddfd9222fa6e4f9ef52baf4b6638935ade`.
+- CI: pending/unverified. The available GitHub status lookup returned no status records; this is not a passing result.
+- Decision: IN PROGRESS. No live Bybit call was made and no real snapshot exists.
+- Limitations: no order history or exchange-side stop/TP verification; local model still lacks exact qty, positionIdx and order/execution identities. Reconciliation and live resume remain BLOCKED. No PnL sweep.

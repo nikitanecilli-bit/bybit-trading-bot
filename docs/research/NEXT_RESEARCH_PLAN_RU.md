@@ -454,3 +454,12 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Подтверждённого дефекта формулы stop-risk sizing не найдено, но ликвидационная устойчивость не моделируется. Это блокирующее ограничение execution realism, а не основание придумывать коэффициенты.
 - Отчёт: `docs/audits/LEVERAGE_MARGIN_LIQUIDATION_AUDIT_2026-11-03.md`; матрица покрытия обновлена.
 - Следующий шаг: получить датированные официальные Bybit instrument + risk-tier snapshots; после этого разработать pure margin calculator и deterministic fixtures для long/short, cross/isolated, tier transitions, mark-price trigger, fees/funding, partial fills и stop-vs-liquidation. Не запускать PnL sweeps и не делать выводов о liquidation safety до закрытия этого gate.
+
+
+## Дополнение 2026-11-03 — exchange sizing integration / Bybit schema
+
+- Проверка официальной документации уточнила, что поля `minNotionalValue`, `maxOrderQty`, `maxMktOrderQty` корректны для Linear/Inverse; Spot использует другую схему. Linear parser менять не нужно.
+- Подтверждён integration gap: основной `_try_fill_pending()` использует `size_usdt` как notional proxy и не вызывает `size_to_exchange_constraints()`; OpenPositionState, TP1, funding и PnL не хранят/не используют точный contract qty.
+- Отчёт: `docs/audits/EXCHANGE_SIZING_INTEGRATION_AND_BYBIT_SCHEMA_2026-11-03.md`.
+- Официальный Bybit V5 risk-limit endpoint публикует `riskLimitValue`, `maintenanceMargin`, `initialMargin`, `maxLeverage`, `mmDeduction`, но свежие значения API в этой сессии не получены. Документация не заменяет архивный snapshot.
+- Следующий этап: определить контрактную семантику qty и расширить position/trade records, versioned instrument/risk snapshots, затем подключить exact qty к TP1/remaining qty/funding/PnL. Изолированную liquidation формулу реализовывать только с настоящими tier fixtures и piecewise tier validation; cross/UTA требует account-level model и остаётся заблокирован.

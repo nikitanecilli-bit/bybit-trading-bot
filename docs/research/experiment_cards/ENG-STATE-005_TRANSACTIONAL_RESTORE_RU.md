@@ -1,6 +1,6 @@
 # ENG-STATE-005 — transactional state restore
 
-Статус до изменения: CONFIRMED SAFETY DEFECT / risk manager mutates before full backup validation.  
+Статус: ACCEPT — transactional restore regression и CI прошли.  
 Дата: 2026-11-02.  
 Тип: state restore atomicity; deterministic tests only.
 
@@ -30,4 +30,12 @@
 
 ## Решение
 
-OPEN до regression tests и CI. Рыночные backtests не нужны.
+Решение: ACCEPT для исследовательского движка.
+
+- Исправление: commit `ee191fb37711a2304b5a7a64752f629a7e0566d4`.
+- Тесты: commit `481a71484579f700feef53930326bde50a4513d1`.
+- CI: [Research engine checks #41433598794](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41433598794), SUCCESS.
+- `tests/test_state_persistence.py`: 9/9; malformed positions, pending payload и trade sequence не изменяют исходный risk manager.
+- Compile, все configured deterministic suites и secret scan прошли.
+
+ACCEPT означает атомарность локального применения backup в памяти. Не заменяет exchange reconciliation, freshness/schema migration или durability.

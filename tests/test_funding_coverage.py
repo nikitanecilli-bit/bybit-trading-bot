@@ -40,8 +40,8 @@ class FundingCoverageTests(unittest.TestCase):
 
     def write_trades(self, rows):
         (self.trades / "BTCUSDT.csv").write_text(
-            "symbol,timestamp_ms,open,high,low,close,volume,turnover\\n" +
-            "".join(f"BTCUSDT,{ts},100,102,99,101,10,1010\\n" for ts in rows),
+            "symbol,timestamp_ms,open,high,low,close,volume,turnover\n" +
+            "".join(f"BTCUSDT,{ts},100,102,99,101,10,1010\n" for ts in rows),
             encoding="utf-8",
         )
 

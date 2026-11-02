@@ -180,4 +180,17 @@ E13 compression-ON rows from the artifact reproduce the report:
 - Fold 2: -2,614.55 USDT, 197 trades, 137 blocked.
 - Fold 3: +167.76 USDT, 316 trades, 89 blocked.
 
-The compression gate improves the sum by +436.89 USDT but leaves every fold except the ungated fold 3? More precisely, gated fold 1 and fold 2 remain negative; gated fold 3 remains positive but is reduced from +409.06 to +167.76. No claim of positive overall expectancy is justified.
+The compression gate improves the sum by +436.89 USDT, but gated fold 1 and fold 2 remain negative; gated fold 3 remains positive but is reduced from +409.06 to +167.76. No claim of positive overall expectancy is justified.
+
+
+### E10/E11/E13 universe and source-manifest equivalence
+
+A direct row-by-row comparison of the downloaded E10, E11 and E13 universe manifests found exact equality across all 50 symbol rows and all manifest columns:
+- same 50 discovered symbols;
+- same 47 included symbols;
+- same three exclusions (AERO, GRAM, HYPE) and exclusion reasons;
+- same per-symbol bars, start/end timestamps, per-fold bar counts and source archive names.
+
+The six source ZIP SHA-256 values embedded in E10, E11 and E13 are also identical. Thus the E10 vs E11 difference is not explained by a different symbol list or different per-symbol bar coverage in the manifests: it is primarily the accounting/simulation design difference (independent 10k accounts per symbol versus one shared-capital portfolio, plus synchronized event ordering). This makes E11 the more relevant portfolio result.
+
+Caveat remains: the 50-symbol CryptoFetch archive is a fixed uploaded universe, not a verified point-in-time historical Bybit listing universe. New listings with insufficient first-fold history were excluded; delisted, renamed or unavailable historical instruments may be absent. Survivorship/universe-selection bias is therefore not fully ruled out.

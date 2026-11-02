@@ -594,3 +594,10 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Added official-host allowlist, redirect refusal, strict integer response checks and no response-body logging.
 - 10 mocked regression tests passed; full Research checks [#41469608200](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41469608200), SUCCESS including secret scan.
 - No real API key or private request was used. Manual credential check remains unrun; no account permissions are claimed as verified.
+
+
+### ENG-RECON-003 follow-up — explicit USDT execution scope (2026-11-02)
+
+- Found a scope mismatch: positions and order-history calls used `settleCoin=USDT`, but `/v5/execution/list` did not. For `category=linear`, that could mix settlement universes.
+- Added `settleCoin=USDT` to execution-history requests and asserted the query parameter on every history/execution call in the mocked collector test.
+- CI: [#41470373006](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41470373006), SUCCESS; full Research workflow passed.

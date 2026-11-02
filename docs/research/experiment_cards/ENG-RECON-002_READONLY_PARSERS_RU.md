@@ -16,7 +16,7 @@ No HTTP client, credentials, private API call, order mutation or engine restore 
 
 ## Tests
 
-`tests/test_bybit_reconciliation.py`: 13/13:
+`tests/test_bybit_reconciliation.py`: 14/14:
 - complete multi-page positions and hedge-side identities;
 - empty zero-size position rows;
 - duplicate position/order/execution identities;
@@ -40,3 +40,8 @@ No HTTP client, credentials, private API call, order mutation or engine restore 
 - No local-vs-exchange comparator yet.
 - Current local position model still lacks exact contract qty, positionIdx and exchange order/execution IDs. Overall reconciliation remains `UNSUPPORTED_LOCAL_MODEL / BLOCKED`.
 - No market PnL sweep, production deployment or live order.
+
+
+## Follow-up: position protection fields
+
+The parser now also preserves optional Bybit position `takeProfit`, `stopLoss`, `trailingStop` and `tpslMode` fields. See [ENG-RECON-005](ENG-RECON-005_POSITION_PROTECTION_RU.md). Parser coverage is now 14/14; full workflow #41459486381 passed.

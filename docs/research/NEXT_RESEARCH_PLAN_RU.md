@@ -319,3 +319,12 @@ No production/live changes and no market backtests were performed in these corre
 - Не запускать collector с GitHub Secrets и не делать реальные API-вызовы в рамках CI. Нужен отдельный, осознанный ручной запуск только с ключом, который Bybit подтвердил как read-only; до него не заявлять, что snapshot существует.
 - После успешного CI: провести дополнительный review схем/пагинации и только затем report-only comparator. Comparator обязан возвращать BLOCKED при любом открытом exchange position/order, пока local model не содержит exact qty, positionIdx и order/execution identities.
 - Ни новые PnL sweeps, ни live resume не разрешены этим этапом.
+
+
+## ENG-RECON-004 — report-only comparator (2026-11-02)
+
+- Implemented `scripts/bybit_reconciliation_report.py`; validates backup/snapshot integrity, parser output, counts, UTC chronology and contiguous execution coverage; emits only diagnostic report.
+- 12/12 tests and full configured workflow passed in [Actions #41458773696](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41458773696).
+- Comparator never returns PASS and always sets `live_resume_allowed=false`. This is intentional until local state has exact exchange qty, positionIdx, order IDs/link IDs and full execution ledger.
+- Next: independently review Bybit endpoint schema/pagination against current official docs; add order-history and exchange-side stop/TP capture to the read-only snapshot design; then specify the missing local execution ledger and exchange identity model. Do not infer qty from `size_usdt / entry_price`.
+- Do not call live endpoints from CI. Do not run PnL sweeps until Bybit data/execution realism gates are closed.

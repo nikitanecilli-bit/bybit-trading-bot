@@ -44,9 +44,12 @@ class StatePersistenceTests(unittest.TestCase):
             position = sample_position()
             pending = {
                 "ETHUSDT": {
-                    "direction": "short", "entry_price": 2000.0,
-                    "order_type": "limit", "strategy": "state-test",
-                    "stop_dist": 100.0,
+                    "symbol": "ETHUSDT", "direction": "short",
+                    "strategy": "state-test", "signal_ts": 1_800_000_000_000,
+                    "entry_price": 2000.0, "stop_price": 2100.0,
+                    "tp1_price": 1900.0, "tp2_price": 1800.0,
+                    "stop_dist": 100.0, "atr": 50.0, "vol_ratio": 1.25,
+                    "session": "eu", "order_type": "limit",
                 }
             }
             writer = engine.PlanBStatePersistence(str(path), enabled=True)
@@ -124,6 +127,46 @@ class StatePersistenceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Не удалось безопасно восстановить"):
                 engine.PlanBStatePersistence(str(path)).load_state(risk)
             self.assertEqual(risk.to_dict(), before)
+
+    def test_pending_non_object_entry_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "pending-entry.json"
+            path.write_text(
+                '{"risk": {}, "open_positions": {}, "pending_orders": {"BTCUSDT": []}}',
+                encoding="utf-8",
+            )
+            risk = engine.AdaptiveRiskManager(engine.BotConfig())
+            before = risk.to_dict().copy()
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(risk)
+            self.assertEqual(risk.to_dict(), before)
+
+    def test_pending_missing_required_field_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "pending-missing.json"
+            path.write_text(
+                '{"risk": {}, "open_positions": {}, "pending_orders": '
+                '{"BTCUSDT": {"symbol": "BTCUSDT", "direction": "long", '
+                '"strategy": "test", "entry_price": 100, "order_type": "market"}}}',
+                encoding="utf-8",
+            )
+            risk = engine.AdaptiveRiskManager(engine.BotConfig())
+            with self.assertRaisesRegex(RuntimeError, "Не удалось безопасно восстановить"):
+                engine.PlanBStatePersistence(str(path)).load_state(risk)
+
+    def test_pending_invalid_direction_and_numeric_values_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "pending-invalid.json"
+            path.write_text(
+                '{"risk": {}, "open_positions": {}, "pending_orders": '
+                '{"BTCUSDT": {"symbol": "BTCUSDT", "direction": "sideways", '
+                '"strategy": "test", "entry_price": 100, "stop_dist": 2, '
+                '"order_type": "market"}}}',
+                encoding="utf-8",
+            )
+            risk = engine.AdaptiveRiskManager(engine.BotConfig())
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(risk)
 
     def test_invalid_trade_sequence_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

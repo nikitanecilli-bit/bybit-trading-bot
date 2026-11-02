@@ -10,7 +10,7 @@
 | Look-ahead | PARTIAL | Основной signal core использует только предыдущие бары для Donchian/ATR; полный аудит scripts/features/folds не завершён | Статический аудит всех сигналов/фич/выходов и fold construction |
 | Stop/TP внутри свечи | PARTIAL | `test_gap_execution.py`: long/short stop-vs-TP1/TP2 collision, fill-bar stop, trailing-stop timing; `test_time_model.py`: kill-switch vs TP2 same-bar collision (ENG-KS-001) | OHLC не раскрывает реальный порядок high/low; проверить time-stop/TP collisions, multi-position risk-trigger sequencing и execution proxy |
 | Market gap execution | PARTIAL | `test_gap_execution.py` и gap report существуют | Повторить тесты, проверить точное покрытие |
-| Limit fills | PARTIAL | E03/E07/E09 моделируют лимитное касание | Нет queue/partial fill/spread/adverse selection |
+| Limit fills | PARTIAL | `test_gap_execution.py`: marketable gap-through long/short классифицируются как taker; обычный OHLC touch остаётся maker proxy; fees/slippage per leg проверяются | Нет bid/ask, queue priority, partial fill, cancellation latency и adverse selection; non-gap maker touch остаётся оптимистичным proxy |
 | Fees | PARTIAL | В v14 есть maker/taker fees per leg; в v15 отдельная модель fee/slippage | Сопоставить тарифы, maker/taker по каждой ноге и rounding |
 | Slippage | PARTIAL | В движке есть модель slippage | Проверить применение к фактической цене и sizing |
 | Funding | PARTIAL / UNVERIFIED IN CURRENT BRANCH | В отдельной diverged ветке есть downloader, mark-price loader, funding cashflow и synthetic tests; текущая ветка это не использует | Проверить exact mark price, settlement semantics и интегрировать отдельным патчем; старые результаты не funding-adjusted |

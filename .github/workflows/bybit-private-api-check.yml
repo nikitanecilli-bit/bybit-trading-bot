@@ -31,6 +31,27 @@ jobs:
           ref: research/market-regime-v1-main
           persist-credentials: false
 
+      - name: Diagnose runner egress geography (no credentials)
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          try:
+              request = urllib.request.Request(
+                  "https://ipinfo.io/json",
+                  headers={"User-Agent": "bybit-readonly-network-diagnostic/1.0"},
+              )
+              with urllib.request.urlopen(request, timeout=10) as response:
+                  data = json.loads(response.read().decode("utf-8"))
+              print("Runner egress country:", data.get("country", "unknown"))
+              print("Runner egress region:", data.get("region", "unknown"))
+              print("Runner egress organization:", data.get("org", "unknown"))
+          except Exception as exc:
+              print("Runner egress geolocation unavailable:", type(exc).__name__)
+          PY
+
       - name: Verify Bybit V5 read-only API credentials
         env:
           BYBIT_API_KEY: ${{ secrets.BYBIT_API_KEY }}

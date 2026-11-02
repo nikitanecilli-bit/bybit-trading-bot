@@ -11,6 +11,7 @@ from scripts.bybit_reconciliation_snapshot import (
     MAX_EXECUTION_WINDOW_MS,
     _execution_intervals,
     _signature,
+    _NoRedirectHandler,
     collect_snapshot,
 )
 
@@ -99,6 +100,11 @@ class ReconciliationCollectorTests(unittest.TestCase):
         fake = FakeTransport(fail_endpoint="/v5/position/list")
         with self.assertRaisesRegex(CollectorError, "retCode must be integer zero"):
             collect_snapshot("key", "secret", SAVED, request_json=fake)
+
+    def test_redirect_handler_refuses_redirects(self):
+        handler = _NoRedirectHandler()
+        self.assertIsNone(handler.redirect_request(None, None, 302, "Found", {},
+                                                   "https://attacker.example/"))
 
     def test_rejects_non_bybit_https_host_before_credentials_are_sent(self):
         fake = FakeTransport()

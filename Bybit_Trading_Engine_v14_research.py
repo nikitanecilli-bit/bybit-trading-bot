@@ -1299,6 +1299,7 @@ class UnifiedQuantEngine:
                 funding_cost = float(accrued_funding_cost(
                     pos, self.funding_by_symbol[sym],
                     self._funding_mark_prices.get(sym, {}), funding_ts,
+                    defer_boundary_receipts=True,
                 ))
             total += gross - entry_cost - entry_slip - tp1_cost - tp1_slip - exit_cost - funding_cost
         return total

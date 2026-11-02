@@ -53,7 +53,7 @@ The report surfaces counts, exchange identifiers, symbol mismatches and directio
 - non-object snapshot rejection;
 - wrong market scope rejection.
 
-CI: [Research engine checks #41467807857](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41467807857), SUCCESS; later full suite [#41468327832](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468327832), SUCCESS. Comparator now rejects conflicting duplicate `execId` records across adjacent intervals rather than silently overwriting them. Latest full suite includes parser 15/15, collector 15/15, comparator 17/17 and instrument snapshot collector tests.
+CI: [Research engine checks #41467807857](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41467807857), SUCCESS; later full suite [#41468327832](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468327832), SUCCESS. Comparator now rejects conflicting duplicate `execId` records across adjacent intervals rather than silently overwriting them. Latest full suite #41468736376 includes parser 16/16, collector 15/15, comparator 17/17 and instrument snapshot collector tests.
 
 ## Ограничения
 

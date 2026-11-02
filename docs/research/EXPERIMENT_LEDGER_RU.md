@@ -743,3 +743,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Added weekly/manual workflow `.github/workflows/bybit-risk-limit-snapshots.yml`; network capture is deliberately not part of CI. No API credentials are required or used.
 - Offline tests: 9/9 passed. Full Research CI [#41518145630](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41518145630), SUCCESS. Includes existing instrument specs, sizing, funding, reconciliation, regime, gap, accounting and persistence suites.
 - Important limitation: this is a prospective point-in-time archive, not a historical risk-tier source. Current risk tiers must not be backdated to earlier test periods. The workflow has not yet captured a real snapshot; previous public Bybit metadata access returned HTTP 403. No proxy or access-control bypass attempted.
+
+
+## ENG-DATA-003 — официальный архив funding settlements и mark-price H1 (2026-11-02)
+
+- Добавлен scripts/archive_bybit_market_history.py для GET /v5/market/funding/history и GET /v5/market/mark-price-kline (linear).
+- Funding выгружается короткими непересекающимися окнами с обязательными startTime + endTime; насыщение лимита 200 строк приводит к ошибке, а не к тихо неполному архиву. Mark klines запрашиваются окнами до 899 H1-свечей, сортируются по времени и сверяются с полной ожидаемой часовой сеткой; любой пропуск останавливает сбор.
+- Сборщик проверяет числовые значения, OHLC-инварианты, символ, временные границы, запрещает редиректы и неофициальные API-хосты, ограничивает имена символов безопасным ASCII-форматом, пишет CSV атомарно и выдерживает паузу между окнами.
+- Формат funding CSV совместим с scripts/validate_funding_coverage.py; после загрузки workflow требует точного совпадения каждого funding settlement timestamp с open timestamp mark-price H1 candle.
+- Добавлен manual workflow .github/workflows/bybit-market-history-archive.yml. Каждый запуск сохраняет отдельную папку с start_ms, end_ms, GitHub run id, чтобы повторная выгрузка не затирала предыдущий архив. После preflight архив коммитится только в research branch.
+- 11/11 новых offline tests прошли в CI #41518707514 (SUCCESS). Последующий кодовый commit 83af4e662e1f66a28a8dce5e064fbedb54347c0c прошёл тестовые шаги полного CI #41518737084 без ошибок; завершение runner cleanup проверялось отдельно.
+- Источники и ограничения: endpoint definitions сверены с официальными Bybit V5 docs. Реальный API capture ещё не выполнен; предыдущий доступ к публичным Bybit API из GitHub Actions давал HTTP 403. Не утверждать, что история уже скачана. Нет обхода региональных ограничений.
+- Funding cost helper по-прежнему использует H1 mark candle open как timestamp-aligned proxy, а не подтверждённую точную settlement mark price. Данные не подменяют реальную биржевую settlement price; до получения точного settlement mark модель остаётся приближённой.

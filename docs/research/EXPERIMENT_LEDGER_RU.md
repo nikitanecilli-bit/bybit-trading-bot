@@ -728,3 +728,10 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - E02 run [40578394009](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/40578394009), artifact SHA-256 `66483e95ece78e773dd47494bbbdfd8bd2a738f7f6be1e28958463d622122c83`, 174 rows. Recomputed 1h selected-policy aggregate −5,999.65 USDT across 150 symbol-fold rows / 2,509 trades; market comparator −16,911.93. 71/150 selected H1 rows positive. 15m selected aggregate −11,470.98 vs market −24,039.44.
 - E03 run [40578393971](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/40578393971), artifact SHA-256 `880e4408f2d8ee2bd3e054ef76b43f06d089843da7086a2282999858645bfd66`, 754 rows. H1 market baseline −5,923.64; limit 10 bps / 3 bars +1,204.81; 10 bps / 5 bars +1,565.78; 20 bps / 3 bars +3,143.13. These are per-symbol parameter cells, not a shared-capital portfolio. 15m aggregate across all tested execution cells is not a valid single-strategy comparison; the market baseline remains −12,562.42.
 - Interpretation unchanged: artifact and code provenance for E01–E03 is now substantially stronger, but the CSVs do not contain a SHA-256 manifest for each source archive. Git blob IDs at the run commit identify the exact committed ZIP objects. Binance OHLCV proxy, modelled fees/slippage and optimistic OHLC limit-touch fills remain decisive execution limitations; none of these runs establishes Bybit-executable profitability.
+
+
+## ENG-EXEC-004 — short-side TP1 → trailing stop lifecycle coverage (2026-11-02)
+
+- Added mirrored short-side regression in `tests/test_gap_execution.py`: TP1 partial close is recorded, remaining 50% is later closed by the updated trailing stop, and TP1 realized gross PnL/remaining fraction are preserved.
+- Full Research CI [#41517776602](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41517776602), SUCCESS. Gap execution, portfolio accounting, funding, instrument-spec, reconciliation and persistence suites all completed successfully.
+- This closes a test-coverage asymmetry only. No production-engine behavior changed and no new trading edge or execution realism is claimed.

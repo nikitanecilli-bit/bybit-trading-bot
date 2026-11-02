@@ -509,9 +509,9 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 
 - Added `bybit_reconciliation.py`; pure parser for fully paginated caller-supplied V5 positions, active orders and executions.
 - Validates retCode, row shapes, decimals, positionIdx, partial order quantities, multiple executions per order, funding records, duplicate identities and pagination cursor continuity/completion.
-- Tests: `tests/test_bybit_reconciliation.py` 12/12.
+- Tests: `tests/test_bybit_reconciliation.py` 13/13.
 - Commits: parser `fa97a4810e14d5d7590c5c4794ba2f98856127da`; workflow `95e5afb46a2869957e90742560f95d21089ddad5`; test import fix `b6d2fe255e692fa001fef5cf86274863485ae26d`.
-- CI: [Research engine checks #41448536690](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41448536690), SUCCESS; parser 12/12, persistence 54/54, compile, configured deterministic suites and secret scan passed.
+- CI: [Research engine checks #41448898597](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41448536690), SUCCESS; parser 13/13, persistence 54/54, compile, configured deterministic suites and secret scan passed.
 - Decision: ACCEPT as parser-only milestone. No HTTP calls, credentials, account reads, order mutations or PnL backtests.
 - Limitation: does not collect all pages, establish snapshot freshness or compare exchange state to local state. Overall reconciliation remains BLOCKED by missing exact local qty and exchange identifiers.
 

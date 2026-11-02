@@ -235,3 +235,7 @@ No production/live changes and no market backtests were performed in these corre
 - **Leverage/margin remains unverified:** `calculate_position_size()` applies a notional ceiling of `current_equity * leverage / max_concurrent_positions * 0.95` per new position. The Bybit Decimal sizing helper is not wired into the engine. There is no aggregate margin ledger, maintenance-margin tier model, liquidation price/fee simulation, or exchange quantity in `OpenPositionState`. Do not interpret the leverage cap as a liquidation model.
 - Next P0/P1: (1) exchange position/order reconciliation before any restore/live-resume; (2) exact exchange quantity integrated consistently into position gross PnL, fees, funding and risk; (3) isolated margin/maintenance tier and liquidation simulation using dated Bybit specs. These require verified point-in-time snapshots and must remain deterministic tests before any market backtest.
 - No market backtest or parameter search was run in this audit cycle.
+
+
+- **ENG-STATE-004 accepted:** when persistence is enabled, failed JSON write/atomic replace now raises `RuntimeError` and cleans up the current temporary file best-effort. CI #41432914403 passed; state persistence tests 6/6. A caller must stop rather than proceed with a stale recovery point.
+- Durability remains incomplete: no explicit fsync of file/directory, remote backup, or exchange reconciliation. Do not equate atomic rename with guaranteed survival of power loss.

@@ -539,7 +539,7 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Card: [ENG-RECON-004](experiment_cards/ENG-RECON-004_REPORT_ONLY_COMPARATOR_RU.md).
 - Added `scripts/bybit_reconciliation_report.py`: validates backup/snapshot schema, canonical raw SHA-256, parsed positions/orders/executions, counts, server-time chronology and contiguous <=7-day execution windows; reports symbol/direction diagnostics.
 - Comparator intentionally **always blocks**: `BLOCKED_UNSUPPORTED_LOCAL_MODEL`, `reconciliation_pass=false`, `live_resume_allowed=false`. It does not infer exchange qty from notional, match pending signal intents to orders, or declare empty-state reconciliation without a local execution ledger.
-- Tests: 14/14 passed. CI: [Research engine checks #41459486381](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41459486381), SUCCESS; parser 14/14, collector 12/12, comparator 14/14, configured deterministic suites and secret scan passed.
+- Tests: 16/16 passed. CI: [Research engine checks #41460727701](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41460727701), SUCCESS; parser 14/14, collector 15/15, comparator 16/16, configured deterministic suites and secret scan passed.
 - No real Bybit snapshot was captured or compared. No order history or exchange-side stop/TP check. Overall reconciliation/live resume remain BLOCKED. No PnL sweep.
 
 
@@ -550,3 +550,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Official schema: [Bybit V5 Get Position Info](https://bybit-exchange.github.io/docs/v5/position).
 - Parser: 14/14; comparator: 14/14; collector: 12/12. Full CI [#41459486381](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41459486381), SUCCESS.
 - This only reports position-level configuration; it does not prove conditional-order health or stop trigger execution. No live Bybit request or real snapshot. Overall reconciliation/live resume remain BLOCKED.
+
+
+## ENG-RECON-006 — paginated historical order capture (2026-11-02)
+
+- Card: [ENG-RECON-006](experiment_cards/ENG-RECON-006_ORDER_HISTORY_RU.md).
+- Collector now calls `GET /v5/order/history` in <=7-day intervals, collects every cursor page, parses rows and deduplicates by `orderId` using latest `updatedTime`; conflicting same-time records fail closed.
+- Snapshot explicitly records `QUERYABLE_WINDOW_ONLY_NOT_COMPLETE`. Bybit documents that cancelled/rejected/deactivated statuses are queryable only in the last 24h; beyond 7d only orders with fills are queryable; endpoint data may be delayed. It is not a complete event journal.
+- CI: [Research engine checks #41460727701](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41460727701), SUCCESS; parser 14/14, collector 15/15, comparator 16/16, persistence 54/54, configured suites and secret scan passed.
+- No real Bybit request or snapshot. Comparator remains permanently BLOCKED until local exchange identities and execution ledger exist. No PnL sweep or live resume.

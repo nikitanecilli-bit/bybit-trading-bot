@@ -191,7 +191,7 @@ class StatePersistenceTests(unittest.TestCase):
                 restore_plan_b=True, state_path=str(path),
             )
             self.assertTrue(restored._state_restored)
-            with self.assertRaisesRegex(RuntimeError, "restored state"):
+            with self.assertRaisesRegex(RuntimeError, "восстановленного состояния"):
                 engine.run_simulation_pass(restored, {}, [])
 
     def test_disabled_persistence_is_a_noop(self):

@@ -34,3 +34,10 @@ No market backtest or live order until test-first and full CI acceptance. No pro
 - Gap-execution tests initially exposed an outdated `RiskSpy` fixture without MTM support; the fixture was updated, not the production code weakened.
 - Full Research CI [#41506990147](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41506990147) completed SUCCESS on commit `300af4a35ba7c3cb30d75a66e99eeb349ba7a44d`. Logs confirm the new TP1 sync test, surviving-position persistence test, and same-bar TP1/stop order-independence test all passed; portfolio suite 21/21.
 - Decision: ACCEPT for TP1/MTM consistency and persistence of open-position lifecycle state. No market backtest or live order; no profitability claim.
+
+
+## Дополнительная проверка одновременных выходов
+
+- Added same-timestamp cross-symbol replay: TP1 on BTCUSDT + stop on ETHUSDT is invariant to symbol iteration order; realized/unrealized/current equity reconcile in both permutations.
+- Added simultaneous two-symbol stop-close test: both trade records are written exactly once, realized equity equals opening equity plus the sum of both net trade PnLs, unrealized PnL is zero, and final equity is order-independent.
+- Full Research CI [#41507219610](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41507219610) SUCCESS on test commit `4e08f7387c970941797aa1c4d1342ef56301c2a0`; portfolio suite 22/22 and state-persistence suite 54 tests passed.

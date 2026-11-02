@@ -174,8 +174,8 @@ def fetch_mark_klines(symbol: str, start_ms: int, end_ms: int, interval: str = "
                       fetch_page: Callable[[int, int, int], list[Any]] | None = None,
                       base_url: str = DEFAULT_BASE_URL, pause: float = 0.1
                       ) -> list[dict[str, Any]]:
-    symbol = symbol.strip().upper()
-    if not symbol or interval not in INTERVALS or start_ms <= 0 or end_ms <= start_ms or pause < 0:
+    symbol = normalize_symbol(symbol)
+    if interval not in INTERVALS or start_ms <= 0 or end_ms <= start_ms or pause < 0:
         raise ValueError("valid symbol, interval, range and non-negative pause are required")
     interval_ms = int(interval) * 60_000
     if start_ms % interval_ms or end_ms % interval_ms:

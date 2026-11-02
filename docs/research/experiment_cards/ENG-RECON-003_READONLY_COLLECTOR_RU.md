@@ -34,7 +34,7 @@ Report-only comparator: 17 deterministic tests passed in the same CI run. It rej
 - HTTPS and official-host allowlist enforced before credentials are sent; redirect refusal;
 - future backup timestamp rejection.
 
-CI: [Research engine checks #41468736376](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468736376), SUCCESS. Compile, all configured deterministic suites, parser tests (16/16), collector tests (15/15), secret scan and persistence tests completed successfully. The host validation and redirect protection are enforced in the actual request path. Cross-interval execution IDs are now deduplicated only when the complete parsed records match; conflicting records fail closed.
+CI: [Research engine checks #41470373006](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41470373006), SUCCESS. Compile, all configured deterministic suites, parser tests (16/16), collector tests (15/15), secret scan and persistence tests completed successfully. The host validation and redirect protection are enforced in the actual request path. Cross-interval execution IDs are now deduplicated only when the complete parsed records match; conflicting records fail closed.
 
 ## Commits
 

@@ -1,6 +1,6 @@
 # ENG-KS-001 — приоритет kill-switch над TP при внутрисвечной неоднозначности
 
-Статус до исправления: HYPOTHESIS REGISTERED / дефект подтверждён чтением кода.  
+Статус: ACCEPT — исправление и regression test прошли технический CI.  
 Дата: 2026-11-02.  
 Тип: deterministic engine correctness regression; не рыночный эксперимент.
 
@@ -36,4 +36,14 @@
 
 ## Решение
 
-Оставить OPEN до завершения regression tests и проверки CI. ACCEPT только если все критерии выполнены; иначе REJECT/INCONCLUSIVE с логами.
+Решение: ACCEPT для исследовательского движка.
+
+- Исправление: commit `3ef0626a776b99c083b0ef289f9ca8ab8fe82c97`.
+- Regression test: commit `7f4fc3ee641e790451081a02628615b19618b230`.
+- CI: [Research engine checks #41431556111](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41431556111), conclusion SUCCESS.
+- Job `tests`: SUCCESS; compile step, все 19 последующих проверок, секрет-скан и deterministic tests завершились без ошибки.
+- `tests/test_time_model.py`: 38/38; новый тест `test_kill_switch_overrides_tp2_when_same_bar_hits_adverse_mark_and_target` явно отмечен PASS.
+- `tests/test_gap_execution.py`: 22/22.
+- Secret scan: `No obvious secret patterns found`.
+
+Критерии выполнены. Рыночные backtests не запускались. ACCEPT означает только исправление детерминированной логики исследовательского симулятора, не подтверждение edge или реального качества исполнения.

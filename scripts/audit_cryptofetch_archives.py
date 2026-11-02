@@ -64,8 +64,6 @@ def parse_member(raw: Any, symbol: str, timeframe: str) -> dict[int, tuple[str, 
         if ts in candles:
             raise ValueError(f"duplicate timestamp {ts} within {symbol} {timeframe}")
         candles[ts] = (o, h, low, close, volume)
-    if not candles:
-        raise ValueError("no candles")
     return candles
 
 
@@ -91,15 +89,15 @@ def inspect_archives(archive_dir: Path) -> tuple[list[dict[str, Any]], dict[tupl
                     gaps = sum(1 for a, b in zip(timestamps, timestamps[1:])
                                if b - a != STEP_MS[timeframe])
                     item = {
-                        **base, "bars": len(candles), "first_ts": timestamps[0],
-                        "last_ts": timestamps[-1], "gap_intervals": gaps,
+                        **base, "bars": len(candles), "first_ts": timestamps[0] if timestamps else None,
+                        "last_ts": timestamps[-1] if timestamps else None, "gap_intervals": gaps, "has_data": bool(candles),
                         "backtest_eligible": len(candles) >= 200, "valid": True, "error": "", "candles": candles,
                     }
                     inventory.append({k: v for k, v in item.items() if k != "candles"})
                     groups[(symbol, timeframe)].append(item)
                 except Exception as exc:
                     inventory.append({**base, "bars": 0, "first_ts": None,
-                                      "last_ts": None, "gap_intervals": None, "backtest_eligible": False,
+                                      "last_ts": None, "gap_intervals": None, "has_data": False, "backtest_eligible": False,
                                       "valid": False, "error": str(exc)})
     return inventory, groups
 

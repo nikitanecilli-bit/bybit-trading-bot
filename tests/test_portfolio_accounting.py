@@ -443,6 +443,71 @@ def test_surviving_position_candle_state_is_persisted():
     assert persisted[-1]["max_adverse_px"] == pos.max_adverse_px
 
 
+
+def _run_same_bar_tp1_and_stop(order):
+    e = make_engine()
+    tp1_pos = make_position(symbol="BTCUSDT", size=1_000.0)
+    stop_pos = make_position(symbol="ETHUSDT", size=1_000.0)
+    e.open_positions = {"BTCUSDT": tp1_pos, "ETHUSDT": stop_pos}
+    exit_ts = tp1_pos.entry_ts + 3_600_000
+
+    def history_for(candle):
+        prior = [
+            engine_mod.Candle(
+                ts=tp1_pos.entry_ts - 14 * 3_600_000 + i * 3_600_000,
+                open=100.0, high=101.0, low=99.0, close=100.0, volume=10.0,
+            )
+            for i in range(15)
+        ]
+        return prior + [candle]
+
+    histories = {
+        "BTCUSDT": history_for(engine_mod.Candle(
+            ts=tp1_pos.entry_ts + 3_600_000,
+            open=106.7, high=107.0, low=106.5, close=106.8, volume=10.0,
+        )),
+        "ETHUSDT": history_for(engine_mod.Candle(
+            ts=tp1_pos.entry_ts + 3_600_000,
+            open=100.0, high=101.0, low=94.0, close=96.0, volume=10.0,
+        )),
+    }
+    e._last_mark_prices.update({"BTCUSDT": 106.8, "ETHUSDT": 96.0})
+    e._intrabar_risk_marks.update({"BTCUSDT": 106.5, "ETHUSDT": 95.0})
+    e._intrabar_risk_marks_ts = exit_ts
+    e._update_mark_to_market(exit_ts)
+
+    for symbol in order:
+        e._manage_position(symbol, histories[symbol], fill_bar=False, exit_ts=exit_ts)
+
+    return e
+
+
+def test_same_bar_tp1_on_one_symbol_and_stop_on_another_is_order_independent():
+    first = _run_same_bar_tp1_and_stop(["BTCUSDT", "ETHUSDT"])
+    reverse = _run_same_bar_tp1_and_stop(["ETHUSDT", "BTCUSDT"])
+
+    for e in (first, reverse):
+        assert len(e.closed_trades) == 1
+        assert e.closed_trades[0].token == "ETHUSDT"
+        assert e.closed_trades[0].exit_reason == "stop_loss"
+        assert "BTCUSDT" in e.open_positions
+        assert "ETHUSDT" not in e.open_positions
+        assert e.open_positions["BTCUSDT"].tp1_hit is True
+        expected_unrealized = e._unrealized_pnl_at_marks(
+            e._intrabar_risk_marks_ts
+        )
+        assert abs(e.risk_mgr.unrealized_pnl - expected_unrealized) < 1e-8
+        assert abs(
+            e.risk_mgr.current_equity
+            - (e.risk_mgr.realized_equity + expected_unrealized)
+        ) < 1e-8
+
+    assert first.closed_trades[0].pnl_usdt == reverse.closed_trades[0].pnl_usdt
+    assert abs(first.risk_mgr.realized_equity - reverse.risk_mgr.realized_equity) < 1e-8
+    assert abs(first.risk_mgr.unrealized_pnl - reverse.risk_mgr.unrealized_pnl) < 1e-8
+    assert abs(first.risk_mgr.current_equity - reverse.risk_mgr.current_equity) < 1e-8
+
+
 if __name__ == "__main__":
     tests = [(name, value) for name, value in sorted(globals().items())
              if name.startswith("test_") and callable(value)]

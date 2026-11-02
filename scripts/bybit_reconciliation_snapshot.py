@@ -139,6 +139,21 @@ def _read_only_key_check(base_url: str, api_key: str, secret: str,
         raise CollectorError("SECURITY BLOCK: API key is not explicitly read-only")
 
 
+def _server_time(base_url: str, request_json: Callable[..., dict[str, Any]]) -> int:
+    payload = request_json(f"{base_url.rstrip('/')}/v5/market/time", {})
+    _check_success(payload, "/v5/market/time")
+    value = payload.get("time")
+    if isinstance(value, bool):
+        raise CollectorError("Bybit server time is invalid")
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise CollectorError("Bybit server time is missing or invalid") from exc
+    if parsed <= 0:
+        raise CollectorError("Bybit server time must be positive")
+    return parsed
+
+
 def _collect_pages(
     base_url: str, endpoint: str, params: dict[str, Any],
     api_key: str, secret: str,
@@ -190,7 +205,6 @@ def collect_snapshot(
     *,
     base_url: str = DEFAULT_BASE_URL,
     request_json: Callable[..., dict[str, Any]] = _http_json,
-    now_ms: int | None = None,
 ) -> dict[str, Any]:
     if not api_key or not secret:
         raise CollectorError("API credentials are missing")
@@ -199,9 +213,10 @@ def collect_snapshot(
     saved_ms = _parse_utc_ms(saved_at_utc)
     capture_started_ms = _utc_ms()
     _read_only_key_check(base_url, api_key, secret, request_json)
-    capture_now_ms = now_ms if now_ms is not None else _utc_ms()
-    if capture_now_ms <= saved_ms:
-        raise CollectorError("saved_at_utc is not earlier than capture time")
+    server_time_before_ms = _server_time(base_url, request_json)
+    if server_time_before_ms <= saved_ms:
+        raise CollectorError("saved_at_utc is not earlier than Bybit server time")
+    capture_now_ms = server_time_before_ms
 
     position_pages = _collect_pages(
         base_url, "/v5/position/list",
@@ -247,7 +262,15 @@ def collect_snapshot(
     except SnapshotValidationError as exc:
         raise CollectorError(f"Snapshot validation failed: {exc}") from exc
 
+    server_time_after_ms = _server_time(base_url, request_json)
+    if server_time_after_ms < server_time_before_ms:
+        raise CollectorError("Bybit server time moved backwards during snapshot")
+    if server_time_after_ms - server_time_before_ms > 120_000:
+        raise CollectorError("Snapshot collection exceeded 120 seconds; capture is not coherent")
+    capture_now_ms = server_time_after_ms
     capture_finished_ms = _utc_ms()
+    unique_executions = {item.exec_id: item for item in parsed_executions}
+    parsed_executions = list(unique_executions.values())
     raw = {
         "positions": position_pages,
         "active_orders": order_pages,
@@ -267,6 +290,8 @@ def collect_snapshot(
         "capture_finished_utc": datetime.fromtimestamp(
             capture_finished_ms / 1000, timezone.utc).isoformat(),
         "capture_now_ms": capture_now_ms,
+        "bybit_server_time_before_ms": server_time_before_ms,
+        "bybit_server_time_after_ms": server_time_after_ms,
         "counts": {
             "positions": len(parsed_positions),
             "active_orders": len(parsed_orders),

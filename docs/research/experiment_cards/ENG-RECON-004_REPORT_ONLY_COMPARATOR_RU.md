@@ -16,8 +16,9 @@
 - local backup envelope, UTC timestamp, position/pending object shape and trade sequence;
 - snapshot schema version, linear/USDT scope, expected status and exact backup timestamp;
 - SHA-256 of canonical raw exchange pages;
-- strict parser validation for positions, active orders and executions;
+- strict parser validation for positions, active orders, historical orders and executions;
 - counts vs validated rows/pages;
+- historical-order interval coverage, statuses, order IDs and explicit Bybit retention limitations;
 - server-time bounds and capture duration;
 - contiguous execution interval coverage from backup time to snapshot boundary, each interval <= 7 days;
 - local/exchange symbol coverage and direction conflicts;
@@ -38,7 +39,7 @@ The report surfaces counts, exchange identifiers, symbol mismatches and directio
 
 ## Tests and CI
 
-`tests/test_bybit_reconciliation_report.py`: 14 deterministic tests passed, covering:
+`tests/test_bybit_reconciliation_report.py`: 16 deterministic tests passed, covering:
 - empty account still blocked;
 - open position diagnostics without quantity reconciliation;
 - direction conflict reporting;
@@ -52,12 +53,12 @@ The report surfaces counts, exchange identifiers, symbol mismatches and directio
 - non-object snapshot rejection;
 - wrong market scope rejection.
 
-CI: [Research engine checks #41459486381](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41459486381), SUCCESS. The workflow compiled the comparator and ran parser, collector, comparator, secret scan, persistence and configured deterministic suites.
+CI: [Research engine checks #41460727701](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41460727701), SUCCESS. The workflow compiled the comparator and ran parser, collector, comparator, secret scan, persistence and configured deterministic suites.
 
 ## Ограничения
 
 - No real Bybit snapshot was fetched or compared.
-- No order history or exchange-side conditional-order health verification. Position-level TP/SL fields are reported when present, but do not prove trigger execution.
+- Historical order history is collected but remains partial under Bybit retention rules and may be delayed; no complete event journal or conditional-order health verification. Position-level TP/SL fields are reported when present, but do not prove trigger execution.
 - No local execution ledger or exact exchange qty/positionIdx/order IDs.
 - This is a diagnostic report, not permission to resume live trading.
 - No PnL sweep, live order, production deployment or automatic recovery.

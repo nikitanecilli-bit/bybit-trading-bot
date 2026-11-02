@@ -1,3 +1,5 @@
+> **Статус на 2026-11-03: PROVISIONAL FOR NET-PNL COMPARISONS.** Эти результаты были получены до исправления exit fee/slippage accounting в v14. TP1/final exit costs ранее рассчитывались от entry notional, а теперь — от qty × modeled execution price. Gross signal results остаются историческими, но net PnL, PF, profitability counts и ranking необходимо пересчитать на исправленном engine. См. `docs/audits/EXCHANGE_SIZING_INTEGRATION_AND_BYBIT_SCHEMA_2026-11-03.md`. Повторный strategy sweep пока заблокирован оставшимися execution/data realism gaps.
+
 # H1 predeclared causal filter sensitivity — 2026-11-02
 
 ## Provenance and design

@@ -304,3 +304,7 @@ No production/live changes and no market backtests were performed in these corre
 - Read [EXCHANGE_RECONCILIATION_READINESS_RU.md](../audits/EXCHANGE_RECONCILIATION_READINESS_RU.md). Current verdict: `UNSUPPORTED_LOCAL_MODEL / BLOCKED`.
 - The engine lacks exact exchange contract qty, `positionIdx`, order IDs/link IDs and execution ledger; `size_usdt / entry_price` is not exact qty. Read-only API key verification alone is insufficient.
 - Next safe implementation: pure response parser + fixture tests for V5 positions, active orders, executions and order history; pagination completeness and fail-closed handling first. Then report-only comparator. No mutation endpoints.
+
+
+- **ENG-RECON-002 accepted:** pure Bybit V5 parser added; 12/12 fixture tests and CI #41448536690 passed. It validates caller-supplied pages only, not live collection.
+- Next: read-only collector with explicit cursor loop, server-time/capture coherence and fail-closed errors. Do not wire restore or trading until exact local qty, positionIdx, exchange IDs and execution ledger exist.

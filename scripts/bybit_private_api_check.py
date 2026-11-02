@@ -78,6 +78,23 @@ def verify_response(payload: dict[str, Any], api_key: str) -> tuple[bool, str]:
     return True, "Authenticated successfully; API key is marked read-only."
 
 
+def probe_public_market_endpoint(base_url: str) -> tuple[int | None, str, str, str]:
+    """Probe an unauthenticated public endpoint to separate edge blocks from auth failures."""
+    request = urllib.request.Request(
+        f"{base_url}/v5/market/time",
+        headers={"User-Agent": "bybit-trading-bot-readonly-check/1.0"},
+        method="GET",
+    )
+    opener = urllib.request.build_opener(_NoRedirectHandler())
+    try:
+        with opener.open(request, timeout=15) as response:
+            return response.status, response.headers.get("Content-Type", ""), response.headers.get("Server", ""), response.headers.get("CF-Ray", "")
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.headers.get("Content-Type", "") if exc.headers else "", exc.headers.get("Server", "") if exc.headers else "", exc.headers.get("CF-Ray", "") if exc.headers else ""
+    except (urllib.error.URLError, TimeoutError):
+        return None, "", "", ""
+
+
 def main() -> int:
     key_from_env = os.environ.get("BYBIT_API_KEY", "")
     secret_from_env = os.environ.get("BYBIT_API_SECRET", "")
@@ -131,6 +148,16 @@ def main() -> int:
         if exc.code == 403:
             print("A 403 from a non-JSON edge response points to network/region/IP filtering, not HMAC signature validation.")
             print("If the response is a Bybit JSON error, use its retCode/retMsg to identify the API-side cause.")
+            public_status, public_type, public_server, public_cf_ray = probe_public_market_endpoint(base_url)
+            print(f"Unauthenticated public market endpoint status: {public_status if public_status is not None else 'network error'}")
+            print(f"Public endpoint Content-Type: {public_type or 'not supplied'}")
+            print(f"Public endpoint Server: {public_server or 'not supplied'}")
+            if public_cf_ray:
+                print(f"Public endpoint Cloudflare Ray ID: {public_cf_ray}")
+            if public_status == 200:
+                print("Public API is reachable; investigate API-key IP binding, key/account restrictions, or private endpoint policy.")
+            elif public_status == 403:
+                print("Public and private API both return 403; this strongly indicates regional/network/IP edge filtering from the runner.")
         return 1
     except urllib.error.URLError as exc:
         reason_type = type(exc.reason).__name__

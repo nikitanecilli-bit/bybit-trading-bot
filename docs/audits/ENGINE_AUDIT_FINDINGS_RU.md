@@ -278,3 +278,17 @@ Helper пока не подключён к v14 и не меняет старые
 3. Add engine-level tests before integrating historical spec as-of sizing; reject any trade where a dated full-universe snapshot is missing/stale or the rounded exchange quantity violates constraints.
 4. Add margin/liquidation modeling from documented historical risk tiers before describing results as exchange-executable.
 5. Keep all changes on this research branch. Do not merge to `main`, do not place live orders, and do not reinterpret historical E01–E13 results as if the new execution constraints had been active.
+
+
+## 2026-11-02 — re-verification: leverage, margin and liquidation model
+
+Current branch HEAD: `87e7e7bd5af2df339849459d463e8a9dc93cf83e`. Current engine blob SHA: `2152729b2f32d9c1cc14dc7f94d2baf962166184`.
+
+### Confirmed limitation (P1 execution-model blocker; not a newly discovered code regression)
+- `RiskManager.calculate_position_size()` at engine line 602 sizes notional from risk-to-stop and caps each position at `0.95 * equity * leverage / max_concurrent_positions` (lines 631–635). It does not calculate initial margin, maintenance margin, tiered risk limits, liquidation price, liquidation fee or exchange-side closeout. The configured leverage therefore acts as a coarse notional ceiling; it is not a liquidation simulation.
+- Current engine has no liquidation or maintenance-margin implementation and no call to `InstrumentSpecHistory` or `size_to_exchange_constraints`. Position quantity remains represented as USDT notional and PnL is computed as notional × percentage price move.
+- The standalone `exchange_order_sizing.py` and `instrument_spec_history.py` modules are present and have offline tests, but they are not wired into v14. Current `data/` contains only `archives/`; `data/instrument_specs/linear/`, `data/archives/funding/` and `data/archives/mark_price/` are absent.
+- The instrument snapshot workflow tries the configured official public Bybit regional hosts and fails closed if none succeeds. Earlier recorded runs failed with HTTP 403; no dated snapshot archive exists to support historical as-of sizing. No attempt was made to bypass regional restrictions.
+
+### Decision
+Do not integrate current instrument specifications retrospectively and do not claim exchange-executable performance. Next valid step is to obtain a dated, complete instrument-spec snapshot and historical funding/mark datasets through a permitted data-access route; then wire as-of validation and margin/liquidation tiers with regression tests. Until then, backtest PnL remains a strategy-research estimate under simplified notional sizing, not a faithful Bybit account simulation. No engine code change was justified by this re-verification.

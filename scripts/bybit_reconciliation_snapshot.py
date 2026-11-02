@@ -13,6 +13,7 @@ import hmac
 import json
 import os
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -316,7 +317,22 @@ def write_snapshot(snapshot: dict[str, Any], output: str | Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     data = json.dumps(snapshot, ensure_ascii=False, sort_keys=True,
                       indent=2, allow_nan=False) + "\n"
-    path.write_text(data, encoding="utf-8")
+    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_name, path)
+        if os.name == "posix":
+            directory_fd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+    finally:
+        if os.path.exists(temp_name):
+            os.unlink(temp_name)
     return path
 
 

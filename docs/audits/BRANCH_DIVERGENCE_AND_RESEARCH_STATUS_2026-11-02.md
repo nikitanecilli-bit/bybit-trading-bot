@@ -300,3 +300,11 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - Fix [commit `7734feca`](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/7734fecaee62d84dd40039c36e2b0fede0386387): recalculate MTM after surviving TP1 transition; persist each still-open position after candle management. Kill-switch remains checked after refreshed MTM; exits persist through `_close_position()`.
 - Full Research CI [#41506990147](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41506990147) SUCCESS. Confirmed 21/21 portfolio accounting tests, including TP1 MTM sync, per-candle position checkpoint, and same-bar TP1 on one symbol + stop on another independent of symbol iteration order.
 - ENG-PERSIST-002 card and experiment ledger updated. No market backtest, parameter search, private API request or live order.
+
+
+## Same-bar multi-symbol close reconciliation — 2026-11-02, 19:12 UTC
+
+- Extended portfolio accounting tests to replay same-bar TP1 BTCUSDT + stop ETHUSDT in both symbol orders and simultaneous BTCUSDT/ETHUSDT stop closes in both orders.
+- Both cases are order-independent. Simultaneous closes produce exactly two unique trade records; realized equity reconciles to start equity plus summed net PnL; unrealized PnL is zero after all positions close.
+- Full Research CI [#41507219610](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41507219610) SUCCESS. Portfolio suite 22/22; persistence suite 54 tests passed.
+- No additional production change was needed for simultaneous close accounting in these tested scenarios. This does not validate live exchange fill ordering, partial fills or queue behavior.

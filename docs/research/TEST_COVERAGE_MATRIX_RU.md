@@ -112,3 +112,5 @@ Added `test_bybit_instrument_specs.py` for versioned snapshot parsing, Decimal b
 - Added focused workflow `.github/workflows/v15-unit-checks.yml` on `research/v15-donchian-signal` pushes touching v15 code/tests.
 - Commits: test `4d9f6f4274d95ded88c67cb563e42cd73baa3c92`; workflow `0305c8229329b56f7c374adce33601ad08b803f5`.
 - CI execution is not yet verified; do not treat tests as passed until run result is inspected.
+
+| Bybit V5 reconciliation parsing | PARTIAL | ENG-RECON-002: pure positions/orders/executions parsers; pagination chain and identity checks; 12 fixture tests | No HTTP collector, server-time coherence, local comparator, exact local qty/positionIdx/order IDs/execution ledger; overall reconciliation BLOCKED |

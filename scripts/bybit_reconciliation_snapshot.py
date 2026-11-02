@@ -50,6 +50,7 @@ def _validate_base_url(base_url: str) -> None:
 RECV_WINDOW = "5000"
 MAX_EXECUTION_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 TIMEOUT_SECONDS = 20
+MAX_PAGES_PER_ENDPOINT = 1000
 
 
 class CollectorError(RuntimeError):
@@ -196,6 +197,8 @@ def _collect_pages(
             "requested_cursor": cursor,
             "response": payload,
         })
+        if len(pages) >= MAX_PAGES_PER_ENDPOINT and next_cursor:
+            raise CollectorError(f"{endpoint} exceeded the page safety limit")
         if not next_cursor:
             return pages
         if next_cursor == cursor or next_cursor in seen:

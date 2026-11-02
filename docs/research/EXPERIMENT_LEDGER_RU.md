@@ -514,3 +514,10 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41448536690](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41448536690), SUCCESS; parser 12/12, persistence 54/54, compile, configured deterministic suites and secret scan passed.
 - Decision: ACCEPT as parser-only milestone. No HTTP calls, credentials, account reads, order mutations or PnL backtests.
 - Limitation: does not collect all pages, establish snapshot freshness or compare exchange state to local state. Overall reconciliation remains BLOCKED by missing exact local qty and exchange identifiers.
+
+
+### ENG-RECON-002 strict retCode follow-up
+
+- Parser now rejects boolean `retCode=False` even though Python considers `False == 0`; only an actual integer zero is accepted as API success.
+- Tests: 13/13. Test commit `9fdaa02d764495a59747f0930e89fa677d03b890`.
+- CI: [Research engine checks #41448898597](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41448898597), SUCCESS; parser 13/13 and persistence 54/54.

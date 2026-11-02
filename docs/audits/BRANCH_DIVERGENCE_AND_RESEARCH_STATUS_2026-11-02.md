@@ -155,3 +155,29 @@ Downloaded the eight available E01–E04/E06–E08 artifacts plus E09. ZIP hashe
 - E09 summary reproduces the report. At 2% gap threshold, all gap ON/OFF pairs are identical; the threshold never fired in this sample.
 
 E01–E04/E06–E08 did not have artifact ZIP SHA-256 values consistently recorded in their original reports; the hashes above now provide a downloaded-byte identity for these archived files. This verifies artifact identity and report arithmetic, not the underlying data's exchange provenance or fill realism.
+
+
+### E10–E13 artifact identity and baseline integrity
+
+Downloaded the later cross-sectional/shared-capital artifacts and checked the SHA-256 of the ZIP bytes against the reports:
+
+| Experiment | Artifact ID | Computed ZIP SHA-256 | Report match |
+|---|---:|---|---|
+| E10 | 13104981517 | `64832db93e5912c877debcfd4548cbf9a6fb2beb71ca647c39762e1321b963fa` | exact |
+| E11 | 13105661683 | `441e518a683435e47327cb85bb741c8fcb24e734ded1ab720722dc50dd588765` | exact |
+| E12 | 13105721458 | `5ac82041680ea6bcbb90561a6da11687c15c171885dd66034db321ce63bd8854` | exact |
+| E13 | 13105403824 | `9930d6f3651305ef9dcf254c85bc0b50b24cb098b6b367accbaaae4bbad6f601` | exact |
+
+E11 and E13 both embed the same six source-archive SHA-256 values in their manifests. The E13 compression-OFF baseline reproduces E11 body-gate-OFF per-fold metrics exactly:
+- Fold 1: -617.62 USDT, 207 trades.
+- Fold 2: -2,970.05 USDT, 227 trades.
+- Fold 3: +409.06 USDT, 338 trades.
+
+This is a meaningful internal reproducibility check: the E13 replay's baseline has no observed drift from E11. It does not prove correctness of the simulator or Bybit execution realism.
+
+E13 compression-ON rows from the artifact reproduce the report:
+- Fold 1: -294.93 USDT, 211 trades, 65 candidate signals blocked.
+- Fold 2: -2,614.55 USDT, 197 trades, 137 blocked.
+- Fold 3: +167.76 USDT, 316 trades, 89 blocked.
+
+The compression gate improves the sum by +436.89 USDT but leaves every fold except the ungated fold 3? More precisely, gated fold 1 and fold 2 remain negative; gated fold 3 remains positive but is reduced from +409.06 to +167.76. No claim of positive overall expectancy is justified.

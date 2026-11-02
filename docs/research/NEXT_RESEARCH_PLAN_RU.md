@@ -264,3 +264,7 @@ No production/live changes and no market backtests were performed in these corre
 
 - **ENG-STATE-009 accepted:** restore rejects symbols present in both open positions and pending signals, and rejects duplicate trade IDs. Persistence tests 31/31; CI #41436083033 passed.
 - The next persistence priority is required-field completeness and backup freshness. A syntactically valid but incomplete JSON object must not be mistaken for a valid empty portfolio snapshot.
+
+
+- **ENG-STATE-010 accepted:** backup restore now requires complete envelope keys and complete known risk snapshot. Incomplete valid JSON can no longer silently become an empty portfolio or reset missing protective flags. Persistence suite 33/33; CI #41436427155 passed.
+- Compatibility consequence: older backups missing current fields fail closed. Do not add silent defaults; implement explicit, versioned migration only after collecting actual legacy backup schemas.

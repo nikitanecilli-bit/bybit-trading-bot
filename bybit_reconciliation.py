@@ -23,6 +23,10 @@ class PositionSnapshot:
     avg_price: Decimal
     updated_time_ms: int
     position_status: str
+    take_profit: Decimal | None = None
+    stop_loss: Decimal | None = None
+    trailing_stop: Decimal | None = None
+    tpsl_mode: str | None = None
 
 
 @dataclass(frozen=True)
@@ -165,7 +169,20 @@ def parse_position_pages(
         if key in seen:
             raise SnapshotValidationError(f"duplicate position identity: {key}")
         seen.add(key)
-        parsed.append(PositionSnapshot(symbol, idx, side, size, avg_price, updated, status))
+        def optional_price(field: str) -> Decimal | None:
+            if field not in row:
+                return None
+            return _decimal(row[field], f"position.{field}",
+                            minimum=Decimal("0"), allow_empty=True)
+
+        raw_tpsl_mode = row.get("tpslMode")
+        if raw_tpsl_mode is not None and not isinstance(raw_tpsl_mode, str):
+            raise SnapshotValidationError("position.tpslMode must be a string")
+        parsed.append(PositionSnapshot(
+            symbol, idx, side, size, avg_price, updated, status,
+            optional_price("takeProfit"), optional_price("stopLoss"),
+            optional_price("trailingStop"), raw_tpsl_mode,
+        ))
     return tuple(sorted(parsed, key=lambda item: (item.symbol, item.position_idx)))
 
 

@@ -366,6 +366,46 @@ def test_mtm_kill_switch_transition_is_persisted_without_trade_close():
     assert persisted[0]["kill_switch_triggered"] is True
 
 
+
+def test_tp1_transition_refreshes_and_persists_portfolio_mtm():
+    e = make_engine()
+    pos = make_position(size=1_000.0)
+    e.open_positions["BTCUSDT"] = pos
+    exit_ts = pos.entry_ts + 3_600_000
+    history = [
+        engine_mod.Candle(
+            ts=pos.entry_ts - 14 * 3_600_000 + i * 3_600_000,
+            open=100.0, high=101.0, low=99.0, close=100.0, volume=10.0,
+        )
+        for i in range(15)
+    ]
+    history.append(engine_mod.Candle(
+        ts=pos.entry_ts + 3_600_000,
+        open=106.7, high=107.0, low=106.5, close=106.8, volume=10.0,
+    ))
+    e._last_mark_prices["BTCUSDT"] = 106.8
+    e._intrabar_risk_marks["BTCUSDT"] = 106.5
+    e._intrabar_risk_marks_ts = exit_ts
+    e._update_mark_to_market(exit_ts)
+    persisted = []
+    e._persist = lambda: persisted.append({
+        "risk": e.risk_mgr.to_dict().copy(),
+        "tp1_hit": e.open_positions["BTCUSDT"].tp1_hit,
+    })
+
+    e._manage_position("BTCUSDT", history, fill_bar=False, exit_ts=exit_ts)
+
+    assert pos.tp1_hit is True
+    expected = e._unrealized_pnl_at_marks(exit_ts)
+    assert abs(e.risk_mgr.unrealized_pnl - expected) < 1e-8
+    assert abs(
+        e.risk_mgr.current_equity
+        - (e.risk_mgr.realized_equity + expected)
+    ) < 1e-8
+    assert persisted and persisted[-1]["tp1_hit"] is True
+    assert abs(persisted[-1]["risk"]["unrealized_pnl"] - expected) < 1e-8
+
+
 if __name__ == "__main__":
     tests = [(name, value) for name, value in sorted(globals().items())
              if name.startswith("test_") and callable(value)]

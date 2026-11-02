@@ -861,6 +861,13 @@ class PlanBStatePersistence:
                     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
                         raise ValueError(f"pending signal {sym}: vol_ratio должен быть конечным числом >= 0")
 
+            overlapping_symbols = set(restored).intersection(pending)
+            if overlapping_symbols:
+                raise ValueError(f"символы одновременно в open_positions и pending_orders: {sorted(overlapping_symbols)}")
+            trade_ids = [position.trade_id for position in restored.values()]
+            if len(trade_ids) != len(set(trade_ids)):
+                raise ValueError("backup содержит повторяющиеся trade_id в open_positions")
+
             seq = raw_seq
             # не даём новым ID совпасть с восстановленными
             for p in restored.values():

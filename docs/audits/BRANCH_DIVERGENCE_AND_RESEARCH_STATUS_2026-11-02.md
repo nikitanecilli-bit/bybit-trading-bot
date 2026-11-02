@@ -191,7 +191,7 @@ A direct row-by-row comparison of the downloaded E10, E11 and E13 universe manif
 - same three exclusions (AERO, GRAM, HYPE) and exclusion reasons;
 - same per-symbol bars, start/end timestamps, per-fold bar counts and source archive names.
 
-The six source ZIP SHA-256 values embedded in E10, E11 and E13 are also identical. Thus the E10 vs E11 difference is not explained by a different symbol list or different per-symbol bar coverage in the manifests: it is primarily the accounting/simulation design difference (independent 10k accounts per symbol versus one shared-capital portfolio, plus synchronized event ordering). This makes E11 the more relevant portfolio result.
+The six source ZIP SHA-256 values embedded in E10, E11 and E13 are also identical. However, identical per-symbol manifests do NOT mean identical replay timestamp sets: E10 replays each symbol on its own timestamps, while E11/E13 intersect timestamps across all 47 symbols and replay 4,321 common aligned bars. In the manifest, 25 included symbols have fold counts 1,314/1,314/1,753 (4,381 bars in the three fold windows), while 22 have 1,278/1,314/1,729 (4,321 bars). The 25 longer-history symbols therefore contribute 60 extra bars each to E10's per-symbol fold windows compared with the E11/E13 common intersection (36 extra in fold 1 and 24 in fold 3). Thus E10 per-symbol aggregate PnL versus E11 shared-capital PnL differs both by account model and by timestamp coverage; it is NOT a pure accounting-only comparison. E11 versus E13 baseline is the clean comparison: same source archive hashes, same common aligned bars, and exact per-fold baseline reproduction. E11 remains the more relevant portfolio result.
 
 Caveat remains: the 50-symbol CryptoFetch archive is a fixed uploaded universe, not a verified point-in-time historical Bybit listing universe. New listings with insufficient first-fold history were excluded; delisted, renamed or unavailable historical instruments may be absent. Survivorship/universe-selection bias is therefore not fully ruled out.
 
@@ -222,3 +222,14 @@ For intrabar limit fills, OHLC cannot prove whether the adverse extreme happened
 - Compare status remains `diverged`: 715 commits ahead, 13 behind main.
 - PR #4 now reports 163 changed files, +17,558 / -116 lines; it remains open and unmerged. GitHub's mergeability field is currently unknown, so do not treat it as merge-ready.
 - Latest code-changing commit `f65c08bec78b179a9a89832ce31b574740f4dce3` passed Research engine checks #41475941543. The two commits after it update documentation only; the current docs HEAD does not have a separate new CI run.
+
+
+### Clarification: E10 per-symbol timestamps versus E11/E13 common replay
+
+The artifact manifest equality above refers to per-symbol metadata and source files, not the actual timestamps used by each replay:
+- E10's run_fold() iterates each symbol's own candles within the fixed UTC fold bounds. It does not build a cross-symbol timestamp intersection.
+- E11/E13 synchronized_data() constructs the intersection of timestamps across the 47 eligible symbols, then replays all symbols on 4,321 common aligned bars.
+- Of the 47 included symbols, 25 have 1,314 / 1,314 / 1,753 bars across folds (4,381 total) and 22 have 1,278 / 1,314 / 1,729 (4,321 total). The longer-history group therefore has 60 additional per-symbol bars in E10's fold windows (36 in fold 1 and 24 in fold 3) that are excluded from the common E11/E13 replay.
+- The E11/E13 manifest is written before the common-timestamp intersection, so its per-symbol fold counts describe source coverage, not the final synchronized replay count. The summary's common_bars=4,321 is the actual shared replay count.
+
+Decision: do not attribute the entire E10-to-E11 result difference to shared-capital accounting. E10 and E11 are different estimands. E11-to-E13 remains a controlled replay comparison because E13's compression-OFF baseline reproduces E11's per-fold results exactly on the same common dataset.

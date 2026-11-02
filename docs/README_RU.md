@@ -3,6 +3,7 @@
 ## Читать в первую очередь
 
 1. [Инструкции агенту](../AGENTS.md) — обязательные правила.
+2. [Exchange reconciliation readiness](audits/EXCHANGE_RECONCILIATION_READINESS_RU.md) — read-only V5 snapshot contract и причина текущего BLOCKED.
 2. [Рабочие правила проекта](../PROJECT_WORKING_RULES_RU.md) — автономность, безопасность и методика.
 3. [Технический аудит](audits/PROJECT_AUDIT_RU.md).
 4. [Аудит движка](audits/ENGINE_AUDIT_FINDINGS_RU.md).

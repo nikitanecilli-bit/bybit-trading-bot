@@ -683,7 +683,16 @@ class PlanBStatePersistence:
         try:
             with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2, ensure_ascii=False, allow_nan=False)
+                f.flush()
+                os.fsync(f.fileno())
             os.replace(tmp_path, self.backup_filepath)
+            if os.name == "posix":
+                parent_dir = os.path.dirname(os.path.abspath(self.backup_filepath)) or "."
+                dir_fd = os.open(parent_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
         except Exception as e:
             # Persistence is explicitly enabled: a failed backup must be visible
             # to the caller so the trading loop can stop rather than continue

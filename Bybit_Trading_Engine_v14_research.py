@@ -1193,12 +1193,19 @@ class UnifiedQuantEngine:
         ref = sig["entry_price"]
         is_long = direction == "long"
 
+        effective_order_type = sig["order_type"]
         if sig["order_type"] == "limit":
             touched = curr.low <= ref if is_long else curr.high >= ref
             if not touched:
                 self._persist()
                 return False                       # лимитка не исполнилась — сделка пропущена
             fill = min(ref, curr.open) if is_long else max(ref, curr.open)
+            # A limit order crossed by the opening gap is marketable and takes
+            # liquidity. OHLC cannot prove maker status for later intrabar
+            # touches, which remain an explicitly optimistic maker proxy.
+            marketable_at_open = curr.open < ref if is_long else curr.open > ref
+            if marketable_at_open:
+                effective_order_type = "market"
         else:
             if ref > 0 and abs(curr.open - ref) / ref * 100.0 > self.cfg.max_chase_limit_pct:
                 self._persist()
@@ -1212,7 +1219,7 @@ class UnifiedQuantEngine:
         if allocated_budget is not None:
             remaining_portfolio_risk = min(remaining_portfolio_risk, allocated_budget)
         size_usdt, risk_usdt = self.risk_mgr.calculate_position_size(
-            fill, stop_price, order_type=sig["order_type"],
+            fill, stop_price, order_type=effective_order_type,
             risk_budget_usdt=remaining_portfolio_risk,
         )
         if size_usdt <= 0 or risk_usdt <= 0:
@@ -1225,7 +1232,7 @@ class UnifiedQuantEngine:
             strategy=sig["strategy"], entry_ts=curr.ts, entry_price=fill,
             stop_price=stop_price, tp1_price=tp1, tp2_price=tp2,
             initial_stop_dist=sig["stop_dist"], size_usdt=size_usdt, risk_usdt=risk_usdt,
-            order_type=sig["order_type"],
+            order_type=effective_order_type,
             maker_exits=(self.cfg.maker_entry_and_tp1 if self.cfg.maker_tp1_and_target is None else self.cfg.maker_tp1_and_target),
             max_favorable_px=fill, max_adverse_px=fill,
             equity_at_entry=self.risk_mgr.current_equity,

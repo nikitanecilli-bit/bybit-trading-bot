@@ -2,7 +2,7 @@ import sys
 import time
 import unittest
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -78,6 +78,12 @@ class ReconciliationCollectorTests(unittest.TestCase):
         self.assertEqual(endpoints.count("/v5/order/history"), interval_count)
         self.assertEqual(endpoints.count("/v5/execution/list"), interval_count)
         self.assertEqual(endpoints[-1], "/v5/market/time")
+        execution_calls = [call for call in fake.calls if call[0] == "/v5/execution/list"]
+        history_calls = [call for call in fake.calls if call[0] == "/v5/order/history"]
+        self.assertTrue(execution_calls)
+        self.assertTrue(history_calls)
+        for _, url, _ in execution_calls + history_calls:
+            self.assertEqual(parse_qs(urlparse(url).query).get("settleCoin"), ["USDT"])
         self.assertEqual(snapshot["status"], "CAPTURED_READ_ONLY_NOT_RECONCILED")
         self.assertEqual(snapshot["counts"]["positions"], 0)
         self.assertEqual(snapshot["counts"]["historical_orders"], 0)

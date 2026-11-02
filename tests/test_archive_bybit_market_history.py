@@ -64,6 +64,14 @@ class BybitMarketHistoryTests(unittest.TestCase):
                               lambda a, b, limit: [[str(hour), "100", "101", "99", "100"],
                                                    [str(hour*3), "100", "101", "99", "100"]])
 
+    def test_mark_range_rejects_current_or_future_unclosed_candle(self):
+        hour = 3_600_000
+        now_ms = int(__import__("time").time() * 1000)
+        next_boundary = (now_ms // hour + 1) * hour
+        with self.assertRaisesRegex(ValueError, "unclosed candle"):
+            fetch_mark_klines("BTCUSDT", next_boundary-hour, next_boundary, "60",
+                              lambda a,b,l: [])
+
     def test_mark_range_must_be_interval_aligned(self):
         hour = 3_600_000
         with self.assertRaisesRegex(ValueError, "align"):

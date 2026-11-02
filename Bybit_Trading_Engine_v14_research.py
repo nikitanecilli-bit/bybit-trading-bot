@@ -704,18 +704,43 @@ class PlanBStatePersistence:
         try:
             with open(self.backup_filepath, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            risk_mgr.from_dict(data.get("risk", {}))
-            known = {f.name for f in dataclasses.fields(OpenPositionState)}
-            restored: Dict[str, OpenPositionState] = {}
-            for sym, pos_dict in data.get("open_positions", {}).items():
-                restored[sym] = OpenPositionState(**{k: v for k, v in pos_dict.items() if k in known})
+            if not isinstance(data, dict):
+                raise ValueError("корень backup должен быть JSON-объектом")
+            risk_data = data.get("risk", {})
+            positions_data = data.get("open_positions", {})
             pending = data.get("pending_orders", {}) or {}
-            seq = int(data.get("trade_seq", 0))
+            raw_seq = data.get("trade_seq", 0)
+            if not isinstance(risk_data, dict):
+                raise ValueError("risk state должен быть JSON-объектом")
+            if not isinstance(positions_data, dict):
+                raise ValueError("open_positions должен быть JSON-объектом")
+            if not isinstance(pending, dict):
+                raise ValueError("pending_orders должен быть JSON-объектом")
+            if isinstance(raw_seq, bool) or not isinstance(raw_seq, int) or raw_seq < 0:
+                raise ValueError("trade_seq должен быть неотрицательным целым числом")
+
+            # Stage every component before mutating the caller's risk manager.
+            candidate_risk = AdaptiveRiskManager(risk_mgr.cfg)
+            candidate_risk.from_dict(risk_data)
+            known = {field.name for field in dataclasses.fields(OpenPositionState)}
+            restored: Dict[str, OpenPositionState] = {}
+            for sym, pos_dict in positions_data.items():
+                if not isinstance(sym, str) or not sym or not isinstance(pos_dict, dict):
+                    raise ValueError("каждая open_position должна быть объектом с непустым symbol key")
+                pos = OpenPositionState(**{k: v for k, v in pos_dict.items() if k in known})
+                if pos.symbol != sym:
+                    raise ValueError(f"ключ позиции {sym!r} не совпадает с pos.symbol {pos.symbol!r}")
+                restored[sym] = pos
+
+            seq = raw_seq
             # не даём новым ID совпасть с восстановленными
             for p in restored.values():
                 m = re.search(r"(\d+)$", p.trade_id)
                 if m:
                     seq = max(seq, int(m.group(1)))
+
+            # Commit the validated risk state only after all backup components parsed.
+            risk_mgr.from_dict(candidate_risk.to_dict())
             if restored:
                 logger.info("🛡️ План Б: восстановлено %d позиций, kill_switch=%s, daily_stop=%s",
                             len(restored), risk_mgr.kill_switch_triggered, risk_mgr.daily_stop_triggered)

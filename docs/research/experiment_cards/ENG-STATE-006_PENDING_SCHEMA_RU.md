@@ -1,6 +1,6 @@
 # ENG-STATE-006 — validate restored pending signal schema
 
-Статус до изменения: CONFIRMED SAFETY DEFECT / nested pending payload is not validated.  
+Статус: ACCEPT — pending schema regression и CI прошли.  
 Дата: 2026-11-02.  
 Тип: state restore validation; deterministic tests only.
 
@@ -31,3 +31,14 @@ Keep valid generated signal payloads unchanged. No strategy or fill behavior cha
 ## Границы
 
 Validating local pending data does not reconcile it with exchange active orders. Market backtests are not required.
+
+
+## Результат
+
+- Исправление и тесты: [CI #41433992368](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41433992368), SUCCESS.
+- Engine commit: `f7ecec11e571c26cce4be2d01903a4d104b7f223`; пустые/нулевые malformed pending containers дополнительно отклоняются commit `990bcf9e66551edb0369e4f2c606e643b3e2ac5f`.
+- Test commit: `b1eeede0558eec4125c7dd4be9bb8b80153bda0f`.
+- State persistence tests: 14/14; valid pending signal round-trips, malformed entry/missing field/invalid direction/order type/NaN price are rejected; failed restore leaves risk manager unchanged.
+- Compile, all configured deterministic tests and secret scan passed.
+
+Решение: ACCEPT. No market backtest or live order. Local pending validation still does not reconcile pending signals with exchange active orders.

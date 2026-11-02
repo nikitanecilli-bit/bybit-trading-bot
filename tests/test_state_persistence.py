@@ -177,6 +177,23 @@ class StatePersistenceTests(unittest.TestCase):
                     )
                 self.assertFalse(path.exists())
 
+
+    def test_restored_state_cannot_be_reused_for_a_fresh_backtest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "restored-backtest.json"
+            cfg = engine.BotConfig()
+            writer = engine.PlanBStatePersistence(str(path), enabled=True)
+            writer.save_state(
+                cfg, engine.AdaptiveRiskManager(cfg), {}, {}, 0,
+                last_mark_prices={},
+            )
+            restored = engine.UnifiedQuantEngine(
+                restore_plan_b=True, state_path=str(path),
+            )
+            self.assertTrue(restored._state_restored)
+            with self.assertRaisesRegex(RuntimeError, "restored state"):
+                engine.run_simulation_pass(restored, {}, [])
+
     def test_disabled_persistence_is_a_noop(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "disabled.json"

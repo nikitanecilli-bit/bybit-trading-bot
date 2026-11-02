@@ -2,12 +2,6 @@ name: E10 H1 Body Gate Cross-Sectional Replication
 
 on:
   workflow_dispatch:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - 'scripts/run_e10_h1_body_gate_replication.py'
-      - '.github/workflows/e10-h1-body-gate-replication.yml'
-
 permissions:
   contents: read
 

@@ -2,12 +2,6 @@ name: CryptoFetch uploaded-dataset backtests
 
 on:
   workflow_dispatch:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - 'scripts/run_uploaded_dataset_backtests.py'
-      - '.github/workflows/cryptofetch-backtests.yml'
-
 permissions:
   contents: read
 

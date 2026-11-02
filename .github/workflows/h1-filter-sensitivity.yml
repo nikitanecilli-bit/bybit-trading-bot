@@ -2,12 +2,6 @@ name: H1 predeclared causal filter sensitivity
 
 on:
   workflow_dispatch:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - 'scripts/test_h1_predeclared_causal_filters.py'
-      - '.github/workflows/h1-filter-sensitivity.yml'
-
 permissions:
   contents: read
 

@@ -2,12 +2,6 @@ name: H1 causal filter exit attribution
 
 on:
   workflow_dispatch:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - 'scripts/analyze_h1_filter_exit_attribution.py'
-      - '.github/workflows/h1-filter-exit-attribution.yml'
-
 permissions:
   contents: read
 

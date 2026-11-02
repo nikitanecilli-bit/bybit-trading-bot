@@ -2,12 +2,6 @@ name: H1 two-period chronological screen
 
 on:
   workflow_dispatch:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - 'scripts/run_h1_two_period_screen.py'
-      - '.github/workflows/h1-two-period-screen.yml'
-
 permissions:
   contents: read
 

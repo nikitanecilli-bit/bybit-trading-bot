@@ -2,12 +2,6 @@ name: E13 H1 Causal Compression Gate Shared-Capital Replay
 
 on:
   workflow_dispatch:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - 'scripts/run_e13_h1_compression_gate_replay.py'
-      - '.github/workflows/e13-h1-compression-gate-replay.yml'
-
 permissions:
   contents: read
 

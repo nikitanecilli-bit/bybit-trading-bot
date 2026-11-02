@@ -2,12 +2,6 @@ name: E12 H1 Broad-Market Context Diagnostics
 
 on:
   workflow_dispatch:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - 'scripts/run_e12_h1_market_context_diagnostics.py'
-      - '.github/workflows/e12-h1-market-context-diagnostics.yml'
-
 permissions:
   contents: read
 

@@ -2,12 +2,6 @@ name: E11 H1 Shared-Capital Body Gate Portfolio Replay
 
 on:
   workflow_dispatch:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - 'scripts/run_e11_h1_shared_capital_replay.py'
-      - '.github/workflows/e11-h1-shared-capital-replay.yml'
-
 permissions:
   contents: read
 

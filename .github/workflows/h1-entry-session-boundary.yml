@@ -2,12 +2,6 @@ name: H1 entry-session boundary audit
 
 on:
   workflow_dispatch:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - 'scripts/audit_h1_entry_session_boundary.py'
-      - '.github/workflows/h1-entry-session-boundary.yml'
-
 permissions:
   contents: read
 

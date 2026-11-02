@@ -2,12 +2,6 @@ name: H1 causal regime trade attribution
 
 on:
   workflow_dispatch:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - 'scripts/analyze_h1_regime_trade_attribution.py'
-      - '.github/workflows/h1-regime-attribution.yml'
-
 permissions:
   contents: read
 

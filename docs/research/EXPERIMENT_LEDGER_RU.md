@@ -578,3 +578,10 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - 13 deterministic tests passed in full Research checks [#41468327832](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468327832).
 - Actual public fetch attempt [#41468304134](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468304134) ended in HTTP 403. No snapshot created; do not interpret as an empty universe or invent substitute specs.
 - Snapshot workflow now runs weekly/manual only. The historical instrument-spec gate remains BLOCKED pending a real dated snapshot.
+
+
+### ENG-RECON-002 follow-up — parser page-chain safety cap (2026-11-02)
+
+- Added a 1,000-page maximum to the shared strict parser, matching the collector's pagination cap. The report-only comparator inherits this guard for all position/order/execution page chains.
+- Added a regression test for a 1,001-page input. Full Research checks [#41468736376](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468736376) passed; parser suite 16/16.
+- This limits pathological or corrupted inputs; it does not prove the exchange supplied all pages.

@@ -487,3 +487,11 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - После проверки всех official regional hosts fallback-loop удалён: workflows используют один `BYBIT_API_BASE_URL` repository variable (default `https://api.bybit.com`), без перебора юрисдикций. Новый single-host run #41534141800 (instrument) и #41534156659 (risk-limit) также получил HTTP 403; архивы не созданы. При необходимости владелец задаёт variable на официальный host своего региона; не использовать cross-region fallback для обхода отказа.
 
 - Дополнительно закрыт fail-open в parser: `maxOrderQty` и `maxMktOrderQty` больше не optional для Linear; оба обязательны. Тест удаления каждого поля проходит. CI #41534399745 и #41534426284 — success. Exact qty integration в engine остаётся не сделана.
+
+
+## Дополнение 2026-11-03 — execution-notional fees
+
+- Подтверждён и исправлен дефект: exit fee/slippage ранее считались от entry notional, а не от `qty × actual modeled exit price`. Исправлены TP1, final exit, MTM reserve и stop-risk sizing. Для linear proxy qty = `size_usdt / entry_price`; точный exchange qty всё ещё не wired.
+- Regression coverage обновлено для long/short stops, gap stops, TP1/TP2 maker legs, TP1 + taker trailing stop, MTM and risk sizing. CI #41536540759 — success.
+- Все старые H1/15m net-PnL rankings, включая 50-symbol screen 14/50 positive, считаются provisional до повторного прогона на исправленном engine. Точное изменение aggregate PnL не вычислено. Новые strategy backtests пока не запускать: отсутствуют датированные instrument/risk snapshots, engine exact qty, IM/MM/liquidation model; API workflow returns 403.
+- Fixed rates remain assumptions: taker 0.055%, maker 0.020%, taker slippage 0.0225%. VIP/region-specific account fee schedule and maker queue/partial fills not modeled.

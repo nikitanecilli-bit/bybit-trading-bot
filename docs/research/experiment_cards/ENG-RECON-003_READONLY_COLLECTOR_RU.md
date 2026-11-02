@@ -31,7 +31,7 @@ Added `scripts/bybit_reconciliation_snapshot.py`.
 - HTTPS and official-host allowlist enforced before credentials are sent; redirect refusal;
 - future backup timestamp rejection.
 
-CI: [Research engine checks #41457143134](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41457143134), SUCCESS. Compile, all configured deterministic suites, parser tests (13/13), collector tests (12/12), secret scan and persistence tests completed successfully. The preceding #41456956477 run also passed after the host validation and redirect protection were wired into the actual request path.
+CI: [Research engine checks #41457143134](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41457143134), SUCCESS. Compile, all configured deterministic suites, parser tests (14/14), collector tests (12/12), secret scan and persistence tests completed successfully. The preceding #41456956477 run also passed after the host validation and redirect protection were wired into the actual request path.
 
 ## Commits
 

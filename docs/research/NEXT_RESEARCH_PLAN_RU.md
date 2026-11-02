@@ -386,3 +386,9 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Доступный CryptoFetch архив заканчивается 2026-10-27 и является Binance OHLCV proxy; в ZIP нет исторических funding/mark-price CSV. Два уже изученных периода и все их производные фильтры не являются новым blind holdout.
 - Не запускать новые parameter sweeps и не объявлять новый holdout на тех же уже просмотренных свечах. Следующий валидный рыночный тест требует нового заранее зафиксированного временного окна/набора данных либо nested walk-forward, явно маркированного как повторный model selection.
 - Bybit public snapshot ранее получил HTTP 403; не обходить ограничение неофициальными прокси или непроверенными источниками.
+
+
+## Дополнение: ENG-METRIC-001 (2026-11-02)
+- Закрыт дефект порядка расчёта drawdown: `MaintenanceGateAuditor` теперь агрегирует net PnL по UTC timestamp закрытия и применяет группы хронологически. Тест-first CI #41512547727 воспроизвёл ошибку; full CI #41512721144 SUCCESS, portfolio accounting 24/24.
+- Следующий инженерный блок: тесты метрик на контрольных equity paths — одновременные закрытия, out-of-order records, несколько UTC offsets, MTM drawdown vs realized curve, cost aggregation с funding receipts. Затем проверить корректность MAE/MFE при TP1 и финальном закрытии.
+- Exchange sizing и margin tier integration пока не менять: достоверных версионированных Bybit instrument snapshots/risk tiers для исторических дат в репозитории нет; public snapshot endpoint ранее вернул 403. Не подставлять текущие параметры в прошлое и не использовать неофициальные обходы.

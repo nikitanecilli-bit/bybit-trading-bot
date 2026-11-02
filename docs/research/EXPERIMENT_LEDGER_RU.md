@@ -309,3 +309,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41432914403](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41432914403), SUCCESS; state persistence tests 6/6, compile, all configured deterministic suites and secret scan passed.
 - Decision: ACCEPT as a local persistence integrity correction. No market backtest, parameter sweep, production deployment or live order.
 - Limitation: no fsync/remote durability guarantee; no Bybit position/order reconciliation.
+
+
+## ENG-STATE-005 — transactional state restore (2026-11-02)
+
+- Preregistered card: [ENG-STATE-005](experiment_cards/ENG-STATE-005_TRANSACTIONAL_RESTORE_RU.md).
+- Confirmed defect: loader applied `risk_mgr.from_dict()` before parsing positions and pending orders. If later parsing failed, the method raised (after ENG-STATE-003) but the caller's risk manager had already been mutated.
+- Fix: validate root/risk/positions/pending/trade_seq types; stage risk state in a temporary `AdaptiveRiskManager`; build all positions and sequence; only then apply staged risk values to the caller's manager. Position dictionary key must match `pos.symbol`.
+- Tests: `tests/test_state_persistence.py` 9/9, including malformed position/pending/sequence proving original risk manager remains unchanged after failed restore.
+- Commits: engine `ee191fb37711a2304b5a7a64752f629a7e0566d4`; tests `481a71484579f700feef53930326bde50a4513d1`.
+- CI: [Research engine checks #41433598794](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41433598794), SUCCESS; compile, all configured deterministic suites and secret scan passed.
+- Decision: ACCEPT as an in-memory restore atomicity correction. No market backtest, parameter sweep, production deployment or live order.
+- Limitation: local restore still lacks exchange reconciliation and backup freshness/schema migration.

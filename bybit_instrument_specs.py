@@ -87,9 +87,9 @@ class InstrumentSpec:
         min_notional = _positive(
             lot_filter.get("minNotionalValue"), "lotSizeFilter.minNotionalValue"
         )
-        max_qty = _positive(lot_filter.get("maxOrderQty"), "lotSizeFilter.maxOrderQty", optional=True)
+        max_qty = _positive(lot_filter.get("maxOrderQty"), "lotSizeFilter.maxOrderQty")
         max_market_qty = _positive(
-            lot_filter.get("maxMktOrderQty"), "lotSizeFilter.maxMktOrderQty", optional=True
+            lot_filter.get("maxMktOrderQty"), "lotSizeFilter.maxMktOrderQty"
         )
         min_lev = _positive(leverage_filter.get("minLeverage"), "leverageFilter.minLeverage", optional=True)
         max_lev = _positive(leverage_filter.get("maxLeverage"), "leverageFilter.maxLeverage", optional=True)

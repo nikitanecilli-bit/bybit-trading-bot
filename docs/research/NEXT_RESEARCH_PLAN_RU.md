@@ -243,3 +243,7 @@ No production/live changes and no market backtests were performed in these corre
 
 - **ENG-STATE-005 accepted:** restore now stages risk state in a temporary manager and validates root, positions, pending orders and trade sequence before mutating the caller's risk manager. Malformed backups leave the original risk state unchanged. CI #41433598794 passed; state persistence tests 9/9.
 - Remaining persistence P0: compare restored local positions and active orders with Bybit before any resume; define stale-backup detection/schema versioning; fsync/remote durability. Transactional in-memory restore alone is not sufficient for live recovery.
+
+
+- **ENG-STATE-006 accepted:** restored pending signals are now validated for required fields, symbol identity, direction, order type, strategy and finite numeric values. Malformed `pending_orders: []` / null containers are no longer silently converted to empty dicts. CI #41433992368 passed; state persistence tests 14/14.
+- This closes local nested-payload validation only. Pending signals are not exchange orders; reconciliation with Bybit active orders remains a separate P0 before any resume.

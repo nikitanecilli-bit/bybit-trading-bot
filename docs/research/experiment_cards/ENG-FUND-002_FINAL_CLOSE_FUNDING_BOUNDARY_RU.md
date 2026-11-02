@@ -1,6 +1,6 @@
 # ENG-FUND-002 — funding receipt when the position fully closes at settlement boundary
 
-Статус: PREREGISTERED — test-first; implementation pending.
+Статус: ACCEPT — confirmed by test-first failure and passing regression CI.
 Дата: 2026-11-02.
 Тип: deterministic accounting/risk correctness; no market experiment.
 
@@ -34,3 +34,14 @@ Separately test MTM at the settlement boundary: because the current engine marks
 ## Scope
 
 No strategy changes, parameter search, market backtest, private API request or live order. Accept only after regression tests and Research CI pass.
+
+
+## Реализация и результаты (2026-11-02)
+
+- Test-first commit: `b06524c6ce0613322169b33892fb8896ad5f720a`.
+- CI [#41502110789](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41502110789) reproduced the missing final-close context: four new cases failed with `TypeError: unexpected keyword argument 'closed_ts_ms'`.
+- Fix: `accrued_funding_cost()` now accepts optional `closed_ts_ms`; at exact full-close boundary, payments use full initial quantity and receipts use zero. `_close_position()` passes its final exit timestamp.
+- Added engine-level trade-ledger tests for both receipt and payment at the final-close boundary.
+- Full Research CI [#41502251992](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41502251992) completed SUCCESS. Funding boundary, realized funding, MTM funding, portfolio accounting and all other configured suites passed.
+- Decision: ACCEPT for realized trade PnL accounting. No market backtest or live operation.
+- Remaining issue tracked separately in ENG-FUND-003: pre-exit MTM currently runs before candle exit resolution and may temporarily credit a receipt at the current as-of boundary.

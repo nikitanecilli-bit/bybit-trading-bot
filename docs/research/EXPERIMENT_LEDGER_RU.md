@@ -275,3 +275,13 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41431923590](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41431923590), SUCCESS. `test_gap_execution.py` 25/25; `test_time_model.py` 38/38; compile, all other configured deterministic checks and secret scan passed.
 - Decision: ACCEPT as a correction to the simulator's marketable-limit entry cost classification. No market backtest, parameter sweep, production change or live order was performed.
 - Limitation: ordinary intrabar limit touch is still an optimistic maker proxy without bid/ask, queue priority, partial fills or adverse-selection modelling. Taker slippage remains a static proxy.
+
+
+## H1 entry-session boundary audit — timestamp semantics (2026-11-02)
+
+- Workflow: [41428755424](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41428755424), success; artifact SHA-256 `3e4a1da0085dfb275395657ec4aa8d6d67e68c70ec9b509010696b30e875866f`.
+- Script: `scripts/audit_h1_entry_session_boundary.py`; 25 symbols; two chronological periods (screen and forward); four variants: baseline, signal-candle US block, next-entry-bar US block, and next-entry-bar US block plus direction/24h alignment.
+- Key semantic finding: native `blocked_sessions_utc` is evaluated against the signal candle timestamp in `QuantStrategyCore.evaluate_signal()`, while trade journal session is computed from the actual fill candle timestamp. A signal on the 15:00 H1 candle can be evaluated in EU session but enter at 16:00 UTC in US session. The native signal-session block therefore does not guarantee blocking actual US-session entries.
+- Per-symbol independent sums (not shared-capital portfolio): screen net baseline -1,886.09; signal-US-block +9,959.67; entry-US-block +7,440.00; aligned-entry-US-block +8,543.31. Forward net baseline -14,789.82; signal-US-block -5,020.33; entry-US-block -5,341.50; aligned-entry-US-block -2,819.98. The signal-session variant still recorded 134 US-session entries in screen and 125 in forward; the entry-session variant recorded zero.
+- Interpretation: signal-time and entry-time filters are different policies. The existing config field is signal-time semantics; do not describe it as an entry-session block. No automatic code change is made because changing the timestamp basis changes strategy behavior and the audit used independent per-symbol simulations. Any future adoption requires a separately preregistered experiment and shared-capital validation after the execution/data gate.
+- Decision: diagnostic only; no filter promoted. Binance OHLCV proxy, static costs, per-symbol independent accounts; not evidence of portfolio profitability.

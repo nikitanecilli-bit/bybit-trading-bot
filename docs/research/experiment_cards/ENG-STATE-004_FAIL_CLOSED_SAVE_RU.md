@@ -1,6 +1,6 @@
 # ENG-STATE-004 — fail-closed state save при ошибке записи
 
-Статус до изменения: CONFIRMED SAFETY DEFECT / write exception is logged and swallowed.  
+Статус: ACCEPT — write-failure regression и CI прошли.  
 Дата: 2026-11-02.  
 Тип: state persistence integrity; deterministic tests only.
 
@@ -31,4 +31,12 @@
 
 ## Решение
 
-OPEN до regression tests и CI. Рыночные backtests не нужны.
+Решение: ACCEPT для исследовательского движка.
+
+- Исправление: commit `ac43d4aa23d2e797eae99d57e6c65c714642e120`.
+- Тесты: commit `0b142dcf5393683844e8e73b7d3f2096525a7722`.
+- CI: [Research engine checks #41432914403](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41432914403), SUCCESS.
+- `tests/test_state_persistence.py`: 6/6; ошибка `os.replace` вызывает RuntimeError, временный файл очищается; disabled persistence остаётся no-op.
+- Compile, все configured deterministic tests и secret scan прошли.
+
+ACCEPT означает, что при включённом persistence ошибка записи больше не маскируется. Это не гарантия fsync/durability при отключении питания и не exchange reconciliation.

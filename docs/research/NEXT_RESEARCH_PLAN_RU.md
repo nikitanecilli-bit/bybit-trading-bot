@@ -208,3 +208,20 @@ The snapshot collector now supports regional `--base-url` fallback; current runn
 - продолжать безопасные deterministic tests, аудит lifecycle, сверку происхождения данных и восстановление воспроизводимости старых экспериментов.
 
 Текущий приоритет не изменён: получить проверяемые Bybit данные и dated instrument specs, закрыть точный exchange sizing/funding/execution gaps, затем выполнить один заранее зафиксированный execution-aware replay без оптимизации параметров.
+
+
+## 2026-11-02 — lifecycle/execution audit follow-up
+
+Completed deterministic corrections:
+- **ENG-KS-001:** kill-switch now overrides TP1/TP2/time-stop once the portfolio kill-switch has latched before position management. Regression test covers adverse intrabar mark and simultaneous TP2 touch. CI run 41431556111 passed; `test_time_model.py` 38/38.
+- **ENG-EXEC-002:** marketable limit gap-through entries are classified as taker for sizing, MTM and journal entry costs; ordinary OHLC limit touch remains maker proxy. CI run 41431923590 passed; `test_gap_execution.py` 25/25 and `test_time_model.py` 38/38.
+- Session-boundary audit 41428755424 recorded a semantic distinction: `blocked_sessions_utc` blocks based on signal-candle timestamp, while journal session uses actual fill-candle timestamp. No policy change is made; signal-time and entry-time gates must remain separate hypotheses.
+
+Remaining execution/lifecycle limitations:
+1. OHLC intrabar limit touch is not proof of maker fill; no spread, queue, partial fill, cancel latency or adverse selection.
+2. Exact Bybit instrument specs and contract quantity are still not wired into the engine.
+3. Funding uses proxy quantity/mark assumptions; Bybit data retrieval remains blocked on current Actions runner.
+4. Session-block semantics must be explicitly selected before any future strategy test; do not silently reinterpret the existing `blocked_sessions_utc` setting.
+5. Continue deterministic lifecycle tests and source audit; do not run new market PnL sweeps until the execution/data gate is closed.
+
+No production/live changes and no market backtests were performed in these corrections.

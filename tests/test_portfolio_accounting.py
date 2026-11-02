@@ -546,7 +546,7 @@ def test_same_bar_tp1_on_one_symbol_and_stop_on_another_is_order_independent():
     assert abs(first.risk_mgr.realized_equity - reverse.risk_mgr.realized_equity) < 1e-8
     assert abs(first.risk_mgr.unrealized_pnl - reverse.risk_mgr.unrealized_pnl) < 1e-8
     assert abs(first.risk_mgr.current_equity - reverse.risk_mgr.current_equity) < 1e-8
-    assert abs(first.risk_mgr.max_drawdown_pct - reverse.risk_mgr.max_drawdown_pct) < 1e-8
+    assert abs(first.risk_mgr.max_drawdown_pct - reverse.risk_mgr.max_drawdown_pct) < 1e-8, (first.risk_mgr.max_drawdown_pct, reverse.risk_mgr.max_drawdown_pct)
 
 
 

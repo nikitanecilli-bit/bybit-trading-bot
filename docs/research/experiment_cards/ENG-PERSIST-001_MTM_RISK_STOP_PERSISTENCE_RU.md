@@ -1,6 +1,6 @@
 # ENG-PERSIST-001 — persist portfolio risk-stop transitions immediately
 
-Статус: PREREGISTERED — implementation not yet accepted.
+Статус: ACCEPT — test-first regression and full Research CI passed.
 Дата: 2026-11-02.
 Тип: fail-safe state persistence / portfolio risk controls.
 
@@ -26,3 +26,13 @@ Persist immediately when either protective latch transitions from false to true 
 ## Acceptance
 
 Accept only if tests fail before the fix, pass after it, and full Research CI passes. No market backtest, parameter search, private API request or live order.
+
+
+## Реализация и результат
+
+- Test-only commit: `79ca7cb865928f9978f654db91310ab527eae02e`.
+- CI [#41504537789](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41504537789) failed in the portfolio-accounting step exactly at `test_mtm_daily_stop_transition_is_persisted_without_trade_close` with `AssertionError`: the daily-stop latch was set but the persistence spy was not called.
+- Fix: `_update_mark_to_market()` now calls `_persist()` when MTM reports a new daily-stop or kill-switch transition. It does not fsync on every candle; ordinary MTM updates retain prior persistence frequency.
+- The first post-fix run exposed an incomplete test fixture in `test_funding_mark_to_market.py` (its engine created with `__new__` lacked a persistence stub). The fixture was corrected; production behavior was not weakened.
+- Full Research CI [#41504995009](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41504995009) completed SUCCESS on commit `cc012f0b4df52fb5da0270e08b0a9438bb70762c`; portfolio accounting and fail-closed state persistence steps passed.
+- Decision: ACCEPT for durability of MTM risk-stop latches. This does not establish strategy profitability or exchange execution correctness.

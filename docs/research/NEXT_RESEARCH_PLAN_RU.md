@@ -399,3 +399,13 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Это фиксирует текущие risk tiers с момента первого успешного захвата. Исторические tiers до даты первого архива остаются неизвестными; не подставлять сегодняшние `maintenanceMargin`, `initialMargin`, `mmDeduction` и `maxLeverage` в старые периоды.
 - Следующий data task: после успешного доступа к официальному Bybit API архивировать historical funding settlements и mark-price klines по exact timestamps; отдельный preflight должен выявлять неполные страницы/символы/границы и не подменять отсутствующие значения last trade price.
 - Risk-tier integration в PnL/ликвидационный симулятор отложена до получения версионированных tiers и точного определения account/position mode, isolated/cross margin и risk-limit transitions.
+
+
+## Дополнение 2026-11-02 — funding/mark archive pipeline
+
+- Реализован scripts/archive_bybit_market_history.py: официальные linear funding history + mark-price klines, bounded windows, проверка полноты H1 grid, атомарные CSV, fail-closed при 403/лимите/пропусках.
+- Добавлен manual workflow bybit-market-history-archive.yml. Для каждого запуска отдельный каталог с временным диапазоном и run id; затем coverage preflight и commit в research branch.
+- 11 offline tests прошли. Полный CI на кодовом commit 83af4e662e1f66a28a8dce5e064fbedb54347c0c прошёл тестовые шаги; окончательное состояние workflow проверяется.
+- Следующий шаг: выполнить ручной архив на 1-2 ликвидных инструментах и небольшом диапазоне, подтвердить фактический API доступ/форматы/coverage. Только после этого расширять на полный 50-symbol universe и 180-day период.
+- После получения реальных данных сверить funding timestamps против mark candle opens; помнить, что H1 open — proxy, не settlement mark. Не переписывать funding accounting или исторические результаты до отдельной проверки event-time semantics.
+- Только после успешной data validation подключать funding + mark data к воспроизводимым shared-capital H1 backtests, затем отдельным этапом — исторические risk tiers и maintenance-margin/liquidation model.

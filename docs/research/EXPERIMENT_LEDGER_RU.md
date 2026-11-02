@@ -626,3 +626,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Follow-up CI [#41501468001](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41501468001): full workflow completed SUCCESS, including compile, funding accounting, realized funding, MTM funding, coverage preflight, private API mock tests, reconciliation suites, regime suites, gap/time/portfolio/persistence tests and secret scan.
 - Decision: FIXED; regression and all substantive test steps pass. Awaiting GitHub workflow finalization for a terminal run conclusion.
 - No market backtest, parameter sweep, production deployment, private API request or live order.
+
+
+## ENG-FUND-002 — funding при полном закрытии на settlement boundary (2026-11-02)
+
+- Карточка: [ENG-FUND-002](experiment_cards/ENG-FUND-002_FINAL_CLOSE_FUNDING_BOUNDARY_RU.md).
+- Test-first CI [#41502110789](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41502110789) воспроизвёл отсутствие final-close context: четыре новых случая упали с `TypeError: unexpected keyword argument 'closed_ts_ms'`.
+- Исправление: `accrued_funding_cost()` принимает `closed_ts_ms`; если funding settlement совпадает с полным закрытием, payment считается на полном начальном объёме, receipt — на нулевом. `_close_position()` передаёт `exit_ts`.
+- Добавлены engine-level тесты реальной записи trade ledger: receipt=0, payment=10 USDT для позиции 1,000 USDT при ставке 1%.
+- Full Research CI [#41502251992](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41502251992), SUCCESS; funding, realized PnL, MTM, portfolio и остальные configured suites прошли.
+- Решение: ACCEPT для realized PnL. Не является доказательством рыночной доходности.
+- Оставшийся риск pre-exit MTM вынесен в ENG-FUND-003: до определения исхода свечи MTM может временно зачесть receipt на текущей границе.

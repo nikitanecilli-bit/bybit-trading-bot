@@ -101,6 +101,16 @@ class InstrumentSpecTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "minPrice/maxPrice"):
             self.spec.round_price("1000000.01", side="sell")
 
+    def test_missing_order_quantity_caps_fail_closed(self):
+        for field in ("maxOrderQty", "maxMktOrderQty"):
+            broken = {"instrument": dict(SNAPSHOT["instrument"])}
+            broken["instrument"]["lotSizeFilter"] = dict(
+                SNAPSHOT["instrument"]["lotSizeFilter"]
+            )
+            del broken["instrument"]["lotSizeFilter"][field]
+            with self.assertRaisesRegex(ValueError, "missing instrument field"):
+                InstrumentSpec.from_snapshot(broken)
+
     def test_non_linear_category_is_rejected(self):
         broken = {"instrument": dict(SNAPSHOT["instrument"])}
         broken["instrument"]["category"] = "spot"

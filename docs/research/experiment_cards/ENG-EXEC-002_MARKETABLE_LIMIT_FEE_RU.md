@@ -1,6 +1,6 @@
 # ENG-EXEC-002 — marketable limit entry fee classification
 
-Статус до исправления: HYPOTHESIS REGISTERED / ошибка подтверждена чтением кода.  
+Статус: ACCEPT — классификация gap-through fills и регрессионные тесты прошли технический CI.  
 Дата: 2026-11-02.  
 Тип: deterministic execution-cost accounting regression; не рыночный эксперимент.
 
@@ -35,4 +35,15 @@
 
 ## Решение
 
-OPEN до regression tests и CI. ACCEPT только при выполнении критериев; иначе REJECT/INCONCLUSIVE с логами.
+Решение: ACCEPT для исследовательского движка.
+
+- Исправление: commit `2a60a261ef5792b72d438ae39c5f99dda807c16e`.
+- Тесты: commit `f1667c273d30c20306e59a746318c8be4d532172`.
+- CI: [Research engine checks #41431923590](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41431923590), conclusion SUCCESS.
+- `tests/test_gap_execution.py`: 25/25; оба marketable gap-through теста (long/short) и обычный non-gap limit-touch proxy отмечены PASS.
+- `tests/test_time_model.py`: 38/38; регрессия ENG-KS-001 остаётся зелёной.
+- Compile и все остальные deterministic checks прошли; secret scan не нашёл очевидных секретов.
+
+Критерии выполнены. В marketable gap-through случаях effective entry type передаётся в sizing и сохраняется в позиции как `market`; обычный внутрисвечной limit touch остаётся `limit` proxy. Никакие рыночные backtests не запускались.
+
+ACCEPT означает исправление классификации затрат в симуляторе. Он не доказывает, что остальные OHLC limit fills действительно получат maker execution.

@@ -1,0 +1,23 @@
+name: Audit CryptoFetch archive coverage
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/market-regime-v1-main]
+    paths:
+      - 'scripts/audit_cryptofetch_archives.py'
+      - '.github/workflows/cryptofetch-archive-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/market-regime-v1-main
+      - name: Inspect archived datasets
+        run: python scripts/audit_cryptofetch_archives.py

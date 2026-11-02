@@ -9,9 +9,11 @@
 5. [Журнал экспериментов](research/EXPERIMENT_LEDGER_RU.md) — исторический источник результатов.
 6. [Протокол непрерывного улучшения](research/CONTINUOUS_IMPROVEMENT_PROTOCOL_RU.md) — гипотезы, контрольная версия, критерии ACCEPT/REJECT и защита от переобучения.
 7. [Шаблон карточки эксперимента](research/EXPERIMENT_CARD_TEMPLATE_RU.md) — заполняется до каждого нового запуска.
-8. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
-9. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
-10. [Карта репозитория](REPOSITORY_MAP_RU.md).
+8. [ENG-KS-001 — kill-switch priority](research/experiment_cards/ENG-KS-001_KILL_SWITCH_PRIORITY_RU.md) — исправление внутрисвечной конкуренции kill-switch и TP.
+9. [ENG-EXEC-002 — marketable limit costs](research/experiment_cards/ENG-EXEC-002_MARKETABLE_LIMIT_FEE_RU.md) — taker-классификация лимитных gap-through fills.
+10. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
+11. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
+12. [Карта репозитория](REPOSITORY_MAP_RU.md).
 
 ## Разделы
 

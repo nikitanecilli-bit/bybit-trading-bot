@@ -20,7 +20,8 @@
 - counts vs validated rows/pages;
 - server-time bounds and capture duration;
 - contiguous execution interval coverage from backup time to snapshot boundary, each interval <= 7 days;
-- local/exchange symbol coverage and direction conflicts.
+- local/exchange symbol coverage and direction conflicts;
+- exchange-side position TP/SL/trailing-stop visibility, including missing or zero stop fields.
 
 ## Fail-closed decision
 
@@ -37,7 +38,7 @@ The report surfaces counts, exchange identifiers, symbol mismatches and directio
 
 ## Tests and CI
 
-`tests/test_bybit_reconciliation_report.py`: 12 deterministic tests passed, covering:
+`tests/test_bybit_reconciliation_report.py`: 14 deterministic tests passed, covering:
 - empty account still blocked;
 - open position diagnostics without quantity reconciliation;
 - direction conflict reporting;
@@ -51,12 +52,12 @@ The report surfaces counts, exchange identifiers, symbol mismatches and directio
 - non-object snapshot rejection;
 - wrong market scope rejection.
 
-CI: [Research engine checks #41458773696](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41458773696), SUCCESS. The workflow compiled the comparator and ran parser, collector, comparator, secret scan, persistence and configured deterministic suites.
+CI: [Research engine checks #41459486381](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41459486381), SUCCESS. The workflow compiled the comparator and ran parser, collector, comparator, secret scan, persistence and configured deterministic suites.
 
 ## Ограничения
 
 - No real Bybit snapshot was fetched or compared.
-- No order history or exchange-side stop/TP verification.
+- No order history or exchange-side conditional-order health verification. Position-level TP/SL fields are reported when present, but do not prove trigger execution.
 - No local execution ledger or exact exchange qty/positionIdx/order IDs.
 - This is a diagnostic report, not permission to resume live trading.
 - No PnL sweep, live order, production deployment or automatic recovery.

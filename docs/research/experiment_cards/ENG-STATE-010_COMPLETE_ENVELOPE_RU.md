@@ -1,6 +1,6 @@
 # ENG-STATE-010 — require complete persisted state envelope
 
-Статус до изменения: CONFIRMED SAFETY GAP / valid JSON can omit portfolio fields and silently restore defaults.  
+Статус: ACCEPT — required envelope and risk snapshot validation passed CI.  
 Дата: 2026-11-02.  
 Тип: backup envelope validation; deterministic tests only.
 
@@ -25,3 +25,12 @@ Do not change backup writer format or strategy behavior.
 5. Full deterministic CI passes.
 
 No market backtest required.
+
+## Результат
+
+- Engine commit: `e8171203ad3f87ad19bca064f9a32b4c8a4ec2f0`.
+- Test fixture / coverage commit: `46c4f01a291634cc2b71f4227c41dfb0b0091e2f`.
+- CI: [Research engine checks #41436427155](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41436427155), SUCCESS.
+- `tests/test_state_persistence.py`: 33/33; all four envelope keys and protective risk flags are required. Tests for malformed positions, pending payloads, risk values and transactionality now use otherwise-valid complete snapshots, so they exercise their intended validation layer.
+- Compile, configured deterministic suites and secret scan passed.
+- Decision: ACCEPT for complete snapshot validation. Existing backup with missing fields now fails closed; explicit migration would be needed for older formats.

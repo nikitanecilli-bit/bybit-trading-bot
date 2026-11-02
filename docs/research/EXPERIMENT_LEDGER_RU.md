@@ -472,3 +472,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41446661723](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41446661723), SUCCESS; compile, configured deterministic suites and secret scan passed.
 - Decision: ACCEPT as preservation of existing one-next-bar policy; no strategy change intended. No market PnL sweep, production deployment or live order.
 - Limitation: exact timestamp adjacency assumes complete candles for the configured timeframe. A missing candle causes safe cancellation rather than late fill; it does not query exchange-side order state.
+
+
+## ENG-STATE-016 — backup event timestamps bounded by save time (2026-11-02)
+
+- Preregistered card: [ENG-STATE-016](experiment_cards/ENG-STATE-016_BACKUP_EVENT_TIME_RU.md).
+- Confirmed temporal gap: positive entry/TP1/pending timestamps could still lie after the backup's `saved_at_utc`.
+- Fix: restore converts UTC save time to milliseconds and requires every position entry, TP1 event and pending signal timestamp to be no later than that save time.
+- Tests: `tests/test_state_persistence.py` 51/51; future entry, TP1 and pending timestamps rejected. Existing valid round-trip, TP1 and pending lifecycle cases pass.
+- Commits: engine `8b33bd56c73c7abaf43513b59d16f6c5295bc8fb`; tests `ab74e2918f3c897443f0b0d1acbbfd7059fa9528`.
+- CI: [Research engine checks #41447112303](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41447112303), SUCCESS; compile, configured deterministic suites and secret scan passed.
+- Decision: ACCEPT as internal backup chronology validation. No market PnL sweep, production deployment or live order.
+- Limitation: this does not define maximum backup age or prove the snapshot matches exchange state; Bybit reconciliation remains mandatory.

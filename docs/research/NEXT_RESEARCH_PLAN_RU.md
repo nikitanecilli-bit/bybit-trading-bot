@@ -256,3 +256,7 @@ No production/live changes and no market backtests were performed in these corre
 
 - **ENG-STATE-008 accepted:** risk-manager restore now rejects unknown keys, NaN/infinity, non-positive equity, invalid drawdown range, malformed date and non-boolean flags before committing staged state. CI #41434930478 passed; persistence suite 23/23.
 - Local backup schema now has separate validation for positions, pending signals and risk-manager fields. This still does not provide exchange reconciliation, backup freshness or crash durability; keep live-resume blocked until those are implemented and verified.
+
+
+- **ENG-STATE-008 accepted:** restored position validation now checks TP1/TP2 directional ordering and cross-field consistency of TP1 flag, remaining quantity and realized TP1 PnL. Persistence regression suite 29/29; CI #41435897233 passed.
+- Remaining hard blockers before any live recovery: exchange reconciliation, stale-backup policy/schema migration, and durability semantics. Local JSON/state invariants alone do not establish safe restart.

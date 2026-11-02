@@ -7,7 +7,7 @@ on:
         description: Bybit API region endpoint
         required: true
         type: choice
-        default: https://api.bybit.kz
+        default: https://api.bybit.com
         options:
           - https://api.bybit.kz
           - https://api.bybit.com

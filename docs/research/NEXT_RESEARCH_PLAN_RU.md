@@ -411,3 +411,10 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Только после успешной data validation подключать funding + mark data к воспроизводимым shared-capital H1 backtests, затем отдельным этапом — исторические risk tiers и maintenance-margin/liquidation model.
 
 - CI update: 12/12 tests for the Bybit history collector passed in Research CI #41518947460 (SUCCESS), including the guard against incomplete current H1 candles.
+
+
+## Дополнение 2026-11-02 — Bybit-native OHLCV
+- Архив Bybit теперь включает trade OHLCV /v5/market/kline, mark-price H1 и funding settlements. Для trade и mark свечей требуется полная H1 сетка, а coverage preflight сверяет их timestamp sets.
+- Добавлены offline тесты парсинга и coverage. В CI на commit 9a94ee7d793e99cdbcc14da6a8eaffce0484dc6f тестовые шаги collector и coverage прошли; общий workflow ещё находился в cleanup.
+- E01–E13 остаются Binance-proxy результатами и не меняются задним числом.
+- После успешного официального API capture: загрузить BTCUSDT/ETHUSDT на коротком интервале, проверить реальные CSV, coverage и архивные SHA256; затем расширить на 50 символов/180 дней. Только после этого повторять shared-capital H1 folds на Bybit-native OHLCV + mark + funding.

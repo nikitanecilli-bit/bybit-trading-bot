@@ -694,3 +694,5 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Fix: PnL закрытий агрегируется по UTC `exit_date`, группы применяются к equity в хронологическом порядке. Невалидные и timezone-naive timestamps fail closed.
 - Full Research CI [#41512721144](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41512721144), SUCCESS; portfolio accounting 24/24, обе новые регрессии PASS; state persistence 60 tests.
 - Это исправление отчётной метрики, не стратегии и не доказательство прибыльности.
+
+- Follow-up проверка расширила same-bar stop permutation tests сравнением `risk_mgr.max_drawdown_pct`; порядок обхода BTC/ETH не меняет MTM drawdown в тестируемых сценариях. CI [#41513430881](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41513430881) SUCCESS; portfolio 24/24, persistence 60.

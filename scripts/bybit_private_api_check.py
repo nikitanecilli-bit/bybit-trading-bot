@@ -81,7 +81,7 @@ def verify_response(payload: dict[str, Any], api_key: str) -> tuple[bool, str]:
 def main() -> int:
     key_from_env = os.environ.get("BYBIT_API_KEY", "")
     secret_from_env = os.environ.get("BYBIT_API_SECRET", "")
-    base_url = os.environ.get("BYBIT_API_BASE_URL", "https://api.bybit.kz").rstrip("/")
+    base_url = os.environ.get("BYBIT_API_BASE_URL", "https://api.bybit.com").rstrip("/")
 
     if not key_from_env or not secret_from_env:
         print("Missing required GitHub Secrets: BYBIT_API_KEY and/or BYBIT_API_SECRET.")

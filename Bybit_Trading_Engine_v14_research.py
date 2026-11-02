@@ -1589,10 +1589,15 @@ class UnifiedQuantEngine:
         # Optional strict execution path. When a dated Bybit snapshot directory
         # is supplied, missing/stale symbols, leverage mismatches and exchange
         # lot constraints reject the entry; there is deliberately no proxy fallback.
-        if self.instrument_spec_history is not None:
+        instrument_spec_history = getattr(self, "instrument_spec_history", None)
+        if instrument_spec_history is not None:
             try:
-                instrument_spec = self.instrument_spec_history.get_spec(
-                    symbol, curr.ts, max_age_ms=self.max_instrument_spec_age_ms,
+                instrument_spec = instrument_spec_history.get_spec(
+                    symbol, curr.ts,
+                    max_age_ms=getattr(
+                        self, "max_instrument_spec_age_ms",
+                        30 * 24 * 60 * 60 * 1000,
+                    ),
                 )
                 instrument_spec.validate_leverage(Decimal(str(self.cfg.leverage_val)))
                 exchange_order = size_to_exchange_constraints(

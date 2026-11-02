@@ -62,6 +62,11 @@ class SnapshotCollectorTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "non-zero or invalid retCode"):
             collector._check_ret_code({"retCode": False, "result": {"list": []}})
 
+    def test_workflow_regional_hosts_are_in_allowlist(self):
+        for host in ("api.bybit.com", "api.bytick.com", "api.bybit.kz",
+                     "api.bybit.nl", "api.bybit.ae", "api.bybit-tr.com"):
+            collector._validate_base_url("https://" + host)
+
     def test_public_collector_rejects_non_bybit_host_before_request(self):
         with self.assertRaisesRegex(ValueError, "official HTTPS Bybit API host"):
             collector._request_page("https://attacker.example", "linear", None)

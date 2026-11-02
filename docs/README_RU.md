@@ -13,9 +13,10 @@
 9. [ENG-EXEC-002 — marketable limit costs](research/experiment_cards/ENG-EXEC-002_MARKETABLE_LIMIT_FEE_RU.md) — taker-классификация лимитных gap-through fills.
 10. [ENG-STATE-003 — fail-closed restore](research/experiment_cards/ENG-STATE-003_FAIL_CLOSED_RESTORE_RU.md) — не допускает тихой потери локального состояния при повреждённом backup.
 11. [ENG-STATE-004 — fail-closed save](research/experiment_cards/ENG-STATE-004_FAIL_CLOSED_SAVE_RU.md) — останавливает цикл при неудачной записи резервного состояния.
-12. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
-13. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
-14. [Карта репозитория](REPOSITORY_MAP_RU.md).
+12. [ENG-STATE-005 — transactional restore](research/experiment_cards/ENG-STATE-005_TRANSACTIONAL_RESTORE_RU.md) — не допускает частичного применения повреждённого backup.
+13. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
+14. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
+15. [Карта репозитория](REPOSITORY_MAP_RU.md).
 
 ## Разделы
 

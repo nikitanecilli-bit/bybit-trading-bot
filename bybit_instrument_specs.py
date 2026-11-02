@@ -50,6 +50,8 @@ class InstrumentSpec:
     status: str
     fetched_at: str | None
     tick_size: Decimal
+    min_price: Decimal
+    max_price: Decimal
     qty_step: Decimal
     min_order_qty: Decimal
     min_notional_value: Decimal
@@ -70,10 +72,16 @@ class InstrumentSpec:
         lot_filter = instrument.get("lotSizeFilter") or {}
         leverage_filter = instrument.get("leverageFilter") or {}
         symbol = str(instrument.get("symbol") or "").strip()
-        category = str(instrument.get("category") or "linear").strip()
+        category = str(instrument.get("category") or "linear").strip().lower()
+        if category != "linear":
+            raise ValueError("InstrumentSpec only supports linear contracts")
         if not symbol:
             raise ValueError("instrument symbol is required")
         tick_size = _positive(price_filter.get("tickSize"), "priceFilter.tickSize")
+        min_price = _positive(price_filter.get("minPrice"), "priceFilter.minPrice")
+        max_price = _positive(price_filter.get("maxPrice"), "priceFilter.maxPrice")
+        if max_price < min_price:
+            raise ValueError("priceFilter.maxPrice cannot be below minPrice")
         qty_step = _positive(lot_filter.get("qtyStep"), "lotSizeFilter.qtyStep")
         min_qty = _positive(lot_filter.get("minOrderQty"), "lotSizeFilter.minOrderQty")
         min_notional = _positive(
@@ -99,6 +107,8 @@ class InstrumentSpec:
             status=str(instrument.get("status") or "unknown"),
             fetched_at=str(payload.get("fetched_at")) if payload.get("fetched_at") else None,
             tick_size=tick_size,
+            min_price=min_price,
+            max_price=max_price,
             qty_step=qty_step,
             min_order_qty=min_qty,
             min_notional_value=min_notional,
@@ -120,6 +130,8 @@ class InstrumentSpec:
             raise ValueError("side must be 'buy' or 'sell'")
         if rounded <= 0:
             raise ValueError("price rounds to zero at tickSize")
+        if rounded < self.min_price or rounded > self.max_price:
+            raise ValueError("rounded limit price is outside minPrice/maxPrice")
         return rounded
 
     def round_qty(self, qty: Any) -> Decimal:
@@ -131,8 +143,12 @@ class InstrumentSpec:
         """Return rounded quantity or reject exchange minimum/maximum constraints."""
         if order_type not in {"limit", "market"}:
             raise ValueError("order_type must be 'limit' or 'market'")
+        if self.status != "Trading":
+            raise ValueError(f"instrument status {self.status!r} is not tradable")
         rounded_qty = self.round_qty(qty)
         px = _positive(price, "price")
+        if order_type == "limit" and not (self.min_price <= px <= self.max_price):
+            raise ValueError("limit price is outside minPrice/maxPrice")
         if order_type == "limit" and px % self.tick_size != 0:
             raise ValueError("limit price must be aligned to tickSize; call round_price first")
         if rounded_qty < self.min_order_qty:

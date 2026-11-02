@@ -34,12 +34,12 @@ Therefore this endpoint is a useful supplement, **not a complete order-event jou
 - presence and matching coverage windows for historical-order pages and execution pages;
 - strict parsing, counts and interval continuity;
 - historical order IDs/statuses and API coverage metadata;
-- no reconciliation PASS is ever possible.
+- no reconciliation PASS is ever possible. Exact duplicate executions at interval boundaries are deduplicated; conflicting records sharing an `execId` block the report.
 
-CI: [Research engine checks #41460727701](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41460727701), SUCCESS:
-- parser 14/14;
+CI: [Research engine checks #41468327832](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468327832), SUCCESS:
+- parser 15/15;
 - collector 15/15;
-- comparator 16/16;
+- comparator 17/17;
 - persistence 54/54;
 - configured deterministic suites and secret scan passed.
 

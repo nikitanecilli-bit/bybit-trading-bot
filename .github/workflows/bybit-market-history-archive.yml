@@ -50,7 +50,7 @@ jobs:
           INTERVAL: ${{ inputs.interval }}
         run: |
           SUCCESS=0
-          for BASE_URL in https://api.bybit.com https://api.bytick.com https://api.bybit.kz https://api.bybit.nl https://api.bybit.ae https://api.bybit-tr.com; do
+          for BASE_URL in https://api.bybit.com https://api.bytick.com https://api.bybit.kz https://api.bybit.tr https://api.bybitgeorgia.ge https://api.bybit.ae https://api.bybit.id; do
             echo "Trying official Bybit public API endpoint: $BASE_URL"
             if python scripts/archive_bybit_market_history.py --symbols "$SYMBOLS" --start-ms "$START_MS" --end-ms "$END_MS" --interval "$INTERVAL" --base-url "$BASE_URL" --output-root "data/archives/bybit/${START_MS}_${END_MS}_${GITHUB_RUN_ID}"; then
               SUCCESS=1

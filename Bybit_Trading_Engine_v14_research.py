@@ -802,6 +802,20 @@ class PlanBStatePersistence:
                 fraction = pos_dict.get("remaining_fraction", 1.0)
                 if fraction < 0 or fraction > 1:
                     raise ValueError(f"позиция {sym}: remaining_fraction должен быть в [0, 1]")
+                entry = pos_dict["entry_price"]
+                tp1 = pos_dict["tp1_price"]
+                tp2 = pos_dict["tp2_price"]
+                if pos_dict["direction"] == "long" and not entry < tp1 < tp2:
+                    raise ValueError(f"позиция {sym}: long targets должны удовлетворять entry < TP1 < TP2")
+                if pos_dict["direction"] == "short" and not entry > tp1 > tp2:
+                    raise ValueError(f"позиция {sym}: short targets должны удовлетворять entry > TP1 > TP2")
+                tp1_hit = pos_dict.get("tp1_hit", False)
+                realized_tp1 = pos_dict.get("realized_tp1_gross_usdt", 0.0)
+                expected_remaining = 1.0 - TP1_FRACTION if tp1_hit else 1.0
+                if not math.isclose(fraction, expected_remaining, rel_tol=0.0, abs_tol=1e-9):
+                    raise ValueError(f"позиция {sym}: tp1_hit и remaining_fraction противоречат друг другу")
+                if not tp1_hit and not math.isclose(realized_tp1, 0.0, rel_tol=0.0, abs_tol=1e-9):
+                    raise ValueError(f"позиция {sym}: realized TP1 PnL задан при tp1_hit=false")
                 for field_name in ("max_favorable_px", "max_adverse_px"):
                     if field_name in pos_dict and pos_dict[field_name] < 0:
                         raise ValueError(f"позиция {sym}: {field_name} не может быть отрицательным")

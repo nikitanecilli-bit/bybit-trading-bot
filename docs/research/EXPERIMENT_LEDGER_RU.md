@@ -392,3 +392,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Engine commit: `22664bd79f8fc93c0cbf7dbafc5c775a82e8cde3`; corrected test fixture commit: `529d1d725752a3010dedc3c06d1c48c572a1e15b`.
 - CI: [Research engine checks #41435897233](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41435897233), SUCCESS; compile, configured deterministic suites and secret scan passed.
 - Decision: ACCEPT for local restore invariants. No market backtest, parameter sweep, production deployment or live order.
+
+
+## ENG-STATE-009 — restored identity consistency (2026-11-02)
+
+- Preregistered card: [ENG-STATE-009](experiment_cards/ENG-STATE-009_RESTORE_IDENTITY_RU.md).
+- Confirmed gap: same symbol could exist simultaneously in restored open positions and pending signals; multiple open positions could also reuse one trade_id.
+- Fix: reject overlapping open/pending symbols and duplicate trade IDs before committing restored risk state.
+- Tests: `tests/test_state_persistence.py` 31/31, including both cross-object conflicts and transactional no-mutation assertions.
+- Engine commit: `984e6a085f74139299ae92c6dfc454686cc2a9a9`; test commit: `c8b0ae1c34768e89a9948fb9352c040bff315d0c`.
+- CI: [Research engine checks #41436083033](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41436083033), SUCCESS; compile, deterministic suites and secret scan passed.
+- Decision: ACCEPT for local restore identity integrity. No market backtest, parameter sweep, production deployment or live order.

@@ -64,8 +64,11 @@ class SnapshotCollectorTests(unittest.TestCase):
 
     def test_workflow_regional_hosts_are_in_allowlist(self):
         for host in ("api.bybit.com", "api.bytick.com", "api.bybit.kz",
-                     "api.bybit.nl", "api.bybit.ae", "api.bybit-tr.com"):
+                     "api.bybit.tr", "api.bybitgeorgia.ge", "api.bybit.ae", "api.bybit.id"):
             collector._validate_base_url("https://" + host)
+        for host in ("api.bybit.nl", "api.bybit-tr.com"):
+            with self.assertRaises(ValueError):
+                collector._validate_base_url("https://" + host)
 
     def test_public_collector_rejects_non_bybit_host_before_request(self):
         with self.assertRaisesRegex(ValueError, "official HTTPS Bybit API host"):

@@ -403,3 +403,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Engine commit: `984e6a085f74139299ae92c6dfc454686cc2a9a9`; test commit: `c8b0ae1c34768e89a9948fb9352c040bff315d0c`.
 - CI: [Research engine checks #41436083033](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41436083033), SUCCESS; compile, deterministic suites and secret scan passed.
 - Decision: ACCEPT for local restore identity integrity. No market backtest, parameter sweep, production deployment or live order.
+
+
+## ENG-STATE-010 — complete backup envelope (2026-11-02)
+
+- Preregistered card: [ENG-STATE-010](experiment_cards/ENG-STATE-010_COMPLETE_ENVELOPE_RU.md).
+- Confirmed gap: existing syntactically valid JSON could omit `open_positions`, `pending_orders`, `trade_seq` or risk fields; permissive `.get(..., {})` defaults could silently restore an empty portfolio or reset protective flags.
+- Fix: require all four envelope keys and all fields emitted by `AdaptiveRiskManager.to_dict()`; no silent empty defaults for an existing incomplete backup.
+- Tests: `tests/test_state_persistence.py` 33/33. Existing malformed position/pending/risk tests were updated to use otherwise-complete snapshots so each test exercises its intended validator. Missing each envelope field and missing kill-switch flag are explicitly rejected.
+- Engine commit: `e8171203ad3f87ad19bca064f9a32b4c8a4ec2f0`; test commit: `46c4f01a291634cc2b71f4227c41dfb0b0091e2f`.
+- CI: [Research engine checks #41436427155](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41436427155), SUCCESS; compile, deterministic suites and secret scan passed.
+- Decision: ACCEPT. Older backups missing fields now fail closed; explicit versioned migration is needed rather than silently inventing defaults. No market backtest or live order.

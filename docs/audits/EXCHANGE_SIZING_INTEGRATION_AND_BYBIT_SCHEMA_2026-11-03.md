@@ -131,3 +131,10 @@ Sources:
 - Bybit Integration Guidance: https://bybit-exchange.github.io/docs/v5/guide
 - Bybit V5 changelog (2026-09-22 removed Netherlands domain): https://bybit-exchange.github.io/docs/changelog/v5
 - GitHub workflow syntax / events: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax and https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows
+
+## 11. Проверка новых branch-scoped API runs завершена
+
+- Instrument snapshot workflow run `41533728951` failed at download step. После исправления host list логи показывают HTTP 403 для каждого официального host, включённого в workflow: api.bybit.com, api.bytick.com, api.bybit.kz, api.bybit.tr, api.bybitgeorgia.ge, api.bybit.ae, api.bybit.id. Snapshot commit step skipped.
+- Risk-limit snapshot workflow run `41533743884` также failed at download step; все перечисленные host attempts returned HTTP 403. Никаких risk-tier rows или dated archive не получено.
+- Это окончательно подтверждает текущий runner-level API access blocker. Повторять те же GET-запросы или добавлять случайные домены бессмысленно. Следующее получение snapshot должно происходить из разрешённой среды/канала с доступом к официальному API; никаких geo/network bypass действий.
+- Latest deterministic Research CI at this point: #41533598553 success after the official-host allowlist tests. Snapshot workflow failures are data-access failures, not deterministic code test failures.

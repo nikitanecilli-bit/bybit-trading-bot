@@ -1,0 +1,33 @@
+name: H1 entry-session boundary audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/market-regime-v1-main]
+    paths:
+      - 'scripts/audit_h1_entry_session_boundary.py'
+      - '.github/workflows/h1-entry-session-boundary.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  session-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/market-regime-v1-main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run H1 entry-session boundary audit
+        run: |
+          set -o pipefail
+          python scripts/audit_h1_entry_session_boundary.py | tee h1_entry_session_boundary.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: h1-entry-session-boundary-audit
+          path: h1_entry_session_boundary.txt
+          if-no-files-found: error

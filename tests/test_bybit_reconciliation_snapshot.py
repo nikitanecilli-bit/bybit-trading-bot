@@ -11,6 +11,7 @@ from scripts.bybit_reconciliation_snapshot import (
     MAX_EXECUTION_WINDOW_MS,
     _execution_intervals,
     _signature,
+    _validate_base_url,
     _NoRedirectHandler,
     collect_snapshot,
 )
@@ -100,6 +101,15 @@ class ReconciliationCollectorTests(unittest.TestCase):
         fake = FakeTransport(fail_endpoint="/v5/position/list")
         with self.assertRaisesRegex(CollectorError, "retCode must be integer zero"):
             collect_snapshot("key", "secret", SAVED, request_json=fake)
+
+    def test_official_regional_hosts_are_allowed(self):
+        for host in (
+            "api.bybit.com", "api.bytick.com", "api.bybit.kz",
+            "api.bybit.tr", "api.bybitgeorgia.ge", "api.bybit.ae",
+            "api.bybit.eu", "api.bybit.id",
+        ):
+            with self.subTest(host=host):
+                _validate_base_url(f"https://{host}")
 
     def test_redirect_handler_refuses_redirects(self):
         handler = _NoRedirectHandler()

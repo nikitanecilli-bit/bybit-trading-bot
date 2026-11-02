@@ -164,3 +164,51 @@ CI:
 - #41534426284, commit `fb73773944a8dc289f84621dfb2ff88cbdb12aa4`: success, including missing-max-cap regression.
 
 Таким образом, helper's static validation now fails closed for missing price bounds, quantity caps, min qty/notional, wrong category, and non-Trading status. This does not close the engine exact-qty integration gap.
+
+## 15. Исправлена комиссия/проскальзывание выхода по execution notional
+
+### Подтверждённый дефект
+
+До исправления `_close_position()` считал комиссию и slippage TP1 и финального выхода от первоначального `pos.size_usdt` × fraction, то есть от entry notional. `_unrealized_pnl_at_marks()` делал то же самое для TP1 и оставшегося выхода. Но для USDT linear фактическая торговая комиссия считается от `executed quantity × executed price × fee rate`; на входе и выходе цены могут различаться. Официальный Bybit USDT P&L guide показывает отдельные формулы Fee to open = Qty × Entry Price × Rate и Fee to close = Qty × Exit Price × Rate.
+
+Это давало направленную ошибку:
+- прибыльный long / прибыльный short с выходом по более низкой цене: exit fee/slippage были занижены, net PnL завышен;
+- убыточный long / убыточный short с выходом по более высокой цене: exit fee/slippage были завышены, net PnL занижен;
+- TP1/остаток также оценивались по entry notional, а не по фактическим модельным ценам своих legs.
+
+### Исправление
+
+В `Bybit_Trading_Engine_v14_research.py`:
+- proxy quantity = `size_usdt / entry_price`;
+- TP1 execution notional = `quantity × tp1_price × TP1_FRACTION`;
+- final execution notional = `quantity × exit_price × remaining_fraction`;
+- MTM TP1/remaining exit costs используют соответственно `tp1_price` и текущий adverse mark;
+- entry fee/slippage остаются на entry notional;
+- risk sizing exit fee/slippage до стопа умножаются на `stop_price / entry_price`, поскольку stop exit notional отличается от entry notional. Нулевая/отрицательная stop price fail-closed отклоняется.
+
+Gross PnL и funding уже используют эквивалентный qty proxy (`size_usdt / entry_price`) и price movement/mark; этот patch синхронизировал с ним fee/slippage legs. Точный биржевой qty всё ещё не используется: он остаётся отдельным integration blocker.
+
+### Регрессионные проверки
+
+Обновлены `tests/test_portfolio_accounting.py`, `tests/test_gap_execution.py`, `tests/test_time_model.py`:
+- long stop 100→95: exit notional 950 вместо 1,000;
+- short stop 100→105: exit notional 1,050;
+- long gap stop 100→90: exit notional 900;
+- TP1 110 на половине qty и TP2 120 на остатке: fees на notional 1,000 + 550 + 600;
+- TP1 maker + trailing taker stop: отдельные maker/taker notional per leg;
+- MTM fee reserve рассчитывается на текущем adverse mark и TP1 fill price;
+- stop-risk estimate учитывает exit notional по stop price.
+
+Research engine checks run `41536540759`, commit `4eb9a2e7d7fc6a198937ef028dec32a5f723e22d`: SUCCESS; все 31 job steps, включая portfolio accounting, gap execution, time model, funding, sizing, state persistence, режимные фильтры и secret scan.
+
+Same-bar order-invariance test допускает максимум (2×10^{-6}) процентного пункта расхождения max-DD из-за 4-decimal equity rounding; realized PnL, final equity и MTM остаются проверены отдельно и инвариантны.
+
+### Последствия для старых результатов
+
+Результаты 50-symbol H1 screen (включая 14/50 net-positive кандидатов) и прежние 15m/H1 сравнения теперь считаются PROVISIONAL до повторного расчёта на исправленном engine. Старый fee formula занижал costs прибыльных exits и завышал costs убыточных exits. Совокупное влияние на старые PnL и ранжирование ещё не пересчитано. Новые market backtests остаются заблокированы до закрытия remaining execution/data realism gate; этот patch сам по себе не разрешает новый strategy sweep.
+
+### Оставшиеся fee assumptions
+
+Rates `TAKER_FEE=0.00055`, `MAKER_FEE=0.00020`, `TAKER_SLIP=0.000225` остаются фиксированными research assumptions. Фактический VIP tier и региональные account fee rates не подключены. Maker fill still assumes touch/fill and lacks queue/partial-fill/adverse-selection model.
+
+Источник формулы: https://www.bybit.com/en/help-center/article/Profit-Loss-calculations-USDT-Contract

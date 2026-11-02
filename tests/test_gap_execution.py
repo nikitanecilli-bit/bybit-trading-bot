@@ -26,21 +26,24 @@ def make_engine(max_chase_pct=1.5):
         current_equity = 10_000.0
         kill_switch_triggered = False
 
+        def __init__(self):
+            self.order_types = []
+
         @staticmethod
         def can_open_new_trade(count):
             return True, "OK"
 
-        @staticmethod
-        def calculate_position_size(entry_price, stop_price, order_type="market", risk_budget_usdt=None):
+        def calculate_position_size(self, entry_price, stop_price, order_type="market", risk_budget_usdt=None):
+            self.order_types.append(order_type)
             return 1000.0, min(10.0, risk_budget_usdt) if risk_budget_usdt is not None else 10.0
 
     e.risk_mgr = RiskSpy()
     return e
 
 
-def pending_signal(order_type="market", ref=100.0):
+def pending_signal(order_type="market", ref=100.0, direction="long"):
     return {
-        "direction": "long", "entry_price": ref, "order_type": order_type,
+        "direction": direction, "entry_price": ref, "order_type": order_type,
         "strategy": "test", "stop_dist": 2.0,
     }
 
@@ -74,6 +77,48 @@ def test_limit_buy_gapped_below_limit_fills_at_open_not_worse_limit():
     opened = e._try_fill_pending("BTCUSDT", candle(98.0, 99.0, 97.0, 98.5))
     assert opened is True
     assert e.open_positions["BTCUSDT"].entry_price == 98.0
+
+
+def test_marketable_buy_limit_gap_through_uses_taker_entry_classification():
+    e = make_engine()
+    e.pending["BTCUSDT"] = pending_signal("limit", 100.0, "long")
+    opened = e._try_fill_pending("BTCUSDT", candle(98.0, 99.0, 97.0, 98.5))
+
+    assert opened is True
+    pos = e.open_positions["BTCUSDT"]
+    assert pos.entry_price == 98.0
+    assert pos.order_type == "market"
+    assert e.risk_mgr.order_types == ["market"]
+
+    # Journal accounting must also charge taker entry fee and slippage.
+    record = _close_with_real_accounting(pos, 96.0, "stop_loss")
+    assert record.order_type == "market"
+    assert record.exchange_fees_usdt == 1.10
+    assert record.slippage_cost_usdt == 0.45
+
+
+def test_marketable_sell_limit_gap_through_uses_taker_entry_classification():
+    e = make_engine()
+    e.pending["BTCUSDT"] = pending_signal("limit", 100.0, "short")
+    opened = e._try_fill_pending("BTCUSDT", candle(102.0, 103.0, 101.0, 102.5))
+
+    assert opened is True
+    pos = e.open_positions["BTCUSDT"]
+    assert pos.entry_price == 102.0
+    assert pos.order_type == "market"
+    assert e.risk_mgr.order_types == ["market"]
+
+
+def test_non_gap_limit_touch_remains_maker_proxy():
+    e = make_engine()
+    e.pending["BTCUSDT"] = pending_signal("limit", 100.0, "long")
+    opened = e._try_fill_pending("BTCUSDT", candle(101.0, 102.0, 99.5, 100.5))
+
+    assert opened is True
+    pos = e.open_positions["BTCUSDT"]
+    assert pos.entry_price == 100.0
+    assert pos.order_type == "limit"
+    assert e.risk_mgr.order_types == ["limit"]
 
 
 def test_limit_buy_not_touched_is_not_filled():
@@ -462,6 +507,9 @@ if __name__ == "__main__":
         test_market_long_gap_above_chase_limit_is_cancelled,
         test_market_long_gap_within_limit_fills_at_next_open,
         test_limit_buy_gapped_below_limit_fills_at_open_not_worse_limit,
+        test_marketable_buy_limit_gap_through_uses_taker_entry_classification,
+        test_marketable_sell_limit_gap_through_uses_taker_entry_classification,
+        test_non_gap_limit_touch_remains_maker_proxy,
         test_limit_buy_not_touched_is_not_filled,
         test_long_stop_gap_fills_at_open_below_stop,
         test_short_stop_gap_fills_at_open_above_stop,

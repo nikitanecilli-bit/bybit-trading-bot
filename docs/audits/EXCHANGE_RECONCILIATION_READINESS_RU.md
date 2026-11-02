@@ -25,7 +25,7 @@
 
 1. **Positions:** `GET /v5/position/list?category=linear&settleCoin=USDT&limit=200`, пройти все страницы по `nextPageCursor`. Нужны как минимум `symbol`, `side`, `size`, `avgPrice`, `positionIdx`, `updatedTime`, `positionStatus`.
 2. **Active orders:** `GET /v5/order/realtime?category=linear&settleCoin=USDT&openOnly=0&limit=50`, пройти все страницы. Сохранить `orderId`, `orderLinkId`, `symbol`, `side`, `qty`, `leavesQty`, `cumExecQty`, `orderStatus`, `createdTime`, `updatedTime`, `positionIdx` если присутствует.
-3. **Executions:** `GET /v5/execution/list?category=linear&startTime=...&endTime=...&limit=100`, пройти все страницы. Сохранить `execId`, `orderId`, `orderLinkId`, `symbol`, `side`, `execQty`, `execPrice`, `execTime`, `execType`, `execFee`. Один ордер может иметь несколько execution rows; дедупликация должна быть по execution identity, не по orderId.
+3. **Executions:** `GET /v5/execution/list?category=linear&startTime=...&endTime=...&limit=100`, пройти все страницы. Bybit ограничивает один временной интервал `endTime - startTime <= 7 дней`; большой outage window нужно разбить на непересекающиеся/стыкующиеся интервалы максимум по 7 дней и дедуплицировать граничные записи по `execId`. Сохранить `execId`, `orderId`, `orderLinkId`, `symbol`, `side`, `execQty`, `execPrice`, `execTime`, `execType`, `execFee`. Один ордер может иметь несколько execution rows; дедупликация должна быть по execution identity, не по orderId.
 4. **Order history:** `GET /v5/order/history` нужен для восстановления закрытых/отменённых/отклонённых ордеров и событий, которые не гарантированно присутствуют в realtime endpoint после перезапуска сервиса.
 
 Официальные ссылки:

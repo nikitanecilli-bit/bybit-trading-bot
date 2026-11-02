@@ -712,6 +712,40 @@ class PlanBStatePersistence:
             raw_seq = data.get("trade_seq", 0)
             if not isinstance(risk_data, dict):
                 raise ValueError("risk state должен быть JSON-объектом")
+            known_risk = {
+                "current_equity", "realized_equity", "unrealized_pnl", "peak_equity",
+                "max_drawdown_pct", "day_start_equity", "current_day_str",
+                "is_paused_manual", "daily_stop_triggered", "kill_switch_triggered",
+            }
+            unknown_risk = set(risk_data).difference(known_risk)
+            if unknown_risk:
+                raise ValueError(f"risk state содержит неизвестные поля {sorted(unknown_risk)}")
+            positive_risk_fields = {
+                "current_equity", "realized_equity", "peak_equity", "day_start_equity",
+            }
+            numeric_risk_fields = positive_risk_fields | {"unrealized_pnl", "max_drawdown_pct"}
+            for field_name in numeric_risk_fields.intersection(risk_data):
+                value = risk_data[field_name]
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                    raise ValueError(f"risk.{field_name} должен быть конечным числом")
+                if field_name in positive_risk_fields and value <= 0:
+                    raise ValueError(f"risk.{field_name} должен быть > 0")
+            if "max_drawdown_pct" in risk_data and not 0 <= risk_data["max_drawdown_pct"] <= 100:
+                raise ValueError("risk.max_drawdown_pct должен быть в [0, 100]")
+            if "current_day_str" in risk_data:
+                day_value = risk_data["current_day_str"]
+                if not isinstance(day_value, str):
+                    raise ValueError("risk.current_day_str должен быть строкой")
+                if day_value:
+                    try:
+                        parsed_day = datetime.strptime(day_value, "%Y-%m-%d")
+                    except ValueError as exc:
+                        raise ValueError("risk.current_day_str должен быть пустым или YYYY-MM-DD") from exc
+                    if parsed_day.strftime("%Y-%m-%d") != day_value:
+                        raise ValueError("risk.current_day_str должен быть пустым или YYYY-MM-DD")
+            for field_name in ("is_paused_manual", "daily_stop_triggered", "kill_switch_triggered"):
+                if field_name in risk_data and not isinstance(risk_data[field_name], bool):
+                    raise ValueError(f"risk.{field_name} должен быть bool")
             if not isinstance(positions_data, dict):
                 raise ValueError("open_positions должен быть JSON-объектом")
             if not isinstance(pending, dict):

@@ -765,3 +765,11 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Added offline tests for sorted trade candles, incomplete OHLCV coverage, invalid volume/turnover, and trade-vs-mark timestamp mismatch. On code commit 9a94ee7d793e99cdbcc14da6a8eaffce0484dc6f, collector and coverage test steps both passed; full Research CI test steps showed no failures, but Actions runner cleanup had not yet returned a terminal conclusion at time of this note.
 - This removes a future dependency on Binance OHLCV for the Bybit-native replay, but does not retroactively change E01–E13. Those experiments remain Binance-proxy results until rerun with captured Bybit data.
 - Actual API download remains unverified because previous public Bybit requests from Actions returned HTTP 403. No archive data is claimed to exist yet.
+
+
+## ENG-DATA-005 — Adaptive funding pagination and final CI (2026-11-02)
+
+- Funding archive no longer stops at the first full 200-row Bybit response. It recursively subdivides saturated time windows and re-requests each half; if saturation persists at the minimum 1 ms width, it fails closed.
+- Added regression tests for adaptive subdivision and minimum-width saturation. Research CI run #41520495668 completed SUCCESS on commit 78a07cbbc5713b5e72874c231c3c53245aff999f; all 23 test steps succeeded.
+- Previous intermediate run #41520465851 failed only because it ran against the old test expecting immediate failure on a saturated page. The test was replaced with adaptive-pagination coverage and the subsequent full CI passed.
+- The API archive workflow still requires a manual dispatch. This GitHub connection has no workflow-dispatch action; no Bybit API data has been fetched or claimed. No main-branch change and no live orders.

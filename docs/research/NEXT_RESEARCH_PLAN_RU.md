@@ -252,3 +252,7 @@ No production/live changes and no market backtests were performed in these corre
 - **ENG-STATE-006 accepted:** nested pending signal payloads are validated (required keys, direction, order type, finite prices/distances) before state commit. CI #41434308834 passed.
 - **ENG-STATE-007 accepted:** restored positions reject unknown fields and invalid required/optional values rather than relying on dataclass annotations. CI #41434308834 passed; combined persistence suite 18/18.
 - The state persistence matrix now tracks both pending and open-position schema validation. Remaining hard blocker is still exchange reconciliation and backup freshness; local JSON validity is not proof of exchange state.
+
+
+- **ENG-STATE-008 accepted:** risk-manager restore now rejects unknown keys, NaN/infinity, non-positive equity, invalid drawdown range, malformed date and non-boolean flags before committing staged state. CI #41434930478 passed; persistence suite 23/23.
+- Local backup schema now has separate validation for positions, pending signals and risk-manager fields. This still does not provide exchange reconciliation, backup freshness or crash durability; keep live-resume blocked until those are implemented and verified.

@@ -362,3 +362,27 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - 10 mocked tests and secret scan passed in [Actions #41469608200](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41469608200).
 - No real key or private API request was used. The manual workflow remains the only step that can verify an actual key's Bybit-reported read-only status.
 - Continue full repository/branch audit for any order mutation endpoints before considering live execution; no live order or deployment.
+
+
+## Продолжение автономного аудита — 2026-11-02
+
+### Закрыто после предыдущей версии плана
+- ENG-FUND-001: funding на точной границе TP1 учитывается консервативно для платежа/получения.
+- ENG-FUND-002: funding на точной границе полного закрытия не начисляется на уже закрытый объём; payment/receipt semantics покрыты тестами.
+- ENG-FUND-003: receipt на pre-exit MTM границе откладывается, чтобы не улучшать equity до разрешения выхода на этой свече.
+- ENG-PERSIST-001/002/003: сохраняются risk-stop latches, post-TP1 MTM и lifecycle state, а также last marks всех открытых позиций; восстановление без валидных last marks отклоняется.
+- Одновременные same-bar close events для двух символов проверены на независимость от порядка обхода; PnL/equity/closed-trade ledger сверяются.
+- Проверены все 21 прямых `python tests/test_*.py` вызовов в `research-checks.yml`: каждый имеет `unittest.main()` или явный runner для plain functions. Неисполнявшиеся ранее suite получили runner.
+- Подтверждено, что CLI `--mode watch` — это config-watch с повторным backtest replay, а не live loop. `--persist-state` не включает restore; отдельный exchange-reconciled live-resume path отсутствует в данном CLI. Read-only private API check не размещает заявки; order sizing helper не является execution adapter.
+
+### Следующие задачи (по приоритету, без новых рыночных прогонов)
+1. **Margin/leverage/exchange sizing:** проверить, как sizing cap соотносится с реальным initial margin, maintenance margin, risk tiers, contract qty, qtyStep/minQty/minNotional, tick size и market/limit maxQty. Не считать `leverage_val` доказательством корректной маржи: сейчас это только notional cap approximation.
+2. **Pending/stop/trailing lifecycle:** дополнить тесты для обеих сторон и пограничных событий, где OHLC не раскрывает порядок исполнения; отдельно зафиксировать консервативные допущения и не превращать их в maker-fill доказательства.
+3. **Persistence recovery freshness:** last marks сохраняются, но не имеют отдельных per-symbol timestamps. До live-resume нужна свежесть mark snapshots и fail-closed gate до получения/сверки актуальных биржевых цен и позиций. Не добавлять live-resume без согласованного протокола reconciliation.
+4. **Journal/metrics:** проверить net-R denominator, MAE/MFE, daily/peak drawdown и агрегирование по периодам на синтетических контрольных примерах.
+5. **Исторические эксперименты:** продолжить E01–E09 provenance reconciliation и пометить недоказанные результаты UNVERIFIED.
+
+### Рыночные данные и holdout
+- Доступный CryptoFetch архив заканчивается 2026-10-27 и является Binance OHLCV proxy; в ZIP нет исторических funding/mark-price CSV. Два уже изученных периода и все их производные фильтры не являются новым blind holdout.
+- Не запускать новые parameter sweeps и не объявлять новый holdout на тех же уже просмотренных свечах. Следующий валидный рыночный тест требует нового заранее зафиксированного временного окна/набора данных либо nested walk-forward, явно маркированного как повторный model selection.
+- Bybit public snapshot ранее получил HTTP 403; не обходить ограничение неофициальными прокси или непроверенными источниками.

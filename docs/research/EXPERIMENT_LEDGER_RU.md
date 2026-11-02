@@ -670,3 +670,13 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Решение: ACCEPT для согласованности accounting и durability open-position lifecycle. Рыночная доходность не тестировалась.
 
 - Дополнительная проверка [CI #41507219610](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41507219610), SUCCESS: одновременные TP1 BTCUSDT + stop ETHUSDT и два stop-close в одной временной точке дали одинаковый итог при перестановке порядка символов. Обе записи закрытия создаются ровно по одному разу; realized equity = стартовый капитал + сумма net PnL, unrealized после двух закрытий = 0. Portfolio suite 22/22; persistence suite 54 tests.
+
+
+## ENG-PERSIST-003 — сохранение last marks при восстановлении открытых позиций (2026-11-02)
+
+- Карточка: [ENG-PERSIST-003](experiment_cards/ENG-PERSIST-003_RESTORE_LAST_MARKS_RU.md).
+- Дефект: резервное состояние сохраняло risk equity и open positions, но не `_last_mark_prices`. После рестарта `_unrealized_pnl_at_marks()` подставлял entry price для ещё не обновлённых символов, из-за чего первое MTM могло потерять накопленный PnL и исказить equity/risk budget.
+- Test-first CI [#41509292651](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509292651) на pre-fix engine завершился ошибкой в persistence suite: шесть `TypeError` из-за отсутствия аргумента `last_mark_prices`.
+- Исправление: `_persist()` передаёт цены последней отметки; `save_state()` валидирует и сохраняет конечные положительные цены для каждого open position; `load_state()` требует точное покрытие символов и восстанавливает карту в engine. Старые backups с открытыми позициями без last marks отклоняются fail-closed.
+- Full Research CI [#41509504557](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509504557), SUCCESS; 58 state-persistence tests. Проверены restore mark/equity, отсутствие mark и invalid values (zero/negative/NaN/Inf/bool).
+- Ограничение: last mark — сохранённый recovery snapshot, а не свежая биржевая цена; он не заменяет exchange reconciliation и не гарантирует актуальность после длительного downtime. Live trading не запускался.

@@ -665,12 +665,28 @@ class PlanBStatePersistence:
     def __init__(self, backup_filepath: str = "bot_state_backup.json", enabled: bool = False):
         self.backup_filepath = backup_filepath
         self.enabled = enabled
+        self.last_mark_prices: Dict[str, float] = {}
 
     def save_state(self, cfg: BotConfig, risk_mgr: AdaptiveRiskManager,
                    open_positions: Dict[str, "OpenPositionState"],
-                   pending: Optional[Dict[str, Dict]] = None, trade_seq: int = 0) -> None:
+                   pending: Optional[Dict[str, Dict]] = None, trade_seq: int = 0,
+                   last_mark_prices: Optional[Dict[str, float]] = None) -> None:
         if not self.enabled:
             return
+        supplied_marks = last_mark_prices or {}
+        missing_marks = set(open_positions).difference(supplied_marks)
+        if missing_marks:
+            raise RuntimeError(
+                f"Не удалось сохранить резервное состояние: отсутствуют last marks для {sorted(missing_marks)}"
+            )
+        validated_marks: Dict[str, float] = {}
+        for symbol in open_positions:
+            value = supplied_marks[symbol]
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                raise RuntimeError(
+                    f"Не удалось сохранить резервное состояние: last mark {symbol} должен быть конечным числом > 0"
+                )
+            validated_marks[symbol] = float(value)
         payload = {
             "saved_at_utc": datetime.now(timezone.utc).isoformat(),
             "bot_version": cfg.bot_version,
@@ -678,6 +694,7 @@ class PlanBStatePersistence:
             "trade_seq": trade_seq,
             "pending_orders": pending or {},
             "open_positions": {sym: asdict(pos) for sym, pos in open_positions.items()},
+            "last_mark_prices": validated_marks,
         }
         tmp_path = self.backup_filepath + ".tmp"
         try:
@@ -740,6 +757,9 @@ class PlanBStatePersistence:
             positions_data = data["open_positions"]
             pending = data["pending_orders"]
             raw_seq = data["trade_seq"]
+            raw_marks = data.get("last_mark_prices", {})
+            if not isinstance(raw_marks, dict):
+                raise ValueError("last_mark_prices должен быть JSON-объектом")
             if not isinstance(risk_data, dict):
                 raise ValueError("risk state должен быть JSON-объектом")
             known_risk = {
@@ -893,6 +913,21 @@ class PlanBStatePersistence:
                     raise ValueError(f"ключ позиции {sym!r} не совпадает с pos.symbol {pos.symbol!r}")
                 restored[sym] = pos
 
+            if set(raw_marks) != set(restored):
+                missing_marks = sorted(set(restored).difference(raw_marks))
+                extra_marks = sorted(set(raw_marks).difference(restored))
+                raise ValueError(
+                    f"last_mark_prices должен точно покрывать open_positions; "
+                    f"отсутствуют={missing_marks}, лишние={extra_marks}"
+                )
+            candidate_marks: Dict[str, float] = {}
+            for symbol, value in raw_marks.items():
+                if not isinstance(symbol, str) or not symbol:
+                    raise ValueError("last_mark_prices содержит некорректный symbol")
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                    raise ValueError(f"last_mark_prices[{symbol}] должен быть конечным числом > 0")
+                candidate_marks[symbol] = float(value)
+
             required_pending = {
                 "symbol", "direction", "strategy", "signal_ts", "entry_price",
                 "stop_dist", "order_type",
@@ -949,6 +984,7 @@ class PlanBStatePersistence:
 
             # Commit the validated risk state only after all backup components parsed.
             risk_mgr.from_dict(candidate_risk.to_dict())
+            self.last_mark_prices = candidate_marks
             if restored:
                 logger.info("🛡️ План Б: восстановлено %d позиций, kill_switch=%s, daily_stop=%s",
                             len(restored), risk_mgr.kill_switch_triggered, risk_mgr.daily_stop_triggered)
@@ -1166,6 +1202,7 @@ class UnifiedQuantEngine:
 
         if restore_plan_b:
             self.open_positions, self.pending, self.trade_seq = self.plan_b.load_state(self.risk_mgr)
+            self._last_mark_prices = dict(self.plan_b.last_mark_prices)
             # Даже если файл содержит только risk state, это не свежий backtest.
             self._state_restored = True
 
@@ -1321,7 +1358,10 @@ class UnifiedQuantEngine:
                 f"-{self.cfg.daily_stop_loss_pct}%. Новые входы заблокированы до 00:00 UTC.")
 
     def _persist(self) -> None:
-        self.plan_b.save_state(self.cfg, self.risk_mgr, self.open_positions, self.pending, self.trade_seq)
+        self.plan_b.save_state(
+            self.cfg, self.risk_mgr, self.open_positions, self.pending,
+            self.trade_seq, last_mark_prices=self._last_mark_prices,
+        )
 
     # ---------------- Hot-reload ----------------
     def check_and_hot_reload_config(self) -> bool:

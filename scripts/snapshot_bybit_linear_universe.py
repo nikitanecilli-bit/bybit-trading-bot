@@ -47,7 +47,7 @@ def validate_instrument_row(row: Any, requested_status: str | None) -> dict[str,
             f"requested {requested_status or 'default'}, got {actual_status!r}"
         )
     launch_ms = _timestamp_ms(row.get("launchTime"), "launchTime", allow_zero=False)
-    delivery_ms = _timestamp_ms(row.get("deliveryTime", "0"), "deliveryTime", allow_zero=True)
+    delivery_ms = _timestamp_ms(row.get("deliveryTime"), "deliveryTime", allow_zero=True)
     if delivery_ms and delivery_ms < launch_ms:
         raise ValueError(f"deliveryTime precedes launchTime for {symbol}")
     if not row.get("contractType") or not row.get("quoteCoin") or not row.get("settleCoin"):
@@ -107,18 +107,21 @@ def fetch_linear_universe(
     return [all_rows[symbol] for symbol in sorted(all_rows)], counts
 
 
-def is_linear_usdt_perpetual_available_at(row: dict[str, Any], timestamp_ms: int) -> bool:
-    """Use launch/delivery bounds; exclude pre-launch and pending-open contracts."""
+def is_linear_usdt_perpetual_within_lifecycle_at(row: dict[str, Any], timestamp_ms: int) -> bool:
+    """Check launch/delivery bounds, not temporary exchange trading availability."""
     if timestamp_ms < 0:
         raise ValueError("timestamp_ms must be non-negative")
     if row.get("contractType") != "LinearPerpetual":
         return False
     if row.get("quoteCoin") != "USDT" or row.get("settleCoin") != "USDT":
         return False
-    if row.get("status") in {"PreLaunch", "PendingOpen"}:
+    status = row.get("status")
+    if status not in CAPTURED_STATUSES or status in {"PreLaunch", "PendingOpen"}:
         return False
     launch_ms = _timestamp_ms(row.get("launchTime"), "launchTime", allow_zero=False)
-    delivery_ms = _timestamp_ms(row.get("deliveryTime", "0"), "deliveryTime", allow_zero=True)
+    delivery_ms = _timestamp_ms(row.get("deliveryTime"), "deliveryTime", allow_zero=True)
+    if status in {"Closed", "Settling", "Delivering"} and delivery_ms == 0:
+        return False
     return launch_ms <= timestamp_ms and (delivery_ms == 0 or timestamp_ms < delivery_ms)
 
 
@@ -170,7 +173,7 @@ def main() -> None:
     output = Path(args.output_dir) / "linear" / f"{stamp}.json"
     write_snapshot(snapshot, output)
     now_ms = int(fetched.timestamp() * 1000)
-    active = sum(is_linear_usdt_perpetual_available_at(row, now_ms) for row in rows)
+    active = sum(is_linear_usdt_perpetual_within_lifecycle_at(row, now_ms) for row in rows)
     print(f"Saved {len(rows)} linear instruments ({active} USDT perpetuals within launch/delivery bounds) to {output}")
     print("Status counts: " + ", ".join(f"{key}={counts[key]}" for key in CAPTURED_STATUSES))
 

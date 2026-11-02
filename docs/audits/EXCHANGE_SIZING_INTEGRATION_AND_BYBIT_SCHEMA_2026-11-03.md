@@ -87,3 +87,7 @@ The branch already contains:
 These workflows check out `research/market-regime-v1-main` and commit snapshots under `data/instrument_specs/linear` and `data/instrument_specs/risk_limits`. However, direct repository-content checks for both expected output directories returned 404 at audit time. Thus workflow definitions and snapshot code exist, but a committed dated dataset was not verified. No workflow dispatch action is exposed through the connected GitHub tools in this session, so neither workflow was triggered and no run result is claimed.
 
 This changes the next action: first inspect the next scheduled/manual workflow result and validate the raw snapshots; do not create a duplicate downloader or duplicate scheduled workflow.
+
+## 7. Исправлено расписание instrument snapshots
+
+Официальная документация предупреждает, что `maxLimitOrderQty`, `maxMarketOrderQty` и `postOnlyMaxLimitOrderSize` пересматриваются 3-го и 17-го числа месяца. Исходный weekly Monday cron мог не снять snapshot непосредственно после этих изменений. Расписание `.github/workflows/bybit-instrument-snapshots.yml` изменено на 3-е и 17-е число в 02:17 UTC (10:17 UTC+8), после указанного Bybit времени обновления 08:00 UTC+8. Workflow dispatch сохранён. Это только изменение расписания; API workflow не запускался и snapshot не получен.

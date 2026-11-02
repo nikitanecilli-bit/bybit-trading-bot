@@ -353,3 +353,12 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - It does not calculate initial margin, maintenance margin, Bybit risk tier, liquidation price, margin mode/cross collateral, or fee/funding effects on liquidation distance.
 - `exchange_order_sizing.py` separately validates tick/lot/min-notional constraints, but `_try_fill_pending()` in v14 currently calls `risk_mgr.calculate_position_size()` directly and does not route the resulting order through the exchange sizing helper or dated `instrument_spec_history`.
 - Therefore the existence of correct Decimal rounding utilities must not be mistaken for exchange-valid sizing in the trading engine. Before live execution, wire dated instrument specs into the entry path and add a separate margin/risk-tier model with fail-closed tests. No production change or market backtest was made for this finding.
+
+
+## ENG-METRIC-001 — drawdown chronology/order independence (2026-11-02)
+
+- Confirmed reporting defect: `MaintenanceGateAuditor.evaluate_portfolio()` calculated closed-equity drawdown in input list order. Same-timestamp closes were treated as sequential sub-events, creating artificial interim peaks/drawdowns; shuffled historical trades could also be processed out of chronology.
+- Test-first reproduction: [CI #41512547727](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41512547727) failed on the simultaneous-close order-independence assertion.
+- Fix commit `2d44d14a4981b1b3b6c259c8c04e2123acc0b489`: aggregate net PnL by timezone-aware UTC exit timestamp, then process timestamps chronologically. Reject invalid/naive exit timestamps.
+- Full Research CI [#41512721144](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41512721144) SUCCESS. Portfolio accounting suite 24/24, both new regressions passed; persistence suite 60 tests.
+- Closed trade equity curve treats same-timestamp closes as one net event; intrabar path remains represented by engine MTM drawdown where available. This is a metrics correctness fix, not a strategy/profitability result.

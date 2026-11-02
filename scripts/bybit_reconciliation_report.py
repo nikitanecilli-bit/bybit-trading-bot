@@ -256,6 +256,42 @@ def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict
         }
         for item in positions
     ]
+    def order_row(item):
+        return {
+            "order_id": item.order_id,
+            "order_link_id": item.order_link_id,
+            "parent_order_link_id": item.parent_order_link_id,
+            "symbol": item.symbol,
+            "side": item.side,
+            "position_idx": item.position_idx,
+            "qty": str(item.qty),
+            "leaves_qty": str(item.leaves_qty),
+            "cum_exec_qty": str(item.cum_exec_qty),
+            "order_status": item.order_status,
+            "order_type": item.order_type,
+            "stop_order_type": item.stop_order_type,
+            "trigger_price": str(item.trigger_price) if item.trigger_price is not None else None,
+            "take_profit": str(item.take_profit) if item.take_profit is not None else None,
+            "stop_loss": str(item.stop_loss) if item.stop_loss is not None else None,
+            "tpsl_mode": item.tpsl_mode,
+            "tp_trigger_by": item.tp_trigger_by,
+            "sl_trigger_by": item.sl_trigger_by,
+            "reduce_only": item.reduce_only,
+            "close_on_trigger": item.close_on_trigger,
+            "created_time_ms": item.created_time_ms,
+            "updated_time_ms": item.updated_time_ms,
+        }
+
+    active_order_rows = [order_row(item) for item in orders]
+    historical_order_rows = [order_row(item) for item in historical_orders]
+    conditional_order_rows = [
+        row for row in active_order_rows + historical_order_rows
+        if (row["stop_order_type"] not in (None, "", "UNKNOWN")
+            or (row["trigger_price"] is not None and float(row["trigger_price"]) > 0)
+            or (row["take_profit"] is not None and float(row["take_profit"]) > 0)
+            or (row["stop_loss"] is not None and float(row["stop_loss"]) > 0))
+    ]
+
     exchange_by_symbol = {}
     for item in positions:
         exchange_by_symbol.setdefault(item.symbol, []).append(item)
@@ -286,6 +322,8 @@ def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict
         reasons.append("Exchange active orders exist but cannot be mapped to local exchange order identities.")
     if historical_orders:
         reasons.append("Historical exchange orders exist but cannot be mapped to a local order/event ledger.")
+    if conditional_order_rows:
+        reasons.append("Conditional/TP/SL order records exist; local conditional-order identity and trigger-health model is absent.")
     reasons.append("Bybit order-history API has retention/status limits and may be delayed; this capture is explicitly not a complete order journal.")
     if executions:
         reasons.append("Exchange executions exist but cannot be compared with a local execution ledger.")
@@ -316,6 +354,9 @@ def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict
             "execution_count_since_backup": len(executions),
             "positions": exchange_position_rows,
             "active_order_ids": [item.order_id for item in orders],
+            "active_orders": active_order_rows,
+            "historical_orders": historical_order_rows,
+            "conditional_orders": conditional_order_rows,
             "historical_order_ids": [item.order_id for item in historical_orders],
             "historical_order_statuses": {item.order_id: item.order_status for item in historical_orders},
             "execution_ids": [item.exec_id for item in executions],

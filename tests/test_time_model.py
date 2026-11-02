@@ -776,8 +776,8 @@ def test_tp1_partial_fill_keeps_equity_consistent_with_remaining_position():
     assert pos.tp1_hit is True
     assert pos.remaining_fraction == 0.5
     assert pos.realized_tp1_gross_usdt == 50.0
-    assert e.risk_mgr.unrealized_pnl == 98.3725
-    assert e.risk_mgr.current_equity == 10_098.3725
+    assert abs(e.risk_mgr.unrealized_pnl - 98.3725) < 1e-9
+    assert abs(e.risk_mgr.current_equity - 10_098.3725) < 1e-9
 
     # Closing the remaining half at TP2 reconciles the conservative MTM estimate
     # with the modeled market-order execution and journal.
@@ -789,7 +789,7 @@ def test_tp1_partial_fill_keeps_equity_consistent_with_remaining_position():
     assert e.closed_trades[0].pnl_usdt == 148.34
     assert e.risk_mgr.realized_equity == 10_148.34
     assert e.risk_mgr.unrealized_pnl == 0.0
-    assert e.risk_mgr.current_equity == 10_148.45
+    assert e.risk_mgr.current_equity == 10_148.34
 
 
 def test_finalize_open_positions_uses_bar_close_timestamp_across_utc_midnight():

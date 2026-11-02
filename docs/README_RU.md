@@ -25,9 +25,10 @@
 21. [ENG-STATE-013 — backup metadata](research/experiment_cards/ENG-STATE-013_BACKUP_METADATA_RU.md) — проверяет UTC timestamp и версию резервной копии.
 22. [ENG-STATE-014 — TP1 timestamp](research/experiment_cards/ENG-STATE-014_TP1_TIMESTAMP_RU.md) — проверяет время события TP1 относительно входа.
 23. [ENG-STATE-015 — pending next-bar chronology](research/experiment_cards/ENG-STATE-015_PENDING_NEXT_BAR_RU.md) — исключает исполнение устаревших pending-сигналов после пропуска свечи/перезапуска.
-24. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
-25. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
-26. [Карта репозитория](REPOSITORY_MAP_RU.md).
+24. [ENG-STATE-016 — backup event chronology](research/experiment_cards/ENG-STATE-016_BACKUP_EVENT_TIME_RU.md) — запрещает событиям позиции/сигнала датироваться позже сохранения backup.
+25. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
+26. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
+27. [Карта репозитория](REPOSITORY_MAP_RU.md).
 
 ## Разделы
 

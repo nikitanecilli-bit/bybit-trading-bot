@@ -25,7 +25,6 @@ MAX_PAGES = 1000
 ALLOWED_API_HOSTS = {
     "api.bybit.com", "api.bytick.com", "api.bybit.kz", "api.bybit.tr",
     "api.bybitgeorgia.ge", "api.bybit.ae", "api.bybit.eu", "api.bybit.id",
-    "api.bybit.nl", "api.bybit-tr.com",
 }
 
 

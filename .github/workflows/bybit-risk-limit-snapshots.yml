@@ -1,6 +1,12 @@
 name: Archive Bybit risk-limit tiers
 
 on:
+  push:
+    branches:
+      - research/market-regime-v1-main
+    paths:
+      - .github/workflows/bybit-risk-limit-snapshots.yml
+      - scripts/snapshot_bybit_risk_limits.py
   schedule:
     - cron: '37 2 * * 1'
   workflow_dispatch:

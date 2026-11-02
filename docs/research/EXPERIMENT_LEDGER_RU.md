@@ -251,3 +251,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Fee/slippage constants are 0.055% taker, 0.020% maker, 0.0225% taker slippage per leg; E13 stress multiplier ×2 is not a measured spread/impact model.
 - Decision: freeze strategy parameter research until Bybit data and dated specs can be captured and validated. No production change.
 
+
+
+## ENG-KS-001 — kill-switch priority over same-bar TP2 (2026-11-02)
+
+- Preregistered card: [ENG-KS-001](experiment_cards/ENG-KS-001_KILL_SWITCH_PRIORITY_RU.md).
+- Confirmed defect in `UnifiedQuantEngine._manage_position()`: after intrabar mark-to-market had latched portfolio kill-switch, TP2 could still close the current symbol first because the kill-switch branch was only a fallback when no other exit had been selected.
+- Fix: when kill-switch is already active at position-management time, close at the precomputed adverse intrabar risk mark (including stop/gap fill semantics) before TP1/TP2/time-stop processing. Do not count same-bar favourable wick in MFE because OHLC path is unknown.
+- Regression: `test_kill_switch_overrides_tp2_when_same_bar_hits_adverse_mark_and_target` exercises full `step_candle()`; adverse low trips kill-switch while high touches TP2 and protective stop remains untouched. Expected journal reason is `kill_switch`, exit price is adverse mark, MFE excludes same-bar high.
+- Commits: engine fix `3ef0626a776b99c083b0ef289f9ca8ab8fe82c97`; regression test `7f4fc3ee641e790451081a02628615b19618b230`.
+- CI: [Research engine checks #41431556111](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41431556111), SUCCESS. `test_time_model.py` 38/38; `test_gap_execution.py` 22/22; compile and all other configured deterministic checks passed; secret scan found no obvious secret patterns.
+- Decision: ACCEPT as a simulator correctness fix. No market backtest, parameter sweep, production change or live order was performed.
+- Limitation: adverse intrabar mark remains an OHLC proxy, not a guaranteed executable fill. This fix does not validate real execution or strategy profitability.

@@ -297,3 +297,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41432693641](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41432693641), SUCCESS. New persistence tests 4/4; compile, all configured deterministic suites and secret scan passed.
 - Decision: ACCEPT as a state-integrity correction. No market backtest, parameter sweep, production deployment or live order.
 - Limitation: a valid backup may still be stale relative to Bybit. This fix does not implement exchange position/order reconciliation and must not be described as safe live-resume.
+
+
+## ENG-STATE-004 — fail-closed state save (2026-11-02)
+
+- Preregistered card: [ENG-STATE-004](experiment_cards/ENG-STATE-004_FAIL_CLOSED_SAVE_RU.md).
+- Confirmed defect: with persistence enabled, `save_state()` caught write/replace exceptions, logged them and returned normally. The trading caller could continue despite a stale recovery point.
+- Fix: when persistence is enabled, save failures now clean up the current attempt's temporary file on a best-effort basis, log CRITICAL and raise `RuntimeError`. Disabled persistence remains a no-op.
+- Tests: `tests/test_state_persistence.py` now covers disabled no-op, successful round-trip, atomic replace failure + temp cleanup, missing backup, corrupt JSON, malformed position.
+- Commits: engine `ac43d4aa23d2e797eae99d57e6c65c714642e120`; tests `0b142dcf5393683844e8e73b7d3f2096525a7722`.
+- CI: [Research engine checks #41432914403](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41432914403), SUCCESS; state persistence tests 6/6, compile, all configured deterministic suites and secret scan passed.
+- Decision: ACCEPT as a local persistence integrity correction. No market backtest, parameter sweep, production deployment or live order.
+- Limitation: no fsync/remote durability guarantee; no Bybit position/order reconciliation.

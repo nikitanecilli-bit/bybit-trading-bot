@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -63,6 +64,28 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertEqual(restored_risk.peak_equity, 10_200.0)
             self.assertTrue(restored_risk.kill_switch_triggered)
             self.assertTrue(restored_risk.daily_stop_triggered)
+
+    def test_disabled_persistence_is_a_noop(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "disabled.json"
+            engine.PlanBStatePersistence(str(path), enabled=False).save_state(
+                engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
+                {}, {}, 0,
+            )
+            self.assertFalse(path.exists())
+
+    def test_atomic_replace_failure_raises_and_cleans_temporary_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            writer = engine.PlanBStatePersistence(str(path), enabled=True)
+            with patch("os.replace", side_effect=OSError("simulated disk failure")):
+                with self.assertRaisesRegex(RuntimeError, "Не удалось сохранить"):
+                    writer.save_state(
+                        engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
+                        {"BTCUSDT": sample_position()}, {}, 42,
+                    )
+            self.assertFalse(path.exists())
+            self.assertFalse(Path(str(path) + ".tmp").exists())
 
     def test_corrupt_json_raises_instead_of_returning_empty_state(self):
         with tempfile.TemporaryDirectory() as tmp:

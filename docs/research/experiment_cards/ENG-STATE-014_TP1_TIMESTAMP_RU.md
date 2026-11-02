@@ -1,6 +1,6 @@
 # ENG-STATE-014 — TP1 timestamp consistency
 
-Статус до изменения: CONFIRMED VALIDATION GAP / partial TP1 state can omit or contradict its event timestamp.  
+Статус: ACCEPT — TP1 timestamp regression и CI прошли.  
 Дата: 2026-11-02.  
 Тип: restored position event chronology; deterministic tests only.
 
@@ -25,4 +25,12 @@ Do not compare TP1 time to backup save time here; timestamp freshness and exchan
 5. Failed restore remains transactional.
 6. Full deterministic CI passes.
 
-No market backtest required.
+Решение: ACCEPT для хронологии локального состояния позиции.
+
+- Engine commit: `adc68a7c413abe5f642a10cd91348c81d15ea746`.
+- Test commit: `e128b6865e290a9b597e4c1749d1fbeb99efd188`.
+- CI: [Research engine checks #41445386482](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41445386482), SUCCESS.
+- `tests/test_state_persistence.py`: 43/43; TP1 timestamp required iff TP1 hit and must not predate entry.
+- Compile, configured deterministic suites and secret scan passed.
+
+No market backtest, parameter sweep, production deployment or live order.

@@ -371,9 +371,9 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Limitation: does not reconcile positions with Bybit or prove backup freshness.
 
 
-## ENG-STATE-008 — risk-manager restore schema validation (2026-11-02)
+## ENG-STATE-018 — risk-manager restore schema validation (2026-11-02)
 
-- Preregistered card: [ENG-STATE-008](experiment_cards/ENG-STATE-008_RISK_SCHEMA_RU.md).
+- Preregistered card: [ENG-STATE-008](experiment_cards/ENG-STATE-018_RISK_SCHEMA_RU.md).
 - Confirmed defect: `AdaptiveRiskManager.from_dict()` coerces values with `float()` and permissive `_as_bool()`; syntactically valid backups could inject NaN/infinity/negative equity, invalid drawdown, malformed date or non-boolean risk flags.
 - Fix: validate known keys, finite numeric values, positive equity fields, drawdown range [0,100], ISO date string and strict boolean flags before staging/committing risk state. Omitted legacy keys retain defaults.
 - Tests: `tests/test_state_persistence.py` 23/23, including invalid risk payloads and unchanged caller risk manager on failed restore.

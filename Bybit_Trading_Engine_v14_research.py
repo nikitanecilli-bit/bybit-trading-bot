@@ -685,7 +685,18 @@ class PlanBStatePersistence:
                 json.dump(payload, f, indent=2, ensure_ascii=False)
             os.replace(tmp_path, self.backup_filepath)
         except Exception as e:
-            logger.error("Ошибка сохранения План Б: %s", e)
+            # Persistence is explicitly enabled: a failed backup must be visible
+            # to the caller so the trading loop can stop rather than continue
+            # with a stale recovery point.
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except OSError:
+                logger.exception("Не удалось удалить временный файл состояния %s", tmp_path)
+            logger.critical("Критическая ошибка сохранения состояния План Б: %s", e)
+            raise RuntimeError(
+                f"Не удалось сохранить резервное состояние в {self.backup_filepath!r}"
+            ) from e
 
     def load_state(self, risk_mgr: AdaptiveRiskManager) -> Tuple[Dict[str, "OpenPositionState"], Dict[str, Dict], int]:
         if not os.path.exists(self.backup_filepath):

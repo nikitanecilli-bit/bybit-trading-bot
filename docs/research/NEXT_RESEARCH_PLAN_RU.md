@@ -297,3 +297,10 @@ No production/live changes and no market backtests were performed in these corre
 
 
 - ENG-STATE-017 follow-up: POSIX parent-directory fsync failure after rename is explicitly tested; save raises even though the replacement file may be visible. Persistence suite now 54/54; CI #41447862710 passed.
+
+
+## Exchange reconciliation — hard blocker
+
+- Read [EXCHANGE_RECONCILIATION_READINESS_RU.md](../audits/EXCHANGE_RECONCILIATION_READINESS_RU.md). Current verdict: `UNSUPPORTED_LOCAL_MODEL / BLOCKED`.
+- The engine lacks exact exchange contract qty, `positionIdx`, order IDs/link IDs and execution ledger; `size_usdt / entry_price` is not exact qty. Read-only API key verification alone is insufficient.
+- Next safe implementation: pure response parser + fixture tests for V5 positions, active orders, executions and order history; pagination completeness and fail-closed handling first. Then report-only comparator. No mutation endpoints.

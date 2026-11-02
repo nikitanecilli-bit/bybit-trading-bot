@@ -215,6 +215,24 @@ class StatePersistenceTests(unittest.TestCase):
                              "realized_tp1_gross_usdt": 30.0})
         self._assert_invalid_position_payload(mutate)
 
+    def test_tp1_hit_requires_event_timestamp(self):
+        def mutate(position):
+            position.update({"tp1_hit": True, "remaining_fraction": 0.5,
+                             "realized_tp1_gross_usdt": 10.0, "tp1_ts_ms": None})
+        self._assert_invalid_position_payload(mutate)
+
+    def test_tp1_timestamp_cannot_precede_entry(self):
+        def mutate(position):
+            position.update({"tp1_hit": True, "remaining_fraction": 0.5,
+                             "realized_tp1_gross_usdt": 10.0,
+                             "tp1_ts_ms": position["entry_ts"] - 1})
+        self._assert_invalid_position_payload(mutate)
+
+    def test_tp1_timestamp_requires_tp1_hit(self):
+        def mutate(position):
+            position.update({"tp1_ts_ms": position["entry_ts"] + 3_600_000})
+        self._assert_invalid_position_payload(mutate)
+
     def test_tp1_realized_pnl_requires_tp1_hit(self):
         self._assert_invalid_position_payload(
             lambda position: position.update({"realized_tp1_gross_usdt": 12.0})

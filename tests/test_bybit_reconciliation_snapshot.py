@@ -42,7 +42,7 @@ class FakeTransport:
         if endpoint == "/v5/position/list" and self.cursor_loop:
             return response(cursor="loop")
         if endpoint in ("/v5/position/list", "/v5/order/realtime",
-                        "/v5/execution/list"):
+                        "/v5/order/history", "/v5/execution/list"):
             return response()
         raise AssertionError(f"unexpected endpoint: {endpoint}")
 
@@ -67,11 +67,13 @@ class ReconciliationCollectorTests(unittest.TestCase):
         self.assertEqual(endpoints[0], "/v5/user/query-api")
         self.assertEqual(endpoints[1], "/v5/market/time")
         self.assertEqual(endpoints[2:5], [
-            "/v5/position/list", "/v5/order/realtime", "/v5/execution/list"
+            "/v5/position/list", "/v5/order/realtime", "/v5/order/history", "/v5/execution/list"
         ])
         self.assertEqual(endpoints[-1], "/v5/market/time")
         self.assertEqual(snapshot["status"], "CAPTURED_READ_ONLY_NOT_RECONCILED")
         self.assertEqual(snapshot["counts"]["positions"], 0)
+        self.assertEqual(snapshot["counts"]["historical_orders"], 0)
+        self.assertEqual(snapshot["order_history_coverage"]["status"], "QUERYABLE_WINDOW_ONLY_NOT_COMPLETE")
         self.assertLessEqual(
             snapshot["bybit_server_time_after_ms"] -
             snapshot["bybit_server_time_before_ms"], 120_000

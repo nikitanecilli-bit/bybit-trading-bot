@@ -406,6 +406,43 @@ def test_tp1_transition_refreshes_and_persists_portfolio_mtm():
     assert abs(persisted[-1]["risk"]["unrealized_pnl"] - expected) < 1e-8
 
 
+
+def test_surviving_position_candle_state_is_persisted():
+    e = make_engine()
+    pos = make_position(size=1_000.0)
+    e.open_positions["BTCUSDT"] = pos
+    exit_ts = pos.entry_ts + 3_600_000
+    history = [
+        engine_mod.Candle(
+            ts=pos.entry_ts - 14 * 3_600_000 + i * 3_600_000,
+            open=100.0, high=101.0, low=99.0, close=100.0, volume=10.0,
+        )
+        for i in range(15)
+    ]
+    history.append(engine_mod.Candle(
+        ts=pos.entry_ts + 3_600_000,
+        open=100.0, high=102.0, low=99.5, close=101.0, volume=10.0,
+    ))
+    e._last_mark_prices["BTCUSDT"] = 101.0
+    e._intrabar_risk_marks["BTCUSDT"] = 99.5
+    e._intrabar_risk_marks_ts = exit_ts
+    e._update_mark_to_market(exit_ts)
+    persisted = []
+    e._persist = lambda: persisted.append({
+        "bars_held": pos.bars_held,
+        "max_favorable_px": pos.max_favorable_px,
+        "max_adverse_px": pos.max_adverse_px,
+        "stop_price": pos.stop_price,
+    })
+
+    e._manage_position("BTCUSDT", history, fill_bar=False, exit_ts=exit_ts)
+
+    assert pos.bars_held == 1
+    assert persisted and persisted[-1]["bars_held"] == 1
+    assert persisted[-1]["max_favorable_px"] == pos.max_favorable_px
+    assert persisted[-1]["max_adverse_px"] == pos.max_adverse_px
+
+
 if __name__ == "__main__":
     tests = [(name, value) for name, value in sorted(globals().items())
              if name.startswith("test_") and callable(value)]

@@ -42,6 +42,42 @@ def make_engine():
     return e
 
 
+def test_final_close_funding_receipt_is_not_credited_on_ambiguous_exit_boundary():
+    e = make_engine()
+    e.funding_dir = "fixture"
+    pos = make_position(size=1_000.0, remaining=0.5, tp1_hit=True, tp1_gross=10.0)
+    exit_ts = 1_800_003_600_000
+    pos.tp1_ts_ms = exit_ts
+    e.open_positions["BTCUSDT"] = pos
+    e.funding_by_symbol = {"BTCUSDT": [{"ts": exit_ts, "rate": "-0.01"}]}
+    e._funding_mark_prices = {"BTCUSDT": {exit_ts: "100"}}
+
+    e._close_position(
+        pos, exit_price=100.0, exit_reason="take_profit",
+        exit_ts=exit_ts, mae_r=0.0, mfe_r=1.0,
+    )
+
+    assert e.closed_trades[-1].funding_cost_usdt == 0.0
+
+
+def test_final_close_funding_payment_uses_full_initial_quantity_on_boundary():
+    e = make_engine()
+    e.funding_dir = "fixture"
+    pos = make_position(size=1_000.0, remaining=0.5, tp1_hit=True, tp1_gross=10.0)
+    exit_ts = 1_800_003_600_000
+    pos.tp1_ts_ms = exit_ts
+    e.open_positions["BTCUSDT"] = pos
+    e.funding_by_symbol = {"BTCUSDT": [{"ts": exit_ts, "rate": "0.01"}]}
+    e._funding_mark_prices = {"BTCUSDT": {exit_ts: "100"}}
+
+    e._close_position(
+        pos, exit_price=100.0, exit_reason="take_profit",
+        exit_ts=exit_ts, mae_r=0.0, mfe_r=1.0,
+    )
+
+    assert e.closed_trades[-1].funding_cost_usdt == 10.0
+
+
 def test_mark_to_market_equity_equals_realized_plus_unrealized():
     e = make_engine()
     e.open_positions["BTCUSDT"] = make_position(size=2_000.0)

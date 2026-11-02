@@ -1,6 +1,6 @@
 # ENG-STATE-008 — validate restored TP1 state invariants
 
-Статус до изменения: CONFIRMED STATE INTEGRITY GAP / inconsistent partial-close state can be restored.  
+Статус: ACCEPT — TP1 cross-field invariants and CI passed.  
 Дата: 2026-11-02.  
 Тип: restore invariant validation; deterministic tests only.
 
@@ -29,3 +29,12 @@ Do not constrain current stop relative to entry: trailing logic may legitimately
 6. Full deterministic CI passes.
 
 No market backtest required.
+
+## Результат
+
+- Engine commit: `22664bd79f8fc93c0cbf7dbafc5c775a82e8cde3`.
+- Test correction commit: `529d1d725752a3010dedc3c06d1c48c572a1e15b`.
+- CI: [Research engine checks #41435897233](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41435897233), SUCCESS.
+- `tests/test_state_persistence.py`: 29/29. Valid TP1 partial position round-trips; inconsistent TP1 flags/fraction/PnL and unordered long/short targets fail closed.
+- Full configured deterministic suites, compile and secret scan passed.
+- Decision: ACCEPT for local state restore validation. No market backtest or live order.

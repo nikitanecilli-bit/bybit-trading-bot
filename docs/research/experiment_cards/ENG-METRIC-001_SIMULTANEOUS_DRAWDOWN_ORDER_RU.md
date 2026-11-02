@@ -25,3 +25,8 @@
 
 ## Границы
 Это исправление корректности метрики отчёта, а не торгового сигнала и не доказательство прибыльности. Синхронные сделки считаются одним net equity event на timestamp; отдельная внутрисвечная траектория equity не восстанавливается из OHLC и должна оцениваться по MTM-маркам, если они доступны.
+
+
+## Дополнительная проверка MTM risk manager
+- В существующие тесты двух одновременных stop-close permutations добавлено сравнение `risk_mgr.max_drawdown_pct`, а не только realized/current equity. Это проверяет, что scalar MTM max-DD также не зависит от порядка обработки символов в этих same-bar сценариях.
+- Follow-up CI [#41513430881](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41513430881) SUCCESS; portfolio suite 24/24 и persistence suite 60 tests.

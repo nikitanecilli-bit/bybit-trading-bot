@@ -659,3 +659,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Первый post-fix прогон выявил неполную тестовую фикстуру `test_funding_mark_to_market.py` (объект `__new__` без persistence stub); фикстура исправлена отдельно, без изменения production-логики.
 - Full Research CI [#41504995009](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41504995009), SUCCESS; portfolio accounting и state persistence прошли.
 - Решение: ACCEPT для durability risk-stop latch. Никакого market backtest, parameter search, private API request или live order.
+
+
+## ENG-PERSIST-002 — синхронизация MTM и сохранения после TP1 (2026-11-02)
+
+- Карточка: [ENG-PERSIST-002](experiment_cards/ENG-PERSIST-002_TP1_MARK_TO_MARKET_SYNC_RU.md).
+- Test-first [#41506138601](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41506138601) воспроизвёл рассинхронизацию: после `_manage_position()` TP1 уже был отмечен, но `risk_mgr.unrealized_pnl` оставался pre-TP1; новая проверка упала на сравнении с `_unrealized_pnl_at_marks()`.
+- Исправление: после surviving TP1 transition выполняется MTM на той же bar-close границе; после каждого candle management открытая позиция сохраняет обновлённые `bars_held`, MFE/MAE и trailing stop. При закрытии сохранение по-прежнему выполняет `_close_position()`.
+- Full Research CI [#41506990147](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41506990147), SUCCESS; portfolio suite 21/21. Новые тесты TP1 MTM, persistence открытой позиции и same-bar TP1/stop order-independence прошли.
+- Решение: ACCEPT для согласованности accounting и durability open-position lifecycle. Рыночная доходность не тестировалась.

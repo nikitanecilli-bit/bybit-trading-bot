@@ -706,10 +706,14 @@ class PlanBStatePersistence:
                 data = json.load(f)
             if not isinstance(data, dict):
                 raise ValueError("корень backup должен быть JSON-объектом")
-            risk_data = data.get("risk", {})
-            positions_data = data.get("open_positions", {})
-            pending = data.get("pending_orders", {})
-            raw_seq = data.get("trade_seq", 0)
+            required_envelope = {"risk", "open_positions", "pending_orders", "trade_seq"}
+            missing_envelope = required_envelope.difference(data)
+            if missing_envelope:
+                raise ValueError(f"backup неполный: отсутствуют поля {sorted(missing_envelope)}")
+            risk_data = data["risk"]
+            positions_data = data["open_positions"]
+            pending = data["pending_orders"]
+            raw_seq = data["trade_seq"]
             if not isinstance(risk_data, dict):
                 raise ValueError("risk state должен быть JSON-объектом")
             known_risk = {
@@ -717,6 +721,9 @@ class PlanBStatePersistence:
                 "max_drawdown_pct", "day_start_equity", "current_day_str",
                 "is_paused_manual", "daily_stop_triggered", "kill_switch_triggered",
             }
+            missing_risk = known_risk.difference(risk_data)
+            if missing_risk:
+                raise ValueError(f"risk state неполный: отсутствуют поля {sorted(missing_risk)}")
             unknown_risk = set(risk_data).difference(known_risk)
             if unknown_risk:
                 raise ValueError(f"risk state содержит неизвестные поля {sorted(unknown_risk)}")

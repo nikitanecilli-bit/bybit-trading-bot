@@ -710,3 +710,20 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Reviewed `_manage_position()` behavior after TP1 when the same OHLC candle also crosses the newly calculated trailing stop.
 - Initially considered this a missed stop, but existing regression `test_new_trailing_stop_is_not_applied_retroactively_to_same_candle` explicitly encodes the policy: a stop calculated from the current candle's favorable high/low becomes active on the next candle only. OHLC cannot establish whether the favorable extreme preceded the adverse extreme.
 - No code change warranted. The temporary test proposal was discarded; do not classify this behavior as a confirmed defect without changing the strategy's documented intrabar policy.
+
+
+## E01–E03 — первичная provenance-сверка workflow и артефактов (2026-11-02)
+
+Проверены GitHub run metadata, исходные workflow/scripts на commit `4e27b6adf8c3199ce78446d33703984394c94152`, загруженные CSV-артефакты и агрегаты.
+
+### E01 — H1 Direction and Execution Ablation
+- Run [40578394090](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/40578394090), branch `research/market-regime-v1-main`, commit `4e27b6adf8c3199ce78446d33703984394c94152`, workflow `.github/workflows/h1-direction-execution-ablation.yml`.
+- Workflow blob SHA `c6036c8c63b1db78a9264ba4f4027bb2c4ce33c9`; strategy script blob SHA `7178fa588cf43ef67fd748037f04643be5cf21e6`; dataset loader blob SHA `a02af75b4ba8311b3ab46ae993c14996d4107a4c`; engine blob SHA `e4501bd3666d7fe25ae8c1a10a9813da89b535dd`.
+- Artifact `h1-direction-execution-ablation`, 13,732 bytes, SHA-256 `a61dfb45f41792ae4dbfb2e0f09975b389e6b0aa1c6d89c64824087065823ebc`; CSV has 600 rows = 50 symbols × 3 folds × 4 variants.
+- Independent recomputation from the downloaded CSV exactly matches ledger totals: both_market −16,911.93 USDT / 2,699 trades; long_market +1,056.65 / 1,458; both_limit20 −261.36 / 2,395; long_limit20 +9,823.41 / 1,308. Long-only market remains regime-sensitive: fold nets +2,815.06 / −732.75 / −1,025.66 USDT. Long-only limit20 fold nets +5,369.05 / +1,543.67 / +2,910.69.
+- All six source ZIPs are present in the exact run commit. Git blob SHAs: `2025-10-27...123436.zip` = `85b279d81ad9e81ec502b52adf4e1c6f5a459094`; `2025-10-27...123811.zip` = `86492adf07c6911e90ce128997d4ab5111f1f7d9`; `2025-10-27...124334.zip` = `f161c89f2002d13e11cf2cc85a94bd5828eeda5a`; `2026-10-26...170116.zip` = `6e3807e2d596726f5f1b5dd9d2b4397a9eb0dcee`; `2026-10-26...230422.zip` = `20faac7bb9e1caf29ae4e2fc55c1bb9012d9f538`; `2026-10-26...230719.zip` = `abdc80e73dbb37c81e070b3cd31a2a5cf88647ec`.
+
+### E02 / E03 artifact checks
+- E02 run [40578394009](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/40578394009), artifact SHA-256 `66483e95ece78e773dd47494bbbdfd8bd2a738f7f6be1e28958463d622122c83`, 174 rows. Recomputed 1h selected-policy aggregate −5,999.65 USDT across 150 symbol-fold rows / 2,509 trades; market comparator −16,911.93. 71/150 selected H1 rows positive. 15m selected aggregate −11,470.98 vs market −24,039.44.
+- E03 run [40578393971](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/40578393971), artifact SHA-256 `880e4408f2d8ee2bd3e054ef76b43f06d089843da7086a2282999858645bfd66`, 754 rows. H1 market baseline −5,923.64; limit 10 bps / 3 bars +1,204.81; 10 bps / 5 bars +1,565.78; 20 bps / 3 bars +3,143.13. These are per-symbol parameter cells, not a shared-capital portfolio. 15m aggregate across all tested execution cells is not a valid single-strategy comparison; the market baseline remains −12,562.42.
+- Interpretation unchanged: artifact and code provenance for E01–E03 is now substantially stronger, but the CSVs do not contain a SHA-256 manifest for each source archive. Git blob IDs at the run commit identify the exact committed ZIP objects. Binance OHLCV proxy, modelled fees/slippage and optimistic OHLC limit-touch fills remain decisive execution limitations; none of these runs establishes Bybit-executable profitability.

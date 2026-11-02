@@ -484,3 +484,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41447112303](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41447112303), SUCCESS; compile, configured deterministic suites and secret scan passed.
 - Decision: ACCEPT as internal backup chronology validation. No market PnL sweep, production deployment or live order.
 - Limitation: this does not define maximum backup age or prove the snapshot matches exchange state; Bybit reconciliation remains mandatory.
+
+
+## ENG-STATE-017 — durable atomic backup write (2026-11-02)
+
+- Preregistered card: [ENG-STATE-017](experiment_cards/ENG-STATE-017_FSYNC_BACKUP_RU.md).
+- Confirmed durability gap: atomic rename alone does not request that temporary-file contents and parent-directory rename metadata be committed to storage.
+- Fix: flush + fsync the temporary file before replace; on POSIX fsync the parent directory after replace. Any fsync error raises through fail-closed persistence. Windows keeps file fsync and skips directory fsync.
+- Tests: `tests/test_state_persistence.py` 53/53; verifies expected fsync calls and that file-fsync failure preserves prior backup and removes temp file.
+- Commits: engine `3f2df9b78b9149e9f820dfc8d67140dbff7ba866`; tests `8d41fe9823d2465fe1ae64d674ed94a18027e4a2`.
+- CI: [Research engine checks #41447569454](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41447569454), SUCCESS; compile, configured deterministic suites and secret scan passed.
+- Decision: ACCEPT for improved local crash-durability. No market PnL sweep, production deployment or live order.
+- Limitation: fsync is an OS/filesystem durability request, not an absolute hardware guarantee; Windows does not receive parent-directory fsync in this implementation.

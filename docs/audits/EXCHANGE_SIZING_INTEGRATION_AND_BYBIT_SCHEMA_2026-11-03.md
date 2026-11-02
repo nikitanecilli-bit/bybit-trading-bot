@@ -144,3 +144,13 @@ Sources:
 Проверены root tree, `Bybit_Trading_Engine_v14_research.py`, `bybit_downloader.py`, `bybit_reconciliation.py`, `README.md` и список `scripts/`. В исследовательском движке нет `/v5/order/create`, `order/create`, `place_order`, `create_order` или вызова pybit; единственный `urllib.request.Request` в engine не является order submission. Скрипты содержат downloader, read-only credential/API check, read-only reconciliation, backtests, reports и snapshot collectors.
 
 Следовательно, точнее говорить: в текущем исследовательском репозитории не обнаружен production/live execution adapter. Предыдущий integration gap относится к контрактно-точному sizing внутри research engine; интеграция в live adapter — отдельная будущая задача после создания/аудита этого adapter. Никаких ордеров не отправлялось.
+
+## 13. API workflows no longer iterate across regional domains
+
+После подтверждения 403 на каждом официальном host удалён fallback-loop по разным юрисдикциям. Instrument, risk-limit и market-history workflows теперь используют один явно настроенный `BYBIT_API_BASE_URL` из repository variable; default — `https://api.bybit.com`. Сам downloader всё равно проверяет host по allowlist официальных доменов. Это исключает случайное переключение регионов в попытке обойти 403 и позволяет владельцу репозитория выбрать только домен своего разрешённого сайта/API.
+
+Проверка нового поведения:
+- instrument workflow run `41534141800`: использовал только default `https://api.bybit.com`, получил HTTP 403, snapshot не создан;
+- risk-limit workflow run `41534156659`: использовал только default `https://api.bybit.com`, получил HTTP 403, snapshot не создан.
+
+Для изменения домена владелец может задать repository variable `BYBIT_API_BASE_URL` на официальное значение своего региона. Это не API secret. Никакие приватные credentials не нужны для этих public GET endpoints.

@@ -154,3 +154,13 @@ Sources:
 - risk-limit workflow run `41534156659`: использовал только default `https://api.bybit.com`, получил HTTP 403, snapshot не создан.
 
 Для изменения домена владелец может задать repository variable `BYBIT_API_BASE_URL` на официальное значение своего региона. Это не API secret. Никакие приватные credentials не нужны для этих public GET endpoints.
+
+## 14. Max order quantity fields are now mandatory
+
+Ещё один fail-open путь: `maxOrderQty` и `maxMktOrderQty` ранее парсились как optional, а `validate_order()` пропускал max cap при `None`. В актуальной Bybit Linear schema оба поля присутствуют в `lotSizeFilter`; их отсутствие означает неполную спецификацию, а не отсутствие лимита. Оба поля теперь обязательны при создании `InstrumentSpec`; добавлен тест, который удаляет каждое поле по отдельности и требует fail-closed ValueError.
+
+CI:
+- #41534399745, commit `2ec1c2b22e0521e370281e1f16d4724862fb138e`: success, parser and full deterministic suite.
+- #41534426284, commit `fb73773944a8dc289f84621dfb2ff88cbdb12aa4`: success, including missing-max-cap regression.
+
+Таким образом, helper's static validation now fails closed for missing price bounds, quantity caps, min qty/notional, wrong category, and non-Trading status. This does not close the engine exact-qty integration gap.

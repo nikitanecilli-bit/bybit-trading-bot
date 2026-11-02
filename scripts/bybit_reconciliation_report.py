@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bybit_reconciliation import (
     SnapshotValidationError,
+    deduplicate_executions,
     parse_active_order_pages,
     parse_execution_pages,
     parse_position_pages,
@@ -137,11 +138,10 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tupl
             if not isinstance(cursor, str) or not isinstance(response, dict):
                 raise ReportError(f"snapshot raw.executions[{index}] has invalid page envelope")
             grouped.setdefault((start, end), []).append((cursor, response))
-        executions_by_id = {}
+        parsed_execution_rows = []
         for interval in sorted(grouped):
-            for execution in parse_execution_pages(grouped[interval]):
-                executions_by_id[execution.exec_id] = execution
-        executions = tuple(executions_by_id[key] for key in sorted(executions_by_id))
+            parsed_execution_rows.extend(parse_execution_pages(grouped[interval]))
+        executions = deduplicate_executions(parsed_execution_rows)
     except SnapshotValidationError as exc:
         raise ReportError(f"exchange snapshot parser rejected input: {exc}") from exc
 

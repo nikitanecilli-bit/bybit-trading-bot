@@ -735,3 +735,11 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Added mirrored short-side regression in `tests/test_gap_execution.py`: TP1 partial close is recorded, remaining 50% is later closed by the updated trailing stop, and TP1 realized gross PnL/remaining fraction are preserved.
 - Full Research CI [#41517776602](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41517776602), SUCCESS. Gap execution, portfolio accounting, funding, instrument-spec, reconciliation and persistence suites all completed successfully.
 - This closes a test-coverage asymmetry only. No production-engine behavior changed and no new trading edge or execution realism is claimed.
+
+
+## ENG-DATA-002 — dated Bybit risk-limit tier archive collector (2026-11-02)
+
+- Official V5 `GET /v5/market/risk-limit` collector added at `scripts/snapshot_bybit_risk_limits.py`. It paginates the full linear universe, validates tier identifiers and finite numeric fields, rejects duplicate tiers/repeated cursors/empty responses, restricts requests to official HTTPS hosts, refuses redirects, suppresses HTTP bodies, and writes timestamped snapshots atomically with fsync.
+- Added weekly/manual workflow `.github/workflows/bybit-risk-limit-snapshots.yml`; network capture is deliberately not part of CI. No API credentials are required or used.
+- Offline tests: 9/9 passed. Full Research CI [#41518145630](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41518145630), SUCCESS. Includes existing instrument specs, sizing, funding, reconciliation, regime, gap, accounting and persistence suites.
+- Important limitation: this is a prospective point-in-time archive, not a historical risk-tier source. Current risk tiers must not be backdated to earlier test periods. The workflow has not yet captured a real snapshot; previous public Bybit metadata access returned HTTP 403. No proxy or access-control bypass attempted.

@@ -106,11 +106,11 @@ def parse_funding_rows(rows: Any, symbol: str) -> list[dict[str, Any]]:
 
 def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
                           fetch_page: Callable[[int, int], list[dict[str, Any]]] | None = None,
-                          base_url: str = DEFAULT_BASE_URL
+                          base_url: str = DEFAULT_BASE_URL, pause: float = 0.1
                           ) -> list[dict[str, Any]]:
     symbol = symbol.strip().upper()
-    if not symbol or start_ms <= 0 or end_ms <= start_ms:
-        raise ValueError("valid symbol and start_ms < end_ms are required")
+    if not symbol or start_ms <= 0 or end_ms <= start_ms or pause < 0:
+        raise ValueError("valid symbol, range and non-negative pause are required")
     if fetch_page is None:
         fetch_page = lambda start, end: _request_json(
             base_url, FUNDING_ENDPOINT,
@@ -122,6 +122,8 @@ def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
     while window_start < end_ms:
         window_end = min(window_start + FUNDING_WINDOW_MS, end_ms)
         page = parse_funding_rows(fetch_page(window_start, window_end - 1), symbol)
+        if pause and window_end < end_ms:
+            time.sleep(pause)
         if len(page) >= FUNDING_LIMIT:
             raise RuntimeError("funding window reached API page limit; reduce window size")
         for row in page:
@@ -162,11 +164,11 @@ def parse_mark_rows(rows: Any, symbol: str, interval_ms: int) -> list[dict[str, 
 
 def fetch_mark_klines(symbol: str, start_ms: int, end_ms: int, interval: str = "60",
                       fetch_page: Callable[[int, int, int], list[Any]] | None = None,
-                      base_url: str = DEFAULT_BASE_URL
+                      base_url: str = DEFAULT_BASE_URL, pause: float = 0.1
                       ) -> list[dict[str, Any]]:
     symbol = symbol.strip().upper()
-    if not symbol or interval not in INTERVALS or start_ms <= 0 or end_ms <= start_ms:
-        raise ValueError("valid symbol, interval and start_ms < end_ms are required")
+    if not symbol or interval not in INTERVALS or start_ms <= 0 or end_ms <= start_ms or pause < 0:
+        raise ValueError("valid symbol, interval, range and non-negative pause are required")
     interval_ms = int(interval) * 60_000
     if start_ms % interval_ms or end_ms % interval_ms:
         raise ValueError("mark range boundaries must align to the selected interval")
@@ -182,6 +184,8 @@ def fetch_mark_klines(symbol: str, start_ms: int, end_ms: int, interval: str = "
     while cursor < end_ms:
         chunk_end = min(cursor + chunk_ms, end_ms)
         page = parse_mark_rows(fetch_page(cursor, chunk_end - 1, MARK_LIMIT), symbol, interval_ms)
+        if pause and chunk_end < end_ms:
+            time.sleep(pause)
         if len(page) >= MARK_LIMIT:
             raise RuntimeError("mark kline chunk reached API page limit; reduce chunk size")
         for row in page:
@@ -228,10 +232,8 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
     validate_base_url(base_url)
     if pause < 0:
         raise ValueError("pause cannot be negative")
-    funding = fetch_funding_history(symbol, start_ms, end_ms, base_url=base_url)
-    if pause:
-        time.sleep(pause)
-    marks = fetch_mark_klines(symbol, start_ms, end_ms, interval, base_url=base_url)
+    funding = fetch_funding_history(symbol, start_ms, end_ms, base_url=base_url, pause=pause)
+    marks = fetch_mark_klines(symbol, start_ms, end_ms, interval, base_url=base_url, pause=pause)
     root = Path(output_root)
     funding_path = root / "funding" / f"{symbol.upper()}.csv"
     mark_path = root / "mark_price" / f"{symbol.upper()}.csv"

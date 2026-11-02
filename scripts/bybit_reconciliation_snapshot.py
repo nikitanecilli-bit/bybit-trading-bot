@@ -71,6 +71,8 @@ def _parse_utc_ms(value: str) -> int:
         raise ValueError("saved_at_utc must be an ISO-8601 timestamp") from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError("saved_at_utc must include an explicit UTC offset")
+    if parsed.utcoffset().total_seconds() != 0:
+        raise ValueError("saved_at_utc must be expressed in UTC")
     return int(parsed.astimezone(timezone.utc).timestamp() * 1000)
 
 

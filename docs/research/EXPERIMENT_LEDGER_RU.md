@@ -755,3 +755,13 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - 11/11 новых offline tests прошли в CI #41518707514 (SUCCESS). Последующий кодовый commit 83af4e662e1f66a28a8dce5e064fbedb54347c0c прошёл тестовые шаги полного CI #41518737084 без ошибок; завершение runner cleanup проверялось отдельно.
 - Источники и ограничения: endpoint definitions сверены с официальными Bybit V5 docs. Реальный API capture ещё не выполнен; предыдущий доступ к публичным Bybit API из GitHub Actions давал HTTP 403. Не утверждать, что история уже скачана. Нет обхода региональных ограничений.
 - Funding cost helper по-прежнему использует H1 mark candle open как timestamp-aligned proxy, а не подтверждённую точную settlement mark price. Данные не подменяют реальную биржевую settlement price; до получения точного settlement mark модель остаётся приближённой.
+
+
+## ENG-DATA-004 — Bybit-native H1 OHLCV added to market archive (2026-11-02)
+
+- archive_bybit_market_history.py now archives native Bybit linear trade OHLCV from /v5/market/kline in addition to funding history and mark-price klines.
+- Trade and mark H1 candles are independently fetched in bounded 899-candle windows; both require a complete timestamp grid, valid OHLC ordering, finite/non-negative volume and turnover, and a closed-candle end boundary.
+- Added kline/ output per symbol. Coverage preflight now optionally requires exact equality of trade-kline and mark-kline timestamp sets, in addition to funding settlement timestamps matching mark candle opens.
+- Added offline tests for sorted trade candles, incomplete OHLCV coverage, invalid volume/turnover, and trade-vs-mark timestamp mismatch. On code commit 9a94ee7d793e99cdbcc14da6a8eaffce0484dc6f, collector and coverage test steps both passed; full Research CI test steps showed no failures, but Actions runner cleanup had not yet returned a terminal conclusion at time of this note.
+- This removes a future dependency on Binance OHLCV for the Bybit-native replay, but does not retroactively change E01–E13. Those experiments remain Binance-proxy results until rerun with captured Bybit data.
+- Actual API download remains unverified because previous public Bybit requests from Actions returned HTTP 403. No archive data is claimed to exist yet.

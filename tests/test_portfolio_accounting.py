@@ -610,3 +610,59 @@ if __name__ == "__main__":
         test()
         print("PASS", name)
     print(f"{len(tests)}/{len(tests)} tests passed")
+
+
+def test_long_tp1_bar_that_reverses_through_new_trailing_stop_is_stopped_conservatively():
+    e = make_engine()
+    pos = make_position(direction="long", entry=100.0, size=1_000.0)
+    e.open_positions["BTCUSDT"] = pos
+    captured = {}
+    e._close_position = lambda p, px, reason, ts, mae, mfe: captured.update(
+        exit_price=px, reason=reason, mae=mae, mfe=mfe
+    )
+    history = [
+        engine_mod.Candle(
+            ts=pos.entry_ts - 14 * 3_600_000 + i * 3_600_000,
+            open=100.0, high=101.0, low=99.0, close=100.0, volume=10.0,
+        )
+        for i in range(15)
+    ]
+    history.append(engine_mod.Candle(
+        ts=pos.entry_ts + 3_600_000,
+        open=100.0, high=110.0, low=104.0, close=107.0, volume=10.0,
+    ))
+
+    e._manage_position("BTCUSDT", history, fill_bar=False, exit_ts=pos.entry_ts + 7_200_000)
+
+    assert captured["reason"] == "trailing_stop"
+    assert captured["exit_price"] == pos.stop_price
+    assert captured["exit_price"] >= 104.0
+    assert pos.tp1_hit is True
+
+
+def test_short_tp1_bar_that_reverses_through_new_trailing_stop_is_stopped_conservatively():
+    e = make_engine()
+    pos = make_position(symbol="ETHUSDT", direction="short", entry=100.0, size=1_000.0)
+    e.open_positions["ETHUSDT"] = pos
+    captured = {}
+    e._close_position = lambda p, px, reason, ts, mae, mfe: captured.update(
+        exit_price=px, reason=reason, mae=mae, mfe=mfe
+    )
+    history = [
+        engine_mod.Candle(
+            ts=pos.entry_ts - 14 * 3_600_000 + i * 3_600_000,
+            open=100.0, high=101.0, low=99.0, close=100.0, volume=10.0,
+        )
+        for i in range(15)
+    ]
+    history.append(engine_mod.Candle(
+        ts=pos.entry_ts + 3_600_000,
+        open=100.0, high=96.0, low=90.0, close=93.0, volume=10.0,
+    ))
+
+    e._manage_position("ETHUSDT", history, fill_bar=False, exit_ts=pos.entry_ts + 7_200_000)
+
+    assert captured["reason"] == "trailing_stop"
+    assert captured["exit_price"] == pos.stop_price
+    assert captured["exit_price"] <= 96.0
+    assert pos.tp1_hit is True

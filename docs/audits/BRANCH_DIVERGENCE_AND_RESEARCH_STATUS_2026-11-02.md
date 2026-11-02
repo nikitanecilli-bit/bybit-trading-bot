@@ -362,3 +362,5 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - Fix commit `2d44d14a4981b1b3b6c259c8c04e2123acc0b489`: aggregate net PnL by timezone-aware UTC exit timestamp, then process timestamps chronologically. Reject invalid/naive exit timestamps.
 - Full Research CI [#41512721144](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41512721144) SUCCESS. Portfolio accounting suite 24/24, both new regressions passed; persistence suite 60 tests.
 - Closed trade equity curve treats same-timestamp closes as one net event; intrabar path remains represented by engine MTM drawdown where available. This is a metrics correctness fix, not a strategy/profitability result.
+
+- Follow-up [CI #41513430881](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41513430881) SUCCESS. Same-bar two-stop permutation tests now also compare `risk_mgr.max_drawdown_pct`, not just realized/current equity; the MTM drawdown scalar is order-independent in those covered scenarios. Portfolio suite 24/24; persistence suite 60.

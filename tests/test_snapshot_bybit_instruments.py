@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import scripts.snapshot_bybit_instruments as collector
 from scripts.snapshot_bybit_instruments import (
     build_snapshot, fetch_all_instruments, write_snapshot,
 )
@@ -56,6 +57,34 @@ class SnapshotCollectorTests(unittest.TestCase):
             fetch_all_instruments("linear", lambda cursor: ([], None))
         with self.assertRaisesRegex(ValueError, "missing symbol"):
             fetch_all_instruments("linear", lambda cursor: ([{}], None))
+
+    def test_strict_retcode_rejects_boolean_false(self):
+        with self.assertRaisesRegex(RuntimeError, "non-zero or invalid retCode"):
+            collector._check_ret_code({"retCode": False, "result": {"list": []}})
+
+    def test_public_collector_rejects_non_bybit_host_before_request(self):
+        with self.assertRaisesRegex(ValueError, "official HTTPS Bybit API host"):
+            collector._request_page("https://attacker.example", "linear", None)
+
+    def test_pagination_page_limit_fails_closed(self):
+        previous = collector.MAX_PAGES
+        collector.MAX_PAGES = 1
+        try:
+            with self.assertRaisesRegex(RuntimeError, "exceeded safety limit"):
+                fetch_all_instruments(
+                    "linear", lambda cursor: ([{"symbol": "BTCUSDT"}], "next")
+                )
+        finally:
+            collector.MAX_PAGES = previous
+
+    def test_pagination_cursor_must_be_string(self):
+        def fetch(cursor):
+            if cursor is None:
+                return ([{"symbol": "BTCUSDT"}], 123)
+            return ([{"symbol": "ETHUSDT"}], None)
+        with self.assertRaisesRegex(ValueError, "missing symbol|cursor"):
+            # Direct transport validates the cursor type before the next request.
+            collector._check_cursor_type(123)
 
     def test_snapshot_has_provenance_and_exact_timestamp(self):
         snapshot = build_snapshot(

@@ -180,6 +180,10 @@ def fetch_mark_klines(symbol: str, start_ms: int, end_ms: int, interval: str = "
     interval_ms = int(interval) * 60_000
     if start_ms % interval_ms or end_ms % interval_ms:
         raise ValueError("mark range boundaries must align to the selected interval")
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    last_closed_boundary = (now_ms // interval_ms) * interval_ms
+    if end_ms > last_closed_boundary:
+        raise ValueError("mark range end includes an unclosed candle or future interval")
     if fetch_page is None:
         fetch_page = lambda start, end, limit: _request_json(
             base_url, MARK_ENDPOINT,

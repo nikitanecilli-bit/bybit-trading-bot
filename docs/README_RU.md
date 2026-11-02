@@ -34,9 +34,10 @@
 30. [ENG-RECON-005 — position protection visibility](research/experiment_cards/ENG-RECON-005_POSITION_PROTECTION_RU.md) — preserves exchange TP/SL/trailing-stop fields; does not verify trigger execution.
 31. [ENG-RECON-006 — historical order capture](research/experiment_cards/ENG-RECON-006_ORDER_HISTORY_RU.md) — paginated order history with explicit Bybit retention limits; not a complete event journal.
 32. [ENG-DATA-001 — instrument snapshot collector](research/experiment_cards/ENG-DATA-001_INSTRUMENT_SNAPSHOT_COLLECTOR_RU.md) — hardened public metadata collector; CI tests pass, real API still returns HTTP 403.
-33. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
-34. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
-35. [Карта репозитория](REPOSITORY_MAP_RU.md).
+33. [ENG-SEC-001 — private API credential preflight](research/experiment_cards/ENG-SEC-001_PRIVATE_API_CHECK_RU.md) — host allowlist, redirect refusal and strict read-only type checks; no real credentials used.
+34. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
+35. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
+36. [Карта репозитория](REPOSITORY_MAP_RU.md).
 
 ## Разделы
 

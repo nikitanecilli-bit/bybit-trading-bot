@@ -495,3 +495,5 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Regression coverage обновлено для long/short stops, gap stops, TP1/TP2 maker legs, TP1 + taker trailing stop, MTM and risk sizing. CI #41536540759 — success.
 - Все старые H1/15m net-PnL rankings, включая 50-symbol screen 14/50 positive, считаются provisional до повторного прогона на исправленном engine. Точное изменение aggregate PnL не вычислено. Новые strategy backtests пока не запускать: отсутствуют датированные instrument/risk snapshots, engine exact qty, IM/MM/liquidation model; API workflow returns 403.
 - Fixed rates remain assumptions: taker 0.055%, maker 0.020%, taker slippage 0.0225%. VIP/region-specific account fee schedule and maker queue/partial fills not modeled.
+
+- Подготовлена карта интеграции точного qty без изменения кода: `_try_fill_pending` → immutable spec snapshot → exchange-valid qty → OpenPositionState → qtyStep-safe TP1/remaining qty → PnL/fees/funding → TradeRecord → persistence schema migration. Подробности и тест-gate в `EXCHANGE_SIZING_INTEGRATION_AND_BYBIT_SCHEMA_2026-11-03.md` section 16.

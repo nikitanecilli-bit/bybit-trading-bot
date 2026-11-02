@@ -859,10 +859,17 @@ class PlanBStatePersistence:
                         raise ValueError(f"позиция {sym}: {field_name} должен быть bool")
                 if "maker_exits" in pos_dict and pos_dict["maker_exits"] is not None and not isinstance(pos_dict["maker_exits"], bool):
                     raise ValueError(f"позиция {sym}: maker_exits должен быть bool или null")
-                if "tp1_ts_ms" in pos_dict and pos_dict["tp1_ts_ms"] is not None:
-                    value = pos_dict["tp1_ts_ms"]
-                    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                tp1_ts = pos_dict.get("tp1_ts_ms")
+                if tp1_ts is not None:
+                    if isinstance(tp1_ts, bool) or not isinstance(tp1_ts, int) or tp1_ts <= 0:
                         raise ValueError(f"позиция {sym}: tp1_ts_ms должен быть положительным целым числом или null")
+                if tp1_hit:
+                    if tp1_ts is None:
+                        raise ValueError(f"позиция {sym}: tp1_hit=true требует tp1_ts_ms")
+                    if tp1_ts < entry_ts:
+                        raise ValueError(f"позиция {sym}: tp1_ts_ms не может быть раньше entry_ts")
+                elif tp1_ts is not None:
+                    raise ValueError(f"позиция {sym}: tp1_ts_ms задан при tp1_hit=false")
                 if "bars_held" in pos_dict:
                     value = pos_dict["bars_held"]
                     if isinstance(value, bool) or not isinstance(value, int) or value < 0:

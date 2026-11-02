@@ -79,7 +79,7 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tupl
     if snapshot.get("status") != "CAPTURED_READ_ONLY_NOT_RECONCILED":
         raise ReportError("snapshot status is not CAPTURED_READ_ONLY_NOT_RECONCILED")
     raw = snapshot.get("raw")
-    if not isinstance(raw, dict) or set(raw) != {"positions", "active_orders", "executions"}:
+    if not isinstance(raw, dict) or set(raw) != {"positions", "active_orders", "order_history", "executions"}:
         raise ReportError("snapshot raw sections are missing or unexpected")
     digest = hashlib.sha256(_canonical_json_bytes(raw)).hexdigest()
     if snapshot.get("raw_sha256") != digest:
@@ -87,6 +87,9 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tupl
 
     position_pages = _page_tuples(raw["positions"], "positions")
     order_pages = _page_tuples(raw["active_orders"], "active_orders")
+    history_pages = raw["order_history"]
+    if not isinstance(history_pages, list) or not history_pages:
+        raise ReportError("snapshot raw.order_history must be a non-empty page list")
     execution_pages = raw["executions"]
     if not isinstance(execution_pages, list) or not execution_pages:
         raise ReportError("snapshot raw.executions must be a non-empty page list")
@@ -94,6 +97,31 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tupl
     try:
         positions = parse_position_pages(position_pages)
         orders = parse_active_order_pages(order_pages)
+        history_grouped: dict[tuple[int, int], list[tuple[str, dict[str, Any]]]] = {}
+        for index, page in enumerate(history_pages):
+            if not isinstance(page, dict):
+                raise ReportError(f"snapshot raw.order_history[{index}] must be an object")
+            start = page.get("interval_start_ms")
+            end = page.get("interval_end_ms")
+            if (isinstance(start, bool) or not isinstance(start, int)
+                    or isinstance(end, bool) or not isinstance(end, int)
+                    or start <= 0 or end <= start):
+                raise ReportError(f"snapshot raw.order_history[{index}] has invalid interval")
+            cursor = page.get("requested_cursor")
+            response = page.get("response")
+            if not isinstance(cursor, str) or not isinstance(response, dict):
+                raise ReportError(f"snapshot raw.order_history[{index}] has invalid page envelope")
+            history_grouped.setdefault((start, end), []).append((cursor, response))
+        history_by_id = {}
+        for interval in sorted(history_grouped):
+            for item in parse_active_order_pages(history_grouped[interval]):
+                previous = history_by_id.get(item.order_id)
+                if previous is None or item.updated_time_ms > previous.updated_time_ms:
+                    history_by_id[item.order_id] = item
+                elif item.updated_time_ms == previous.updated_time_ms and item != previous:
+                    raise ReportError(f"historical order {item.order_id} has conflicting records")
+        historical_orders = tuple(history_by_id[key] for key in sorted(history_by_id))
+
         grouped: dict[tuple[int, int], list[tuple[str, dict[str, Any]]]] = {}
         for index, page in enumerate(execution_pages):
             if not isinstance(page, dict):
@@ -121,9 +149,11 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tupl
     expected_counts = {
         "positions": len(positions),
         "active_orders": len(orders),
+        "historical_orders": len(historical_orders),
         "executions": len(executions),
         "position_pages": len(position_pages),
         "active_order_pages": len(order_pages),
+        "order_history_pages": len(history_pages),
         "execution_pages": len(execution_pages),
     }
     if not isinstance(counts, dict):
@@ -144,6 +174,15 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tupl
     if before <= saved_at_ms or before > after or after - before > 120_000 or capture_now != before:
         raise ReportError("snapshot server-time bounds are inconsistent with backup time")
     interval_keys = sorted(grouped)
+    history_interval_keys = sorted(history_grouped)
+    if history_interval_keys != interval_keys:
+        raise ReportError("order-history and execution interval coverage differs")
+    coverage = snapshot.get("order_history_coverage")
+    if not isinstance(coverage, dict) or coverage.get("status") != "QUERYABLE_WINDOW_ONLY_NOT_COMPLETE":
+        raise ReportError("order-history coverage limitation metadata is missing")
+    if (coverage.get("start_ms") != saved_at_ms or coverage.get("end_ms") != capture_now
+            or coverage.get("duration_ms") != capture_now - saved_at_ms):
+        raise ReportError("order-history coverage metadata does not match capture window")
     expected_start = saved_at_ms
     for start, end in interval_keys:
         if start != expected_start or end - start > 7 * 24 * 60 * 60 * 1000:
@@ -151,7 +190,7 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tupl
         expected_start = end
     if expected_start != capture_now:
         raise ReportError("execution intervals do not reach the capture boundary")
-    return positions, orders, executions
+    return positions, orders, historical_orders, executions
 
 
 def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -182,7 +221,7 @@ def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict
     if isinstance(seq, bool) or not isinstance(seq, int) or seq < 0:
         raise ReportError("local backup trade_seq must be a non-negative integer")
 
-    positions, orders, executions = _parse_exchange_snapshot(snapshot, saved_at_ms)
+    positions, orders, historical_orders, executions = _parse_exchange_snapshot(snapshot, saved_at_ms)
     local_positions = local_backup["open_positions"]
     pending = local_backup["pending_orders"]
 
@@ -245,6 +284,9 @@ def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict
         reasons.append("At least one exchange position has neither stopLoss nor trailingStop configured.")
     if orders:
         reasons.append("Exchange active orders exist but cannot be mapped to local exchange order identities.")
+    if historical_orders:
+        reasons.append("Historical exchange orders exist but cannot be mapped to a local order/event ledger.")
+    reasons.append("Bybit order-history API has retention/status limits and may be delayed; this capture is explicitly not a complete order journal.")
     if executions:
         reasons.append("Exchange executions exist but cannot be compared with a local execution ledger.")
     if direction_conflicts:
@@ -269,9 +311,13 @@ def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict
             "raw_sha256": snapshot["raw_sha256"],
             "position_count": len(positions),
             "active_order_count": len(orders),
+            "historical_order_count": len(historical_orders),
+            "order_history_coverage": snapshot["order_history_coverage"],
             "execution_count_since_backup": len(executions),
             "positions": exchange_position_rows,
             "active_order_ids": [item.order_id for item in orders],
+            "historical_order_ids": [item.order_id for item in historical_orders],
+            "historical_order_statuses": {item.order_id: item.order_status for item in historical_orders},
             "execution_ids": [item.exec_id for item in executions],
         },
         "diagnostics": {

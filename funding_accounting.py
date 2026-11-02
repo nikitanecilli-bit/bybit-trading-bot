@@ -29,6 +29,7 @@ def accrued_funding_cost(
     mark_prices: Mapping[int, Any],
     as_of_ts: int,
     closed_ts_ms: int | None = None,
+    defer_boundary_receipts: bool = False,
 ) -> Decimal:
     """Return cumulative funding paid/received in [entry_ts, as_of_ts].
 
@@ -37,7 +38,8 @@ def accrued_funding_cost(
     mark-candle open proxies. At an ambiguous final-close boundary, payments
     use full initial quantity and receipts use zero quantity. At an ambiguous
     TP1-only boundary, payments use full quantity and receipts use the
-    remaining fraction; later settlements use the remaining fraction.
+    remaining fraction; later settlements use the remaining fraction. For
+    pre-exit MTM, defer receipts at the current as-of boundary until a later mark.
     """
     entry_ts = int(position.entry_ts)
     as_of_ts = int(as_of_ts)
@@ -99,6 +101,11 @@ def accrued_funding_cost(
             # credit a receipt on a position that may already have been closed.
             if full_position_cost < 0:
                 fraction = Decimal("0")
+        elif defer_boundary_receipts and ts == as_of_ts and full_position_cost < 0:
+            # MTM runs before candle exit resolution. Defer same-boundary receipts
+            # so they cannot mask an adverse stop/kill-switch mark. If still open,
+            # the receipt is included at the next mark (ts < as_of_ts).
+            fraction = Decimal("0")
         elif tp1_ts is not None and ts > tp1_ts:
             fraction = remaining_fraction
         elif tp1_ts is not None and ts == tp1_ts:

@@ -559,3 +559,13 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Snapshot explicitly records `QUERYABLE_WINDOW_ONLY_NOT_COMPLETE`. Bybit documents that cancelled/rejected/deactivated statuses are queryable only in the last 24h; beyond 7d only orders with fills are queryable; endpoint data may be delayed. It is not a complete event journal.
 - CI: [Research engine checks #41460727701](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41460727701), SUCCESS; parser 14/14, collector 15/15, comparator 16/16, persistence 54/54, configured suites and secret scan passed.
 - No real Bybit request or snapshot. Comparator remains permanently BLOCKED until local exchange identities and execution ledger exist. No PnL sweep or live resume.
+
+
+### ENG-RECON-003 follow-up — cross-interval execution identity integrity (2026-11-02)
+
+- Confirmed risk: overlapping/adjacent seven-day execution windows can surface the same `execId`. Silent dict overwrite would hide conflicting payloads.
+- Added shared `deduplicate_executions()` in `bybit_reconciliation.py`: exact duplicates deduplicate; same ID with differing fields raises `SnapshotValidationError`.
+- Wired strict deduplication into both snapshot collector and report-only comparator.
+- Added parser tests for exact and conflicting duplicates, plus comparator-level tampered cross-interval fixture.
+- CI: [#41467807857](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41467807857), SUCCESS — parser 15/15, collector 15/15, comparator 17/17; full workflow passed.
+- Status: ACCEPT for code/fixture coverage only. No live exchange capture. Reconciliation/live resume remains BLOCKED.

@@ -7,16 +7,16 @@
 3. [Технический аудит](audits/PROJECT_AUDIT_RU.md).
 4. [Аудит движка](audits/ENGINE_AUDIT_FINDINGS_RU.md).
 5. [Журнал экспериментов](research/EXPERIMENT_LEDGER_RU.md) — исторический источник результатов.
-6. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
-7. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
-8. [Карта репозитория](REPOSITORY_MAP_RU.md).
+6. [Протокол непрерывного улучшения](research/CONTINUOUS_IMPROVEMENT_PROTOCOL_RU.md) — гипотезы, контрольная версия, критерии ACCEPT/REJECT и защита от переобучения.
+7. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
+8. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
+9. [Карта репозитория](REPOSITORY_MAP_RU.md).
 
 ## Разделы
 
 - `audits/` — технические аудиты, сравнение веток и подтверждённые ограничения.
 - `reports/` — исторические backtest, holdout и диагностические отчёты.
-- `research/` — журнал экспериментов, матрица тестового покрытия и исследовательский план.
-
+- `research/` — журнал экспериментов, протокол исследований, матрица тестового покрытия и исследовательский план.
 
 ## Последние исследовательские результаты
 
@@ -25,7 +25,6 @@
 - [E11 — shared-capital портфель, 47 инструментов](reports/E11_H1_SHARED_CAPITAL_PORTFOLIO_RU.md): единый капитал и конкуренция за позиции.
 - [E12 — broad-market context diagnostics](reports/E12_BROAD_MARKET_CONTEXT_DIAGNOSTICS_RU.md): breadth, momentum, ATR и cross-sectional dispersion.
 - [E13 — causal compression gate](reports/E13_CAUSAL_COMPRESSION_GATE_RU.md): один фиксированный фильтр на shared capital.
-
 
 ## Технические блокеры перед execution-aware replay
 

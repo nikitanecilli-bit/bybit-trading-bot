@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Regression tests for the research multi-bar limit-wait policy."""
+import os
+import sys
 import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from multibar_limit_wait import evaluate_limit_wait, prepare_signal_for_next_bar_fill
 

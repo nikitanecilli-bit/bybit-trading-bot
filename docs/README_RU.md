@@ -28,9 +28,10 @@
 24. [ENG-STATE-015 — pending next-bar chronology](research/experiment_cards/ENG-STATE-015_PENDING_NEXT_BAR_RU.md) — исключает исполнение устаревших pending-сигналов после пропуска свечи/перезапуска.
 25. [ENG-STATE-016 — backup event chronology](research/experiment_cards/ENG-STATE-016_BACKUP_EVENT_TIME_RU.md) — запрещает событиям позиции/сигнала датироваться позже сохранения backup.
 26. [ENG-STATE-017 — fsync backup durability](research/experiment_cards/ENG-STATE-017_FSYNC_BACKUP_RU.md) — fsync содержимого backup и каталога после atomic replace на POSIX.
-27. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
-28. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
-29. [Карта репозитория](REPOSITORY_MAP_RU.md).
+27. [ENG-RECON-002 — read-only V5 parsers](research/experiment_cards/ENG-RECON-002_READONLY_PARSERS_RU.md) — strict parsing snapshots; no HTTP calls or account mutations.
+28. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
+29. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
+30. [Карта репозитория](REPOSITORY_MAP_RU.md).
 
 ## Разделы
 

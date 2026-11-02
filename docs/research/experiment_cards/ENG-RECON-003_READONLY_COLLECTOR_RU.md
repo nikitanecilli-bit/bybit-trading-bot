@@ -1,6 +1,6 @@
 # ENG-RECON-003 — fail-closed read-only Bybit V5 snapshot collector
 
-Статус: IN PROGRESS — implementation committed; CI result not independently observable yet.  
+Статус: ACCEPT — implementation and mocked CI coverage passed; real exchange capture is NOT verified.  
 Дата: 2026-11-02.  
 Тип: read-only authenticated collection; no order or account mutation.
 
@@ -19,7 +19,7 @@ Added `scripts/bybit_reconciliation_snapshot.py`.
 
 ## Tests
 
-`tests/test_bybit_reconciliation_snapshot.py`: 11 deterministic tests are authored for:
+`tests/test_bybit_reconciliation_snapshot.py`: 12 deterministic tests passed for:
 - signature construction;
 - seven-day execution interval limits;
 - read-only verification before account calls;
@@ -28,10 +28,10 @@ Added `scripts/bybit_reconciliation_snapshot.py`.
 - boolean `retCode=False` rejection;
 - API errors not treated as empty account;
 - repeated cursor rejection;
-- HTTPS and official-host allowlist;
+- HTTPS and official-host allowlist enforced before credentials are sent; redirect refusal;
 - future backup timestamp rejection.
 
-CI compile and test steps are wired in `.github/workflows/research-checks.yml`. A successful run has not yet been independently verified; do not mark ACCEPT until the Actions result is confirmed.
+CI: [Research engine checks #41457143134](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41457143134), SUCCESS. Compile, all configured deterministic suites, parser tests (13/13), collector tests (12/12), secret scan and persistence tests completed successfully. The preceding #41456956477 run also passed after the host validation and redirect protection were wired into the actual request path.
 
 ## Commits
 
@@ -41,8 +41,9 @@ CI compile and test steps are wired in `.github/workflows/research-checks.yml`. 
 
 ## Ограничения и вердикт
 
-- No live Bybit request was made and no real snapshot exists from this implementation.
+- No live Bybit request was made and no real snapshot exists from this implementation. ACCEPT applies only to code and mocked CI coverage.
 - Collector output status is `CAPTURED_READ_ONLY_NOT_RECONCILED`, never a reconciliation PASS.
 - Order history and exchange-side stop/TP verification are not included.
 - The local engine still lacks exact exchange qty, `positionIdx`, order identifiers and execution ledger; comparator must remain BLOCKED for open positions/orders.
 - Prior GitHub-runner HTTP 403 remains unresolved. No PnL sweep, live order, production deployment or live resume.
+- Audit correction: earlier revisions documented the host allowlist/redirect guard before they were wired into `collect_snapshot()` and `_http_json()`. This was caught by the failing host-allowlist test in run #41452045788, fixed in commit `455182c4d0db3f761f35562d542c9a57cad11797`, and re-verified with redirect regression coverage in #41457143134.

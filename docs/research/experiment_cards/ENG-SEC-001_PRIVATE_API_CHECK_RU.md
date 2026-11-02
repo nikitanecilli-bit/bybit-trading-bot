@@ -28,6 +28,10 @@
 
 Full Research checks: [Actions #41469608200](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41469608200), SUCCESS. Secret scan and all configured deterministic suites passed.
 
+## Дополнительный read-only code scan
+
+Проверены `Bybit_Trading_Engine_v14_research.py` на ветках `Audit`, `main`, `research/bybit-funding-data-v1`, `research/data-adapter-v1`, `research/market-regime-v1-main`, `research/market-regime-v1`, `research/v15-donchian-signal`: в этих семи engine-файлах не найдено `/v5/order/create|amend|cancel`, `place_order`, `create_order` или `set_trading_stop`. Аналогичные сигнатуры не найдены в `bybit_downloader.py` и funding/mark-price downloaders там, где они существуют. Это ограниченная проверка выбранных файлов, не доказательство отсутствия mutating endpoint во всех файлах и всех исторических коммитах.
+
 ## Ограничения
 
 - No real API key was used and no Bybit request was made.

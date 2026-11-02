@@ -345,3 +345,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41434308834](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41434308834), SUCCESS; compile, all configured deterministic suites and secret scan passed.
 - Decision: ACCEPT as local restore validation. No market backtest, parameter sweep, production deployment or live order.
 - Limitation: no Bybit position/order reconciliation, backup freshness/schema migration or fsync durability.
+
+
+## ENG-STATE-006 — pending signal schema validation (2026-11-02)
+
+- Preregistered card: [ENG-STATE-006](experiment_cards/ENG-STATE-006_PENDING_SCHEMA_RU.md).
+- Confirmed defect: restore checked only that `pending_orders` was a dictionary. Nested values could be lists or incomplete/malformed signal objects, later failing in the fill/risk path or admitting invalid direction/order type.
+- Fix: validate symbol-keyed objects, required fields (`symbol`, `direction`, `strategy`, `entry_price`, `stop_dist`, `order_type`), symbol/key match, long/short direction, market/limit order type, non-empty strategy and finite positive price/stop distance; validate optional `vol_ratio` as finite and non-negative.
+- Tests: `tests/test_state_persistence.py` 18/18; valid pending signal round-trip plus malformed entry, missing field, invalid direction/order type, NaN price and failed restore atomicity.
+- Validator commit: `c76ad2ed897bc05b7e59be5deff66ba74418aa9c`.
+- CI: [Research engine checks #41434308834](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41434308834), SUCCESS; compile, all configured deterministic suites and secret scan passed.
+- Decision: ACCEPT as local pending-state schema validation. No market backtest, parameter sweep, production deployment or live order.
+- Limitation: validated pending signal is not proof of an active Bybit order; exchange reconciliation remains mandatory.

@@ -88,13 +88,24 @@ class CryptoFetchArchiveAuditTests(unittest.TestCase):
             self.assertFalse(inventory[0]["backtest_eligible"])
             self.assertEqual(len(groups[("ADAUSDT", "1h")]), 1)
 
+    def test_empty_member_is_recorded_without_being_malformed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with zipfile.ZipFile(root / "empty.zip", "w") as z:
+                z.writestr("XMRUSDT_1h_empty.csv", csv_bytes([]))
+            inventory, groups = inspect_archives(root)
+            self.assertTrue(inventory[0]["valid"])
+            self.assertEqual(inventory[0]["bars"], 0)
+            self.assertFalse(inventory[0]["has_data"])
+            self.assertEqual(len(groups[("XMRUSDT", "1h")]), 1)
+
     def test_output_files_are_written(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             out = root / "out"
             write_outputs(out, [], [], {
                 "candidate_files": 0, "valid_files": 0, "backtest_eligible_files": 0,
-                "too_short_for_backtest_files": 0, "rejected_files": 0,
+                "too_short_for_backtest_files": 0, "empty_files": 0, "rejected_files": 0,
                 "duplicate_symbol_timeframe_groups": 0, "pairwise_comparisons": 0,
                 "conflicting_overlap_bars": 0,
                 "longest_archive_not_superset_pair_count": 0,

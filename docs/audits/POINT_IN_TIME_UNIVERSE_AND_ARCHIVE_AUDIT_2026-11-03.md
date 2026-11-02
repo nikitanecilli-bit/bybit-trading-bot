@@ -132,3 +132,15 @@ Static source inspection confirmed that `read_zip_datasets()` in `scripts/run_up
 - shorter files contain complementary timestamps missing from the selected file.
 
 This is a confirmed provenance/selection limitation, not proof that historical E01–E13 rows are corrupted. Added a read-only audit utility and CI scan; it reports per-archive SHA-256, time coverage, gaps, pairwise overlap equality, and longest-file superset status. The scan must complete before choosing whether to retain the legacy winner, reject conflicts, or build a non-conflicting union. No old experiment input is modified.
+
+
+## ENG-DATA-007 — full archive scan result
+
+The dedicated CryptoFetch audit workflow completed successfully:
+- Audit run [41542079766](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41542079766), artifact [13187466159](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41542079766/artifacts/13187466159).
+- Research CI [41542100415](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41542100415) passed compile and deterministic unit tests.
+- 67 CSV members inspected: 67 structurally valid; 64 meet the legacy 200-bar loader floor; 3 are empty (DAIUSDT, MATICUSDT, XMRUSDT) and are skipped by the existing loader; 0 malformed members.
+- Six duplicate symbol/timeframe groups and six pairwise comparisons: zero conflicting overlapping OHLCV candles, zero cases where the legacy longest-file winner omits timestamps present in its comparison partner. All 67 members have zero irregular/missing hourly/15m intervals.
+- AAVEUSDT, DOTUSDT, TAOUSDT each have a 4,321-bar subset exactly matching the same timestamps in an 8,761-bar archive. ENAUSDT, ONDOUSDT, QNTUSDT each have two identical 8,761-bar copies.
+- All six ZIP SHA-256 hashes in the E11 and E13 artifacts match the current checked-in archive hashes. Thus the scan covers the exact archive bytes used in those experiments.
+- Conclusion: no current duplicate-selection corruption or coverage loss was found in E11/E13 source archives. This resolves the present duplicate-archive concern for these exact inputs only. It does not resolve the separate Binance-vs-Bybit market-data gap, historical listing availability, funding, spread, or execution fidelity.

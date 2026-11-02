@@ -1,0 +1,49 @@
+name: Archive Bybit risk-limit tiers
+
+on:
+  schedule:
+    - cron: '37 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bybit-risk-limit-snapshots
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/market-regime-v1-main
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Download dated linear risk-limit tiers
+        run: |
+          SUCCESS=0
+          for BASE_URL in https://api.bybit.com https://api.bytick.com https://api.bybit.kz https://api.bybit.nl https://api.bybit.ae https://api.bybit-tr.com; do
+            echo "Trying official Bybit public API endpoint: $BASE_URL"
+            if python scripts/snapshot_bybit_risk_limits.py --category linear --base-url "$BASE_URL"; then
+              SUCCESS=1
+              break
+            fi
+            echo "Endpoint failed; trying next supported official host."
+          done
+          test "$SUCCESS" -eq 1
+      - name: Commit snapshot if changed
+        run: |
+          if [[ -n "$(git status --porcelain data/instrument_specs/risk_limits)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/instrument_specs/risk_limits
+            git commit -m "data: archive Bybit linear risk-limit tiers"
+            git push
+          else
+            echo "Risk-limit snapshot unchanged; no commit needed."
+          fi

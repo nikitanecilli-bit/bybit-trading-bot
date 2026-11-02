@@ -121,8 +121,10 @@ def compare_groups(groups: dict[tuple[str, str], list[dict[str, Any]]]) -> tuple
                 left_ts, right_ts = set(left["candles"]), set(right["candles"])
                 overlap = left_ts & right_ts
                 conflicts = [ts for ts in overlap if left["candles"][ts] != right["candles"][ts]]
-                winner_is_superset = set(legacy_winner["candles"]).issuperset(
-                    set(right["candles"]) if legacy_winner is left else set(left["candles"])
+                winner_timestamps = set(legacy_winner["candles"])
+                winner_is_superset = (
+                    winner_timestamps.issuperset(left_ts)
+                    and winner_timestamps.issuperset(right_ts)
                 )
                 if not winner_is_superset:
                     non_superset += 1

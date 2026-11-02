@@ -14,7 +14,7 @@ import Bybit_Trading_Engine_v14_research as engine
 def sample_position():
     return engine.OpenPositionState(
         trade_id="T-0042", symbol="BTCUSDT", direction="long",
-        strategy="state-test", entry_ts=1_800_000_000_000,
+        strategy="state-test", entry_ts=1_790_000_000_000,
         entry_price=100.0, stop_price=95.0, tp1_price=106.0,
         tp2_price=112.0, initial_stop_dist=5.0, size_usdt=1_000.0,
         risk_usdt=60.0, order_type="market",
@@ -51,7 +51,7 @@ class StatePersistenceTests(unittest.TestCase):
             pending = {
                 "ETHUSDT": {
                     "symbol": "ETHUSDT", "direction": "short",
-                    "strategy": "state-test", "signal_ts": 1_800_000_000_000,
+                    "strategy": "state-test", "signal_ts": 1_790_000_000_000,
                     "entry_price": 2000.0, "stop_price": 2100.0,
                     "tp1_price": 1900.0, "tp2_price": 1800.0,
                     "stop_dist": 100.0, "atr": 50.0, "vol_ratio": 1.25,
@@ -195,7 +195,7 @@ class StatePersistenceTests(unittest.TestCase):
             position.tp1_hit = True
             position.remaining_fraction = 0.5
             position.realized_tp1_gross_usdt = 30.0
-            position.tp1_ts_ms = 1_800_000_003_600
+            position.tp1_ts_ms = 1_790_000_003_600
             writer = engine.PlanBStatePersistence(str(path), enabled=True)
             writer.save_state(engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
                               {"BTCUSDT": position}, {}, 42)
@@ -291,7 +291,7 @@ class StatePersistenceTests(unittest.TestCase):
 
     def _write_pending_fixture(self, path, signal, add_signal_ts=True):
         if isinstance(signal, dict) and add_signal_ts:
-            signal = {"signal_ts": 1_800_000_000_000, **signal}
+            signal = {"signal_ts": 1_790_000_000_000, **signal}
         path.write_text(json.dumps({
             "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": sample_risk_data(), "open_positions": {},
             "pending_orders": {"BTCUSDT": signal}, "trade_seq": 0,
@@ -317,6 +317,33 @@ class StatePersistenceTests(unittest.TestCase):
             risk = engine.AdaptiveRiskManager(engine.BotConfig())
             with self.assertRaisesRegex(RuntimeError, "Не удалось безопасно восстановить"):
                 engine.PlanBStatePersistence(str(path)).load_state(risk)
+
+    def test_future_position_entry_timestamp_is_rejected(self):
+        self._assert_invalid_position_payload(
+            lambda position: position.update({"entry_ts": 1_800_000_000_000})
+        )
+
+    def test_future_tp1_timestamp_is_rejected(self):
+        def mutate(position):
+            position.update({
+                "tp1_hit": True, "remaining_fraction": 0.5,
+                "realized_tp1_gross_usdt": 10.0,
+                "tp1_ts_ms": 1_800_000_000_000,
+            })
+        self._assert_invalid_position_payload(mutate)
+
+    def test_future_pending_signal_timestamp_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "future-pending.json"
+            self._write_pending_fixture(path, {
+                "symbol": "BTCUSDT", "direction": "long", "strategy": "test",
+                "entry_price": 100, "stop_dist": 2, "order_type": "market",
+                "signal_ts": 1_800_000_000_000,
+            })
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(
+                    engine.AdaptiveRiskManager(engine.BotConfig())
+                )
 
     def test_pending_signal_timestamp_must_be_positive_integer(self):
         for bad_ts in (None, 0, -1, True, "1800000000000"):

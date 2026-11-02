@@ -34,3 +34,9 @@ No market backtest, parameter optimization, private API request or live order. N
 - `PlanBStatePersistence.save_state()` now requires a finite positive last mark for every open position and writes the exact symbol-to-price map. `load_state()` validates exact symbol coverage and finite positive values, and rejects open-position backups without marks. The engine's `_persist()` passes `_last_mark_prices`; restore hydrates `_last_mark_prices` before the first new candle.
 - Full Research CI [#41509504557](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509504557) completed SUCCESS; 58 state-persistence tests ran. Coverage includes engine restore preserving equity from the saved mark, rejection of missing marks, and rejection of zero/negative/NaN/Inf/boolean marks.
 - The last mark is a recovery snapshot, not a live exchange quote. It does not replace Bybit reconciliation or guarantee freshness after downtime; live trading remains out of scope.
+
+
+## Engine integration confirmation
+
+- Added explicit `_persist()` integration test: an engine with an open BTCUSDT position and mark 103.25 writes that mark into the backup; a fresh `PlanBStatePersistence` instance restores it.
+- Full Research CI [#41509795468](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509795468) SUCCESS; state-persistence suite 59 tests passed, including the engine `_persist()` integration test.

@@ -1,6 +1,6 @@
 # ENG-STATE-003 — fail-closed restore при повреждённом backup
 
-Статус до изменения: CONFIRMED SAFETY DEFECT / exception path silently discards state.  
+Статус: ACCEPT — fail-closed restore regression и CI прошли.  
 Дата: 2026-11-02.  
 Тип: state persistence integrity; deterministic tests only.
 
@@ -33,4 +33,14 @@
 
 ## Решение
 
-OPEN до regression tests и CI. Рыночные backtests не нужны и не запускать.
+Решение: ACCEPT для исследовательского движка.
+
+- Исправление: commit `ce6f3a1b3ba7b3277c9e8180fee799bf7dc67a9f`.
+- Тесты и CI workflow: commits `1706cd3cf9f8e8022361b02c8e62516932f50dfc`, `d6f6d2374f93979e1253f6bf22fe5192f18ae471`, import-path correction `3bff014673d77ae7b6eddaa63aa010f6b89f08a0`.
+- CI: [Research engine checks #41432693641](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41432693641), SUCCESS.
+- `tests/test_state_persistence.py`: 4/4 — missing file cold start, valid round-trip, corrupt JSON rejection, invalid position shape rejection.
+- Compile, all configured deterministic tests, secret scan passed.
+
+Критерии выполнены. Market backtests не запускались.
+
+ACCEPT означает только то, что существующий повреждённый backup больше не маскируется под пустое состояние. Восстановление всё ещё не доказывает соответствие локального backup фактическим позициям и ордерам Bybit; exchange reconciliation остаётся обязательной отдельной задачей перед live-resume.

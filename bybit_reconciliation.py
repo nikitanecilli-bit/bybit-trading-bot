@@ -42,6 +42,17 @@ class ActiveOrderSnapshot:
     created_time_ms: int
     updated_time_ms: int
     position_idx: int | None
+    order_type: str | None = None
+    stop_order_type: str | None = None
+    trigger_price: Decimal | None = None
+    take_profit: Decimal | None = None
+    stop_loss: Decimal | None = None
+    tpsl_mode: str | None = None
+    tp_trigger_by: str | None = None
+    sl_trigger_by: str | None = None
+    reduce_only: bool | None = None
+    close_on_trigger: bool | None = None
+    parent_order_link_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -216,9 +227,38 @@ def parse_active_order_pages(
         link_id = row.get("orderLinkId", "")
         if not isinstance(link_id, str):
             raise SnapshotValidationError("order.orderLinkId must be a string")
+        def optional_string(field: str) -> str | None:
+            value = row.get(field)
+            if value in (None, ""):
+                return None
+            if not isinstance(value, str):
+                raise SnapshotValidationError(f"order.{field} must be a string")
+            return value
+
+        def optional_price(field: str) -> Decimal | None:
+            if field not in row:
+                return None
+            return _decimal(row[field], f"order.{field}",
+                            minimum=Decimal("0"), allow_empty=True)
+
+        def optional_bool(field: str) -> bool | None:
+            if field not in row:
+                return None
+            value = row[field]
+            if not isinstance(value, bool):
+                raise SnapshotValidationError(f"order.{field} must be a boolean")
+            return value
+
+        parent_link = optional_string("parentOrderLinkId")
         parsed.append(ActiveOrderSnapshot(
             order_id, link_id, symbol, side, qty, leaves, cumulative,
             status, created, updated, idx,
+            optional_string("orderType"), optional_string("stopOrderType"),
+            optional_price("triggerPrice"), optional_price("takeProfit"),
+            optional_price("stopLoss"), optional_string("tpslMode"),
+            optional_string("tpTriggerBy"), optional_string("slTriggerBy"),
+            optional_bool("reduceOnly"), optional_bool("closeOnTrigger"),
+            parent_link,
         ))
     return tuple(sorted(parsed, key=lambda item: item.order_id))
 

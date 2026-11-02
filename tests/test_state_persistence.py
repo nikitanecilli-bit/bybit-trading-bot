@@ -347,6 +347,37 @@ class StatePersistenceTests(unittest.TestCase):
     def test_risk_unknown_field_is_rejected(self):
         self._assert_invalid_risk_payload({"equity_usdt": 10000.0})
 
+    def test_each_required_backup_envelope_field_is_mandatory(self):
+        for field in ("risk", "open_positions", "pending_orders", "trade_seq"):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "incomplete-envelope.json"
+                payload = {
+                    "risk": sample_risk_data(), "open_positions": {},
+                    "pending_orders": {}, "trade_seq": 0,
+                }
+                payload.pop(field)
+                path.write_text(json.dumps(payload), encoding="utf-8")
+                risk = engine.AdaptiveRiskManager(engine.BotConfig())
+                before = risk.to_dict().copy()
+                with self.assertRaises(RuntimeError):
+                    engine.PlanBStatePersistence(str(path)).load_state(risk)
+                self.assertEqual(risk.to_dict(), before)
+
+    def test_missing_protective_risk_flag_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "missing-risk-flag.json"
+            risk_data = sample_risk_data()
+            risk_data.pop("kill_switch_triggered")
+            path.write_text(json.dumps({
+                "risk": risk_data, "open_positions": {},
+                "pending_orders": {}, "trade_seq": 0,
+            }), encoding="utf-8")
+            risk = engine.AdaptiveRiskManager(engine.BotConfig())
+            before = risk.to_dict().copy()
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(risk)
+            self.assertEqual(risk.to_dict(), before)
+
     def test_invalid_trade_sequence_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "sequence.json"

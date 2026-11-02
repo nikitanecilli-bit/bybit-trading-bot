@@ -131,3 +131,13 @@ Source artifacts and commits:
 - Fee correction CI run 41536540759, commit `4eb9a2e7d7fc6a198937ef028dec32a5f723e22d`.
 
 Decision: keep E11/E13 historical PnL marked provisional. No strategy conclusion changes; no market backtest or parameter sweep was run.
+
+
+## E11/E13 directional scope check
+
+A direct read of the archived trade CSVs confirms all 1,452 E11 trade rows and all 1,496 E13 trade rows have `direction=long`; both experiment runners explicitly discard non-long signals. Therefore:
+- the fixed-trade exit-notional sensitivity formula above is directionally valid for these artifacts (long gross PnL equals total exit-notional change);
+- E11/E13 do not provide evidence about short-side breakout expectancy, costs, or portfolio interaction;
+- any future two-sided strategy validation must treat short-side testing as a separate experiment, not infer it from these long-only results.
+
+This is a scope limitation, not a newly discovered defect in the portfolio engine.

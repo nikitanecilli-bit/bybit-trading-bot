@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bybit_reconciliation import (
     SnapshotValidationError,
+    deduplicate_executions,
     parse_active_order_pages,
     parse_execution_pages,
     parse_position_pages,
@@ -327,8 +328,10 @@ def collect_snapshot(
         raise CollectorError("Snapshot collection exceeded 120 seconds; capture is not coherent")
     # Execution pagination was bounded by server_time_before_ms; keep that exact end bound.
     capture_finished_ms = _utc_ms()
-    unique_executions = {item.exec_id: item for item in parsed_executions}
-    parsed_executions = list(unique_executions.values())
+    try:
+        parsed_executions = deduplicate_executions(parsed_executions)
+    except SnapshotValidationError as exc:
+        raise CollectorError(f"Execution identity validation failed: {exc}") from exc
     raw = {
         "positions": position_pages,
         "active_orders": order_pages,

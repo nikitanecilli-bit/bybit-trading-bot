@@ -134,7 +134,7 @@ class StatePersistenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "partial.json"
             path.write_text(json.dumps({
-                "risk": sample_risk_data(),
+                "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": sample_risk_data(),
                 "open_positions": {"BTCUSDT": {"symbol": "BTCUSDT"}},
                 "pending_orders": {}, "trade_seq": 0,
             }), encoding="utf-8")
@@ -149,7 +149,7 @@ class StatePersistenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "pending.json"
             path.write_text(json.dumps({
-                "risk": sample_risk_data(), "open_positions": {},
+                "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": sample_risk_data(), "open_positions": {},
                 "pending_orders": [], "trade_seq": 0,
             }), encoding="utf-8")
             cfg = engine.BotConfig()
@@ -163,7 +163,7 @@ class StatePersistenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "invalid-position.json"
             payload = {
-                "risk": sample_risk_data(),
+                "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": sample_risk_data(),
                 "open_positions": {"BTCUSDT": engine.asdict(sample_position())},
                 "pending_orders": {},
                 "trade_seq": 42,
@@ -234,7 +234,7 @@ class StatePersistenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "overlap.json"
             payload = {
-                "risk": sample_risk_data(),
+                "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": sample_risk_data(),
                 "open_positions": {"BTCUSDT": engine.asdict(sample_position())},
                 "pending_orders": {
                     "BTCUSDT": {"symbol": "BTCUSDT", "direction": "long",
@@ -259,7 +259,7 @@ class StatePersistenceTests(unittest.TestCase):
                            "stop_price": 1900.0, "tp1_price": 2120.0,
                            "tp2_price": 2240.0})
             payload = {
-                "risk": sample_risk_data(),
+                "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": sample_risk_data(),
                 "open_positions": {"BTCUSDT": first, "ETHUSDT": second},
                 "pending_orders": {},
                 "trade_seq": 42,
@@ -273,7 +273,7 @@ class StatePersistenceTests(unittest.TestCase):
 
     def _write_pending_fixture(self, path, signal):
         path.write_text(json.dumps({
-            "risk": sample_risk_data(), "open_positions": {},
+            "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": sample_risk_data(), "open_positions": {},
             "pending_orders": {"BTCUSDT": signal}, "trade_seq": 0,
         }, allow_nan=True), encoding="utf-8")
 
@@ -341,7 +341,7 @@ class StatePersistenceTests(unittest.TestCase):
             complete_risk.update(risk_payload)
             path.write_text(
                 json.dumps({
-                    "risk": complete_risk,
+                    "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": complete_risk,
                     "open_positions": {},
                     "pending_orders": {},
                     "trade_seq": 0,
@@ -377,7 +377,7 @@ class StatePersistenceTests(unittest.TestCase):
                 "max_drawdown_pct": 5.0,
             })
             path.write_text(json.dumps({
-                "risk": risk_data, "open_positions": {},
+                "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": risk_data, "open_positions": {},
                 "pending_orders": {}, "trade_seq": 0,
             }), encoding="utf-8")
             restored = engine.AdaptiveRiskManager(engine.BotConfig())
@@ -406,14 +406,37 @@ class StatePersistenceTests(unittest.TestCase):
         self._assert_invalid_risk_payload({"equity_usdt": 10000.0})
 
     def test_each_required_backup_envelope_field_is_mandatory(self):
-        for field in ("risk", "open_positions", "pending_orders", "trade_seq"):
+        for field in ("saved_at_utc", "bot_version", "risk", "open_positions", "pending_orders", "trade_seq"):
             with self.subTest(field=field), tempfile.TemporaryDirectory() as tmp:
                 path = Path(tmp) / "incomplete-envelope.json"
                 payload = {
-                    "risk": sample_risk_data(), "open_positions": {},
+                    "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": sample_risk_data(), "open_positions": {},
                     "pending_orders": {}, "trade_seq": 0,
                 }
                 payload.pop(field)
+                path.write_text(json.dumps(payload), encoding="utf-8")
+                risk = engine.AdaptiveRiskManager(engine.BotConfig())
+                before = risk.to_dict().copy()
+                with self.assertRaises(RuntimeError):
+                    engine.PlanBStatePersistence(str(path)).load_state(risk)
+                self.assertEqual(risk.to_dict(), before)
+
+    def test_backup_metadata_requires_utc_timestamp_and_version(self):
+        invalid_metadata = (
+            {"saved_at_utc": "not-a-date", "bot_version": "test"},
+            {"saved_at_utc": "2026-11-02T00:00:00", "bot_version": "test"},
+            {"saved_at_utc": "2026-11-02T03:00:00+03:00", "bot_version": "test"},
+            {"saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": ""},
+        )
+        for metadata in invalid_metadata:
+            with self.subTest(metadata=metadata), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "metadata.json"
+                payload = {
+                    "saved_at_utc": metadata["saved_at_utc"],
+                    "bot_version": metadata["bot_version"],
+                    "risk": sample_risk_data(), "open_positions": {},
+                    "pending_orders": {}, "trade_seq": 0,
+                }
                 path.write_text(json.dumps(payload), encoding="utf-8")
                 risk = engine.AdaptiveRiskManager(engine.BotConfig())
                 before = risk.to_dict().copy()
@@ -427,7 +450,7 @@ class StatePersistenceTests(unittest.TestCase):
             risk_data = sample_risk_data()
             risk_data.pop("kill_switch_triggered")
             path.write_text(json.dumps({
-                "risk": risk_data, "open_positions": {},
+                "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": risk_data, "open_positions": {},
                 "pending_orders": {}, "trade_seq": 0,
             }), encoding="utf-8")
             risk = engine.AdaptiveRiskManager(engine.BotConfig())
@@ -440,7 +463,7 @@ class StatePersistenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "sequence.json"
             path.write_text(json.dumps({
-                "risk": sample_risk_data(), "open_positions": {},
+                "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": sample_risk_data(), "open_positions": {},
                 "pending_orders": {}, "trade_seq": -1,
             }), encoding="utf-8")
             risk = engine.AdaptiveRiskManager(engine.BotConfig())
@@ -453,7 +476,7 @@ class StatePersistenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "invalid.json"
             path.write_text(json.dumps({
-                "risk": sample_risk_data(),
+                "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": sample_risk_data(),
                 "open_positions": {"BTCUSDT": {"symbol": "BTCUSDT"}},
                 "pending_orders": {}, "trade_seq": 0,
             }), encoding="utf-8")

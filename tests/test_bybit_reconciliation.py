@@ -97,12 +97,34 @@ class BybitReconciliationParserTests(unittest.TestCase):
             "side": "Buy", "qty": "10", "leavesQty": "4", "cumExecQty": "6",
             "orderStatus": "PartiallyFilled", "createdTime": "1800000000000",
             "updatedTime": "1800000000100", "positionIdx": 1,
+            "orderType": "Market", "stopOrderType": "StopLoss",
+            "triggerPrice": "62000", "takeProfit": "70000", "stopLoss": "62000",
+            "tpslMode": "Full", "tpTriggerBy": "MarkPrice",
+            "slTriggerBy": "MarkPrice", "reduceOnly": True,
+            "closeOnTrigger": True, "parentOrderLinkId": "parent-1",
         }
         orders = parse_active_order_pages([("", page([order]))])
         self.assertEqual(len(orders), 1)
         self.assertEqual(orders[0].leaves_qty, Decimal("4"))
         self.assertEqual(orders[0].cum_exec_qty, Decimal("6"))
         self.assertEqual(orders[0].position_idx, 1)
+        self.assertEqual(orders[0].stop_order_type, "StopLoss")
+        self.assertEqual(orders[0].trigger_price, Decimal("62000"))
+        self.assertEqual(orders[0].take_profit, Decimal("70000"))
+        self.assertEqual(orders[0].stop_loss, Decimal("62000"))
+        self.assertTrue(orders[0].reduce_only)
+        self.assertTrue(orders[0].close_on_trigger)
+        self.assertEqual(orders[0].parent_order_link_id, "parent-1")
+
+    def test_conditional_order_boolean_fields_are_strict(self):
+        order = {
+            "orderId": "order-1", "symbol": "BTCUSDT", "side": "Sell",
+            "qty": "1", "leavesQty": "1", "cumExecQty": "0",
+            "orderStatus": "Untriggered", "createdTime": "1800000000000",
+            "updatedTime": "1800000000100", "reduceOnly": "true",
+        }
+        with self.assertRaisesRegex(SnapshotValidationError, "order.reduceOnly must be a boolean"):
+            parse_active_order_pages([("", page([order]))])
 
     def test_active_order_inconsistent_quantities_are_rejected(self):
         order = {

@@ -283,3 +283,7 @@ No production/live changes and no market backtests were performed in these corre
 
 
 - **ENG-STATE-014 accepted:** TP1-hit state requires a positive event timestamp no earlier than entry; untouched TP1 must not carry a TP1 timestamp. Persistence tests 43/43; CI #41445386482 passed.
+
+
+- **ENG-STATE-015 accepted:** restored pending signals now require a valid signal-candle timestamp and can fill only on the immediately following configured-timeframe candle. Stale/gapped signals are discarded, not delayed. Persistence tests 48/48; gap-execution/time-model suites and CI #41446661723 passed.
+- Next temporal integrity check: ensure restored event timestamps (entry, TP1, pending signal) cannot lie after the backup's own `saved_at_utc`. Keep freshness/age policy separate from this internal chronology check.

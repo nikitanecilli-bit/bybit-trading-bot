@@ -112,6 +112,11 @@ class ReconciliationCollectorTests(unittest.TestCase):
             collect_snapshot("key", "secret", SAVED, base_url="http://example.test",
                              request_json=FakeTransport())
 
+    def test_rejects_non_utc_offset_even_when_timezone_is_explicit(self):
+        with self.assertRaisesRegex(ValueError, "expressed in UTC"):
+            collect_snapshot("key", "secret", "2026-10-01T03:00:00+03:00",
+                             request_json=FakeTransport())
+
     def test_rejects_backup_timestamp_in_future_of_exchange(self):
         with self.assertRaisesRegex(CollectorError, "not earlier than Bybit server time"):
             collect_snapshot("key", "secret", "2099-01-01T00:00:00Z",

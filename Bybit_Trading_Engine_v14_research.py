@@ -1382,6 +1382,13 @@ class UnifiedQuantEngine:
 
         if symbol in self.pending:
             if self._try_fill_pending(symbol, curr):
+                # The mark above was computed before this position existed. Re-mark
+                # the new position at its conservative adverse fill-bar price so
+                # portfolio daily-stop / kill-switch logic sees its entry-bar risk.
+                self._intrabar_risk_marks[symbol] = self._risk_mark_for_position(
+                    self.open_positions[symbol], curr
+                )
+                self._update_mark_to_market(bar_close_ts)
                 self._manage_position(symbol, candles_history, fill_bar=True, exit_ts=bar_close_ts)
                 return
             # A multi-bar execution policy may retain an unfilled order in

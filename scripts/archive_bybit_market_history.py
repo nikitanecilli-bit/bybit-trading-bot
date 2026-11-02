@@ -31,6 +31,7 @@ ALLOWED_API_HOSTS = {
     "api.bybit.nl", "api.bybit-tr.com",
 }
 FUNDING_ENDPOINT = "/v5/market/funding/history"
+KLINE_ENDPOINT = "/v5/market/kline"
 MARK_ENDPOINT = "/v5/market/mark-price-kline"
 FUNDING_WINDOW_MS = 5 * 24 * 60 * 60 * 1000
 FUNDING_LIMIT = 200
@@ -147,6 +148,81 @@ def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
     return [events[ts] for ts in sorted(events)]
 
 
+def parse_trade_rows(rows: Any, symbol: str, interval_ms: int) -> list[dict[str, Any]]:
+    if not isinstance(rows, list):
+        raise ValueError("trade kline list must be an array")
+    parsed = []
+    for raw in rows:
+        if not isinstance(raw, (list, tuple)) or len(raw) < 7:
+            raise ValueError("trade kline row must contain timestamp, OHLC, volume and turnover")
+        try:
+            ts = int(raw[0])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("invalid trade kline timestamp") from exc
+        o, h, low, c = [_decimal(raw[i], "trade OHLC", positive=True) for i in range(1, 5)]
+        volume = _decimal(raw[5], "trade volume")
+        turnover = _decimal(raw[6], "trade turnover")
+        if ts <= 0 or ts % interval_ms != 0:
+            raise ValueError("trade kline timestamp is not interval-aligned")
+        if volume < 0 or turnover < 0:
+            raise ValueError("trade kline volume and turnover must be non-negative")
+        if h < max(o, low, c) or low > min(o, h, c):
+            raise ValueError("invalid trade OHLC ordering")
+        parsed.append({
+            "symbol": symbol, "timestamp_ms": ts,
+            "open": str(o), "high": str(h), "low": str(low), "close": str(c),
+            "volume": str(volume), "turnover": str(turnover),
+        })
+    return parsed
+
+
+def fetch_trade_klines(symbol: str, start_ms: int, end_ms: int, interval: str = "60",
+                       fetch_page: Callable[[int, int, int], list[Any]] | None = None,
+                       base_url: str = DEFAULT_BASE_URL, pause: float = 0.1
+                       ) -> list[dict[str, Any]]:
+    symbol = normalize_symbol(symbol)
+    if interval not in INTERVALS or start_ms <= 0 or end_ms <= start_ms or pause < 0:
+        raise ValueError("valid symbol, interval, range and non-negative pause are required")
+    interval_ms = int(interval) * 60_000
+    if start_ms % interval_ms or end_ms % interval_ms:
+        raise ValueError("trade kline range boundaries must align to the selected interval")
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    last_closed_boundary = (now_ms // interval_ms) * interval_ms
+    if end_ms > last_closed_boundary:
+        raise ValueError("trade kline range end includes an unclosed candle or future interval")
+    if fetch_page is None:
+        fetch_page = lambda start, end, limit: _request_json(
+            base_url, KLINE_ENDPOINT,
+            {"category": "linear", "symbol": symbol, "interval": interval,
+             "start": start, "end": end, "limit": limit},
+        ).get("list")
+    candles: dict[int, dict[str, Any]] = {}
+    cursor = start_ms
+    chunk_ms = (MARK_LIMIT - 1) * interval_ms
+    while cursor < end_ms:
+        chunk_end = min(cursor + chunk_ms, end_ms)
+        page = parse_trade_rows(fetch_page(cursor, chunk_end - 1, MARK_LIMIT), symbol, interval_ms)
+        if pause and chunk_end < end_ms:
+            time.sleep(pause)
+        if len(page) >= MARK_LIMIT:
+            raise RuntimeError("trade kline chunk reached API page limit; reduce chunk size")
+        for row in page:
+            ts = row["timestamp_ms"]
+            if not (cursor <= ts < chunk_end):
+                raise ValueError("trade candle outside requested chunk")
+            if ts in candles and candles[ts] != row:
+                raise ValueError(f"conflicting duplicate trade candle: {ts}")
+            candles[ts] = row
+        cursor = chunk_end
+    expected = range(start_ms, end_ms, interval_ms)
+    missing = [ts for ts in expected if ts not in candles]
+    if missing:
+        raise RuntimeError(
+            f"incomplete trade kline coverage: {len(missing)} missing; first={missing[:5]}"
+        )
+    return [candles[ts] for ts in sorted(candles)]
+
+
 def parse_mark_rows(rows: Any, symbol: str, interval_ms: int) -> list[dict[str, Any]]:
     if not isinstance(rows, list):
         raise ValueError("mark kline list must be an array")
@@ -246,16 +322,19 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
     if pause < 0:
         raise ValueError("pause cannot be negative")
     funding = fetch_funding_history(symbol, start_ms, end_ms, base_url=base_url, pause=pause)
+    klines = fetch_trade_klines(symbol, start_ms, end_ms, interval, base_url=base_url, pause=pause)
     marks = fetch_mark_klines(symbol, start_ms, end_ms, interval, base_url=base_url, pause=pause)
     root = Path(output_root)
     funding_path = root / "funding" / f"{symbol.upper()}.csv"
+    kline_path = root / "kline" / f"{symbol.upper()}.csv"
     mark_path = root / "mark_price" / f"{symbol.upper()}.csv"
     _atomic_csv(funding_path, ["symbol", "funding_timestamp_ms", "funding_rate"], funding)
+    _atomic_csv(kline_path, ["symbol", "timestamp_ms", "open", "high", "low", "close", "volume", "turnover"], klines)
     _atomic_csv(mark_path, ["symbol", "timestamp_ms", "open", "high", "low", "close"], marks)
     return {
-        "symbol": symbol.upper(), "funding_events": len(funding), "mark_candles": len(marks),
+        "symbol": symbol.upper(), "funding_events": len(funding), "trade_candles": len(klines), "mark_candles": len(marks),
         "start_ms": start_ms, "end_exclusive_ms": end_ms,
-        "funding_file": str(funding_path), "mark_file": str(mark_path),
+        "funding_file": str(funding_path), "trade_kline_file": str(kline_path), "mark_file": str(mark_path),
     }
 
 

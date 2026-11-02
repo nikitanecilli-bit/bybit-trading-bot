@@ -1,6 +1,6 @@
 # ENG-RISK-001 — mark-to-market immediately after a new position fills
 
-Статус: PREREGISTERED — pending regression test and CI.
+Статус: ACCEPT — confirmed defect fixed; regression tests and technical CI passed.
 Дата: 2026-11-02.
 Тип: deterministic portfolio-risk accounting regression; не рыночный эксперимент.
 
@@ -45,5 +45,12 @@
 
 ## Решение
 
-Pending. Критерии записаны до изменения кода и до regression run.
-Рыночные backtests запрещены для этого engineering task.
+Решение: ACCEPT для исследовательского движка.
+
+- Regression tests were committed first: `bf0b556f7cb0b88620c62af22634b6d95612dfc9`.
+- The test-only CI run [#41475914811](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41475914811) failed exactly at the new long fill-bar test: observed only the pre-fill MTM call `[(0, bar_close_ts)]`; the test expected a second adverse mark `-100`.
+- Fix commit: `f65c08bec78b179a9a89832ce31b574740f4dce3` updates the adverse mark after a successful fill and calls MTM again before position management.
+- Passing CI: [#41475941543](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41475941543), SUCCESS. Compile, secret scan, all 27 gap-execution tests, 38 time-model tests, portfolio risk tests and 54 persistence tests passed; all other workflow steps completed successfully.
+- Both long and short fill-bar regression tests passed and confirm the kill-switch sees the adverse entry-bar excursion at the same bar-close timestamp.
+
+Рыночные backtests запрещены для этого engineering task. ACCEPT означает исправление риск-учёта в исследовательском движке, не доказательство доходности стратегии и не live/production approval.

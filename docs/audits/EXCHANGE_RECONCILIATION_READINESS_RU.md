@@ -77,7 +77,7 @@
 
 ## Реализация первого слоя
 
-- **ENG-RECON-002 ACCEPT:** `bybit_reconciliation.py` добавлен как pure parser для paginated V5 positions, active orders и executions. 12/12 fixture tests passed; CI #41448536690 SUCCESS.
-- Парсер не делает HTTP calls, не использует ключи и не отправляет ордера. Он проверяет только переданные ему страницы; он не доказывает, что вызывающий код получил все страницы.
+- **ENG-RECON-002 ACCEPT:** `bybit_reconciliation.py` добавлен как pure parser для paginated V5 positions, active orders и executions. 13/13 fixture tests passed; CI #41448898597 SUCCESS.
+- Парсер не делает HTTP calls, не использует ключи и не отправляет ордера. Он проверяет только переданные ему страницы, требует integer retCode=0 и непрерывную цепочку cursor; он не доказывает, что вызывающий код получил все страницы.
 - Следующий слой: read-only collector with cursor loop + server-time coherence, затем report-only comparator.
 - Общий статус по-прежнему `UNSUPPORTED_LOCAL_MODEL / BLOCKED`: exact local qty, `positionIdx`, order IDs/link IDs и execution ledger отсутствуют.

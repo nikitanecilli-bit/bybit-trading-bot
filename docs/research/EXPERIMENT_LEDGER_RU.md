@@ -333,3 +333,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41433992368](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41433992368), SUCCESS; compile, all configured deterministic suites and secret scan passed.
 - Decision: ACCEPT as a local backup validation correction. No market backtest, parameter sweep, production deployment or live order.
 - Limitation: local pending signal state is not an exchange order; no reconciliation with Bybit active orders is implemented.
+
+
+## ENG-STATE-007 — restored open-position schema (2026-11-02)
+
+- Preregistered card: [ENG-STATE-007](experiment_cards/ENG-STATE-007_POSITION_SCHEMA_RU.md).
+- Confirmed defect: dataclass annotations do not enforce runtime types/invariants; loader silently filtered unknown fields. Malformed position prices/sizes/direction could survive restore and fail later in PnL/position management.
+- Fix: require core position fields; reject unknown fields; validate symbol/trade/strategy, direction/order type, positive integer timestamp, finite positive price/distance/size/risk, bounded remaining fraction, optional numeric/boolean/timestamp/bar fields; preserve defaults for omitted optional dataclass fields.
+- Tests: `tests/test_state_persistence.py` 18/18, including unknown field, invalid direction, NaN entry price and negative notional; existing valid position round-trip passes and failed restore leaves risk manager unchanged.
+- Commits: engine `3a5fc1bdb6df645f9dc010f2f8abefaac918b82d`; tests `c76ad2ed897bc05b7e59be5deff66ba74418aa9c`.
+- CI: [Research engine checks #41434308834](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41434308834), SUCCESS; compile, all configured deterministic suites and secret scan passed.
+- Decision: ACCEPT as local restore validation. No market backtest, parameter sweep, production deployment or live order.
+- Limitation: no Bybit position/order reconciliation, backup freshness/schema migration or fsync durability.

@@ -713,7 +713,7 @@ def test_equity_reconciles_journal_and_remaining_open_positions_after_each_close
     e.tg = type("Notifier", (), {"send_message": lambda self, message: None})()
     e._persist = lambda: None
 
-    # Both open positions have -50 gross and -1.55 estimated execution costs.
+    # Both open positions have -50 gross; exit costs use each stop's executed notional.
     e.risk_mgr.mark_to_market(e._unrealized_pnl_at_marks(), ts)
     assert e.risk_mgr.unrealized_pnl == -103.10
     assert e.risk_mgr.current_equity == 9_896.90
@@ -723,12 +723,12 @@ def test_equity_reconciles_journal_and_remaining_open_positions_after_each_close
         e, btc, 95.0, "stop_loss", ts, mae_r=0.5, mfe_r=0.0,
     )
     journal_net = round(sum(r.pnl_usdt for r in e.closed_trades), 2)
-    assert journal_net == -51.55
-    assert e.risk_mgr.realized_equity == 9_948.45
-    assert e.risk_mgr.unrealized_pnl == -51.55
-    assert e.risk_mgr.current_equity == 9_896.90
+    assert journal_net == -51.51
+    assert e.risk_mgr.realized_equity == 9_948.49
+    assert e.risk_mgr.unrealized_pnl == -51.58875
+    assert e.risk_mgr.current_equity == round(9_948.49 - 51.58875, 4)
     assert e.risk_mgr.current_equity == round(
-        cfg.capital_usdt + journal_net + e.risk_mgr.unrealized_pnl, 2,
+        cfg.capital_usdt + journal_net + e.risk_mgr.unrealized_pnl, 4,
     )
 
     eth = e.open_positions["ETHUSDT"]

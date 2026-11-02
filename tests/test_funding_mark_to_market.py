@@ -33,6 +33,7 @@ def make_engine(funding=True):
     engine._intrabar_risk_marks = {"BTCUSDT": 100.0}
     engine._last_mark_prices = {"BTCUSDT": 100.0}
     engine._intrabar_risk_marks_ts = 2_000
+    engine._persist = lambda: None
     return engine
 
 

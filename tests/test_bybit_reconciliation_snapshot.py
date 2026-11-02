@@ -70,7 +70,7 @@ class ReconciliationCollectorTests(unittest.TestCase):
     def test_non_read_only_key_stops_before_account_calls(self):
         fake = FakeTransport(readonly=0)
         with self.assertRaisesRegex(CollectorError, "not explicitly read-only"):
-            collect_snapshot("key", "secret", SAVED, request_json=fake, now_ms=NOW)
+            collect_snapshot("key", "secret", SAVED, request_json=fake)
         self.assertEqual([call[0] for call in fake.calls], ["/v5/user/query-api"])
 
     def test_boolean_retcode_is_rejected(self):
@@ -80,7 +80,7 @@ class ReconciliationCollectorTests(unittest.TestCase):
                 return {"retCode": False, "result": {"apiKey": "key", "readOnly": 1}}
             raise AssertionError("account endpoint must not be called")
         with self.assertRaisesRegex(CollectorError, "integer zero"):
-            collect_snapshot("key", "secret", SAVED, request_json=transport, now_ms=NOW)
+            collect_snapshot("key", "secret", SAVED, request_json=transport)
 
     def test_api_error_is_not_treated_as_empty_account(self):
         fake = FakeTransport(fail_endpoint="/v5/position/list")
@@ -90,7 +90,7 @@ class ReconciliationCollectorTests(unittest.TestCase):
     def test_rejects_http_non_tls_base_url(self):
         with self.assertRaisesRegex(ValueError, "HTTPS"):
             collect_snapshot("key", "secret", SAVED, base_url="http://example.test",
-                             request_json=FakeTransport(), now_ms=NOW)
+                             request_json=FakeTransport())
 
     def test_rejects_capture_time_before_backup(self):
         with self.assertRaisesRegex(CollectorError, "not earlier"):

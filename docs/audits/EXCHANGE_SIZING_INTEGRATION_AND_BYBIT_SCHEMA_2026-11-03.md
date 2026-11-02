@@ -91,3 +91,24 @@ This changes the next action: first inspect the next scheduled/manual workflow r
 ## 7. Исправлено расписание instrument snapshots
 
 Официальная документация предупреждает, что `maxLimitOrderQty`, `maxMarketOrderQty` и `postOnlyMaxLimitOrderSize` пересматриваются 3-го и 17-го числа месяца. Исходный weekly Monday cron мог не снять snapshot непосредственно после этих изменений. Расписание `.github/workflows/bybit-instrument-snapshots.yml` изменено на 3-е и 17-е число в 02:17 UTC (10:17 UTC+8), после указанного Bybit времени обновления 08:00 UTC+8. Workflow dispatch сохранён. Это только изменение расписания; API workflow не запускался и snapshot не получен.
+
+## 8. Дополнительные fail-closed дефекты InstrumentSpec закрыты
+
+При повторной проверке обнаружены ещё три ограничения текущего sizing helper:
+
+1. Parser не читал `priceFilter.minPrice/maxPrice`, хотя Linear V5 их публикует. Лимитная цена могла быть tick-aligned, но находиться за биржевым диапазоном.
+2. Parser принимал явно указанный category, отличный от `linear`, хотя helper рассчитывает USDT linear notional как qty × price. Это могло ошибочно применить linear semantics к другому контрактному типу.
+3. `validate_order()` не блокировал инструменты со статусом `PendingOpen`/unknown; V5 возвращает PendingOpen в общем наборе, но размещать ордер до Trading нельзя.
+
+Минимальное fail-closed исправление внесено в `bybit_instrument_specs.py`:
+- явно отвергать category != linear;
+- парсить обязательные `minPrice/maxPrice`, проверять диапазон и tick-rounded limit price;
+- отклонять sizing при `status != Trading`.
+
+Регрессионные тесты добавлены в `tests/test_bybit_instrument_specs.py` и `tests/test_exchange_order_sizing.py`. GitHub Actions Research engine checks #631 (parser) и #632 (tests) были запущены автоматически на push и на момент фиксации аудита находились `in_progress`; итог пока не заявляется. Предыдущий run #630 завершился success и включал базовые тесты parser/sizing, но не новые регрессии.
+
+Это исправление локально закрывает ограничения helper; оно не меняет подтверждённый integration gap с основным engine и не превращает notional proxy backtest в contract-accurate replay.
+
+## 9. Доказательство недоступности Bybit API из GitHub Actions
+
+Получены jobs и decoded logs для существующих запусков instrument snapshot workflow #7–#10. Во всех попытках API hosts возвращали HTTP 403; затем workflow завершался exit code 1, snapshot commit step пропускался. В логах также есть отказ host validation для одного из fallback hosts. Это подтверждает сетевую/API access проблему на runner, а не отсутствие endpoint или ошибку JSON schema. Не предпринимать обход географических/сетевых ограничений; получать официальный snapshot из разрешённой пользователем среды или ждать исправления доступности.

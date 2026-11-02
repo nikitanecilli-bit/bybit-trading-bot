@@ -72,5 +72,34 @@ class AccruedFundingTests(unittest.TestCase):
                          Decimal("10.00"))
 
 
+    def test_tp1_boundary_funding_receipts_use_remaining_quantity(self):
+        pos_long = position("long", tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
+        pos_short = position("short", tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
+        negative_rate = [{"ts": SETTLE_1, "rate": "-0.01"}]
+        positive_rate = [{"ts": SETTLE_1, "rate": "0.01"}]
+        self.assertEqual(
+            accrued_funding_cost(pos_long, negative_rate, MARKS, SETTLE_1),
+            Decimal("-5.00"),
+        )
+        self.assertEqual(
+            accrued_funding_cost(pos_short, positive_rate, MARKS, SETTLE_1),
+            Decimal("-5.00"),
+        )
+
+    def test_tp1_boundary_funding_payments_keep_full_quantity(self):
+        pos_long = position("long", tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
+        pos_short = position("short", tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
+        positive_rate = [{"ts": SETTLE_1, "rate": "0.01"}]
+        negative_rate = [{"ts": SETTLE_1, "rate": "-0.01"}]
+        self.assertEqual(
+            accrued_funding_cost(pos_long, positive_rate, MARKS, SETTLE_1),
+            Decimal("10.00"),
+        )
+        self.assertEqual(
+            accrued_funding_cost(pos_short, negative_rate, MARKS, SETTLE_1),
+            Decimal("10.00"),
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

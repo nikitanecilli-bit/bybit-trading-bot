@@ -183,6 +183,36 @@ class ReportOnlyComparatorTests(unittest.TestCase):
         with self.assertRaisesRegex(ReportError, "coverage limitation metadata"):
             build_report(backup(), data)
 
+    def test_conflicting_exec_id_across_intervals_rejects_report(self):
+        execution = {
+            "execId": "exec-boundary", "orderId": "order-1", "orderLinkId": "",
+            "symbol": "BTCUSDT", "execType": "Trade", "execTime": CAPTURE_MS,
+            "side": "Buy", "execQty": "0.1", "execPrice": "50000", "execFee": "0.1",
+        }
+        data = snapshot(execution_rows=[execution])
+        midpoint = SAVED_MS + (CAPTURE_MS - SAVED_MS) // 2
+        first = data["raw"]["executions"][0]
+        first["interval_end_ms"] = midpoint
+        second = copy.deepcopy(first)
+        second["interval_start_ms"] = midpoint
+        second["interval_end_ms"] = CAPTURE_MS
+        second["response"]["result"]["list"][0]["execFee"] = "0.2"
+        data["raw"]["executions"].append(second)
+        first_history = data["raw"]["order_history"][0]
+        first_history["interval_end_ms"] = midpoint
+        second_history = copy.deepcopy(first_history)
+        second_history["interval_start_ms"] = midpoint
+        second_history["interval_end_ms"] = CAPTURE_MS
+        data["raw"]["order_history"].append(second_history)
+        data["counts"]["execution_pages"] = 2
+        data["counts"]["order_history_pages"] = 2
+        data["raw_sha256"] = hashlib.sha256(json.dumps(
+            data["raw"], ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"), allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        with self.assertRaisesRegex(ReportError, "conflicting duplicate execution identity"):
+            build_report(backup(), data)
+
     def test_execution_without_local_ledger_blocks(self):
         execution = {
             "execId": "exec-1", "orderId": "order-1", "orderLinkId": "",

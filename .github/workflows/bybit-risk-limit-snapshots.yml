@@ -31,17 +31,11 @@ jobs:
         with:
           python-version: "3.11"
       - name: Download dated linear risk-limit tiers
+        env:
+          BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}
         run: |
-          SUCCESS=0
-          for BASE_URL in https://api.bybit.com https://api.bytick.com https://api.bybit.kz https://api.bybit.tr https://api.bybitgeorgia.ge https://api.bybit.ae https://api.bybit.id; do
-            echo "Trying official Bybit public API endpoint: $BASE_URL"
-            if python scripts/snapshot_bybit_risk_limits.py --category linear --base-url "$BASE_URL"; then
-              SUCCESS=1
-              break
-            fi
-            echo "Endpoint failed; trying next supported official host."
-          done
-          test "$SUCCESS" -eq 1
+          echo "Using configured official Bybit API base URL: $BYBIT_API_BASE_URL"
+          python scripts/snapshot_bybit_risk_limits.py --category linear --base-url "$BYBIT_API_BASE_URL"
       - name: Commit snapshot if changed
         run: |
           if [[ -n "$(git status --porcelain data/instrument_specs/risk_limits)" ]]; then

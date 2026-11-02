@@ -272,3 +272,13 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - The successful job log confirms explicit execution counts: gap execution 27/27; time model 38/38; timeframe validation 5/5; portfolio accounting 16/16; state persistence 54 tests. Other unittest and explicit-runner steps completed successfully.
 - The previous missing-card 404 was resolved by creating the ENG-FUND-003 card at the path linked above.
 - Scope: accounting and CI reliability only. No market backtest, parameter optimization, private API request or live order. Do not infer profitability from this CI.
+
+
+## ENG-PERSIST-001 — MTM risk-stop persistence (2026-11-02, 18:55 UTC)
+
+- Confirmed: MTM can latch daily-stop / kill-switch without a trade close, while the previous `_update_mark_to_market()` did not persist the risk state. A crash before another persistence event could restore a stale backup and lose the protective latch.
+- Test-first CI [#41504537789](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41504537789) failed at the new daily-stop persistence assertion, as expected.
+- Fix: persist immediately only when MTM reports a new daily-stop or kill-switch transition; no per-candle fsync was introduced.
+- Initial post-fix CI exposed an incomplete test fixture (`__new__` engine without persistence stub) in `test_funding_mark_to_market.py`; fixture was corrected.
+- Full Research CI [#41504995009](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41504995009) completed SUCCESS; portfolio accounting and fail-closed state persistence steps passed.
+- Card and experiment ledger updated. No market backtest, optimization, private API request or live order.

@@ -16,7 +16,7 @@ No HTTP client, credentials, private API call, order mutation or engine restore 
 
 ## Tests
 
-`tests/test_bybit_reconciliation.py`: 14/14:
+`tests/test_bybit_reconciliation.py`: 16/16:
 - complete multi-page positions and hedge-side identities;
 - empty zero-size position rows;
 - duplicate position/order/execution identities;

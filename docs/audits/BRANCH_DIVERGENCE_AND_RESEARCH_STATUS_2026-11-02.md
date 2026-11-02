@@ -291,3 +291,12 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - Compare against that `main` ref: diverged, 759 commits ahead / 14 behind; 167 changed files, +15,198 / -110. GitHub reports merge state dirty.
 - PR #4 remains open, Draft, unmerged. Its description now records ENG-FUND-002/003, ENG-PERSIST-001 and current CI status.
 - Latest full successful Research CI: [#41504995009](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41504995009), commit `cc012f0b4df52fb5da0270e08b0a9438bb70762c`. The production fix is `b547cf91139467442a5eabfbaa3df70bd77f95d5`; later commits in this snapshot are test-fixture, workflow-comment or documentation/PR metadata changes.
+
+
+## ENG-PERSIST-002 — TP1 MTM sync and open-position checkpointing (2026-11-02, 19:08 UTC)
+
+- Confirmed defect: `_manage_position()` could apply TP1 after the candle's MTM calculation, leaving `risk_mgr.unrealized_pnl/current_equity` based on pre-TP1 state while the position already held post-TP1 realized/remaining fractions. It also updated per-candle position lifecycle fields (bars held, MFE/MAE, trailing stop) without persisting the surviving position.
+- Test-first [#41506138601](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41506138601) failed at the explicit post-TP1 MTM equality assertion.
+- Fix [commit `7734feca`](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/7734fecaee62d84dd40039c36e2b0fede0386387): recalculate MTM after surviving TP1 transition; persist each still-open position after candle management. Kill-switch remains checked after refreshed MTM; exits persist through `_close_position()`.
+- Full Research CI [#41506990147](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41506990147) SUCCESS. Confirmed 21/21 portfolio accounting tests, including TP1 MTM sync, per-candle position checkpoint, and same-bar TP1 on one symbol + stop on another independent of symbol iteration order.
+- ENG-PERSIST-002 card and experiment ledger updated. No market backtest, parameter search, private API request or live order.

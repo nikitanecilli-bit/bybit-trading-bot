@@ -30,10 +30,10 @@ class MultiBarLimitWaitTests(unittest.TestCase):
 
     def test_original_signal_timestamp_is_preserved(self):
         signal = {"signal_ts": 1_000, "direction": "long"}
-        origin = prepare_signal_for_next_bar_fill(signal, 10_000, 3_600_000)
+        origin = prepare_signal_for_next_bar_fill(signal, 3_602_000, 3_600_000)
         self.assertEqual(origin, 1_000)
         self.assertEqual(signal["signal_origin_ts"], 1_000)
-        self.assertEqual(signal["signal_ts"], -3_590_000)
+        self.assertEqual(signal["signal_ts"], 2_000)
 
 
 if __name__ == "__main__":

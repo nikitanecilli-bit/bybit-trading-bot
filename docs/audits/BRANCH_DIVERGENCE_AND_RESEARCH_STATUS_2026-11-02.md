@@ -252,3 +252,12 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - Follow-up CI [#41501468001](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41501468001) completed SUCCESS. All steps passed, including funding boundary, realized funding, MTM funding, preflight, private API mock checks, reconciliation, regime, execution, time, portfolio accounting, persistence and secret scan.
 - Research HEAD at this audit update: `06c1803f2232ad8fd970f2ff61607741d022d39a`; 726 ahead / 13 behind main. PR #4 remains draft/open/unmerged and dirty; 164 files, +17,690 / -116. Main is unchanged.
 - No market backtest, optimization, live order or private API request.
+
+
+## ENG-FUND-002 — full-close funding boundary
+
+- Confirmed that TP1+TP2 on one candle, or a stop exit without TP1, can fully close a position at the same timestamp as funding settlement.
+- Test-first CI #41502110789 failed the four new close-boundary cases because the funding helper had no final-close timestamp.
+- Added `closed_ts_ms`; final close boundary charges payments on full initial size and credits zero receipts. `_close_position()` passes `exit_ts`.
+- Engine-level trade ledger tests cover both receipt and payment. Full CI [#41502251992](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41502251992) passed.
+- ENG-FUND-003 separately addresses pre-exit MTM, which runs before candle exit resolution.

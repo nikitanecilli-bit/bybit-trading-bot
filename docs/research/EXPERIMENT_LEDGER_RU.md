@@ -696,3 +696,17 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Это исправление отчётной метрики, не стратегии и не доказательство прибыльности.
 
 - Follow-up проверка расширила same-bar stop permutation tests сравнением `risk_mgr.max_drawdown_pct`; порядок обхода BTC/ETH не меняет MTM drawdown в тестируемых сценариях. CI [#41513430881](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41513430881) SUCCESS; portfolio 24/24, persistence 60.
+
+
+## ENG-METRIC-002 — fail-closed finalization requires marks for every open position (2026-11-02)
+
+- Test-first reproduction: [Research CI #41515565933](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41515565933) failed in `test_finalize_rejects_missing_open_position_marks`. `finalize_open_positions()` accepted a marks map that omitted BTCUSDT and silently fell back to that position's entry price, creating a synthetic zero-price-move exit instead of rejecting incomplete input.
+- Fix commit: `cc756497d6375c9ba08805699bacebafb82e752d`. Before MTM or closing any position, finalization now checks that every currently open symbol is present in `marks`; missing symbols raise a ValueError listing the symbols.
+- Full Research CI [#41515639337](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41515639337), SUCCESS. Portfolio accounting suite 25/25; the new fail-closed regression passed. Gap 27/27, time model 38/38, timeframe validation 5/5 and persistence suite passed.
+- Scope: protects incomplete caller input. The standard `run_simulation_pass()` caller already builds final marks from its selected symbol set; this does not by itself establish a historical PnL change. No market backtest, data modification, private API request or live order.
+
+## Rejected hypothesis — same-bar newly tightened trailing stop (2026-11-02)
+
+- Reviewed `_manage_position()` behavior after TP1 when the same OHLC candle also crosses the newly calculated trailing stop.
+- Initially considered this a missed stop, but existing regression `test_new_trailing_stop_is_not_applied_retroactively_to_same_candle` explicitly encodes the policy: a stop calculated from the current candle's favorable high/low becomes active on the next candle only. OHLC cannot establish whether the favorable extreme preceded the adverse extreme.
+- No code change warranted. The temporary test proposal was discarded; do not classify this behavior as a confirmed defect without changing the strategy's documented intrabar policy.

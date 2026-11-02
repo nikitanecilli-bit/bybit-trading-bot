@@ -30,6 +30,23 @@ from bybit_reconciliation import (
 )
 
 DEFAULT_BASE_URL = "https://api.bybit.kz"
+ALLOWED_API_HOSTS = {
+    "api.bybit.com", "api.bybit.kz", "api.bytick.com", "api.bybit.eu",
+    "api.bybit.nl", "api.bybit-tr.com", "api.bybitgeorgia.ge",
+}
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _validate_base_url(base_url: str) -> None:
+    parsed = urllib.parse.urlsplit(base_url)
+    if (parsed.scheme != "https" or parsed.hostname not in ALLOWED_API_HOSTS
+            or parsed.username or parsed.password or parsed.port not in (None, 443)
+            or parsed.path not in ("", "/") or parsed.query or parsed.fragment):
+        raise ValueError("base URL must be an official HTTPS Bybit API host")
 RECV_WINDOW = "5000"
 MAX_EXECUTION_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 TIMEOUT_SECONDS = 20

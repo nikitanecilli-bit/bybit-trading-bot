@@ -1,6 +1,6 @@
 # ENG-PERSIST-003 — restore last known marks for open positions
 
-Статус: PREREGISTERED — test-first reproduction pending.
+Статус: ACCEPT — pre-fix CI reproduction and full post-fix Research CI passed.
 Дата: 2026-11-02.
 Тип: recovery integrity / portfolio risk accounting.
 
@@ -25,3 +25,12 @@ A restored position last marked materially away from entry is restored without i
 Persist a validated `last_mark_prices` mapping for every open position. Restore it into the engine's `_last_mark_prices`; do not treat entry price as a valid substitute for a missing mark in an open-position recovery snapshot. Keep pending-only/cold-start backups valid.
 
 No market backtest, parameter optimization, private API request or live order. No profitability claim.
+
+
+## Реализация и доказательства
+
+- Test-first CI [#41509292651](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509292651) was run against the pre-fix engine source. The state-persistence step failed with six `TypeError: PlanBStatePersistence.save_state() got an unexpected keyword argument 'last_mark_prices'` errors, demonstrating that the old recovery contract had no persisted-mark support.
+- Fix commit: `496cafecf0d5f622cd4480c635eec5b94a35184f`; restored on branch in `0824d623f5ea2112e3051c905f434cbe42c7500b`.
+- `PlanBStatePersistence.save_state()` now requires a finite positive last mark for every open position and writes the exact symbol-to-price map. `load_state()` validates exact symbol coverage and finite positive values, and rejects open-position backups without marks. The engine's `_persist()` passes `_last_mark_prices`; restore hydrates `_last_mark_prices` before the first new candle.
+- Full Research CI [#41509504557](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509504557) completed SUCCESS; 58 state-persistence tests ran. Coverage includes engine restore preserving equity from the saved mark, rejection of missing marks, and rejection of zero/negative/NaN/Inf/boolean marks.
+- The last mark is a recovery snapshot, not a live exchange quote. It does not replace Bybit reconciliation or guarantee freshness after downtime; live trading remains out of scope.

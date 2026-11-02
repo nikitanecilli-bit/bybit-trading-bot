@@ -275,8 +275,8 @@ def collect_snapshot(
     for start_ms, end_ms in _execution_intervals(saved_ms, capture_now_ms):
         interval_pages = _collect_pages(
             base_url, "/v5/execution/list",
-            {"category": "linear", "startTime": start_ms,
-             "endTime": end_ms, "limit": 100},
+            {"category": "linear", "settleCoin": "USDT",
+             "startTime": start_ms, "endTime": end_ms, "limit": 100},
             api_key, secret, request_json,
         )
         for page in interval_pages:

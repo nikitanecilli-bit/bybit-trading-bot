@@ -324,6 +324,48 @@ def test_stopped_short_mae_uses_stop_fill_and_does_not_count_later_wick_as_mfe()
     assert captured["mfe"] == 0.0
 
 
+
+def test_mtm_daily_stop_transition_is_persisted_without_trade_close():
+    e = make_engine()
+    e.cfg.daily_stop_loss_pct = 5.0
+    e.risk_mgr.cfg = e.cfg
+    e.risk_mgr.realized_equity = 10_000.0
+    e.risk_mgr.unrealized_pnl = 0.0
+    e.risk_mgr.current_equity = 10_000.0
+    e.risk_mgr.day_start_equity = 10_000.0
+    e.risk_mgr.peak_equity = 10_000.0
+    e._unrealized_pnl_at_marks = lambda _ts: -600.0
+    persisted = []
+    e._persist = lambda: persisted.append(e.risk_mgr.to_dict().copy())
+
+    e._update_mark_to_market(1_800_003_600_000)
+
+    assert e.risk_mgr.daily_stop_triggered
+    assert len(persisted) == 1
+    assert persisted[0]["daily_stop_triggered"] is True
+
+
+def test_mtm_kill_switch_transition_is_persisted_without_trade_close():
+    e = make_engine()
+    e.cfg.daily_stop_loss_pct = 99.0
+    e.cfg.emergency_kill_switch_pct = 35.0
+    e.risk_mgr.cfg = e.cfg
+    e.risk_mgr.realized_equity = 10_000.0
+    e.risk_mgr.unrealized_pnl = 0.0
+    e.risk_mgr.current_equity = 10_000.0
+    e.risk_mgr.day_start_equity = 10_000.0
+    e.risk_mgr.peak_equity = 10_000.0
+    e._unrealized_pnl_at_marks = lambda _ts: -3_600.0
+    persisted = []
+    e._persist = lambda: persisted.append(e.risk_mgr.to_dict().copy())
+
+    e._update_mark_to_market(1_800_003_600_000)
+
+    assert e.risk_mgr.kill_switch_triggered
+    assert len(persisted) == 1
+    assert persisted[0]["kill_switch_triggered"] is True
+
+
 if __name__ == "__main__":
     tests = [(name, value) for name, value in sorted(globals().items())
              if name.startswith("test_") and callable(value)]

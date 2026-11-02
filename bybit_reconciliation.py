@@ -10,6 +10,9 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable, Mapping, Sequence
 
 
+MAX_PAGES_PER_CHAIN = 1000
+
+
 class SnapshotValidationError(ValueError):
     """Raised when an exchange snapshot is invalid, incomplete, or ambiguous."""
 
@@ -133,6 +136,8 @@ def _collect_complete_pages(pages: Iterable[tuple[str, Mapping[str, Any]]]) -> l
     page_list = list(pages)
     if not page_list:
         raise SnapshotValidationError("snapshot has no response pages")
+    if len(page_list) > MAX_PAGES_PER_CHAIN:
+        raise SnapshotValidationError("snapshot pagination exceeds the page safety limit")
     expected_cursor = ""
     seen_cursors: set[str] = set()
     all_rows: list[dict[str, Any]] = []

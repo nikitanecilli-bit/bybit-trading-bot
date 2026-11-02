@@ -1,3 +1,5 @@
+> **Статус на 2026-11-03: PROVISIONAL / SUPERSEDED FOR NET-PNL DECISIONS.** В движке исправлен расчёт exit fee/slippage: раньше комиссии TP1/final exit считались от entry notional, теперь от quantity × execution price. Поэтому приведённые ниже net PnL, PF, число положительных инструментов и ранжирование требуют повторного расчёта на исправленном engine. Исходные raw результаты сохранены как исторический эксперимент и не переписаны. См. `docs/audits/EXCHANGE_SIZING_INTEGRATION_AND_BYBIT_SCHEMA_2026-11-03.md`.
+
 # CryptoFetch per-symbol backtest — 2026-11-02
 
 ## Run provenance

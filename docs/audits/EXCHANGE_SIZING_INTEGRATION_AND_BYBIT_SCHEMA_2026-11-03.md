@@ -244,3 +244,17 @@ The research engine now accepts `instrument_specs_dir` and loads `InstrumentSpec
 There is intentionally no silent fallback: if the directory is supplied but the dated spec is absent, stale, non-trading, leverage-invalid, or violates exchange constraints, the entry is rejected. If no directory is supplied, legacy notional-proxy mode remains for backwards-compatible research and is explicitly **not contract-accurate**.
 
 The H1 runner has not yet been switched to strict mode because the repository currently contains no archived `data/instrument_specs/linear/*.json` snapshots and the Bybit snapshot workflow has repeatedly received HTTP 403. Therefore no existing H1 PnL or experiment result is retroactively upgraded by this integration. Synthetic regression tests exercise the strict path; an actual market replay remains blocked on dated official snapshots.
+
+
+## 17. Strict engine integration CI verification
+
+Research engine checks [#41543597235](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41543597235) completed with **SUCCESS** on commit `550d0c03b830aad99203bca078c078ed204583c5`. The run passed:
+- Python compilation;
+- dated InstrumentSpec parser and as-of history tests;
+- Decimal exchange sizing and leverage-filter tests;
+- strict engine entry integration tests (qtyStep/minNotional and missing-snapshot fail-closed);
+- existing gap execution, portfolio accounting, funding, state-persistence and all other deterministic suites.
+
+Two intermediate CI failures were corrected before this successful run: first the sizing fixture lacked leverageFilter fields; then older unit-test harnesses constructed the engine with `__new__` and therefore lacked the new optional attributes. The engine now uses a backward-compatible `getattr` guard while retaining strict behavior whenever an instrument-spec history is explicitly supplied.
+
+This is code-path verification with synthetic specs only. It does not establish that dated Bybit snapshots exist for the historical E11/E13 periods, nor does it validate actual Bybit fills, funding, margin tiers or liquidation.

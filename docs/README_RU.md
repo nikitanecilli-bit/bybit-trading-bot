@@ -29,10 +29,11 @@
 25. [ENG-STATE-016 — backup event chronology](research/experiment_cards/ENG-STATE-016_BACKUP_EVENT_TIME_RU.md) — запрещает событиям позиции/сигнала датироваться позже сохранения backup.
 26. [ENG-STATE-017 — fsync backup durability](research/experiment_cards/ENG-STATE-017_FSYNC_BACKUP_RU.md) — fsync содержимого backup и каталога после atomic replace на POSIX.
 27. [ENG-RECON-002 — read-only V5 parsers](research/experiment_cards/ENG-RECON-002_READONLY_PARSERS_RU.md) — strict parsing snapshots; no HTTP calls or account mutations.
-28. [ENG-RECON-003 — read-only V5 collector](research/experiment_cards/ENG-RECON-003_READONLY_COLLECTOR_RU.md) — authenticated read-only capture, pending CI; no real Bybit snapshot captured.
-28. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
-29. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
-30. [Карта репозитория](REPOSITORY_MAP_RU.md).
+28. [ENG-RECON-003 — read-only V5 collector](research/experiment_cards/ENG-RECON-003_READONLY_COLLECTOR_RU.md) — read-only capture implementation; mocked CI passed, no real Bybit snapshot captured.
+29. [ENG-RECON-004 — report-only comparator](research/experiment_cards/ENG-RECON-004_REPORT_ONLY_COMPARATOR_RU.md) — validates snapshot integrity and reports differences; always blocks live resume.
+30. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
+31. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
+32. [Карта репозитория](REPOSITORY_MAP_RU.md).
 
 ## Разделы
 

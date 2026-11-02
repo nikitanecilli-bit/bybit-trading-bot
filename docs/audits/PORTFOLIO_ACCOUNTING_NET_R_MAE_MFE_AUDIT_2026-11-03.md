@@ -77,7 +77,7 @@ MAE/MFE рассчитываются в ценовых R от initial_stop_dist,
 
 В `tests/test_gap_execution.py` есть long/short gap, stop-vs-TP collision, fill-bar MAE/MFE, partial TP1 и per-leg fees/slippage cases. В `tests/test_funding_mark_to_market.py` есть accrued funding, settlement boundary, missing mark fail-closed и funding-triggered daily stop.
 
-Это статическая проверка кода и перечня тестов. Я не утверждаю, что новый CI был запущен в этой сессии: доступного действия для dispatch workflow нет. Последний ранее подтверждённый полный Research CI — #41520724088; он предшествует этому аудиту.
+Это статическая проверка кода и перечня тестов. Последующая полная Research CI проверка #41542100415 завершилась SUCCESS на commit `0546f53a45bb4508d1f16ba06bbb310cdd69b1de`; compile и весь детерминированный suite, включая portfolio accounting, funding, exchange sizing и новые archive-audit tests, прошли. Этот CI не добавляет отдельного threshold-boundary теста для MTM maker-vs-taker asymmetry; этот конкретный пробел остаётся OPEN.
 
 ## 5. Открытые ограничения
 

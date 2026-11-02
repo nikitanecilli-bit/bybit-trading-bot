@@ -158,6 +158,48 @@ class StatePersistenceTests(unittest.TestCase):
     def test_negative_position_size_is_rejected(self):
         self._assert_invalid_position_payload(lambda position: position.update({"size_usdt": -100.0}))
 
+    def test_valid_tp1_partial_position_round_trips(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "tp1-state.json"
+            position = sample_position()
+            position.tp1_hit = True
+            position.remaining_fraction = 0.5
+            position.realized_tp1_gross_usdt = 30.0
+            position.tp1_ts_ms = 1_800_000_003_600
+            writer = engine.PlanBStatePersistence(str(path), enabled=True)
+            writer.save_state(engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
+                              {"BTCUSDT": position}, {}, 42)
+            restored, _, _ = engine.PlanBStatePersistence(str(path)).load_state(
+                engine.AdaptiveRiskManager(engine.BotConfig())
+            )
+            self.assertEqual(restored["BTCUSDT"], position)
+
+    def test_tp1_not_hit_cannot_restore_partial_remaining_fraction(self):
+        self._assert_invalid_position_payload(
+            lambda position: position.update({"remaining_fraction": 0.5})
+        )
+
+    def test_tp1_hit_requires_partial_remaining_fraction(self):
+        def mutate(position):
+            position.update({"tp1_hit": True, "remaining_fraction": 1.0,
+                             "realized_tp1_gross_usdt": 30.0})
+        self._assert_invalid_position_payload(mutate)
+
+    def test_tp1_realized_pnl_requires_tp1_hit(self):
+        self._assert_invalid_position_payload(
+            lambda position: position.update({"realized_tp1_gross_usdt": 12.0})
+        )
+
+    def test_long_targets_must_be_ordered_above_entry(self):
+        self._assert_invalid_position_payload(
+            lambda position: position.update({"tp1_price": 110.0, "tp2_price": 108.0})
+        )
+
+    def test_short_targets_must_be_ordered_below_entry(self):
+        def mutate(position):
+            position.update({"direction": "short", "tp1_price": 95.0, "tp2_price": 90.0})
+        self._assert_invalid_position_payload(mutate)
+
     def test_pending_non_object_entry_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "pending-entry.json"

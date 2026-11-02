@@ -101,7 +101,7 @@ def test_marketable_buy_limit_gap_through_uses_taker_entry_classification():
     # Journal accounting must also charge taker entry fee and slippage.
     record = _close_with_real_accounting(pos, 96.0, "stop_loss")
     assert record.order_type == "market"
-    assert record.exchange_fees_usdt == 1.10
+    assert record.exchange_fees_usdt == 1.09
     assert record.slippage_cost_usdt == 0.45
 
 
@@ -339,13 +339,13 @@ def test_market_long_stop_journal_matches_independent_fee_and_slippage_math():
     record = _close_with_real_accounting(pos, 95.0, "stop_loss")
 
     gross = round(1_000.0 * (95.0 - 100.0) / 100.0, 2)
-    fees = round(1_000.0 * engine_mod.TAKER_FEE + 1_000.0 * engine_mod.TAKER_FEE, 2)
-    slip = round(1_000.0 * engine_mod.TAKER_SLIP + 1_000.0 * engine_mod.TAKER_SLIP, 2)
+    fees = round(1_000.0 * engine_mod.TAKER_FEE + 950.0 * engine_mod.TAKER_FEE, 2)
+    slip = round(1_000.0 * engine_mod.TAKER_SLIP + 950.0 * engine_mod.TAKER_SLIP, 2)
     assert record.gross_pnl == gross == -50.0
     assert record.exchange_fees_usdt == fees
     assert record.slippage_cost_usdt == slip
     assert record.pnl_usdt == round(gross - fees - slip, 2)
-    assert record.pnl_usdt == -51.55
+    assert record.pnl_usdt == -51.51
 
 
 def test_limit_tp2_after_tp1_journal_accounts_for_three_execution_legs():
@@ -360,13 +360,13 @@ def test_limit_tp2_after_tp1_journal_accounts_for_three_execution_legs():
     gross = round(1_000.0 * 0.5 * (110.0 - 100.0) / 100.0
                   + 1_000.0 * 0.5 * (120.0 - 100.0) / 100.0, 2)
     fees = round(1_000.0 * engine_mod.MAKER_FEE
-                 + 500.0 * engine_mod.MAKER_FEE
-                 + 500.0 * engine_mod.MAKER_FEE, 2)
+                 + 550.0 * engine_mod.MAKER_FEE
+                 + 600.0 * engine_mod.MAKER_FEE, 2)
     slip = 0.0
     assert record.gross_pnl == gross == 150.0
-    assert record.exchange_fees_usdt == fees == 0.40
+    assert record.exchange_fees_usdt == fees == 0.43
     assert record.slippage_cost_usdt == slip
-    assert record.pnl_usdt == round(gross - fees - slip, 2) == 149.60
+    assert record.pnl_usdt == round(gross - fees - slip, 2) == 149.57
 
 
 def test_limit_tp1_then_market_trailing_stop_charges_correct_exit_fee_types():
@@ -381,14 +381,14 @@ def test_limit_tp1_then_market_trailing_stop_charges_correct_exit_fee_types():
 
     gross = round(50.0 + 500.0 * (105.0 - 100.0) / 100.0, 2)
     fees = round(1_000.0 * engine_mod.MAKER_FEE
-                 + 500.0 * engine_mod.MAKER_FEE
-                 + 500.0 * engine_mod.TAKER_FEE, 2)
-    slip = round(500.0 * engine_mod.TAKER_SLIP, 2)
+                 + 550.0 * engine_mod.MAKER_FEE
+                 + 525.0 * engine_mod.TAKER_FEE, 2)
+    slip = round(525.0 * engine_mod.TAKER_SLIP, 2)
     assert record.gross_pnl == gross == 75.0
-    assert record.exchange_fees_usdt == 0.58
+    assert record.exchange_fees_usdt == 0.60
     # Exact decimal fee sum is 0.575 USDT, rounded half-up to cents.
-    assert record.slippage_cost_usdt == slip == 0.11
-    assert record.pnl_usdt == 74.31
+    assert record.slippage_cost_usdt == slip == 0.12
+    assert record.pnl_usdt == 74.28
 
 
 
@@ -398,12 +398,12 @@ def test_market_short_stop_journal_matches_independent_fee_and_slippage_math():
     record = _close_with_real_accounting(pos, 105.0, "stop_loss")
 
     gross = round(1_000.0 * -1.0 * (105.0 - 100.0) / 100.0, 2)
-    fees = round(1_000.0 * engine_mod.TAKER_FEE + 1_000.0 * engine_mod.TAKER_FEE, 2)
-    slip = round(1_000.0 * engine_mod.TAKER_SLIP + 1_000.0 * engine_mod.TAKER_SLIP, 2)
+    fees = round(1_000.0 * engine_mod.TAKER_FEE + 1_050.0 * engine_mod.TAKER_FEE, 2)
+    slip = round(1_000.0 * engine_mod.TAKER_SLIP + 1_050.0 * engine_mod.TAKER_SLIP, 2)
     assert record.gross_pnl == gross == -50.0
-    assert record.exchange_fees_usdt == fees == 1.10
-    assert record.slippage_cost_usdt == slip == 0.45
-    assert record.pnl_usdt == -51.55
+    assert record.exchange_fees_usdt == fees == 1.13
+    assert record.slippage_cost_usdt == slip == 0.46
+    assert record.pnl_usdt == -51.59
 
 
 def test_long_gap_stop_journal_uses_actual_gap_fill_price():
@@ -414,9 +414,9 @@ def test_long_gap_stop_journal_uses_actual_gap_fill_price():
 
     assert record.exit_price == 90.0
     assert record.gross_pnl == -100.0
-    assert record.exchange_fees_usdt == 1.10
-    assert record.slippage_cost_usdt == 0.45
-    assert record.pnl_usdt == -101.55
+    assert record.exchange_fees_usdt == 1.05
+    assert record.slippage_cost_usdt == 0.43
+    assert record.pnl_usdt == -101.48
 
 
 def test_financial_rounding_uses_half_up_at_half_cent():

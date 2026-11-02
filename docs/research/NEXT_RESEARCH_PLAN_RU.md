@@ -312,19 +312,30 @@ No production/live changes and no market backtests were performed in these corre
 - Parser hardening: only integer `retCode=0` counts as success; boolean false is rejected. Parser tests 13/13; CI #41448898597 passed.
 
 
-## ENG-RECON-003 — read-only collector (2026-11-02, CI pending)
+## ENG-RECON-003 — read-only collector (2026-11-02, code/fixture ACCEPT)
 
-- Добавлен `scripts/bybit_reconciliation_snapshot.py`: только GET, обязательная проверка read-only API key до account endpoints, cursor pagination, server-time bounds, execution windows <= 7 days, SHA-256 raw capture и атомарная fsync-запись.
-- Добавлены mocked tests и CI compile/test steps. CI acceptance пока не подтверждён.
-- Не запускать collector с GitHub Secrets и не делать реальные API-вызовы в рамках CI. Нужен отдельный, осознанный ручной запуск только с ключом, который Bybit подтвердил как read-only; до него не заявлять, что snapshot существует.
-- После успешного CI: провести дополнительный review схем/пагинации и только затем report-only comparator. Comparator обязан возвращать BLOCKED при любом открытом exchange position/order, пока local model не содержит exact qty, positionIdx и order/execution identities.
-- Ни новые PnL sweeps, ни live resume не разрешены этим этапом.
-
+- `scripts/bybit_reconciliation_snapshot.py`: only GET; API key must be explicitly read-only; official host allowlist is enforced before credentials are sent; redirects are refused; complete cursor pagination; server-time bounds; execution windows <= 7 days; SHA-256 raw capture and atomic fsync write.
+- 12 mocked tests passed; full configured workflow #41459486381 SUCCESS. No live API call or real snapshot.
+- Do not add credentials to CI or infer a successful exchange capture from fixture tests.
 
 ## ENG-RECON-004 — report-only comparator (2026-11-02)
 
-- Implemented `scripts/bybit_reconciliation_report.py`; validates backup/snapshot integrity, parser output, counts, UTC chronology and contiguous execution coverage; emits only diagnostic report.
-- 12/12 tests and full configured workflow passed in [Actions #41458773696](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41458773696).
-- Comparator never returns PASS and always sets `live_resume_allowed=false`. This is intentional until local state has exact exchange qty, positionIdx, order IDs/link IDs and full execution ledger.
-- Next: independently review Bybit endpoint schema/pagination against current official docs; add order-history and exchange-side stop/TP capture to the read-only snapshot design; then specify the missing local execution ledger and exchange identity model. Do not infer qty from `size_usdt / entry_price`.
-- Do not call live endpoints from CI. Do not run PnL sweeps until Bybit data/execution realism gates are closed.
+- `scripts/bybit_reconciliation_report.py` validates backup/snapshot integrity, parser output, counts, UTC chronology and contiguous execution coverage; emits symbol/direction and protection diagnostics.
+- 14/14 tests passed; full workflow [#41459486381](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41459486381) SUCCESS.
+- Comparator never returns PASS and always sets `live_resume_allowed=false`. This remains intentional until local state has exact exchange qty, positionIdx, order IDs/link IDs and full execution ledger.
+
+## ENG-RECON-005 — exchange-side position protection visibility (2026-11-02)
+
+- Parser preserves Bybit position `takeProfit`, `stopLoss`, `trailingStop`, `tpslMode`; comparator distinguishes configured stop, absent stop and unknown fields.
+- Parser 14/14, collector 12/12, comparator 14/14; full workflow #41459486381 SUCCESS.
+- Position-level fields are not proof of conditional-order health or stop trigger execution. No real position snapshot was captured.
+
+## Next technical gates
+
+1. Extend read-only capture with order history and document the endpoint's coverage limits. Bybit's official contract: per-request interval <= 7 days; cancelled/rejected/deactivated statuses are queryable only in the last 24 hours; beyond 7 days only orders with fills are available. Therefore history is not a complete event journal for arbitrary downtime.
+2. Add report-only diagnostics for historical orders and conditional/TP/SL order identities without ever returning a PASS.
+3. Design local exchange execution ledger and state schema: exact exchange qty, positionIdx/account mode, orderId/orderLinkId, execId, partial fills, stop/TP identifiers and status.
+4. Keep all network capture out of CI. Any live capture must use a Bybit-confirmed read-only key and must remain a manual, separately audited operation.
+5. No PnL sweeps, live resume, order mutations or production deployment until execution/data gates are closed.
+
+Do not infer exchange qty from `size_usdt / entry_price`.

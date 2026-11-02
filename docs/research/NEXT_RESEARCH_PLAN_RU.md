@@ -392,3 +392,10 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Закрыт дефект порядка расчёта drawdown: `MaintenanceGateAuditor` теперь агрегирует net PnL по UTC timestamp закрытия и применяет группы хронологически. Тест-first CI #41512547727 воспроизвёл ошибку; full CI #41512721144 SUCCESS, portfolio accounting 24/24.
 - Следующий инженерный блок: тесты метрик на контрольных equity paths — одновременные закрытия, out-of-order records, несколько UTC offsets, MTM drawdown vs realized curve, cost aggregation с funding receipts. Затем проверить корректность MAE/MFE при TP1 и финальном закрытии.
 - Exchange sizing и margin tier integration пока не менять: достоверных версионированных Bybit instrument snapshots/risk tiers для исторических дат в репозитории нет; public snapshot endpoint ранее вернул 403. Не подставлять текущие параметры в прошлое и не использовать неофициальные обходы.
+
+
+## Дополнение 2026-11-02 — prospective risk-tier archive
+- Добавлен fail-closed collector `scripts/snapshot_bybit_risk_limits.py` и еженедельный/manual workflow `bybit-risk-limit-snapshots.yml`; 9/9 offline tests, CI #41518145630 SUCCESS.
+- Это фиксирует текущие risk tiers с момента первого успешного захвата. Исторические tiers до даты первого архива остаются неизвестными; не подставлять сегодняшние `maintenanceMargin`, `initialMargin`, `mmDeduction` и `maxLeverage` в старые периоды.
+- Следующий data task: после успешного доступа к официальному Bybit API архивировать historical funding settlements и mark-price klines по exact timestamps; отдельный preflight должен выявлять неполные страницы/символы/границы и не подменять отсутствующие значения last trade price.
+- Risk-tier integration в PnL/ликвидационный симулятор отложена до получения версионированных tiers и точного определения account/position mode, isolated/cross margin и risk-limit transitions.

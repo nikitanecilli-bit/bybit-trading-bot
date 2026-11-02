@@ -684,3 +684,13 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Дополнительный engine-path тест подтвердил, что `_persist()` реально передаёт last marks в backup и новая persistence instance их восстанавливает. Full Research CI [#41509795468](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509795468), SUCCESS; state-persistence suite 59 tests.
 
 - Дополнительный regression: восстановленный Plan-B state блокирует запуск `run_simulation_pass()` как нового backtest (fail closed). CI [#41511547342](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41511547342), SUCCESS; state-persistence suite 60 tests.
+
+
+## ENG-METRIC-001 — order-independent portfolio drawdown (2026-11-02)
+
+- Карточка: [ENG-METRIC-001](experiment_cards/ENG-METRIC-001_SIMULTANEOUS_DRAWDOWN_ORDER_RU.md).
+- Дефект подтверждён test-first: `MaintenanceGateAuditor.evaluate_portfolio()` считал drawdown по последовательности элементов списка, а не по времени. Одновременные сделки могли давать разный max_dd в зависимости от порядка; несортированный список мог нарушать хронологию.
+- Test-only CI [#41512547727](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41512547727) failed на `test_drawdown_is_order_independent_for_simultaneous_trade_closes` (AssertionError).
+- Fix: PnL закрытий агрегируется по UTC `exit_date`, группы применяются к equity в хронологическом порядке. Невалидные и timezone-naive timestamps fail closed.
+- Full Research CI [#41512721144](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41512721144), SUCCESS; portfolio accounting 24/24, обе новые регрессии PASS; state persistence 60 tests.
+- Это исправление отчётной метрики, не стратегии и не доказательство прибыльности.

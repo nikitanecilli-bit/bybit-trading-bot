@@ -276,3 +276,7 @@ No production/live changes and no market backtests were performed in these corre
 
 - **ENG-STATE-012 accepted:** risk restore checks cross-field identities (current = realized + unrealized, peak >= current, max drawdown covers implied drawdown). Persistence tests 39/39; CI #41444495022 passed. Keep historical max drawdown values above current drawdown; do not "normalize" them down.
 - Next persistence work: validate timestamps/identity semantics and decide explicit versioned migration/freshness/reconciliation. Local consistency still does not prove Bybit state.
+
+
+- **ENG-STATE-013 accepted:** backup restore now validates required `saved_at_utc` (ISO-8601, explicit UTC) and non-empty `bot_version`. Persistence tests 40/40; CI #41445058006 passed.
+- Important boundary: this validates metadata shape, not backup age. A stale but correctly timestamped backup can still restore; define a freshness threshold and exchange reconciliation before any live resume.

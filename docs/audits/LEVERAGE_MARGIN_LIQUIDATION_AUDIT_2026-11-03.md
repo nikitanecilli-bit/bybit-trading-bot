@@ -53,3 +53,17 @@ Scope: `Bybit_Trading_Engine_v14_research.py`, `exchange_order_sizing.py`, `bybi
 Не добавлять выдуманную liquidation formula и не использовать произвольный maintenance rate. До реализации необходимы датированные официальные Bybit linear instrument/risk-tier snapshots, точный exchange qty и account margin mode. Затем pure deterministic margin calculator + fixtures из реальных risk tiers, отдельно cross/isolated, mark-price trigger, funding/fees, partial fills и stop-vs-liquidation stress cases.
 
 Текущие Binance-proxy OHLCV backtests не могут подтвердить Bybit liquidation safety. Рыночные PnL sweeps и live deployment остаются заблокированы до закрытия execution-data gate.
+
+
+## 6. Official formula and account-mode boundary (verified 2026-11-03)
+
+Current Bybit documentation confirms:
+- The V5 `GET /v5/market/risk-limit` response supplies per-symbol tier ID, riskLimitValue, maintenanceMargin, initialMargin, maxLeverage and mmDeduction; linear returns a paginated universe. See [official API schema](https://bybit-exchange.github.io/docs/v5/market/risk-limit).
+- For USDT contracts, position value is contract quantity × mark price. Maintenance margin is tier-based; `MM = positionValue × MMR − mmDeduction`. Tier transitions can occur as mark price changes. The documented deduction recurrence is `MMDeduction[n] = riskLimit[n−1] × (MMR[n] − MMR[n−1]) + MMDeduction[n−1]`. See [Bybit Maintenance Margin (USDT)](https://www.bybit.com/en/help-center/article/Maintenance-Margin-USDT-Contract), last updated 2026-04-16.
+- Bybit's isolated liquidation formula is account/product-mode specific. The current UTA isolated USDT formula includes entry price, quantity, leverage, extra margin, MMR, mmDeduction and taker close-fee adjustment. Cross margin instead depends on shared account equity/MMR; Portfolio Margin uses account-level stress risk. See [Bybit isolated liquidation calculation](https://www.bybit.kz/en-KAZ/help-center/article/Liquidation-Price-Calculation-under-Isolated-Mode-Unified-Trading-Account) and [Bybit liquidation rules](https://www.bybit-global.com/en/help-center/article/UTA-Trading-Rules).
+
+The risk-tier snapshot collector now validates each symbol's tier sequence before saving: unique lowest-tier flag, strictly increasing risk limits, non-decreasing maintenance/initial margin rates, non-increasing max leverage, and the documented mmDeduction recurrence. These are data-integrity checks, not a liquidation model.
+
+**Implementation decision:** do not wire a single liquidation formula into the engine yet. The config string `ISOLATED_5X` indicates intended leverage/mode but does not establish whether the actual account is Classic isolated or Unified Trading Account isolated, nor extra-margin/auto-add-margin settings. The current official UTA formula cannot safely be assumed to match a Classic account. Implement isolated UTA only as an explicitly selected model after account mode is known; keep Cross and Portfolio Margin out of scope until their account-level inputs are available. The mark-price trigger must remain distinct from trade/last-price OHLC.
+
+No live account or private API was queried for this decision.

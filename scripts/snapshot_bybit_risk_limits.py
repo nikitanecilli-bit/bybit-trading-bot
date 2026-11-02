@@ -68,6 +68,54 @@ def validate_tier(row: Any) -> dict[str, Any]:
     return dict(row)
 
 
+def validate_tier_groups(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Validate per-symbol tier monotonicity and Bybit's MM deduction recurrence."""
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for raw in rows:
+        row = validate_tier(raw)
+        grouped.setdefault(row["symbol"], []).append(row)
+    if not grouped:
+        raise ValueError("risk-limit snapshot has no tiers")
+
+    tolerance = Decimal("0.00000001")
+    for symbol, tiers in grouped.items():
+        tiers.sort(key=lambda row: _decimal(row["riskLimitValue"], f"{symbol}.riskLimitValue"))
+        lowest_flags = [row["isLowestRisk"] for row in tiers]
+        if lowest_flags.count(1) != 1 or lowest_flags[0] != 1:
+            raise ValueError(f"{symbol}: exactly the lowest risk tier must have isLowestRisk=1")
+        previous = None
+        for index, row in enumerate(tiers):
+            risk_limit = _decimal(row["riskLimitValue"], f"{symbol}.riskLimitValue")
+            mmr = _decimal(row["maintenanceMargin"], f"{symbol}.maintenanceMargin")
+            imr = _decimal(row["initialMargin"], f"{symbol}.initialMargin")
+            max_leverage = _decimal(row["maxLeverage"], f"{symbol}.maxLeverage")
+            deduction_raw = row.get("mmDeduction")
+            deduction = _decimal(
+                deduction_raw, f"{symbol}.mmDeduction", allow_empty=True
+            )
+            deduction = deduction if deduction is not None else Decimal("0")
+            if previous is not None:
+                prev_limit, prev_mmr, prev_imr, prev_max_lev, prev_deduction = previous
+                if risk_limit <= prev_limit:
+                    raise ValueError(f"{symbol}: riskLimitValue must increase across tiers")
+                if mmr < prev_mmr or imr < prev_imr:
+                    raise ValueError(f"{symbol}: maintenance/initial margin rates cannot decrease")
+                if max_leverage > prev_max_lev:
+                    raise ValueError(f"{symbol}: maxLeverage cannot increase across tiers")
+                if row.get("mmDeduction") in (None, ""):
+                    raise ValueError(f"{symbol}: mmDeduction is required above the lowest tier")
+                expected = prev_limit * (mmr - prev_mmr) + prev_deduction
+                if abs(deduction - expected) > tolerance:
+                    raise ValueError(
+                        f"{symbol}: tier {row['id']} mmDeduction {deduction} "
+                        f"does not match recurrence {expected}"
+                    )
+            elif row.get("mmDeduction") not in (None, "") and deduction < 0:
+                raise ValueError(f"{symbol}: lowest-tier mmDeduction cannot be negative")
+            previous = (risk_limit, mmr, imr, max_leverage, deduction)
+    return rows
+
+
 def _request_page(base_url: str, category: str, cursor: str | None,
                   symbol: str | None = None, timeout: float = 20.0):
     _validate_base_url(base_url)
@@ -135,13 +183,13 @@ def fetch_all_tiers(category: str = "linear",
         raise RuntimeError("risk-limit pagination exceeded safety limit")
     if not rows:
         raise RuntimeError("Bybit returned an empty risk-limit universe")
-    return [rows[key] for key in sorted(rows)]
+    return validate_tier_groups([rows[key] for key in sorted(rows)])
 
 
 def build_snapshot(rows: list[dict[str, Any]], category: str,
                    fetched_at: str | None = None) -> dict[str, Any]:
     timestamp = fetched_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    validated = [validate_tier(row) for row in rows]
+    validated = validate_tier_groups(rows)
     keys = [(row["symbol"], row["id"]) for row in validated]
     if not validated or len(keys) != len(set(keys)):
         raise ValueError("snapshot requires non-empty unique symbol/risk-tier rows")

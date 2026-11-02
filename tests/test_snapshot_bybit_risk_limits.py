@@ -21,7 +21,7 @@ def row(symbol="BTCUSDT", tier_id=1, risk="200000", mm="0.005", im="0.01",
 class RiskLimitSnapshotTests(unittest.TestCase):
     def test_paginates_all_symbols_and_tiers(self):
         pages = {
-            None: ([row("BTCUSDT"), row("BTCUSDT", 2, "500000")], "next"),
+            None: ([row("BTCUSDT"), row("BTCUSDT", 2, "500000", mm="0.01", im="0.02", lowest=0, leverage="50", deduction="1000")], "next"),
             "next": ([row("ETHUSDT"), row("SOLUSDT")], None),
         }
         seen = []
@@ -61,12 +61,41 @@ class RiskLimitSnapshotTests(unittest.TestCase):
 
     def test_snapshot_is_timestamped_and_counts_symbols_and_tiers(self):
         snapshot = build_snapshot(
-            [row("BTCUSDT"), row("BTCUSDT", 2, "500000"), row("ETHUSDT")],
+            [row("BTCUSDT"), row("BTCUSDT", 2, "500000", mm="0.01", im="0.02", lowest=0, leverage="50", deduction="1000"), row("ETHUSDT")],
             "linear", "2026-11-02T00:00:00Z",
         )
         self.assertEqual(snapshot["symbol_count"], 2)
         self.assertEqual(snapshot["tier_count"], 3)
         self.assertEqual(snapshot["fetched_at"], "2026-11-02T00:00:00Z")
+
+    def test_tier_group_checks_monotonic_rates_and_mm_deduction_recurrence(self):
+        valid = [
+            row("BTCUSDT", 1, "100000", mm="0.005", im="0.01", lowest=1, leverage="100", deduction="0"),
+            row("BTCUSDT", 2, "200000", mm="0.01", im="0.02", lowest=0, leverage="50", deduction="500"),
+        ]
+        snapshot = build_snapshot(valid, "linear", "2026-11-02T00:00:00Z")
+        self.assertEqual(snapshot["tier_count"], 2)
+
+        broken = [dict(item) for item in valid]
+        broken[1]["mmDeduction"] = "499"
+        with self.assertRaisesRegex(ValueError, "mmDeduction"):
+            build_snapshot(broken, "linear", "2026-11-02T00:00:00Z")
+
+    def test_tier_group_rejects_increasing_max_leverage(self):
+        invalid = [
+            row("BTCUSDT", 1, "100000", lowest=1, leverage="50"),
+            row("BTCUSDT", 2, "200000", mm="0.01", im="0.02", lowest=0, leverage="60", deduction="500"),
+        ]
+        with self.assertRaisesRegex(ValueError, "maxLeverage"):
+            build_snapshot(invalid, "linear", "2026-11-02T00:00:00Z")
+
+    def test_tier_group_requires_exactly_one_lowest_tier(self):
+        invalid = [
+            row("BTCUSDT", 1, "100000", lowest=1),
+            row("BTCUSDT", 2, "200000", mm="0.01", im="0.02", lowest=1, deduction="500"),
+        ]
+        with self.assertRaisesRegex(ValueError, "isLowestRisk"):
+            build_snapshot(invalid, "linear", "2026-11-02T00:00:00Z")
 
     def test_snapshot_rejects_duplicate_tier_keys(self):
         with self.assertRaisesRegex(ValueError, "unique"):

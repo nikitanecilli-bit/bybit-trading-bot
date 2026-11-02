@@ -268,3 +268,7 @@ No production/live changes and no market backtests were performed in these corre
 
 - **ENG-STATE-010 accepted:** backup restore now requires complete envelope keys and complete known risk snapshot. Incomplete valid JSON can no longer silently become an empty portfolio or reset missing protective flags. Persistence suite 33/33; CI #41436427155 passed.
 - Compatibility consequence: older backups missing current fields fail closed. Do not add silent defaults; implement explicit, versioned migration only after collecting actual legacy backup schemas.
+
+
+- **ENG-STATE-011 accepted:** backup serialization now uses strict JSON (`allow_nan=False`); NaN/Infinity cannot replace a previously valid backup. Persistence tests 35/35; CI #41436653943 passed.
+- Remaining persistence priorities: explicit legacy schema migration, freshness/reconciliation policy, and durability guarantees beyond atomic rename.

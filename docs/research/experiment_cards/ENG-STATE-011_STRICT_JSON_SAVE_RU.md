@@ -1,6 +1,6 @@
 # ENG-STATE-011 — reject non-finite values during backup save
 
-Статус до изменения: CONFIRMED PERSISTENCE DEFECT / JSON encoder emits NaN/Infinity by default.  
+Статус: ACCEPT — strict JSON serialization and CI passed.  
 Дата: 2026-11-02.  
 Тип: fail-closed serialization; deterministic tests only.
 
@@ -21,3 +21,12 @@ Serialize with `allow_nan=False`. On non-finite values, preserve the previous ba
 5. Full deterministic CI passes.
 
 No market backtest required.
+
+## Результат
+
+- Engine commit: `1a354260945ed34a0be466d790fa24254cd5d472`.
+- Test commit: `87a483a4fd9a2a2518bc1ca3fcdc9c4df5301c70`.
+- CI: [Research engine checks #41436653943](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41436653943), SUCCESS.
+- `tests/test_state_persistence.py`: 35/35. NaN in risk and Infinity in position now fail save, preserve previous backup, and clean temp file.
+- Compile, all configured deterministic suites and secret scan passed.
+- Decision: ACCEPT. No market backtest or live order.

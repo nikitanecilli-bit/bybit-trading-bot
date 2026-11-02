@@ -369,3 +369,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41434308834](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41434308834), SUCCESS.
 - Decision: ACCEPT for local restore schema integrity. No market backtest, parameter sweep, production deployment or live order.
 - Limitation: does not reconcile positions with Bybit or prove backup freshness.
+
+
+## ENG-STATE-008 — risk-manager restore schema validation (2026-11-02)
+
+- Preregistered card: [ENG-STATE-008](experiment_cards/ENG-STATE-008_RISK_SCHEMA_RU.md).
+- Confirmed defect: `AdaptiveRiskManager.from_dict()` coerces values with `float()` and permissive `_as_bool()`; syntactically valid backups could inject NaN/infinity/negative equity, invalid drawdown, malformed date or non-boolean risk flags.
+- Fix: validate known keys, finite numeric values, positive equity fields, drawdown range [0,100], ISO date string and strict boolean flags before staging/committing risk state. Omitted legacy keys retain defaults.
+- Tests: `tests/test_state_persistence.py` 23/23, including invalid risk payloads and unchanged caller risk manager on failed restore.
+- Commits: engine `84beee0dbe10cd0ab6f9e67255c21d6518a80957`; tests `4a9045fdc01f36c4b4a5e52278691056d4dce9ae`.
+- CI: [Research engine checks #41434930478](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41434930478), SUCCESS; compile, all configured deterministic suites and secret scan passed.
+- Decision: ACCEPT as local risk-state validation. No market backtest, parameter sweep, production deployment or live order.
+- Limitation: validation does not prove risk state is current relative to Bybit or safe for live-resume.

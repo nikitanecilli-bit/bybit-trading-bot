@@ -241,3 +241,14 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - Git Compare: diverged, 720 ahead / 13 behind.
 - PR #4: open, draft, mergeable=false / dirty; 163 files, +17,583 / -116.
 - Commits after the latest passing code CI are documentation-only; engine/test code remains at passing commit `f65c08bec78b179a9a89832ce31b574740f4dce3`.
+
+
+## ENG-FUND-001 — funding receipt at TP1 settlement boundary (2026-11-02)
+
+- `_manage_position()` stamps TP1 at the candle-close boundary (`exit_ts`). Funding settlements can share that timestamp, but OHLC cannot establish which event occurred first.
+- Previous logic applied full initial quantity at `ts <= tp1_ts_ms`. That is conservative for a funding payment but optimistic for a funding receipt, because it credits the full initial position even if TP1 may already have reduced exposure.
+- Test-first CI #41501387632 reproduced the optimistic receipt: actual `-10.00 USDT`, conservative expected `-5.00 USDT`.
+- Fix commit: `d88e7d900768d5b2bbdc67963fe2ff8c1d2f40f5`. At the exact TP1 boundary, payments use full initial quantity; receipts use remaining quantity. Strictly before/after boundary handling is unchanged.
+- Follow-up CI #41501468001: every substantive test step through persistence reported SUCCESS, including funding boundary, realized funding, MTM funding, preflight, private API mock checks, reconciliation, regime, execution, time, portfolio accounting, persistence and secret scan. The overall GitHub job remained in the post-checkout cleanup step at the latest poll; final workflow conclusion was not yet available.
+- Research HEAD at this audit update: `06c1803f2232ad8fd970f2ff61607741d022d39a`; 726 ahead / 13 behind main. PR #4 remains draft/open/unmerged and dirty; 164 files, +17,690 / -116. Main is unchanged.
+- No market backtest, optimization, live order or private API request.

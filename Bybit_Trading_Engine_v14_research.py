@@ -610,7 +610,7 @@ class AdaptiveRiskManager:
         а не гарантия: гэпы, funding и фактическое исполнение могут увеличить убыток.
         """
         stop_dist = abs(entry_price - stop_price)
-        if entry_price <= 0 or stop_dist <= 0 or self.current_equity <= 0:
+        if entry_price <= 0 or stop_price <= 0 or stop_dist <= 0 or self.current_equity <= 0:
             return 0.0, 0.0
 
         stop_pct = stop_dist / entry_price
@@ -618,7 +618,13 @@ class AdaptiveRiskManager:
         entry_fee_rate = MAKER_FEE if is_limit_entry else TAKER_FEE
         entry_slip_rate = 0.0 if is_limit_entry else TAKER_SLIP
         # Стоп-выход моделируется как taker независимо от типа входа.
-        estimated_loss_rate = stop_pct + entry_fee_rate + entry_slip_rate + TAKER_FEE + TAKER_SLIP
+        # Exit fees/slippage are charged on executed exit notional (qty * stop price),
+        # not on the original entry notional. qty = entry notional / entry price.
+        exit_notional_ratio = stop_price / entry_price
+        estimated_loss_rate = (
+            stop_pct + entry_fee_rate + entry_slip_rate
+            + exit_notional_ratio * (TAKER_FEE + TAKER_SLIP)
+        )
         if not math.isfinite(estimated_loss_rate) or estimated_loss_rate <= 0:
             return 0.0, 0.0
 
@@ -1336,10 +1342,13 @@ class UnifiedQuantEngine:
             gross = pos.realized_tp1_gross_usdt + remaining_gross
             entry_cost = pos.size_usdt * (MAKER_FEE if pos.order_type == "limit" else TAKER_FEE)
             entry_slip = 0.0 if pos.order_type == "limit" else pos.size_usdt * TAKER_SLIP
-            tp1_cost = (pos.size_usdt * TP1_FRACTION * (MAKER_FEE if pos.maker_exits else TAKER_FEE)) if pos.tp1_hit else 0.0
-            tp1_slip = (pos.size_usdt * TP1_FRACTION * TAKER_SLIP
+            position_qty = pos.size_usdt / pos.entry_price
+            tp1_notional = position_qty * pos.tp1_price * TP1_FRACTION
+            remaining_exit_notional = position_qty * mark * pos.remaining_fraction
+            tp1_cost = (tp1_notional * (MAKER_FEE if pos.maker_exits else TAKER_FEE)) if pos.tp1_hit else 0.0
+            tp1_slip = (tp1_notional * TAKER_SLIP
                         if pos.tp1_hit and not pos.maker_exits else 0.0)
-            exit_cost = pos.size_usdt * pos.remaining_fraction * (TAKER_FEE + TAKER_SLIP)
+            exit_cost = remaining_exit_notional * (TAKER_FEE + TAKER_SLIP)
             funding_cost = 0.0
             if getattr(self, "funding_dir", None):
                 if sym not in self.funding_by_symbol:
@@ -1718,14 +1727,17 @@ class UnifiedQuantEngine:
         # затем округляем итог в денежном формате (half-up), а не каждую ногу отдельно.
         entry_maker = pos.order_type == "limit"
         fees = slip = 0.0
-        f, s = self._leg_cost(pos.size_usdt, entry_maker)                     # вход
+        position_qty = pos.size_usdt / pos.entry_price
+        f, s = self._leg_cost(pos.size_usdt, entry_maker)                      # вход: qty * entry
         fees += f; slip += s
         maker_exits = (pos.order_type == "limit") if pos.maker_exits is None else pos.maker_exits
-        if pos.tp1_hit:                                                        # TP1-нога
-            f, s = self._leg_cost(pos.size_usdt * TP1_FRACTION, maker_exits)
+        if pos.tp1_hit:                                                        # TP1: qty * TP1 price
+            tp1_notional = position_qty * pos.tp1_price * TP1_FRACTION
+            f, s = self._leg_cost(tp1_notional, maker_exits)
             fees += f; slip += s
         final_maker = maker_exits and exit_reason == "take_profit"             # финальная нога
-        f, s = self._leg_cost(pos.size_usdt * pos.remaining_fraction, final_maker)
+        final_notional = position_qty * exit_price * pos.remaining_fraction
+        f, s = self._leg_cost(final_notional, final_maker)
         fees += f; slip += s
         fees, slip = _money_round(fees), _money_round(slip)
 

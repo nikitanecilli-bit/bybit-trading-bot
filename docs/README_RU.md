@@ -11,9 +11,10 @@
 7. [Шаблон карточки эксперимента](research/EXPERIMENT_CARD_TEMPLATE_RU.md) — заполняется до каждого нового запуска.
 8. [ENG-KS-001 — kill-switch priority](research/experiment_cards/ENG-KS-001_KILL_SWITCH_PRIORITY_RU.md) — исправление внутрисвечной конкуренции kill-switch и TP.
 9. [ENG-EXEC-002 — marketable limit costs](research/experiment_cards/ENG-EXEC-002_MARKETABLE_LIMIT_FEE_RU.md) — taker-классификация лимитных gap-through fills.
-10. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
-11. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
-12. [Карта репозитория](REPOSITORY_MAP_RU.md).
+10. [ENG-STATE-003 — fail-closed restore](research/experiment_cards/ENG-STATE-003_FAIL_CLOSED_RESTORE_RU.md) — не допускает тихой потери локального состояния при повреждённом backup.
+11. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
+12. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
+13. [Карта репозитория](REPOSITORY_MAP_RU.md).
 
 ## Разделы
 

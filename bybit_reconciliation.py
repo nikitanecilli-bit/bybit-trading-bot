@@ -99,10 +99,9 @@ def _response_page(payload: Mapping[str, Any], requested_cursor: str,
         raise SnapshotValidationError("response page must be an object")
     if requested_cursor != expected_cursor:
         raise SnapshotValidationError("pagination cursor chain is discontinuous")
-    if payload.get("retCode") != 0:
-        raise SnapshotValidationError(
-            f"Bybit retCode is not zero: {payload.get('retCode')!r}"
-        )
+    ret_code = payload.get("retCode")
+    if isinstance(ret_code, bool) or not isinstance(ret_code, int) or ret_code != 0:
+        raise SnapshotValidationError(f"Bybit retCode is not integer zero: {ret_code!r}")
     result = payload.get("result")
     if not isinstance(result, Mapping):
         raise SnapshotValidationError("response result must be an object")

@@ -64,8 +64,8 @@ def parse_member(raw: Any, symbol: str, timeframe: str) -> dict[int, tuple[str, 
         if ts in candles:
             raise ValueError(f"duplicate timestamp {ts} within {symbol} {timeframe}")
         candles[ts] = (o, h, low, close, volume)
-    if len(candles) < 2:
-        raise ValueError("fewer than two candles")
+    if not candles:
+        raise ValueError("no candles")
     return candles
 
 
@@ -93,13 +93,13 @@ def inspect_archives(archive_dir: Path) -> tuple[list[dict[str, Any]], dict[tupl
                     item = {
                         **base, "bars": len(candles), "first_ts": timestamps[0],
                         "last_ts": timestamps[-1], "gap_intervals": gaps,
-                        "valid": True, "error": "", "candles": candles,
+                        "backtest_eligible": len(candles) >= 200, "valid": True, "error": "", "candles": candles,
                     }
                     inventory.append({k: v for k, v in item.items() if k != "candles"})
                     groups[(symbol, timeframe)].append(item)
                 except Exception as exc:
                     inventory.append({**base, "bars": 0, "first_ts": None,
-                                      "last_ts": None, "gap_intervals": None,
+                                      "last_ts": None, "gap_intervals": None, "backtest_eligible": False,
                                       "valid": False, "error": str(exc)})
     return inventory, groups
 
@@ -168,7 +168,9 @@ def write_outputs(output_dir: Path, inventory: list[dict[str, Any]],
         "# CryptoFetch archive comparison",
         "",
         f"- Candidate CSV members: {summary['candidate_files']}",
-        f"- Valid members: {summary['valid_files']}",
+        f"- Structurally valid members: {summary['valid_files']}",
+        f"- Members meeting legacy 200-bar minimum: {summary['backtest_eligible_files']}",
+        f"- Valid but too short for legacy backtest loader: {summary['too_short_for_backtest_files']}",
         f"- Rejected members: {summary['rejected_files']}",
         f"- Duplicate symbol/timeframe groups: {summary['duplicate_symbol_timeframe_groups']}",
         f"- Pairwise comparisons: {summary['pairwise_comparisons']}",
@@ -195,6 +197,8 @@ def main() -> int:
         "archive_dir": str(args.archive_dir),
         "candidate_files": len(inventory),
         "valid_files": sum(bool(x["valid"]) for x in inventory),
+        "backtest_eligible_files": sum(bool(x.get("backtest_eligible")) for x in inventory),
+        "too_short_for_backtest_files": sum(bool(x["valid"]) and not bool(x.get("backtest_eligible")) for x in inventory),
         "rejected_files": sum(not bool(x["valid"]) for x in inventory),
         **pair_summary,
     }

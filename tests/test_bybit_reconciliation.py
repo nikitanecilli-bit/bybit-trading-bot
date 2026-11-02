@@ -71,6 +71,11 @@ class BybitReconciliationParserTests(unittest.TestCase):
         with self.assertRaisesRegex(SnapshotValidationError, "retCode"):
             parse_position_pages([("", payload)])
 
+    def test_boolean_ret_code_is_not_accepted_as_success(self):
+        payload = {"retCode": False, "retMsg": "invalid", "result": {"list": [], "nextPageCursor": ""}}
+        with self.assertRaisesRegex(SnapshotValidationError, "integer zero"):
+            parse_position_pages([("", payload)])
+
     def test_active_order_parser_preserves_partial_fill_quantities(self):
         order = {
             "orderId": "order-1", "orderLinkId": "bot-1", "symbol": "BTCUSDT",

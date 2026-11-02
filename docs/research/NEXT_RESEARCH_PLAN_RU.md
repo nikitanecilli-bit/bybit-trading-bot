@@ -260,3 +260,7 @@ No production/live changes and no market backtests were performed in these corre
 
 - **ENG-STATE-008 accepted:** restored position validation now checks TP1/TP2 directional ordering and cross-field consistency of TP1 flag, remaining quantity and realized TP1 PnL. Persistence regression suite 29/29; CI #41435897233 passed.
 - Remaining hard blockers before any live recovery: exchange reconciliation, stale-backup policy/schema migration, and durability semantics. Local JSON/state invariants alone do not establish safe restart.
+
+
+- **ENG-STATE-009 accepted:** restore rejects symbols present in both open positions and pending signals, and rejects duplicate trade IDs. Persistence tests 31/31; CI #41436083033 passed.
+- The next persistence priority is required-field completeness and backup freshness. A syntactically valid but incomplete JSON object must not be mistaken for a valid empty portfolio snapshot.

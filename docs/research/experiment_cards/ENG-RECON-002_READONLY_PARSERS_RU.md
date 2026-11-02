@@ -21,7 +21,7 @@ No HTTP client, credentials, private API call, order mutation or engine restore 
 - empty zero-size position rows;
 - duplicate position/order/execution identities;
 - incomplete/discontinuous pagination;
-- Bybit error response not treated as empty account;
+- Bybit error response and boolean `retCode=False` are not treated as integer success or empty account;
 - partial fill quantity accounting;
 - multiple executions per order;
 - funding execution without trade side/price;

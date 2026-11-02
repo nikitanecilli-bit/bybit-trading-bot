@@ -231,10 +231,10 @@ def test_stop_risk_uses_exit_notional_at_stop_price():
         leverage_val=5.0, max_concurrent_positions=2,
     )
     risk = engine_mod.AdaptiveRiskManager(cfg)
-    _, long_risk = risk.calculate_position_size(
+    long_size, long_risk = risk.calculate_position_size(
         100.0, 95.0, order_type="market", risk_budget_usdt=100.0,
     )
-    _, short_risk = risk.calculate_position_size(
+    short_size, short_risk = risk.calculate_position_size(
         100.0, 105.0, order_type="market", risk_budget_usdt=100.0,
     )
     long_rate = 0.05 + engine_mod.TAKER_FEE + engine_mod.TAKER_SLIP + 0.95 * (
@@ -245,7 +245,9 @@ def test_stop_risk_uses_exit_notional_at_stop_price():
     )
     assert long_risk > 0
     assert short_risk > 0
-    assert short_risk > long_risk
+    assert short_size < long_size
+    assert long_risk <= 100.0
+    assert short_risk <= 100.0
 
 
 def test_close_trade_reconciles_net_pnl_fees_slippage_and_realized_equity():

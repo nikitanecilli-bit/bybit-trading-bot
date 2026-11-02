@@ -308,3 +308,11 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - Both cases are order-independent. Simultaneous closes produce exactly two unique trade records; realized equity reconciles to start equity plus summed net PnL; unrealized PnL is zero after all positions close.
 - Full Research CI [#41507219610](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41507219610) SUCCESS. Portfolio suite 22/22; persistence suite 54 tests passed.
 - No additional production change was needed for simultaneous close accounting in these tested scenarios. This does not validate live exchange fill ordering, partial fills or queue behavior.
+
+
+## Current branch relationship after ENG-PERSIST-002 records (2026-11-02)
+
+- Research branch HEAD: `1b086c65d518b42902da3b4615feac1f90af0089`.
+- `main` HEAD observed: `e7303f7731a52eb72a2447d0cc060f346a943776`; unchanged by this work.
+- Current compare: 773 commits ahead / 14 behind, 168 changed files, +15,076 / -111; GitHub merge state dirty.
+- PR #4 remains open Draft and unmerged. Description updated with ENG-PERSIST-002 and CI #41507219610.

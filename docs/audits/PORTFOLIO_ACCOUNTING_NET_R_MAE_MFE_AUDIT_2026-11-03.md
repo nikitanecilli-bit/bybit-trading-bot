@@ -93,3 +93,10 @@ MAE/MFE рассчитываются в ценовых R от initial_stop_dist,
 `NO P0 ACCOUNTING DEFECT CONFIRMED`.
 `P1 DOCUMENTED`: conservative MTM exit-cost asymmetry may trigger risk gates earlier than a maker TP close would.
 Не менять движок и не запускать рыночные бэктесты на основании этого статического аудита. Следующий безопасный шаг — добавить детерминированные тесты на границе daily-stop/kill-switch и явно зафиксировать expected conservative behavior, затем продолжить аудит margin/liquidation and data alignment.
+
+
+## Superseding finding — exit fee/slippage notional basis (2026-11-03)
+
+The earlier audit verified that closed net PnL reconciled as gross PnL minus modeled fees, slippage and funding, but did not verify the notional basis used for each execution leg. A subsequent Bybit fee-formula audit found a confirmed defect: TP1/final exit fee and slippage were calculated from entry notional rather than actual modeled exit notional. This has now been corrected in v14; see `EXCHANGE_SIZING_INTEGRATION_AND_BYBIT_SCHEMA_2026-11-03.md` section 15.
+
+The earlier reconciliation conclusion remains true algebraically, but the historical fee amounts and net PnL values produced by the old formula were not exchange-price accurate. The regression suite now checks long/short stops, gaps, TP1/TP2 and MTM with execution-price notionals. CI #41536540759 passed.

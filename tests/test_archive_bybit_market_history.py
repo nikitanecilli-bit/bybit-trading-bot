@@ -138,9 +138,13 @@ class BybitMarketHistoryTests(unittest.TestCase):
                 normalize_symbol(symbol)
 
     def test_only_official_https_hosts_are_allowed(self):
-        validate_base_url("https://api.bybit.com")
+        for host in ("api.bybit.com", "api.bytick.com", "api.bybit.kz",
+                     "api.bybit.tr", "api.bybitgeorgia.ge", "api.bybit.ae",
+                     "api.bybit.eu", "api.bybit.id"):
+            validate_base_url(f"https://{host}")
         for url in ("http://api.bybit.com", "https://example.com",
-                    "https://api.bybit.com:444", "https://" + "user" + ":" + "pass" + "@api.bybit.com"):
+                    "https://api.bybit.com:444", "https://" + "user" + ":" + "pass" + "@api.bybit.com",
+                    "https://api.bybit.nl", "https://api.bybit-tr.com"):
             with self.assertRaises(ValueError):
                 validate_base_url(url)
 

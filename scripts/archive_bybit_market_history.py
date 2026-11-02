@@ -28,7 +28,6 @@ DEFAULT_BASE_URL = "https://api.bybit.com"
 ALLOWED_API_HOSTS = {
     "api.bybit.com", "api.bytick.com", "api.bybit.kz", "api.bybit.tr",
     "api.bybitgeorgia.ge", "api.bybit.ae", "api.bybit.eu", "api.bybit.id",
-    "api.bybit.nl", "api.bybit-tr.com",
 }
 FUNDING_ENDPOINT = "/v5/market/funding/history"
 KLINE_ENDPOINT = "/v5/market/kline"

@@ -321,3 +321,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41433598794](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41433598794), SUCCESS; compile, all configured deterministic suites and secret scan passed.
 - Decision: ACCEPT as an in-memory restore atomicity correction. No market backtest, parameter sweep, production deployment or live order.
 - Limitation: local restore still lacks exchange reconciliation and backup freshness/schema migration.
+
+
+## ENG-STATE-006 — restored pending signal schema (2026-11-02)
+
+- Preregistered card: [ENG-STATE-006](experiment_cards/ENG-STATE-006_PENDING_SCHEMA_RU.md).
+- Confirmed defect: loader only checked that `pending_orders` was a dict; nested values could be arrays/scalars or malformed signal objects, and `pending_orders: []` was silently normalized to an empty dict by `or {}`.
+- Fix: validate pending signal object shape, symbol/key identity, required fields, direction, order type, strategy, finite positive entry/stop distance and optional nonnegative finite vol_ratio. Do not normalize malformed empty list/null containers into an empty state.
+- Tests: `tests/test_state_persistence.py` 14/14; includes malformed pending container/entry, missing fields, invalid direction/order type, NaN price, valid pending round-trip, and no risk-manager mutation on failed restore.
+- Commits: engine `f7ecec11e571c26cce4be2d01903a4d104b7f223`, strict empty/null container handling `990bcf9e66551edb0369e4f2c606e643b3e2ac5f`; tests `b1eeede0558eec4125c7dd4be9bb8b80153bda0f`.
+- CI: [Research engine checks #41433992368](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41433992368), SUCCESS; compile, all configured deterministic suites and secret scan passed.
+- Decision: ACCEPT as a local backup validation correction. No market backtest, parameter sweep, production deployment or live order.
+- Limitation: local pending signal state is not an exchange order; no reconciliation with Bybit active orders is implemented.

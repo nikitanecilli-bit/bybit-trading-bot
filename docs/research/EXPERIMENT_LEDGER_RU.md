@@ -496,3 +496,10 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41447569454](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41447569454), SUCCESS; compile, configured deterministic suites and secret scan passed.
 - Decision: ACCEPT for improved local crash-durability. No market PnL sweep, production deployment or live order.
 - Limitation: fsync is an OS/filesystem durability request, not an absolute hardware guarantee; Windows does not receive parent-directory fsync in this implementation.
+
+
+### ENG-STATE-017 follow-up regression
+
+- Added POSIX test for parent-directory fsync failing after atomic rename. It confirms save raises even though the new file is already visible, and the temp file is absent; caller must stop because directory-entry durability was not confirmed.
+- Test commit: `dd808b3cb83e1308a26490f16582d26498fe0709`.
+- CI: [Research engine checks #41447862710](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41447862710), SUCCESS; persistence tests 54/54.

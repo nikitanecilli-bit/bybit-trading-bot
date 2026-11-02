@@ -109,3 +109,16 @@ Workflow не запускает исследовательские рыночн
 ## Решение
 
 Технический CI текущей исследовательской ветки зелёный. Это означает, что детерминированные проверки прошли, но финансовая модель ещё не exchange-complete. Read-only reconciliation pipeline реализован fail-closed, однако реальная сверка аккаунта не выполнена. Никакая стратегия или фильтр не одобрены для live торговли.
+
+
+## Дополнительная проверка публичного snapshot workflow
+
+Отдельно проверен workflow `.github/workflows/bybit-instrument-snapshots.yml` и его run [41468304134](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468304134).
+
+- Job `snapshot` завершился `failure` на шаге `Download dated linear instrument snapshot`.
+- Лог подтверждает HTTP 403 при запросах к публичному `/v5/market/instruments-info` на доступных runner endpoints; содержимое ответа намеренно подавлено.
+- На более раннем запуске #41468109413 один из fallback-hosts также не прошёл локальную host allowlist; позднее allowlist/fixture были расширены, но доступность публичного API из runner всё равно не подтверждена.
+- Это отдельный внешний сетевой блокер, а не провал unit tests. Успешный основной CI проверяет collector на mocked fixtures и не снимает HTTP 403.
+- Автоматический snapshot не был сохранён; свежих exchange instrument specs в репозитории нет.
+
+Не следует обходить 403 через непроверенные proxy, случайные домены или сторонние endpoints. Следующий безопасный путь — получить публичный snapshot из разрешённой сети/среды, сохранить URL/host, fetched_at, raw response и hash, затем импортировать как датированный артефакт без подмены источника.

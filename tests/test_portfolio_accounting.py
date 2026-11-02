@@ -560,6 +560,47 @@ def test_two_positions_stopped_on_same_bar_reconcile_once_independent_of_order()
     assert abs(first.risk_mgr.current_equity - reverse.risk_mgr.current_equity) < 1e-8
 
 
+
+
+def _metric_trade(trade_id, pnl, exit_date):
+    return engine_mod.TradeRecord(
+        id=trade_id, token=trade_id, direction="long",
+        entry_date="2026-10-01T00:00:00Z", exit_date=exit_date,
+        entry_price=100.0, exit_price=100.0, size_usdt=1_000.0,
+        strategy="metric-order-test", pnl_usdt=pnl, gross_pnl=pnl,
+        r_multiple=pnl / 100.0, exchange_fees_usdt=0.0,
+        slippage_cost_usdt=0.0, mae=0.0, mfe=0.0,
+        exit_reason="test", order_type="market", risk_usdt=100.0,
+        risk_pct=1.0,
+    )
+
+
+def test_drawdown_is_order_independent_for_simultaneous_trade_closes():
+    cfg = engine_mod.BotConfig(capital_usdt=10_000.0)
+    ts = "2026-10-02T12:00:00Z"
+    simultaneous = [
+        _metric_trade("WIN", 100.0, ts),
+        _metric_trade("LOSS", -200.0, ts),
+    ]
+    forward = engine_mod.MaintenanceGateAuditor.evaluate_portfolio(simultaneous, cfg)
+    reverse = engine_mod.MaintenanceGateAuditor.evaluate_portfolio(list(reversed(simultaneous)), cfg)
+
+    assert forward["net_pnl"] == reverse["net_pnl"] == -100.0
+    assert forward["max_dd_pct"] == reverse["max_dd_pct"] == 1.0
+
+
+def test_drawdown_uses_exit_chronology_not_input_list_order():
+    cfg = engine_mod.BotConfig(capital_usdt=10_000.0)
+    early = _metric_trade("EARLY", -200.0, "2026-10-02T10:00:00Z")
+    late = _metric_trade("LATE", 100.0, "2026-10-02T11:00:00Z")
+
+    chronological = engine_mod.MaintenanceGateAuditor.evaluate_portfolio([early, late], cfg)
+    shuffled = engine_mod.MaintenanceGateAuditor.evaluate_portfolio([late, early], cfg)
+
+    assert chronological["net_pnl"] == shuffled["net_pnl"] == -100.0
+    assert chronological["max_dd_pct"] == shuffled["max_dd_pct"] == 2.0
+
+
 if __name__ == "__main__":
     tests = [(name, value) for name, value in sorted(globals().items())
              if name.startswith("test_") and callable(value)]

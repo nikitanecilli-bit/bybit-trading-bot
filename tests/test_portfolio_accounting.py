@@ -243,7 +243,7 @@ def run_simultaneous_entries(order):
     for symbol in order:
         e.pending[symbol] = {
             "direction": "long", "entry_price": 100.0, "order_type": "market",
-            "strategy": "simultaneous-test", "stop_dist": 5.0,
+            "strategy": "simultaneous-test", "stop_dist": 5.0, "signal_ts": 1_799_996_400_000,
         }
     bar = engine_mod.Candle(
         ts=1_800_000_000_000, open=100.0, high=101.0,
@@ -272,9 +272,9 @@ def test_position_slot_priority_uses_signal_strength_not_iteration_order():
         e = make_engine()
         e.cfg.max_concurrent_positions = 2
         e.pending = {
-            "BTCUSDT": {"direction": "long", "entry_price": 100.0, "order_type": "market", "strategy": "test", "stop_dist": 5.0, "vol_ratio": 1.8},
-            "ETHUSDT": {"direction": "long", "entry_price": 100.0, "order_type": "market", "strategy": "test", "stop_dist": 5.0, "vol_ratio": 2.4},
-            "SOLUSDT": {"direction": "long", "entry_price": 100.0, "order_type": "market", "strategy": "test", "stop_dist": 5.0, "vol_ratio": 2.1},
+            "BTCUSDT": {"direction": "long", "entry_price": 100.0, "order_type": "market", "strategy": "test", "stop_dist": 5.0, "signal_ts": 1_799_996_400_000, "vol_ratio": 1.8},
+            "ETHUSDT": {"direction": "long", "entry_price": 100.0, "order_type": "market", "strategy": "test", "stop_dist": 5.0, "signal_ts": 1_799_996_400_000, "vol_ratio": 2.4},
+            "SOLUSDT": {"direction": "long", "entry_price": 100.0, "order_type": "market", "strategy": "test", "stop_dist": 5.0, "signal_ts": 1_799_996_400_000, "vol_ratio": 2.1},
         }
         bar = engine_mod.Candle(ts=1_800_000_000_000, open=100.0, high=101.0, low=99.0, close=100.5, volume=10.0)
         e._prepare_pending_entry_risk_budgets()

@@ -258,3 +258,10 @@ Research engine checks [#41543597235](https://github.com/nikitanecilli-bit/bybit
 Two intermediate CI failures were corrected before this successful run: first the sizing fixture lacked leverageFilter fields; then older unit-test harnesses constructed the engine with `__new__` and therefore lacked the new optional attributes. The engine now uses a backward-compatible `getattr` guard while retaining strict behavior whenever an instrument-spec history is explicitly supplied.
 
 This is code-path verification with synthetic specs only. It does not establish that dated Bybit snapshots exist for the historical E11/E13 periods, nor does it validate actual Bybit fills, funding, margin tiers or liquidation.
+
+
+## 18. Remaining lifecycle limitation after entry-side integration
+
+The strict path currently validates and floors the **opening order quantity** only. It does not yet validate the modeled TP1 partial close, final close, or any future reduce-only order quantity against qtyStep/minOrderQty/minNotionalValue. The engine still models TP1 as a 50% fractional reduction and reconstructs linear quantity downstream from `size_usdt / entry_price` (stored as float notional), rather than persisting the Decimal contract quantity as first-class position state.
+
+Therefore this change closes the entry sizing integration gap, but **does not make the entire position lifecycle exchange-quantity exact**. Before claiming contract-accurate replay, add persisted contract quantity and dated lot constraints to position state; quantize partial and final reduce-only quantities; reconcile any residual dust; and test minimum-close behavior. Liquidation/margin remains a separate open gate.

@@ -770,6 +770,6 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 ## ENG-DATA-005 — Adaptive funding pagination and final CI (2026-11-02)
 
 - Funding archive no longer stops at the first full 200-row Bybit response. It recursively subdivides saturated time windows and re-requests each half; if saturation persists at the minimum 1 ms width, it fails closed.
-- Added regression tests for adaptive subdivision and minimum-width saturation. Research CI run #41520495668 completed SUCCESS on commit 78a07cbbc5713b5e72874c231c3c53245aff999f; all 23 test steps succeeded.
-- Previous intermediate run #41520465851 failed only because it ran against the old test expecting immediate failure on a saturated page. The test was replaced with adaptive-pagination coverage and the subsequent full CI passed.
+- Added regression tests for adaptive subdivision and minimum-width saturation. Research CI run #41520724088 completed SUCCESS on commit 77fee281686a2ca29bdf295e3b8dcc011ea856e4; all 23 test steps succeeded. Run #41520495668 remained in progress during runner cleanup when last checked; do not treat it as terminal success.
+- Previous intermediate run #41520465851 failed only because it ran against the old test expecting immediate failure on a saturated page. The test was replaced with adaptive-pagination coverage and the subsequent full CI #41520724088 passed.
 - The API archive workflow still requires a manual dispatch. This GitHub connection has no workflow-dispatch action; no Bybit API data has been fetched or claimed. No main-branch change and no live orders.

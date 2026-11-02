@@ -226,6 +226,44 @@ class StatePersistenceTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 engine.PlanBStatePersistence(str(path)).load_state(risk)
 
+    def _assert_invalid_risk_payload(self, risk_payload):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid-risk.json"
+            path.write_text(
+                json.dumps({
+                    "risk": risk_payload,
+                    "open_positions": {},
+                    "pending_orders": {},
+                    "trade_seq": 0,
+                }, allow_nan=True),
+                encoding="utf-8",
+            )
+            risk = engine.AdaptiveRiskManager(engine.BotConfig())
+            before = risk.to_dict().copy()
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(risk)
+            self.assertEqual(risk.to_dict(), before)
+
+    def test_risk_nan_equity_is_rejected(self):
+        self._assert_invalid_risk_payload({"current_equity": float("nan")})
+
+    def test_risk_negative_equity_is_rejected(self):
+        self._assert_invalid_risk_payload({"realized_equity": -1.0})
+
+    def test_risk_drawdown_out_of_range_is_rejected(self):
+        self._assert_invalid_risk_payload({"max_drawdown_pct": 101.0})
+
+    def test_risk_invalid_day_and_flag_types_are_rejected(self):
+        for payload in (
+            {"current_day_str": "2026-02-30"},
+            {"kill_switch_triggered": "false"},
+        ):
+            with self.subTest(payload=payload):
+                self._assert_invalid_risk_payload(payload)
+
+    def test_risk_unknown_field_is_rejected(self):
+        self._assert_invalid_risk_payload({"equity_usdt": 10000.0})
+
     def test_invalid_trade_sequence_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "sequence.json"

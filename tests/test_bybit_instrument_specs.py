@@ -15,7 +15,7 @@ SNAPSHOT = {
         "symbol": "TESTUSDT",
         "category": "linear",
         "status": "Trading",
-        "priceFilter": {"tickSize": "0.05"},
+        "priceFilter": {"minPrice": "0.05", "maxPrice": "1000000", "tickSize": "0.05"},
         "lotSizeFilter": {
             "qtyStep": "0.001",
             "minOrderQty": "0.01",
@@ -40,6 +40,8 @@ class InstrumentSpecTests(unittest.TestCase):
         self.assertEqual(self.spec.schema_version, 1)
         self.assertEqual(self.spec.symbol, "TESTUSDT")
         self.assertEqual(self.spec.tick_size, Decimal("0.05"))
+        self.assertEqual(self.spec.min_price, Decimal("0.05"))
+        self.assertEqual(self.spec.max_price, Decimal("1000000"))
         self.assertEqual(self.spec.qty_step, Decimal("0.001"))
         self.assertEqual(self.spec.min_notional_value, Decimal("5"))
         self.assertEqual(self.spec.fetched_at, "2026-11-02T00:00:00Z")
@@ -85,6 +87,27 @@ class InstrumentSpecTests(unittest.TestCase):
             self.spec.round_price("100", side="long")
         with self.assertRaisesRegex(ValueError, r"> 0"):
             self.spec.round_qty("0")
+
+    def test_limit_price_respects_exchange_price_bounds(self):
+        with self.assertRaisesRegex(ValueError, "minPrice/maxPrice"):
+            self.spec.validate_order("1", "0.00")
+        with self.assertRaisesRegex(ValueError, "minPrice/maxPrice"):
+            self.spec.validate_order("1", "1000000.05")
+        with self.assertRaisesRegex(ValueError, "minPrice/maxPrice"):
+            self.spec.round_price("1000000.01", side="sell")
+
+    def test_non_linear_category_is_rejected(self):
+        broken = {"instrument": dict(SNAPSHOT["instrument"])}
+        broken["instrument"]["category"] = "spot"
+        with self.assertRaisesRegex(ValueError, "only supports linear"):
+            InstrumentSpec.from_snapshot(broken)
+
+    def test_non_trading_instrument_cannot_be_sized(self):
+        broken = {"instrument": dict(SNAPSHOT["instrument"])}
+        broken["instrument"]["status"] = "PendingOpen"
+        spec = InstrumentSpec.from_snapshot(broken)
+        with self.assertRaisesRegex(ValueError, "not tradable"):
+            spec.validate_order("1", "100")
 
     def test_invalid_min_max_relationship_rejected(self):
         broken = {"instrument": dict(SNAPSHOT["instrument"])}

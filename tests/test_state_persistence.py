@@ -44,6 +44,7 @@ class StatePersistenceTests(unittest.TestCase):
             risk.unrealized_pnl = -125.0
             risk.current_equity = 9_375.0
             risk.peak_equity = 10_200.0
+            risk.max_drawdown_pct = (10_200.0 - 9_375.0) / 10_200.0 * 100.0
             risk.kill_switch_triggered = True
             risk.daily_stop_triggered = True
             position = sample_position()
@@ -352,6 +353,37 @@ class StatePersistenceTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 engine.PlanBStatePersistence(str(path)).load_state(risk)
             self.assertEqual(risk.to_dict(), before)
+
+    def test_risk_current_equity_must_match_realized_plus_unrealized(self):
+        self._assert_invalid_risk_payload({"current_equity": 9_999.0})
+
+    def test_risk_peak_equity_cannot_be_below_current_equity(self):
+        self._assert_invalid_risk_payload({"peak_equity": 9_000.0})
+
+    def test_risk_max_drawdown_must_cover_implied_current_drawdown(self):
+        self._assert_invalid_risk_payload({
+            "current_equity": 9_000.0, "realized_equity": 9_000.0,
+            "unrealized_pnl": 0.0, "peak_equity": 10_000.0,
+            "max_drawdown_pct": 2.0,
+        })
+
+    def test_risk_historical_max_drawdown_above_current_drawdown_is_valid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "historical-dd.json"
+            risk_data = sample_risk_data()
+            risk_data.update({
+                "realized_equity": 9_900.0, "unrealized_pnl": 0.0,
+                "current_equity": 9_900.0, "peak_equity": 10_000.0,
+                "max_drawdown_pct": 5.0,
+            })
+            path.write_text(json.dumps({
+                "risk": risk_data, "open_positions": {},
+                "pending_orders": {}, "trade_seq": 0,
+            }), encoding="utf-8")
+            restored = engine.AdaptiveRiskManager(engine.BotConfig())
+            engine.PlanBStatePersistence(str(path)).load_state(restored)
+            self.assertEqual(restored.current_equity, 9_900.0)
+            self.assertEqual(restored.max_drawdown_pct, 5.0)
 
     def test_risk_nan_equity_is_rejected(self):
         self._assert_invalid_risk_payload({"current_equity": float("nan")})

@@ -112,3 +112,22 @@ This changes the next action: first inspect the next scheduled/manual workflow r
 ## 9. Доказательство недоступности Bybit API из GitHub Actions
 
 Получены jobs и decoded logs для существующих запусков instrument snapshot workflow #7–#10. Во всех попытках API hosts возвращали HTTP 403; затем workflow завершался exit code 1, snapshot commit step пропускался. В логах также есть отказ host validation для одного из fallback hosts. Это подтверждает сетевую/API access проблему на runner, а не отсутствие endpoint или ошибку JSON schema. Не предпринимать обход географических/сетевых ограничений; получать официальный snapshot из разрешённой пользователем среды или ждать исправления доступности.
+
+## 10. Официальные региональные API hosts и workflow triggers
+
+По текущей Bybit Integration Guidance официальный список mainnet hosts включает `api.bybit.com`, `api.bytick.com`, `api.bybit.tr`, `api.bybit.kz`, `api.bybitgeorgia.ge`, `api.bybit.ae`, `api.bybit.eu`, `api.bybit.id`. Документация прямо говорит, что IP из США и Mainland China получают HTTP 403; для EEA API отдельно указано ограничение для API broker users. Фактическая география egress GitHub runner в проверенных логах не установлена, поэтому 403 нельзя приписывать конкретной стране без IP evidence.
+
+Устаревший Netherlands host был удалён из Integration Guidance 2026-09-22; в workflow ошибочно использовался `api.bybit-tr.com` вместо официального `api.bybit.tr`. Исправлены allowlists обоих snapshot scripts, host lists всех трёх market-data workflows и соответствующие tests. Официальные домены проверяются unit tests; retired/invalid hosts отвергаются.
+
+GitHub Actions trigger semantics: scheduled workflows run only on default branch, and `workflow_dispatch` only receives events when workflow file exists on default branch. Три snapshot/archive workflow существуют только в research branch (проверка main вернула 404). Чтобы instrument/risk snapshots можно было валидировать без изменения main, добавлен branch-scoped `push` trigger с paths filter к обоим snapshot workflows. Schedule и workflow_dispatch оставлены как future-ready, но до появления этих файлов в default branch не являются действующими триггерами. Market-history archive остаётся manual-only и не может быть dispatch-нут из branch-only workflow через GitHub UI/API.
+
+CI evidence:
+- Research engine checks run #41533273830, commit `e55aa6b46b7ab2ab0a06060fa12da70a49c20082`: success; full deterministic suite including updated InstrumentSpec parser, as-of history, and exchange sizing.
+- Research engine checks #41533575723, commit `e5256757dc088d27b0081302639392de9a3255a3`: success; official/retired host allowlist tests for instrument collector.
+- Research engine checks #41533598553, commit `032a97bc18ad7eb28f750f565c0dd86f3a90db6c`: success; full deterministic suite including risk-limit host allowlist tests.
+- Instrument snapshot workflow #41533728951 was triggered by the new branch-scoped push trigger; result is being checked separately. No risk-limit snapshot success or real data archive is claimed.
+
+Sources:
+- Bybit Integration Guidance: https://bybit-exchange.github.io/docs/v5/guide
+- Bybit V5 changelog (2026-09-22 removed Netherlands domain): https://bybit-exchange.github.io/docs/changelog/v5
+- GitHub workflow syntax / events: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax and https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows

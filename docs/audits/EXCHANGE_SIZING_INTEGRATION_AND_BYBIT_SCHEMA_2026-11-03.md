@@ -212,3 +212,20 @@ Same-bar order-invariance test допускает максимум (2×10^{-6}) 
 Rates `TAKER_FEE=0.00055`, `MAKER_FEE=0.00020`, `TAKER_SLIP=0.000225` остаются фиксированными research assumptions. Фактический VIP tier и региональные account fee rates не подключены. Maker fill still assumes touch/fill and lacks queue/partial-fill/adverse-selection model.
 
 Источник формулы: https://www.bybit.com/en/help-center/article/Profit-Loss-calculations-USDT-Contract
+
+## 16. Точный qty: implementation map and migration requirements
+
+Static call-site mapping for the next implementation (not yet coded):
+
+1. **Spec resolution / entry:** `UnifiedQuantEngine._try_fill_pending()` currently receives `size_usdt, risk_usdt` from `calculate_position_size()` and stores notional proxy. Resolve an immutable point-in-time Linear `InstrumentSpec` for symbol and entry timestamp; call `size_to_exchange_constraints()` after choosing modeled fill price; reject if min/max/qtyStep/minNotional fails. Recompute risk from final rounded qty and actual entry/stop prices, not from pre-round target notional.
+2. **Position state:** extend `OpenPositionState` with requested qty, actual modeled filled qty, remaining qty, and spec snapshot identifier/hash/fetched_at. Do not reconstruct actual qty from rounded notional after entry.
+3. **Partial TP1:** `_apply_tp1()` currently uses fixed `TP1_FRACTION` and `remaining_fraction`. Replace with step-rounded `tp1_qty` and exact `remaining_qty = entry_qty - tp1_qty`; verify both legs meet minQty/qtyStep/minNotional. If no valid split exists, define an explicit policy (skip partial TP1 or close full position); never send an invalid half-qty.
+4. **PnL and costs:** unrealized/realized linear PnL = signed `qty × (mark/exit_price - entry_price)`; fee/slippage per leg = actual leg qty × modeled execution price × rate. TP1 and final exit quantities must sum to entry filled qty exactly.
+5. **Funding:** `funding_accounting.accrued_funding_cost()` currently derives qty as `size_usdt / entry_price`. Use stored actual qty and remaining qty; settlement quantity at TP1/close boundaries must follow the existing conservative event-order policy.
+6. **Journal:** extend `TradeRecord` with entry/TP1/final executed qty and spec snapshot reference; keep `size_usdt` only as descriptive entry notional, not as canonical position size.
+7. **Persistence:** `PlanBStatePersistence` serializes `asdict(pos)`, checks strict `known`/required/numeric field sets and constructs `OpenPositionState(**pos_dict)`. Adding qty requires a schema version bump and explicit migration/rejection policy for old backups. Never infer live open-order qty from an old notional-only backup.
+8. **Margin/liquidation:** only after qty is canonical and dated risk tiers exist; isolated calculator first. Cross/UTA remains a separate account-level project.
+
+Required tests before market PnL sweeps: arbitrary qtyStep (including odd step counts), minQty/minNotional boundary, market-vs-limit max caps, long/short entry sizing after qty rounding, TP1 split valid/invalid, TP1+final quantity conservation, gap exit, mark-to-market, funding at entry/TP1/close boundary, save/restore schema migration, and portfolio multi-symbol order invariance.
+
+Current blocker: no committed dated Bybit instrument/risk-limit snapshots; both snapshot workflows fail HTTP 403 on the configured default host. Therefore this section is a design checklist only; do not substitute invented instrument specs or risk tiers.

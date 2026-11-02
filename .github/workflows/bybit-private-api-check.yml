@@ -25,9 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check out repository without persisted Git credentials
+      - name: Check out research branch without persisted Git credentials
         uses: actions/checkout@v4
         with:
+          ref: research/market-regime-v1-main
           persist-credentials: false
 
       - name: Verify Bybit V5 read-only API credentials

@@ -114,4 +114,4 @@ Added `test_bybit_instrument_specs.py` for versioned snapshot parsing, Decimal b
 - CI execution is not yet verified; do not treat tests as passed until run result is inspected.
 
 | Bybit V5 reconciliation parsing | PARTIAL | ENG-RECON-002: pure positions/orders/executions parsers; pagination chain and identity checks; 13 fixture tests | Exact local qty/positionIdx/order IDs/execution ledger and comparator absent; overall reconciliation BLOCKED |
-| Bybit V5 read-only snapshot collector | IN PROGRESS | ENG-RECON-003: mocked tests for read-only preflight, host allowlist, server-time bounds, pagination, 7-day execution windows, fail-closed API errors; 10 tests authored | CI run not verified; no real snapshot/API call; no order history or exchange-side stop/TP check |
+| Bybit V5 read-only snapshot collector | IN PROGRESS | ENG-RECON-003: mocked tests for read-only preflight, host allowlist, server-time bounds, pagination, 7-day execution windows, fail-closed API errors; 11 tests authored | CI run not verified; no real snapshot/API call; no order history or exchange-side stop/TP check |

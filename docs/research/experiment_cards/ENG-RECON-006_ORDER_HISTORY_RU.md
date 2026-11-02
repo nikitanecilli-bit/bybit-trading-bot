@@ -7,7 +7,7 @@
 ## Реализация
 
 `scripts/bybit_reconciliation_snapshot.py` теперь дополнительно вызывает `GET /v5/order/history`:
-- `category=linear`, `settleCoin=USDT`;
+- `category=linear`, `settleCoin=USDT` for order history and execution history;
 - time windows are split into <=7-day intervals;
 - each interval has its own cursor pagination;
 - historical rows are parsed using strict order quantity/identity validation;
@@ -36,7 +36,7 @@ Therefore this endpoint is a useful supplement, **not a complete order-event jou
 - historical order IDs/statuses and API coverage metadata;
 - no reconciliation PASS is ever possible. Exact duplicate executions at interval boundaries are deduplicated; conflicting records sharing an `execId` block the report.
 
-CI: [Research engine checks #41468736376](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468736376), SUCCESS:
+CI: [Research engine checks #41470373006](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41470373006), SUCCESS:
 - parser 16/16;
 - collector 15/15;
 - comparator 17/17;

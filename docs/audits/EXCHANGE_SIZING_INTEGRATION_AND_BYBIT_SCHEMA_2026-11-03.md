@@ -138,3 +138,9 @@ Sources:
 - Risk-limit snapshot workflow run `41533743884` также failed at download step; все перечисленные host attempts returned HTTP 403. Никаких risk-tier rows или dated archive не получено.
 - Это окончательно подтверждает текущий runner-level API access blocker. Повторять те же GET-запросы или добавлять случайные домены бессмысленно. Следующее получение snapshot должно происходить из разрешённой среды/канала с доступом к официальному API; никаких geo/network bypass действий.
 - Latest deterministic Research CI at this point: #41533598553 success after the official-host allowlist tests. Snapshot workflow failures are data-access failures, not deterministic code test failures.
+
+## 12. В репозитории не обнаружен live order adapter
+
+Проверены root tree, `Bybit_Trading_Engine_v14_research.py`, `bybit_downloader.py`, `bybit_reconciliation.py`, `README.md` и список `scripts/`. В исследовательском движке нет `/v5/order/create`, `order/create`, `place_order`, `create_order` или вызова pybit; единственный `urllib.request.Request` в engine не является order submission. Скрипты содержат downloader, read-only credential/API check, read-only reconciliation, backtests, reports и snapshot collectors.
+
+Следовательно, точнее говорить: в текущем исследовательском репозитории не обнаружен production/live execution adapter. Предыдущий integration gap относится к контрактно-точному sizing внутри research engine; интеграция в live adapter — отдельная будущая задача после создания/аудита этого adapter. Никаких ордеров не отправлялось.

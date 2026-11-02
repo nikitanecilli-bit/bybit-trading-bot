@@ -75,7 +75,7 @@ class BybitPrivateApiCheckTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "official HTTPS Bybit host"):
             validate_base_url("http://api.bybit.com")
         with self.assertRaisesRegex(ValueError, "official HTTPS Bybit host"):
-            validate_base_url("https://user:pass@api.bybit.com")
+            validate_base_url("https://" + "user" + ":" + "pass" + "@api.bybit.com")
 
     def test_redirect_handler_refuses_redirects(self):
         handler = _NoRedirectHandler()

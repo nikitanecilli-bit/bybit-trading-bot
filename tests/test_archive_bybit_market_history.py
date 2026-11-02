@@ -6,7 +6,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.archive_bybit_market_history import (
     FUNDING_WINDOW_MS, fetch_funding_history, fetch_mark_klines,
-    parse_funding_rows, parse_mark_rows, validate_base_url,
+    normalize_symbol, parse_funding_rows, parse_mark_rows, validate_base_url,
 )
 
 
@@ -85,6 +85,12 @@ class BybitMarketHistoryTests(unittest.TestCase):
         self.assertEqual(len(rows), 900)
         self.assertEqual(len(calls), 2)
         self.assertLess(calls[0][2], 1000)
+
+    def test_symbol_path_traversal_and_invalid_characters_rejected(self):
+        self.assertEqual(normalize_symbol("btcusdt"), "BTCUSDT")
+        for symbol in ("../BTCUSDT", "BTC/USDT", "A", "BTC USDT"):
+            with self.assertRaises(ValueError):
+                normalize_symbol(symbol)
 
     def test_only_official_https_hosts_are_allowed(self):
         validate_base_url("https://api.bybit.com")

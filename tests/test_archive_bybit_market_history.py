@@ -25,12 +25,27 @@ class BybitMarketHistoryTests(unittest.TestCase):
         self.assertEqual(rows[1]["funding_timestamp_ms"], start + FUNDING_WINDOW_MS + 1)
         self.assertEqual(calls[-1][1], end - 1)
 
-    def test_funding_rejects_saturated_page(self):
+    def test_funding_saturated_page_is_split_until_complete(self):
+        calls = []
         def fetch(a, b):
-            return [{"symbol": "BTCUSDT", "fundingRateTimestamp": str(a+i+1),
-                     "fundingRate": "0.001"} for i in range(200)]
-        with self.assertRaisesRegex(RuntimeError, "page limit"):
-            fetch_funding_history("BTCUSDT", 10_000, 20_000, fetch)
+            calls.append((a, b))
+            timestamps = [10_001 + i for i in range(200) if a <= 10_001+i <= b]
+            if b-a+1 > 5_000:
+                timestamps = list(range(a+1, a+201))
+            return [{"symbol": "BTCUSDT", "fundingRateTimestamp": str(ts),
+                     "fundingRate": "0.001"} for ts in timestamps[:200]]
+        rows = fetch_funding_history("BTCUSDT", 10_000, 20_000, fetch, pause=0)
+        self.assertEqual(len(rows), 200)
+        self.assertGreater(len(calls), 1)
+        self.assertEqual([x["funding_timestamp_ms"] for x in rows],
+                         sorted(x["funding_timestamp_ms"] for x in rows))
+
+    def test_funding_still_fails_if_minimum_window_is_saturated(self):
+        def fetch(a, b):
+            return [{"symbol": "BTCUSDT", "fundingRateTimestamp": str(a),
+                     "fundingRate": "0.001"} for _ in range(200)]
+        with self.assertRaisesRegex(RuntimeError, "minimum window"):
+            fetch_funding_history("BTCUSDT", 10_000, 10_001, fetch, pause=0)
 
     def test_funding_rejects_empty_history_and_symbol_mismatch(self):
         with self.assertRaisesRegex(RuntimeError, "no funding events"):

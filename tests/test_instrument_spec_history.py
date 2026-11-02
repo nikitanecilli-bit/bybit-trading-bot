@@ -14,7 +14,7 @@ from instrument_spec_history import InstrumentSpecHistory
 def row(symbol="BTCUSDT", tick="0.1", status="Trading"):
     return {
         "symbol": symbol, "status": status, "category": "linear",
-        "priceFilter": {"tickSize": tick},
+        "priceFilter": {"minPrice": "0.01", "maxPrice": "1000000", "tickSize": tick},
         "lotSizeFilter": {
             "qtyStep": "0.001", "minOrderQty": "0.001",
             "maxOrderQty": "100", "maxMktOrderQty": "50",

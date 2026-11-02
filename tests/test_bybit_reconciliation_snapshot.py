@@ -92,6 +92,13 @@ class ReconciliationCollectorTests(unittest.TestCase):
         with self.assertRaisesRegex(CollectorError, "retCode must be integer zero"):
             collect_snapshot("key", "secret", SAVED, request_json=fake)
 
+    def test_rejects_non_bybit_https_host_before_credentials_are_sent(self):
+        fake = FakeTransport()
+        with self.assertRaisesRegex(ValueError, "official HTTPS Bybit API host"):
+            collect_snapshot("key", "secret", SAVED,
+                             base_url="https://attacker.example", request_json=fake)
+        self.assertEqual(fake.calls, [])
+
     def test_rejects_http_non_tls_base_url(self):
         with self.assertRaisesRegex(ValueError, "HTTPS"):
             collect_snapshot("key", "secret", SAVED, base_url="http://example.test",

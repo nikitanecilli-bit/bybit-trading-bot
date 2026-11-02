@@ -75,6 +75,8 @@ def _request_page(base_url: str, category: str, cursor: str | None,
     if not all(isinstance(row, dict) for row in rows):
         raise ValueError("Instrument list contains a non-object row")
     next_cursor = result.get("nextPageCursor") or None
+    if next_cursor is not None and not isinstance(next_cursor, str):
+        raise ValueError("Bybit instrument nextPageCursor must be a string")
     return rows, next_cursor
 
 

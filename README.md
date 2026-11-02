@@ -8,6 +8,7 @@ Private repository for strategy research, historical backtests, data tooling, re
 - [Project working rules](PROJECT_WORKING_RULES_RU.md)
 - [Documentation index](docs/README_RU.md)
 - [Continuous improvement protocol](docs/research/CONTINUOUS_IMPROVEMENT_PROTOCOL_RU.md)
+- [Experiment card template](docs/research/EXPERIMENT_CARD_TEMPLATE_RU.md)
 - [Repository map](docs/REPOSITORY_MAP_RU.md)
 - [Technical audit](docs/audits/PROJECT_AUDIT_RU.md)
 - [Experiment ledger](docs/research/EXPERIMENT_LEDGER_RU.md)
@@ -30,7 +31,7 @@ data/archives/           immutable source datasets
 dashboards/v15/          dashboard exports and instructions
 docs/audits/             technical and branch audits
 docs/reports/            historical backtest and diagnostic reports
-docs/research/           experiment ledger, protocol, coverage matrix and next plan
+docs/research/           experiment ledger, protocol, templates, coverage matrix and next plan
 research/config/         research universe/configuration data
 scripts/                 experiment runners and utilities
 tests/                   deterministic regression tests

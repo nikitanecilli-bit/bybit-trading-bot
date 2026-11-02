@@ -19,7 +19,7 @@ Added `scripts/bybit_reconciliation_snapshot.py`.
 
 ## Tests
 
-`tests/test_bybit_reconciliation_snapshot.py`: 10 deterministic tests are authored for:
+`tests/test_bybit_reconciliation_snapshot.py`: 11 deterministic tests are authored for:
 - signature construction;
 - seven-day execution interval limits;
 - read-only verification before account calls;
@@ -37,7 +37,7 @@ CI compile and test steps are wired in `.github/workflows/research-checks.yml`. 
 
 - Collector initial: `bc62ee0d2de849bd8742fa67ec13a8f3fd0c1338`.
 - Workflow integration/fixes: `3d2b150b3f2a2cc7928a7bf8925fe6fe6ca9f501`, `6e06d3155bfc351c6e258127426bcda9150f9a58`.
-- Server-time, atomic-write, host-security and pagination hardening: `49ea05fb32b73b4f3fde41d16b19bd04d5357a78`, `9e3770b9183efc5812e5c702c3a63f64d42c1a83`, `8a6b5efc0199b1b707d12ac95eeb508e900e53e7`, `4f6470ee0955de0beafba25d010f2266ba25dc5d`, `89853634a76814b537d869074b9cfccaae093630`, `423e7fb3f15c5674aa8f99f44e2f448dbc52db03`.
+- Server-time, atomic-write, host-security and pagination hardening: `49ea05fb32b73b4f3fde41d16b19bd04d5357a78`, `9e3770b9183efc5812e5c702c3a63f64d42c1a83`, `8a6b5efc0199b1b707d12ac95eeb508e900e53e7`, `4f6470ee0955de0beafba25d010f2266ba25dc5d`, `89853634a76814b537d869074b9cfccaae093630`, `033aa3e8d9da9b57de70af1f59369d9451e02a02`, `928a43782c5dc5dd91c94ea0034b3fdb448f953b`, `423e7fb3f15c5674aa8f99f44e2f448dbc52db03`, `1dd1a86dae9cea158c8e664a784dfb93cbaad4f2`.
 
 ## Ограничения и вердикт
 

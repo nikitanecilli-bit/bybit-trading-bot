@@ -510,6 +510,42 @@ def test_new_trailing_stop_is_not_applied_retroactively_to_same_candle():
     assert "BTCUSDT" in e.open_positions
 
 
+def test_short_partial_tp1_then_trailing_stop_closes_remaining_fraction():
+    e = make_engine()
+    pos = make_position("short", entry=100.0, stop=105.0)
+    pos.tp1_price = 90.0
+    pos.tp2_price = 80.0
+    e.open_positions["BTCUSDT"] = pos
+
+    first = [
+        candle(100, 101, 99, 100, ts=1_799_998_200_000),
+        candle(100, 101, 99, 100, ts=1_799_999_100_000),
+        candle(100, 101, 89, 90),
+    ]
+    e._close_position = lambda *args: None
+    engine_mod.UnifiedQuantEngine._manage_position(
+        e, "BTCUSDT", first, fill_bar=False, exit_ts=first[-1].ts + 900_000
+    )
+    assert pos.tp1_hit is True
+    assert pos.remaining_fraction == 0.5
+    assert pos.realized_tp1_gross_usdt == 50.0
+
+    captured = []
+    e._close_position = lambda *args: captured.append(args)
+    second = [
+        first[0], first[1], first[2],
+        candle(90, 97, 88, 94),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(
+        e, "BTCUSDT", second, fill_bar=False, exit_ts=second[-1].ts + 900_000
+    )
+    assert len(captured) == 1
+    assert captured[0][1] == pos.stop_price
+    assert captured[0][2] == "trailing_stop"
+    assert pos.remaining_fraction == 0.5
+    assert pos.realized_tp1_gross_usdt == 50.0
+
+
 def _fill_bar_mtm_case(direction):
     e = make_engine()
     ts = 1_800_000_000_000

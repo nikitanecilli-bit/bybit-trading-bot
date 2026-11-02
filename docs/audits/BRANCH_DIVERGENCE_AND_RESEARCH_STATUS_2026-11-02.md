@@ -316,3 +316,12 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - `main` HEAD observed: `e7303f7731a52eb72a2447d0cc060f346a943776`; unchanged by this work.
 - Current compare: 773 commits ahead / 14 behind, 168 changed files, +15,076 / -111; GitHub merge state dirty.
 - PR #4 remains open Draft and unmerged. Description updated with ENG-PERSIST-002 and CI #41507219610.
+
+
+## ENG-PERSIST-003 — restored last-mark integrity (2026-11-02, 19:24 UTC)
+
+- Confirmed recovery gap: open positions and portfolio risk equity were persisted, but `_last_mark_prices` were not. A restored engine would value not-yet-refreshed positions at entry price on its first MTM, potentially erasing marked losses/profits and distorting risk budget.
+- Pre-fix test run [#41509292651](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509292651) failed the state-persistence suite with six `TypeError` errors because the persistence API did not accept `last_mark_prices`.
+- Fix: persist a validated finite positive mark for every open position; restore the exact map to engine `_last_mark_prices`; reject open-position backups missing mark coverage. `_persist()` now passes the current mark map.
+- Full Research CI [#41509504557](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509504557) SUCCESS; 58 state-persistence tests. Additional engine `_persist()` integration test was added in commit `2c6fc6505474244d23e7d7e0436b324dba549a23` and is awaiting its full CI completion in run #41509795468 at the time of this entry.
+- Limit: restored marks are last-known snapshots, not fresh exchange marks. No Bybit reconciliation, market backtest, private API request or live order was performed.

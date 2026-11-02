@@ -357,3 +357,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41434308834](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41434308834), SUCCESS; compile, all configured deterministic suites and secret scan passed.
 - Decision: ACCEPT as local pending-state schema validation. No market backtest, parameter sweep, production deployment or live order.
 - Limitation: validated pending signal is not proof of an active Bybit order; exchange reconciliation remains mandatory.
+
+
+## ENG-STATE-007 — open-position schema validation (2026-11-02)
+
+- Preregistered card: [ENG-STATE-007](experiment_cards/ENG-STATE-007_POSITION_SCHEMA_RU.md).
+- Confirmed defect: dataclass annotations are not runtime validation; loader silently dropped unknown fields and accepted malformed position values that could fail later in PnL/management.
+- Fix: reject unknown position fields; validate required identifiers, direction/order type, positive finite price/distance/notional/risk, timestamp, optional numeric/fraction/boolean fields and bars-held before committing restored state. Optional fields omitted by legacy payloads continue using dataclass defaults.
+- Tests: included in `tests/test_state_persistence.py` 18/18 at CI #41434308834, alongside ENG-STATE-006 pending-schema tests.
+- Engine commit: `3a5fc1bdb6df645f9dc010f2f8abefaac918b82d`; test/CI commit: `c76ad2ed897bc05b7e59be5deff66ba74418aa9c`.
+- CI: [Research engine checks #41434308834](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41434308834), SUCCESS.
+- Decision: ACCEPT for local restore schema integrity. No market backtest, parameter sweep, production deployment or live order.
+- Limitation: does not reconcile positions with Bybit or prove backup freshness.

@@ -559,6 +559,7 @@ def test_two_positions_stopped_on_same_bar_reconcile_once_independent_of_order()
     )
     assert abs(first.risk_mgr.realized_equity - reverse.risk_mgr.realized_equity) < 1e-8
     assert abs(first.risk_mgr.current_equity - reverse.risk_mgr.current_equity) < 1e-8
+    assert abs(first.risk_mgr.max_drawdown_pct - reverse.risk_mgr.max_drawdown_pct) < 1e-8
 
 
 

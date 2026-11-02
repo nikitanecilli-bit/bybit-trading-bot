@@ -381,3 +381,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41434930478](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41434930478), SUCCESS; compile, all configured deterministic suites and secret scan passed.
 - Decision: ACCEPT as local risk-state validation. No market backtest, parameter sweep, production deployment or live order.
 - Limitation: validation does not prove risk state is current relative to Bybit or safe for live-resume.
+
+
+## ENG-STATE-008 — TP1 cross-field restore invariants (2026-11-02)
+
+- Preregistered card: [ENG-STATE-008](experiment_cards/ENG-STATE-008_TP1_INVARIANTS_RU.md).
+- Confirmed gap: individually valid fields could contradict one another: e.g. `tp1_hit=true` with 100% remaining size, or `tp1_hit=false` with partial size/realized TP1 PnL. Such state corrupts subsequent MTM/exit accounting. Targets could also be reversed relative to entry.
+- Fix: validate directional TP1/TP2 ordering and consistency between TP1 flag, remaining fraction and realized TP1 gross PnL. Current stop is intentionally not constrained relative to entry because trailing stop may cross breakeven.
+- Tests: `tests/test_state_persistence.py` 29/29, including valid partial-TP1 round-trip and five invalid cross-field cases.
+- Engine commit: `22664bd79f8fc93c0cbf7dbafc5c775a82e8cde3`; corrected test fixture commit: `529d1d725752a3010dedc3c06d1c48c572a1e15b`.
+- CI: [Research engine checks #41435897233](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41435897233), SUCCESS; compile, configured deterministic suites and secret scan passed.
+- Decision: ACCEPT for local restore invariants. No market backtest, parameter sweep, production deployment or live order.

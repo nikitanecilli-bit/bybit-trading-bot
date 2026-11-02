@@ -797,3 +797,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Added offline tests for identical overlap, a longest-but-not-superset case, conflicting OHLCV, and report writing.
 - Research CI runs deterministic unit tests. The dedicated `.github/workflows/cryptofetch-archive-audit.yml` scans all checked-in CryptoFetch ZIPs when archive/code paths change and uploads CSV/JSON/Markdown diagnostics. A detected conflicting overlapping candle fails the audit step; non-superset selections are reported for review. Structurally valid one-row files are reported as below the legacy 200-bar eligibility floor, not as malformed datasets.
 - No dataset is merged, rewritten, or substituted by this audit. E01–E13 inputs and historical PnL remain unchanged until the report is inspected and a deterministic conflict/coverage policy is approved by evidence.
+
+
+### ENG-DATA-007 — результат полного CryptoFetch archive scan
+
+- Dedicated audit run [#41542079766](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41542079766) завершился SUCCESS на code commit `627b005edc20424ba3b4e5e094612ed063dce521`; artifact [#13187466159](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41542079766/artifacts/13187466159).
+- Research CI [#41542100415](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41542100415) завершился SUCCESS на commit `0546f53a45bb4508d1f16ba06bbb310cdd69b1de`; compile + deterministic archive-audit tests passed.
+- Полный scan: 67 CSV members, 67 structurally valid, 64 содержат не менее 200 свечей (legacy loader minimum), 3 пустых CSV (DAIUSDT/MATICUSDT/XMRUSDT; loader их и так пропускает), 0 malformed members.
+- В архивах 6 duplicate symbol/timeframe groups, 6 pairwise comparisons: 0 conflicting OHLCV overlap candles; 0 случаев, когда legacy longest-file winner не является timestamp superset пары. Для всех 67 members сумма missing/irregular interval gaps = 0.
+- Duplicate detail: AAVEUSDT, DOTUSDT, TAOUSDT — 4,321-bar subset полностью совпадает с соответствующими 4,321 timestamps в 8,761-bar archive; ENAUSDT, ONDOUSDT, QNTUSDT — две 8,761-bar копии полностью совпадают.
+- Все шесть SHA-256 из E11 и E13 artifact manifests совпадают с текущими SHA-256 тех же ZIP-файлов. Это подтверждает, что скан проверил именно те архивные байты, на которых были выполнены E11/E13.
+- Вывод: текущая эвристика longest-file selection не привела к выявленному конфликту или потере покрытия в этих конкретных архивах. Это снимает текущий duplicate-archive blocker для E11/E13 inputs, но не заменяет Bybit-native market data и point-in-time universe. Будущие архивы по-прежнему должны проходить такой scan.

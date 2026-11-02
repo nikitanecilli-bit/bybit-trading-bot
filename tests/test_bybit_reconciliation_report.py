@@ -24,6 +24,11 @@ def snapshot(position_rows=None, order_rows=None, execution_rows=None):
     raw = {
         "positions": [page(position_rows)],
         "active_orders": [page(order_rows)],
+        "order_history": [{
+            "interval_start_ms": SAVED_MS,
+            "interval_end_ms": CAPTURE_MS,
+            **page(order_rows),
+        }],
         "executions": [{
             "interval_start_ms": SAVED_MS,
             "interval_end_ms": CAPTURE_MS,
@@ -45,10 +50,19 @@ def snapshot(position_rows=None, order_rows=None, execution_rows=None):
         "counts": {
             "positions": len(position_rows or []),
             "active_orders": len(order_rows or []),
+            "historical_orders": len(order_rows or []),
             "executions": len(execution_rows or []),
             "position_pages": 1,
             "active_order_pages": 1,
+            "order_history_pages": 1,
             "execution_pages": 1,
+        },
+        "order_history_coverage": {
+            "status": "QUERYABLE_WINDOW_ONLY_NOT_COMPLETE",
+            "start_ms": SAVED_MS,
+            "end_ms": CAPTURE_MS,
+            "duration_ms": CAPTURE_MS - SAVED_MS,
+            "limitations": ["test fixture"],
         },
         "bybit_server_time_before_ms": CAPTURE_MS,
         "bybit_server_time_after_ms": CAPTURE_MS + 1000,
@@ -134,8 +148,31 @@ class ReportOnlyComparatorTests(unittest.TestCase):
         local = backup(pending={"ETHUSDT": {"signal_ts": SAVED_MS}})
         report = build_report(local, snapshot(order_rows=[order]))
         self.assertEqual(report["exchange"]["active_order_ids"], ["order-1"])
+        self.assertEqual(report["exchange"]["historical_order_ids"], ["order-1"])
         self.assertEqual(report["local"]["pending_signal_count"], 1)
         self.assertFalse(report["live_resume_allowed"])
+
+    def test_historical_order_status_and_coverage_are_reported(self):
+        order = {
+            "orderId": "history-1", "orderLinkId": "bot-order-1",
+            "symbol": "BTCUSDT", "side": "Buy", "qty": "0.1",
+            "leavesQty": "0", "cumExecQty": "0.1",
+            "orderStatus": "Filled", "createdTime": SAVED_MS,
+            "updatedTime": CAPTURE_MS, "positionIdx": 0,
+        }
+        report = build_report(backup(), snapshot(order_rows=[order]))
+        self.assertEqual(report["exchange"]["historical_order_count"], 1)
+        self.assertEqual(report["exchange"]["historical_order_statuses"]["history-1"], "Filled")
+        self.assertEqual(report["exchange"]["order_history_coverage"]["status"],
+                         "QUERYABLE_WINDOW_ONLY_NOT_COMPLETE")
+        self.assertTrue(any("not a complete order journal" in reason
+                            for reason in report["block_reasons"]))
+
+    def test_missing_order_history_coverage_metadata_is_rejected(self):
+        data = snapshot()
+        data.pop("order_history_coverage")
+        with self.assertRaisesRegex(ReportError, "coverage limitation metadata"):
+            build_report(backup(), data)
 
     def test_execution_without_local_ledger_blocks(self):
         execution = {
@@ -178,6 +215,7 @@ class ReportOnlyComparatorTests(unittest.TestCase):
     def test_execution_interval_gap_is_rejected(self):
         data = snapshot()
         data["raw"]["executions"][0]["interval_start_ms"] += 1
+        data["raw"]["order_history"][0]["interval_start_ms"] += 1
         data["raw_sha256"] = hashlib.sha256(json.dumps(
             data["raw"], ensure_ascii=False, sort_keys=True,
             separators=(",", ":"), allow_nan=False,

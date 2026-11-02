@@ -57,6 +57,9 @@
 
 ## Технические блокеры перед execution-aware replay
 
+- [Portfolio accounting, Net R и MAE/MFE audit](audits/PORTFOLIO_ACCOUNTING_NET_R_MAE_MFE_AUDIT_2026-11-03.md) — сверка бухгалтерских инвариантов и fixed-trade sensitivity E11/E13 после exit-notional correction.
+
+
 - [Execution realism readiness audit](audits/EXECUTION_REALISM_READINESS_RU.md): отсутствие Bybit snapshot на GitHub runner, неподключённый exchange sizing, funding/mark proxy и ограничения модели издержек.
 
 ## Методологические правила

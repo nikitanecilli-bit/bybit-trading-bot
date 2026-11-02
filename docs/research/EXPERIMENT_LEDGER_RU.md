@@ -427,9 +427,9 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Decision: ACCEPT. No market backtest, parameter sweep, production deployment or live order.
 
 
-## ENG-STATE-009 — risk snapshot cross-field invariants (2026-11-02)
+## ENG-STATE-012 — risk snapshot cross-field invariants (2026-11-02)
 
-- Preregistered card: [ENG-STATE-009](experiment_cards/ENG-STATE-009_RISK_SNAPSHOT_INVARIANTS_RU.md).
+- Preregistered card: [ENG-STATE-009](experiment_cards/ENG-STATE-012_RISK_SNAPSHOT_INVARIANTS_RU.md).
 - Confirmed gap: independently valid fields could contradict each other. Restore now requires current equity = rounded realized equity + unrealized PnL; peak equity >= current equity; and max drawdown >= the drawdown implied by peak/current equity.
 - Historical max drawdown above current drawdown remains valid.
 - Tests: `tests/test_state_persistence.py` 39/39; covers all three invalid identities, valid historical max DD and restore atomicity.

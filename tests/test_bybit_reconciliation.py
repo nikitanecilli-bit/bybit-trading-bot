@@ -26,6 +26,14 @@ def page(rows, cursor=""):
 
 
 class BybitReconciliationParserTests(unittest.TestCase):
+    def test_parser_rejects_more_than_one_thousand_pages(self):
+        pages = []
+        for index in range(1001):
+            cursor = f"cursor-{index + 1}" if index < 1000 else ""
+            pages.append((("" if index == 0 else f"cursor-{index}"), page([], cursor)))
+        with self.assertRaisesRegex(SnapshotValidationError, "page safety limit"):
+            parse_position_pages(pages)
+
     def test_position_pages_require_complete_cursor_chain_and_parse_hedge_sides(self):
         first = page([{
             "symbol": "BTCUSDT", "positionIdx": 1, "side": "Buy",

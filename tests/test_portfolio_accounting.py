@@ -508,6 +508,58 @@ def test_same_bar_tp1_on_one_symbol_and_stop_on_another_is_order_independent():
     assert abs(first.risk_mgr.current_equity - reverse.risk_mgr.current_equity) < 1e-8
 
 
+
+def _run_two_same_bar_stops(order):
+    e = make_engine()
+    e.open_positions = {
+        "BTCUSDT": make_position(symbol="BTCUSDT", size=1_000.0),
+        "ETHUSDT": make_position(symbol="ETHUSDT", size=1_000.0),
+    }
+    exit_ts = 1_800_003_600_000
+    histories = {}
+    for symbol in ("BTCUSDT", "ETHUSDT"):
+        pos = e.open_positions[symbol]
+        prior = [
+            engine_mod.Candle(
+                ts=pos.entry_ts - 14 * 3_600_000 + i * 3_600_000,
+                open=100.0, high=101.0, low=99.0, close=100.0, volume=10.0,
+            )
+            for i in range(15)
+        ]
+        histories[symbol] = prior + [engine_mod.Candle(
+            ts=pos.entry_ts + 3_600_000,
+            open=100.0, high=101.0, low=94.0, close=96.0, volume=10.0,
+        )]
+    e._last_mark_prices.update({"BTCUSDT": 96.0, "ETHUSDT": 96.0})
+    e._intrabar_risk_marks.update({"BTCUSDT": 95.0, "ETHUSDT": 95.0})
+    e._intrabar_risk_marks_ts = exit_ts
+    e._update_mark_to_market(exit_ts)
+    for symbol in order:
+        e._manage_position(symbol, histories[symbol], fill_bar=False, exit_ts=exit_ts)
+    return e
+
+
+def test_two_positions_stopped_on_same_bar_reconcile_once_independent_of_order():
+    first = _run_two_same_bar_stops(["BTCUSDT", "ETHUSDT"])
+    reverse = _run_two_same_bar_stops(["ETHUSDT", "BTCUSDT"])
+
+    for e in (first, reverse):
+        assert not e.open_positions
+        assert len(e.closed_trades) == 2
+        assert {trade.token for trade in e.closed_trades} == {"BTCUSDT", "ETHUSDT"}
+        assert len({trade.id for trade in e.closed_trades}) == 2
+        expected_realized = 10_000.0 + sum(t.pnl_usdt for t in e.closed_trades)
+        assert abs(e.risk_mgr.realized_equity - expected_realized) < 1e-8
+        assert e.risk_mgr.unrealized_pnl == 0.0
+        assert abs(e.risk_mgr.current_equity - expected_realized) < 1e-8
+
+    assert sorted(t.pnl_usdt for t in first.closed_trades) == sorted(
+        t.pnl_usdt for t in reverse.closed_trades
+    )
+    assert abs(first.risk_mgr.realized_equity - reverse.risk_mgr.realized_equity) < 1e-8
+    assert abs(first.risk_mgr.current_equity - reverse.risk_mgr.current_equity) < 1e-8
+
+
 if __name__ == "__main__":
     tests = [(name, value) for name, value in sorted(globals().items())
              if name.startswith("test_") and callable(value)]

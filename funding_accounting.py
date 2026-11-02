@@ -28,14 +28,16 @@ def accrued_funding_cost(
     events: Iterable[Mapping[str, Any]],
     mark_prices: Mapping[int, Any],
     as_of_ts: int,
+    closed_ts_ms: int | None = None,
 ) -> Decimal:
     """Return cumulative funding paid/received in [entry_ts, as_of_ts].
 
     Funding settlement at entry timestamp is excluded; settlement at the
     as-of timestamp is included. mark_prices contains timestamp-aligned
-    mark-candle open proxies. A settlement at or before the conservative
-    TP1 candle-close boundary uses full initial quantity; later settlements
-    use the remaining position fraction.
+    mark-candle open proxies. At an ambiguous final-close boundary, payments
+    use full initial quantity and receipts use zero quantity. At an ambiguous
+    TP1-only boundary, payments use full quantity and receipts use the
+    remaining fraction; later settlements use the remaining fraction.
     """
     entry_ts = int(position.entry_ts)
     as_of_ts = int(as_of_ts)
@@ -60,6 +62,10 @@ def accrued_funding_cost(
         tp1_ts = int(tp1_ts)
         if tp1_ts < entry_ts:
             raise ValueError("tp1_ts_ms cannot precede entry")
+    if closed_ts_ms is not None:
+        closed_ts_ms = int(closed_ts_ms)
+        if closed_ts_ms < entry_ts:
+            raise ValueError("closed_ts_ms cannot precede position entry")
 
     sign = Decimal("1") if direction == "long" else Decimal("-1")
     quantity = size_usdt / entry_price
@@ -86,13 +92,18 @@ def accrued_funding_cost(
         if mark <= 0:
             raise ValueError(f"funding mark price must be > 0 at {ts}")
         fraction = Decimal("1")
-        if tp1_ts is not None and ts > tp1_ts:
+        full_position_cost = sign * quantity * mark * rate
+        if closed_ts_ms is not None and ts == closed_ts_ms:
+            # A full exit and settlement share an OHLC candle-close boundary.
+            # With unknown event order, charge a payment on full size but never
+            # credit a receipt on a position that may already have been closed.
+            if full_position_cost < 0:
+                fraction = Decimal("0")
+        elif tp1_ts is not None and ts > tp1_ts:
             fraction = remaining_fraction
         elif tp1_ts is not None and ts == tp1_ts:
-            # TP1 and funding share an OHLC candle-close boundary. Event ordering
-            # is unknowable, so choose the quantity that is less favorable to PnL:
-            # full size for a payment, remaining size for a funding receipt.
-            full_position_cost = sign * quantity * mark * rate
+            # TP1 and funding share a candle-close boundary, but position remains
+            # open: use full size for payments and remaining size for receipts.
             if full_position_cost < 0:
                 fraction = remaining_fraction
         total += sign * quantity * mark * fraction * rate

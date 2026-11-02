@@ -964,6 +964,57 @@ def test_daily_stop_keeps_managing_existing_positions_without_new_entries():
     assert e.risk_mgr.can_open_new_trade(0) == (True, "OK")
 
 
+def test_kill_switch_overrides_tp2_when_same_bar_hits_adverse_mark_and_target():
+    cfg = engine_mod.BotConfig(
+        timeframe="15m", capital_usdt=10_000.0,
+        daily_stop_loss_pct=50.0, emergency_kill_switch_pct=5.0,
+        atr_period=2,
+    )
+    e = engine_mod.UnifiedQuantEngine.__new__(engine_mod.UnifiedQuantEngine)
+    e.cfg = cfg
+    e._last_mark_prices = {}
+    e._intrabar_risk_marks = {}
+    e._intrabar_risk_marks_ts = None
+    ts = 1_800_000_000_000
+    e.open_positions = {
+        "BTCUSDT": engine_mod.OpenPositionState(
+            trade_id="btc-kill-switch-tp-collision", symbol="BTCUSDT",
+            direction="long", strategy="test",
+            entry_ts=ts - 1_800_000, entry_price=100.0, stop_price=50.0,
+            tp1_price=110.0, tp2_price=120.0, initial_stop_dist=50.0,
+            size_usdt=10_000.0, risk_usdt=5_000.0, order_type="market",
+            equity_at_entry=10_000.0,
+        ),
+    }
+    e.pending = {}
+    e.closed_trades = []
+    e.trade_seq = 0
+    e.risk_mgr = engine_mod.AdaptiveRiskManager(cfg)
+    e.tg = type("Notifier", (), {"send_message": lambda self, message: None})()
+    e._persist = lambda: None
+
+    candles = [
+        engine_mod.Candle(ts=ts - 1_800_000, open=100, high=101, low=99, close=100, volume=10),
+        engine_mod.Candle(ts=ts - 900_000, open=100, high=101, low=99, close=100, volume=10),
+        # The adverse low trips portfolio kill-switch, while high also reaches TP2.
+        # Stop is deliberately far away so only kill-switch-vs-TP ordering is tested.
+        engine_mod.Candle(ts=ts, open=100, high=125, low=80, close=110, volume=10),
+    ]
+    e._prepare_portfolio_intrabar_marks({"BTCUSDT": candles[-1]})
+    assert e._intrabar_risk_marks["BTCUSDT"] == 80.0
+
+    engine_mod.UnifiedQuantEngine.step_candle(e, "BTCUSDT", candles)
+
+    assert e.risk_mgr.kill_switch_triggered is True
+    assert len(e.closed_trades) == 1
+    trade = e.closed_trades[0]
+    assert trade.exit_reason == "kill_switch", trade.exit_reason
+    assert trade.exit_price == 80.0, trade.exit_price
+    assert trade.mfe == 0.0, trade.mfe
+    assert trade.mae == 0.4, trade.mae
+    assert not e.open_positions
+    assert not e.pending
+
 
 if __name__ == "__main__":
     tests = [test_tp1_partial_fill_keeps_equity_consistent_with_remaining_position,
@@ -971,6 +1022,7 @@ if __name__ == "__main__":
              test_equity_reconciles_journal_and_remaining_open_positions_after_each_close,
              test_daily_stop_keeps_managing_existing_positions_without_new_entries,
              test_full_step_candle_kill_switch_flattens_portfolio_and_blocks_reentry,
+             test_kill_switch_overrides_tp2_when_same_bar_hits_adverse_mark_and_target,
              test_sequential_kill_switch_closes_do_not_double_count_unrealized_pnl,
              test_combined_intrabar_losses_trigger_daily_stop_and_kill_switch,
              test_kill_switch_exit_price_is_written_to_closed_trade_journal,

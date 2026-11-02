@@ -682,3 +682,5 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Ограничение: last mark — сохранённый recovery snapshot, а не свежая биржевая цена; он не заменяет exchange reconciliation и не гарантирует актуальность после длительного downtime. Live trading не запускался.
 
 - Дополнительный engine-path тест подтвердил, что `_persist()` реально передаёт last marks в backup и новая persistence instance их восстанавливает. Full Research CI [#41509795468](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509795468), SUCCESS; state-persistence suite 59 tests.
+
+- Дополнительный regression: восстановленный Plan-B state блокирует запуск `run_simulation_pass()` как нового backtest (fail closed). CI [#41511547342](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41511547342), SUCCESS; state-persistence suite 60 tests.

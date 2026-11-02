@@ -22,9 +22,10 @@ def response(rows=None, cursor=""):
 
 
 class FakeTransport:
-    def __init__(self, readonly=1, fail_endpoint=None):
+    def __init__(self, readonly=1, fail_endpoint=None, cursor_loop=False):
         self.readonly = readonly
         self.fail_endpoint = fail_endpoint
+        self.cursor_loop = cursor_loop
         self.calls = []
 
     def __call__(self, url, headers=None, timeout=20):
@@ -36,6 +37,8 @@ class FakeTransport:
             return {"retCode": 0, "result": {}, "time": int(time.time() * 1000)}
         if endpoint == self.fail_endpoint:
             return {"retCode": 10004, "retMsg": "hidden"}
+        if endpoint == "/v5/position/list" and self.cursor_loop:
+            return response(cursor="loop")
         if endpoint in ("/v5/position/list", "/v5/order/realtime",
                         "/v5/execution/list"):
             return response()
@@ -86,6 +89,11 @@ class ReconciliationCollectorTests(unittest.TestCase):
             raise AssertionError("account endpoint must not be called")
         with self.assertRaisesRegex(CollectorError, "integer zero"):
             collect_snapshot("key", "secret", SAVED, request_json=transport)
+
+    def test_repeated_pagination_cursor_fails_closed(self):
+        fake = FakeTransport(cursor_loop=True)
+        with self.assertRaisesRegex(CollectorError, "pagination cursor repeated"):
+            collect_snapshot("key", "secret", SAVED, request_json=fake)
 
     def test_api_error_is_not_treated_as_empty_account(self):
         fake = FakeTransport(fail_endpoint="/v5/position/list")

@@ -585,3 +585,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Added a 1,000-page maximum to the shared strict parser, matching the collector's pagination cap. The report-only comparator inherits this guard for all position/order/execution page chains.
 - Added a regression test for a 1,001-page input. Full Research checks [#41468736376](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468736376) passed; parser suite 16/16.
 - This limits pathological or corrupted inputs; it does not prove the exchange supplied all pages.
+
+
+## ENG-SEC-001 — private Bybit API credential preflight hardening (2026-11-02)
+
+- Card: [ENG-SEC-001](experiment_cards/ENG-SEC-001_PRIVATE_API_CHECK_RU.md).
+- Confirmed and fixed arbitrary HTTPS host acceptance, redirect following with auth headers, boolean `False == 0` retCode acceptance and boolean `True == 1` readOnly acceptance in `scripts/bybit_private_api_check.py`.
+- Added official-host allowlist, redirect refusal, strict integer response checks and no response-body logging.
+- 10 mocked regression tests passed; full Research checks [#41469608200](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41469608200), SUCCESS including secret scan.
+- No real API key or private request was used. Manual credential check remains unrun; no account permissions are claimed as verified.

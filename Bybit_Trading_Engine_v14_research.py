@@ -1638,6 +1638,7 @@ class UnifiedQuantEngine:
             funding_cost = float(accrued_funding_cost(
                 pos, self.funding_by_symbol[pos.symbol],
                 self._funding_mark_prices.get(pos.symbol, {}), exit_ts,
+                closed_ts_ms=exit_ts,
             ))
 
         # Издержки по ногам. Сначала суммируем точные значения всех ног,

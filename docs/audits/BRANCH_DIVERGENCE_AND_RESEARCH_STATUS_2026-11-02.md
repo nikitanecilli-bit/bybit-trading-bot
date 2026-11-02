@@ -218,7 +218,7 @@ For intrabar limit fills, OHLC cannot prove whether the adverse extreme happened
 
 ### Latest Git snapshot after ENG-RISK-001 (15:54 UTC)
 
-- Research HEAD: `6fbcc22693fce38ec699b42257a628bf390d1a09` (documentation update after the passing code/test commit).
+- Research HEAD has since advanced through documentation-only audit commits; the latest code-changing commit remains `f65c08bec78b179a9a89832ce31b574740f4dce3`.
 - Compare status remains `diverged`: 715 commits ahead, 13 behind main.
 - PR #4 now reports 163 changed files, +17,558 / -116 lines; it remains open and unmerged. GitHub's mergeability field is currently unknown, so do not treat it as merge-ready.
 - Latest code-changing commit `f65c08bec78b179a9a89832ce31b574740f4dce3` passed Research engine checks #41475941543. The two commits after it update documentation only; the current docs HEAD does not have a separate new CI run.

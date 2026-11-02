@@ -739,6 +739,18 @@ class PlanBStatePersistence:
                     raise ValueError(f"risk.{field_name} должен быть > 0")
             if "max_drawdown_pct" in risk_data and not 0 <= risk_data["max_drawdown_pct"] <= 100:
                 raise ValueError("risk.max_drawdown_pct должен быть в [0, 100]")
+            expected_equity = round(risk_data["realized_equity"] + risk_data["unrealized_pnl"], 4)
+            if not math.isclose(risk_data["current_equity"], expected_equity, rel_tol=0.0, abs_tol=1e-4):
+                raise ValueError("risk.current_equity не совпадает с realized_equity + unrealized_pnl")
+            if risk_data["peak_equity"] + 1e-9 < risk_data["current_equity"]:
+                raise ValueError("risk.peak_equity не может быть ниже current_equity")
+            implied_drawdown = max(
+                0.0,
+                (risk_data["peak_equity"] - risk_data["current_equity"])
+                / risk_data["peak_equity"] * 100.0,
+            )
+            if risk_data["max_drawdown_pct"] + 1e-6 < implied_drawdown:
+                raise ValueError("risk.max_drawdown_pct меньше просадки, следующей из peak/current equity")
             if "current_day_str" in risk_data:
                 day_value = risk_data["current_day_str"]
                 if not isinstance(day_value, str):

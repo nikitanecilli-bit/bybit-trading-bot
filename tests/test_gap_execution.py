@@ -45,6 +45,7 @@ def pending_signal(order_type="market", ref=100.0, direction="long"):
     return {
         "direction": direction, "entry_price": ref, "order_type": order_type,
         "strategy": "test", "stop_dist": 2.0,
+        "signal_ts": 1_800_000_000_000 - 15 * 60_000,
     }
 
 

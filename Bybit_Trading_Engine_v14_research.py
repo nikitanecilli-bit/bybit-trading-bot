@@ -1778,6 +1778,12 @@ class UnifiedQuantEngine:
             return
         if not marks:
             raise ValueError("Для финализации открытых позиций нужны последние свечи (marks)")
+        missing_symbols = sorted(set(self.open_positions) - set(marks))
+        if missing_symbols:
+            raise ValueError(
+                "Для финализации отсутствуют последние свечи открытых позиций: "
+                + ", ".join(missing_symbols)
+            )
         timestamps = {c.ts for c in marks.values()}
         if len(timestamps) != 1:
             raise ValueError("Финальные свечи для символов должны иметь одинаковый timestamp")

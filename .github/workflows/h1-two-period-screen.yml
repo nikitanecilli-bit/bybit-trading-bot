@@ -1,0 +1,36 @@
+name: H1 two-period chronological screen
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/market-regime-v1-main]
+    paths:
+      - 'scripts/run_h1_two_period_screen.py'
+      - '.github/workflows/h1-two-period-screen.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/market-regime-v1-main
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run chronological H1 screen
+        run: |
+          set -o pipefail
+          python scripts/run_h1_two_period_screen.py | tee h1_two_period_results.txt
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: h1-two-period-screen-results
+          path: h1_two_period_results.txt
+          if-no-files-found: error

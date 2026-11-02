@@ -39,4 +39,6 @@ No market backtest, parameter optimization, private API request or live order. N
 ## Engine integration confirmation
 
 - Added explicit `_persist()` integration test: an engine with an open BTCUSDT position and mark 103.25 writes that mark into the backup; a fresh `PlanBStatePersistence` instance restores it.
-- Full Research CI [#41509795468](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509795468) SUCCESS; state-persistence suite 59 tests passed, including the engine `_persist()` integration test.
+- Full Research CI [#41509795468](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509795468) SUCCESS; state-persistence suite 60 tests passed, including the engine `_persist()` integration test.
+
+- Дополнительно проверено, что восстановленное состояние нельзя повторно использовать как свежий backtest: `run_simulation_pass()` должен fail closed до обработки данных. Full Research CI [#41511547342](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41511547342) SUCCESS; state-persistence suite 60 tests.

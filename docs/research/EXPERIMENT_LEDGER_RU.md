@@ -263,3 +263,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41431556111](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41431556111), SUCCESS. `test_time_model.py` 38/38; `test_gap_execution.py` 22/22; compile and all other configured deterministic checks passed; secret scan found no obvious secret patterns.
 - Decision: ACCEPT as a simulator correctness fix. No market backtest, parameter sweep, production change or live order was performed.
 - Limitation: adverse intrabar mark remains an OHLC proxy, not a guaranteed executable fill. This fix does not validate real execution or strategy profitability.
+
+
+## ENG-EXEC-002 — marketable limit gap-through entry costs (2026-11-02)
+
+- Preregistered card: [ENG-EXEC-002](experiment_cards/ENG-EXEC-002_MARKETABLE_LIMIT_FEE_RU.md).
+- Confirmed issue: `_try_fill_pending()` filled a limit order at the opening price when the market gapped through the limit, but retained `order_type="limit"`. Sizing, MTM and close-journal accounting therefore charged maker entry fee and zero entry slippage for a marketable opening fill.
+- Fix: classify a long limit with `open < limit` and short limit with `open > limit` as effective market/taker entry. Pass that type to position sizing and persist it in the position so MTM and final journal use taker fee/slippage. A non-gap intrabar touch remains the existing maker proxy; maker exit behavior remains independently configured.
+- Regression tests: buy and sell gap-through cases assert taker classification; non-gap limit touch asserts maker proxy; buy case also checks journal taker fee/slippage.
+- Commits: engine fix `2a60a261ef5792b72d438ae39c5f99dda807c16e`; tests `f1667c273d30c20306e59a746318c8be4d532172`.
+- CI: [Research engine checks #41431923590](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41431923590), SUCCESS. `test_gap_execution.py` 25/25; `test_time_model.py` 38/38; compile, all other configured deterministic checks and secret scan passed.
+- Decision: ACCEPT as a correction to the simulator's marketable-limit entry cost classification. No market backtest, parameter sweep, production change or live order was performed.
+- Limitation: ordinary intrabar limit touch is still an optimistic maker proxy without bid/ask, queue priority, partial fills or adverse-selection modelling. Taker slippage remains a static proxy.

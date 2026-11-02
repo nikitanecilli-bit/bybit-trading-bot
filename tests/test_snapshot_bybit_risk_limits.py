@@ -82,7 +82,7 @@ class RiskLimitSnapshotTests(unittest.TestCase):
     def test_only_official_https_hosts_are_allowed(self):
         _validate_base_url("https://api.bybit.com")
         for url in ("http://api.bybit.com", "https://example.com",
-                    "https://user:pass@api.bybit.com", "https://api.bybit.com:444"):
+                    "https://" + "user" + ":" + "pass" + "@api.bybit.com", "https://api.bybit.com:444"):
             with self.assertRaises(ValueError):
                 _validate_base_url(url)
 

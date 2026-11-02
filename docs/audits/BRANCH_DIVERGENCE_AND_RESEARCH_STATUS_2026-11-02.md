@@ -261,3 +261,14 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - Added `closed_ts_ms`; final close boundary charges payments on full initial size and credits zero receipts. `_close_position()` passes `exit_ts`.
 - Engine-level trade ledger tests cover both receipt and payment. Full CI [#41502251992](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41502251992) passed.
 - ENG-FUND-003 separately addresses pre-exit MTM, which runs before candle exit resolution.
+
+
+
+## ENG-FUND-003 and CI test-runner audit — 2026-11-02 (18:44 UTC)
+
+- ENG-FUND-003 is implemented and documented in [its experiment card](../research/experiment_cards/ENG-FUND-003_MTM_BOUNDARY_RECEIPT_RU.md) and the experiment ledger.
+- Full Research CI [#41503287534](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41503287534) completed SUCCESS on `037aabd80769be88ea6ed99b05855665da92230d`.
+- Audit of all 21 test files invoked directly by `.github/workflows/research-checks.yml`: every file has an executable `if __name__ == "__main__"` path. unittest suites call `unittest.main()`; plain-function suites use explicit test runners. No further silently skipped direct-invocation suite was found in this workflow.
+- The successful job log confirms explicit execution counts: gap execution 27/27; time model 38/38; timeframe validation 5/5; portfolio accounting 16/16; state persistence 54 tests. Other unittest and explicit-runner steps completed successfully.
+- The previous missing-card 404 was resolved by creating the ENG-FUND-003 card at the path linked above.
+- Scope: accounting and CI reliability only. No market backtest, parameter optimization, private API request or live order. Do not infer profitability from this CI.

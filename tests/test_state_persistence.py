@@ -95,6 +95,32 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertFalse(path.exists())
             self.assertFalse(Path(str(path) + ".tmp").exists())
 
+    def test_non_finite_state_save_preserves_previous_backup_and_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            previous = '{"previous": "known-good"}'
+            path.write_text(previous, encoding="utf-8")
+            cfg = engine.BotConfig()
+            risk = engine.AdaptiveRiskManager(cfg)
+            risk.unrealized_pnl = float("nan")
+            writer = engine.PlanBStatePersistence(str(path), enabled=True)
+            with self.assertRaisesRegex(RuntimeError, "Не удалось сохранить"):
+                writer.save_state(cfg, risk, {}, {}, 0)
+            self.assertEqual(path.read_text(encoding="utf-8"), previous)
+            self.assertFalse(Path(str(path) + ".tmp").exists())
+
+    def test_infinite_position_value_cannot_be_saved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "infinite-position.json"
+            position = sample_position()
+            position.max_favorable_px = float("inf")
+            writer = engine.PlanBStatePersistence(str(path), enabled=True)
+            with self.assertRaisesRegex(RuntimeError, "Не удалось сохранить"):
+                writer.save_state(engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
+                                  {"BTCUSDT": position}, {}, 42)
+            self.assertFalse(path.exists())
+            self.assertFalse(Path(str(path) + ".tmp").exists())
+
     def test_corrupt_json_raises_instead_of_returning_empty_state(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "corrupt.json"

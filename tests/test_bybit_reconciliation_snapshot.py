@@ -69,7 +69,7 @@ class ReconciliationCollectorTests(unittest.TestCase):
         endpoints = [call[0] for call in fake.calls]
         self.assertEqual(endpoints[0], "/v5/user/query-api")
         self.assertEqual(endpoints[1], "/v5/market/time")
-        self.assertEqual(endpoints[2:5], [
+        self.assertEqual(endpoints[2:6], [
             "/v5/position/list", "/v5/order/realtime", "/v5/order/history", "/v5/execution/list"
         ])
         self.assertEqual(endpoints[-1], "/v5/market/time")

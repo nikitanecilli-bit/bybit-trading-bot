@@ -1,4 +1,4 @@
-name: Archive Bybit funding and mark-price history
+name: Archive Bybit OHLCV, funding and mark-price history
 
 on:
   workflow_dispatch:

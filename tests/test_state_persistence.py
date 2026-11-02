@@ -197,7 +197,7 @@ class StatePersistenceTests(unittest.TestCase):
 
     def test_short_targets_must_be_ordered_below_entry(self):
         def mutate(position):
-            position.update({"direction": "short", "tp1_price": 95.0, "tp2_price": 90.0})
+            position.update({"direction": "short", "tp1_price": 90.0, "tp2_price": 95.0})
         self._assert_invalid_position_payload(mutate)
 
     def test_pending_non_object_entry_is_rejected(self):

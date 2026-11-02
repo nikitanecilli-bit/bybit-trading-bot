@@ -268,7 +268,8 @@ def collect_snapshot(
         raise CollectorError("Bybit server time moved backwards during snapshot")
     if server_time_after_ms - server_time_before_ms > 120_000:
         raise CollectorError("Snapshot collection exceeded 120 seconds; capture is not coherent")
-    # Execution pagination was bounded by server_time_before_ms; keep that exact end bound.\n    capture_finished_ms = _utc_ms()
+    # Execution pagination was bounded by server_time_before_ms; keep that exact end bound.
+    capture_finished_ms = _utc_ms()
     unique_executions = {item.exec_id: item for item in parsed_executions}
     parsed_executions = list(unique_executions.values())
     raw = {

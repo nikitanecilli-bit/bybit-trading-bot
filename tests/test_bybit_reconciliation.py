@@ -29,18 +29,33 @@ class BybitReconciliationParserTests(unittest.TestCase):
         first = page([{
             "symbol": "BTCUSDT", "positionIdx": 1, "side": "Buy",
             "size": "0.010", "avgPrice": "65000", "updatedTime": "1800000000000",
-            "positionStatus": "Normal",
+            "positionStatus": "Normal", "takeProfit": "70000", "stopLoss": "62000",
+            "trailingStop": "0", "tpslMode": "Full",
         }], "cursor-1")
         second = page([{
             "symbol": "BTCUSDT", "positionIdx": 2, "side": "Sell",
             "size": "0.020", "avgPrice": "64000", "updatedTime": "1800000000100",
-            "positionStatus": "Normal",
+            "positionStatus": "Normal", "takeProfit": "0", "stopLoss": "65000",
+            "trailingStop": "0", "tpslMode": "Full",
         }])
         positions = parse_position_pages([("", first), ("cursor-1", second)])
         self.assertEqual(len(positions), 2)
         self.assertEqual([p.position_idx for p in positions], [1, 2])
         self.assertEqual(positions[0].size, Decimal("0.010"))
         self.assertEqual(positions[1].side, "Sell")
+        self.assertEqual(positions[0].take_profit, Decimal("70000"))
+        self.assertEqual(positions[0].stop_loss, Decimal("62000"))
+        self.assertEqual(positions[0].trailing_stop, Decimal("0"))
+        self.assertEqual(positions[0].tpsl_mode, "Full")
+
+    def test_position_stop_fields_must_be_nonnegative_decimals_when_present(self):
+        row = {
+            "symbol": "BTCUSDT", "positionIdx": 0, "side": "Buy",
+            "size": "1", "avgPrice": "100", "updatedTime": "1800000000000",
+            "positionStatus": "Normal", "stopLoss": "-1",
+        }
+        with self.assertRaisesRegex(SnapshotValidationError, "position.stopLoss"):
+            parse_position_pages([("", page([row]))])
 
     def test_position_empty_zero_size_row_is_ignored(self):
         positions = parse_position_pages([("", page([{

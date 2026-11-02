@@ -131,6 +131,28 @@ class StatePersistenceTests(unittest.TestCase):
                 )
 
 
+
+    def test_engine_persist_writes_last_marks_for_open_positions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "engine-persist.json"
+            bot = engine.UnifiedQuantEngine.__new__(engine.UnifiedQuantEngine)
+            bot.cfg = engine.BotConfig()
+            bot.risk_mgr = engine.AdaptiveRiskManager(bot.cfg)
+            bot.plan_b = engine.PlanBStatePersistence(str(path), enabled=True)
+            bot.open_positions = {"BTCUSDT": sample_position()}
+            bot.pending = {}
+            bot.trade_seq = 42
+            bot._last_mark_prices = {"BTCUSDT": 103.25}
+
+            bot._persist()
+
+            restored_risk = engine.AdaptiveRiskManager(engine.BotConfig())
+            restored_writer = engine.PlanBStatePersistence(str(path))
+            positions, _, seq = restored_writer.load_state(restored_risk)
+            self.assertEqual(seq, 42)
+            self.assertEqual(positions["BTCUSDT"], bot.open_positions["BTCUSDT"])
+            self.assertEqual(restored_writer.last_mark_prices, {"BTCUSDT": 103.25})
+
     def test_save_open_position_requires_last_mark(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "missing-save-mark.json"

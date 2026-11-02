@@ -1,6 +1,6 @@
 # ENG-STATE-017 — durable atomic backup write
 
-Статус до изменения: CONFIRMED DURABILITY GAP / atomic replace is not a durability barrier.  
+Статус: ACCEPT — fsync durability regression и CI прошли.  
 Дата: 2026-11-02.  
 Тип: local backup durability; deterministic tests only.
 
@@ -22,4 +22,14 @@ The writer flushes JSON through Python's buffered file object and atomically rep
 3. Existing atomic replace failure remains fail-closed.
 4. Full deterministic CI passes.
 
-No market backtest required.
+Решение: ACCEPT для повышения локальной crash-durability.
+
+- Engine commit: `3f2df9b78b9149e9f820dfc8d67140dbff7ba866`.
+- Test commit: `8d41fe9823d2465fe1ae64d674ed94a18027e4a2`.
+- CI: [Research engine checks #41447569454](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41447569454), SUCCESS.
+- `tests/test_state_persistence.py`: 53/53; verifies file + parent-directory fsync on POSIX, and previous backup preservation when file fsync fails.
+- Compile, configured deterministic suites and secret scan passed.
+
+No market backtest, parameter sweep, production deployment or live order.
+
+Boundary: fsync requests OS/filesystem durability but cannot guarantee survival against every storage controller, filesystem, virtualization layer or hardware failure. Directory fsync is performed on POSIX; Windows uses file fsync only.

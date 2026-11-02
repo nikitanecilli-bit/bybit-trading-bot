@@ -443,3 +443,14 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Аудит: `docs/audits/PORTFOLIO_ACCOUNTING_NET_R_MAE_MFE_AUDIT_2026-11-03.md`; матрица покрытия обновлена.
 - Следующий шаг: отдельные deterministic threshold-boundary tests для MTM cost asymmetry; затем продолжить margin/liquidation, dataset alignment и execution realism. Не менять текущую консервативную модель и не запускать рыночные бэктесты без тестов/CI.
 - Полный CI #41520724088 — последнее ранее подтверждённое успешное выполнение; новый CI в этой сессии не dispatch-ился и не заявляется.
+
+
+## Дополнение 2026-11-03 — leverage / margin / liquidation
+
+- Проверены `AdaptiveRiskManager.calculate_position_size()`, `OpenPositionState`, entry lifecycle, exchange sizing helper и portfolio accounting tests.
+- Подтверждено: текущий `leverage_val` используется только в грубом notional cap `equity * leverage / max_concurrent_positions * 0.95`. Это не Bybit margin model.
+- В движке отсутствуют расчёт IM/MM по symbol risk tiers, liquidation price/event, cross/isolated collateral, maintenance tier transitions и mark-price liquidation trigger. Точный exchange qty также не участвует в sizing/funding/partial exits.
+- Отдельный `exchange_order_sizing.py` не подключён к engine lifecycle; текущая позиция хранит notional proxy.
+- Подтверждённого дефекта формулы stop-risk sizing не найдено, но ликвидационная устойчивость не моделируется. Это блокирующее ограничение execution realism, а не основание придумывать коэффициенты.
+- Отчёт: `docs/audits/LEVERAGE_MARGIN_LIQUIDATION_AUDIT_2026-11-03.md`; матрица покрытия обновлена.
+- Следующий шаг: получить датированные официальные Bybit instrument + risk-tier snapshots; после этого разработать pure margin calculator и deterministic fixtures для long/short, cross/isolated, tier transitions, mark-price trigger, fees/funding, partial fills и stop-vs-liquidation. Не запускать PnL sweeps и не делать выводов о liquidation safety до закрытия этого gate.

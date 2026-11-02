@@ -66,3 +66,12 @@ def test_empty_data_is_rejected():
         assert "Нет свечных данных" in str(exc), exc
     else:
         raise AssertionError("empty data must be rejected")
+
+
+if __name__ == "__main__":
+    tests = [(name, value) for name, value in sorted(globals().items())
+             if name.startswith("test_") and callable(value)]
+    for name, test in tests:
+        test()
+        print("PASS", name)
+    print(f"{len(tests)}/{len(tests)} tests passed")

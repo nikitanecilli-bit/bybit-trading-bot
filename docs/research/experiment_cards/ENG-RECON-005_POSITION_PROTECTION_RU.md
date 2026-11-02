@@ -17,10 +17,10 @@ This reports configuration visible in the position response only. It does not pr
 
 ## Tests and CI
 
-- Parser tests: 14/14.
-- Comparator tests: 14/14.
-- Collector tests: 12/12.
-- Full workflow: [Research engine checks #41459486381](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41459486381), SUCCESS.
+- Parser tests: 15/15.
+- Comparator tests: 17/17.
+- Collector tests: 15/15.
+- Full workflow: [Research engine checks #41468327832](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468327832), SUCCESS.
 - Coverage includes valid TP/SL parsing, negative stop-price rejection, configured stop, missing stop and unknown fields.
 
 ## Ограничения

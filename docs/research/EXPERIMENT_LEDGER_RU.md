@@ -414,3 +414,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Engine commit: `e8171203ad3f87ad19bca064f9a32b4c8a4ec2f0`; test commit: `46c4f01a291634cc2b71f4227c41dfb0b0091e2f`.
 - CI: [Research engine checks #41436427155](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41436427155), SUCCESS; compile, deterministic suites and secret scan passed.
 - Decision: ACCEPT. Older backups missing fields now fail closed; explicit versioned migration is needed rather than silently inventing defaults. No market backtest or live order.
+
+
+## ENG-STATE-011 — strict JSON backup serialization (2026-11-02)
+
+- Preregistered card: [ENG-STATE-011](experiment_cards/ENG-STATE-011_STRICT_JSON_SAVE_RU.md).
+- Confirmed defect: Python JSON encoder default `allow_nan=True` could persist non-standard NaN/Infinity tokens, replacing a valid backup with a file that restore correctly rejects.
+- Fix: `json.dump(..., allow_nan=False)`; serialization failure follows ENG-STATE-004 fail-closed behavior, preserves previous backup and removes the failed temporary file best-effort.
+- Tests: `tests/test_state_persistence.py` 35/35, including NaN risk and infinite position value; both fail save and preserve previous backup / clean temp file.
+- Engine commit: `1a354260945ed34a0be466d790fa24254cd5d472`; test commit: `87a483a4fd9a2a2518bc1ca3fcdc9c4df5301c70`.
+- CI: [Research engine checks #41436653943](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41436653943), SUCCESS; compile, configured deterministic suites and secret scan passed.
+- Decision: ACCEPT. No market backtest, parameter sweep, production deployment or live order.

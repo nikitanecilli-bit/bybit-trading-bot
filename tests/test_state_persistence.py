@@ -200,6 +200,47 @@ class StatePersistenceTests(unittest.TestCase):
             position.update({"direction": "short", "tp1_price": 90.0, "tp2_price": 95.0})
         self._assert_invalid_position_payload(mutate)
 
+    def test_restore_rejects_symbol_in_both_open_and_pending(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "overlap.json"
+            payload = {
+                "risk": {},
+                "open_positions": {"BTCUSDT": engine.asdict(sample_position())},
+                "pending_orders": {
+                    "BTCUSDT": {"symbol": "BTCUSDT", "direction": "long",
+                                "strategy": "test", "entry_price": 100.0,
+                                "stop_dist": 5.0, "order_type": "market"}
+                },
+                "trade_seq": 42,
+            }
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            risk = engine.AdaptiveRiskManager(engine.BotConfig())
+            before = risk.to_dict().copy()
+            with self.assertRaisesRegex(RuntimeError, "Не удалось безопасно восстановить"):
+                engine.PlanBStatePersistence(str(path)).load_state(risk)
+            self.assertEqual(risk.to_dict(), before)
+
+    def test_restore_rejects_duplicate_trade_ids(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "duplicate-id.json"
+            first = engine.asdict(sample_position())
+            second = engine.asdict(sample_position())
+            second.update({"symbol": "ETHUSDT", "entry_price": 2000.0,
+                           "stop_price": 1900.0, "tp1_price": 2120.0,
+                           "tp2_price": 2240.0})
+            payload = {
+                "risk": {},
+                "open_positions": {"BTCUSDT": first, "ETHUSDT": second},
+                "pending_orders": {},
+                "trade_seq": 42,
+            }
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            risk = engine.AdaptiveRiskManager(engine.BotConfig())
+            before = risk.to_dict().copy()
+            with self.assertRaisesRegex(RuntimeError, "Не удалось безопасно восстановить"):
+                engine.PlanBStatePersistence(str(path)).load_state(risk)
+            self.assertEqual(risk.to_dict(), before)
+
     def test_pending_non_object_entry_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "pending-entry.json"

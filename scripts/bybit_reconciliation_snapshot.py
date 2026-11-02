@@ -34,8 +34,8 @@ from bybit_reconciliation import (
 
 DEFAULT_BASE_URL = "https://api.bybit.kz"
 ALLOWED_API_HOSTS = {
-    "api.bybit.com", "api.bybit.kz", "api.bytick.com", "api.bybit.eu",
-    "api.bybit.nl", "api.bybit-tr.com", "api.bybitgeorgia.ge",
+    "api.bybit.com", "api.bytick.com", "api.bybit.kz", "api.bybit.tr",
+    "api.bybitgeorgia.ge", "api.bybit.ae", "api.bybit.eu", "api.bybit.id",
 }
 
 

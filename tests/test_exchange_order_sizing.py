@@ -19,6 +19,9 @@ SNAPSHOT = {
             "maxOrderQty": "1000", "maxMktOrderQty": "800",
             "minNotionalValue": "5",
         },
+        "leverageFilter": {
+            "minLeverage": "1", "maxLeverage": "50", "leverageStep": "0.01",
+        },
     }
 }
 

@@ -327,3 +327,19 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - Limit: restored marks are last-known snapshots, not fresh exchange marks. No Bybit reconciliation, market backtest, private API request or live order was performed.
 
 - Follow-up full Research CI [#41509795468](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509795468) completed SUCCESS; state-persistence suite 59 tests. The added integration test confirms the engine `_persist()` call path writes and restores the open-position last mark. ENG-PERSIST-003 is fully accepted; no pending CI remains for this change.
+
+
+## CI invocation audit + live-path boundary (2026-11-02, continuation)
+
+### Direct test execution audit
+
+- Reviewed every one of the 21 `python tests/test_*.py` invocations in `.github/workflows/research-checks.yml`.
+- All 21 files now contain an executable test entry point: either `unittest.main()` for TestCase suites or an explicit runner for plain `test_*` functions. The earlier silent-skip issue in `test_funding_pnl.py`, `test_timeframe_validation.py` and `test_portfolio_accounting.py` is corrected. This is a static invocation audit plus the successful CI evidence for the latest relevant suites; it is not a claim that every historical green run executed those tests.
+
+### Important live-trading limitation
+
+- The research engine CLI's `--mode watch` is not a live trading loop: it runs `run_simulation_pass()` initially and reruns that simulation when a config file changes.
+- CLI constructs `UnifiedQuantEngine` without `restore_plan_b=True`; `--persist-state` only writes a Plan-B backup. The explicit restore constructor path sets `_state_restored`, and `run_simulation_pass()` rejects backtesting over restored state because a separate live-resume loop with exchange reconciliation is required.
+- `scripts/bybit_private_api_check.py` performs one authenticated GET to `/v5/user/query-api` and explicitly makes no order/account mutations. `exchange_order_sizing.py` calculates/validates order quantities but is not an order submission adapter. Reconciliation code models/validates snapshots; this does not constitute order execution.
+- Repository tree inspection found no separate live order execution module in the research branch. Therefore this CLI/research engine must not be described as ready for live trading. A live execution subsystem would need independently tested public market data ingestion, private read endpoints, exchange/local position and active-order reconciliation, idempotent client order IDs, place/cancel/amend lifecycle, partial-fill handling, protective-order verification, restart recovery, and kill-switch behavior.
+- No live order, private API call, or market backtest was made during this continuation. This is an architecture boundary, not a strategy result.

@@ -9,7 +9,7 @@
 - merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`
 - GitHub Compare (`main...research`): status `diverged`, research ahead 715, behind 13.
 - Pull Request #4: open, draft, not merged, `mergeable=false`, `mergeable_state=dirty`; head is current research HEAD.
-- PR reports 163 changed files, +17,550 / -116 lines.
+- PR reports 163 changed files, +17,558 / -116 lines.
 
 **Interpretation:** 705 commits is not 705 independent strategy changes; the branch has a long divergent history since the common ancestor. The count is a graph relationship, not a measure of code quality. The PR is not safe to merge as-is.
 
@@ -220,5 +220,5 @@ For intrabar limit fills, OHLC cannot prove whether the adverse extreme happened
 
 - Research HEAD: `6fbcc22693fce38ec699b42257a628bf390d1a09` (documentation update after the passing code/test commit).
 - Compare status remains `diverged`: 715 commits ahead, 13 behind main.
-- PR #4 now reports 163 changed files, +17,550 / -116 lines; it remains open and unmerged. GitHub's mergeability field is currently unknown, so do not treat it as merge-ready.
+- PR #4 now reports 163 changed files, +17,558 / -116 lines; it remains open and unmerged. GitHub's mergeability field is currently unknown, so do not treat it as merge-ready.
 - Latest code-changing commit `f65c08bec78b179a9a89832ce31b574740f4dce3` passed Research engine checks #41475941543. The two commits after it update documentation only; the current docs HEAD does not have a separate new CI run.

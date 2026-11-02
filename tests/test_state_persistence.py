@@ -168,6 +168,34 @@ class StatePersistenceTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 engine.PlanBStatePersistence(str(path)).load_state(risk)
 
+    def test_pending_invalid_order_type_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "pending-order-type.json"
+            path.write_text(
+                '{"risk": {}, "open_positions": {}, "pending_orders": '
+                '{"BTCUSDT": {"symbol": "BTCUSDT", "direction": "long", '
+                '"strategy": "test", "entry_price": 100, "stop_dist": 2, '
+                '"order_type": "post_only"}}}',
+                encoding="utf-8",
+            )
+            risk = engine.AdaptiveRiskManager(engine.BotConfig())
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(risk)
+
+    def test_pending_non_finite_price_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "pending-nan.json"
+            path.write_text(
+                '{"risk": {}, "open_positions": {}, "pending_orders": '
+                '{"BTCUSDT": {"symbol": "BTCUSDT", "direction": "long", '
+                '"strategy": "test", "entry_price": NaN, "stop_dist": 2, '
+                '"order_type": "market"}}}',
+                encoding="utf-8",
+            )
+            risk = engine.AdaptiveRiskManager(engine.BotConfig())
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(risk)
+
     def test_invalid_trade_sequence_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "sequence.json"

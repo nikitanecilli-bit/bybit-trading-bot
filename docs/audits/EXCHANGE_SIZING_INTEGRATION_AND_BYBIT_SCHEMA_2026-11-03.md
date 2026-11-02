@@ -75,3 +75,15 @@ Bybit V5 предоставляет публичный GET `/v5/market/risk-limi
 `RISK-TIER SNAPSHOT: NOT ACQUIRED`.
 `ISOLATED LIQUIDATION: NOT IMPLEMENTED`.
 `CROSS/UTA PORTFOLIO LIQUIDATION: NOT IMPLEMENTED`.
+
+## 6. Snapshot automation already exists; data still unverified
+
+The branch already contains:
+- `.github/workflows/bybit-instrument-snapshots.yml` (weekly schedule + workflow_dispatch; retries a list of official regional API hosts);
+- `.github/workflows/bybit-risk-limit-snapshots.yml` (same pattern for risk tiers);
+- `scripts/snapshot_bybit_instruments.py`;
+- `scripts/snapshot_bybit_risk_limits.py`.
+
+These workflows check out `research/market-regime-v1-main` and commit snapshots under `data/instrument_specs/linear` and `data/instrument_specs/risk_limits`. However, direct repository-content checks for both expected output directories returned 404 at audit time. Thus workflow definitions and snapshot code exist, but a committed dated dataset was not verified. No workflow dispatch action is exposed through the connected GitHub tools in this session, so neither workflow was triggered and no run result is claimed.
+
+This changes the next action: first inspect the next scheduled/manual workflow result and validate the raw snapshots; do not create a duplicate downloader or duplicate scheduled workflow.

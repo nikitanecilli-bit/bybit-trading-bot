@@ -7,9 +7,9 @@
 - `main`: `e86b1bfd6d086684c32e395e0dc383802665d59f`
 - `research/market-regime-v1-main`: `df3b1ed1c37b5895aadb3636c088123e963bec73`
 - merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`
-- GitHub Compare (`main...research`): status `diverged`, research ahead 715, behind 13.
+- GitHub Compare (`main...research`): status `diverged`, research ahead 720, behind 13.
 - Pull Request #4: open, draft, not merged, `mergeable=false`, `mergeable_state=dirty`; head is current research HEAD.
-- PR reports 163 changed files, +17,558 / -116 lines.
+- PR reports 163 changed files, +17,583 / -116 lines.
 
 **Interpretation:** 705 commits is not 705 independent strategy changes; the branch has a long divergent history since the common ancestor. The count is a graph relationship, not a measure of code quality. The PR is not safe to merge as-is.
 
@@ -233,3 +233,11 @@ The artifact manifest equality above refers to per-symbol metadata and source fi
 - The E11/E13 manifest is written before the common-timestamp intersection, so its per-symbol fold counts describe source coverage, not the final synchronized replay count. The summary's common_bars=4,321 is the actual shared replay count.
 
 Decision: do not attribute the entire E10-to-E11 result difference to shared-capital accounting. E10 and E11 are different estimands. E11-to-E13 remains a controlled replay comparison because E13's compression-OFF baseline reproduces E11's per-fold results exactly on the same common dataset.
+
+
+### Snapshot refresh after E10/E11 comparability clarification
+
+- Research HEAD: `e4629b614e641add9023cfbc5340ce533ad65e54`.
+- Git Compare: diverged, 720 ahead / 13 behind.
+- PR #4: open, draft, mergeable=false / dirty; 163 files, +17,583 / -116.
+- Commits after the latest passing code CI are documentation-only; engine/test code remains at passing commit `f65c08bec78b179a9a89832ce31b574740f4dce3`.

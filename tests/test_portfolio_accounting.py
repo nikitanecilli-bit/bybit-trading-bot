@@ -160,19 +160,18 @@ def test_mark_to_market_equity_equals_realized_plus_unrealized():
 
 def test_tp1_partial_position_mark_includes_realized_leg_and_remaining_leg():
     e = make_engine()
-    # TP1 has realized 1% on 50% notional; remaining 50% is marked 2% above entry.
+    # TP1 closed 50% at 106; remaining 50% is marked at 102.
     e.open_positions["BTCUSDT"] = make_position(
         size=2_000.0, remaining=0.5, tp1_hit=True, tp1_gross=10.0,
     )
     e._last_mark_prices["BTCUSDT"] = 102.0
     value = e._unrealized_pnl_at_marks()
     expected_gross = 10.0 + 2_000.0 * 0.5 * 0.02
+    # 20 base units: entry notional 2,000; TP1 notional 1,060; remaining mark notional 1,020.
     expected_costs = (
-        2_000.0 * engine_mod.TAKER_FEE
-        + 2_000.0 * engine_mod.TAKER_SLIP
-        + 2_000.0 * engine_mod.TP1_FRACTION * engine_mod.TAKER_FEE
-        + 2_000.0 * engine_mod.TP1_FRACTION * engine_mod.TAKER_SLIP
-        + 2_000.0 * 0.5 * (engine_mod.TAKER_FEE + engine_mod.TAKER_SLIP)
+        2_000.0 * (engine_mod.TAKER_FEE + engine_mod.TAKER_SLIP)
+        + 1_060.0 * (engine_mod.TAKER_FEE + engine_mod.TAKER_SLIP)
+        + 1_020.0 * (engine_mod.TAKER_FEE + engine_mod.TAKER_SLIP)
     )
     assert abs(value - (expected_gross - expected_costs)) < 1e-8
 
@@ -211,14 +210,53 @@ def test_long_and_short_unrealized_pnl_have_opposite_signs():
     assert long_only > 0
 
 
+def test_short_exit_costs_use_lower_executed_notional():
+    e = make_engine()
+    pos = make_position(direction="short", size=1_000.0, order_type="market", maker_exits=False)
+    e.open_positions["BTCUSDT"] = pos
+    e._close_position(
+        pos, exit_price=90.0, exit_reason="take_profit",
+        exit_ts=1_800_003_600_000, mae_r=0.0, mfe_r=2.0,
+    )
+    trade = e.closed_trades[-1]
+    expected_fees = 1_000.0 * engine_mod.TAKER_FEE + 900.0 * engine_mod.TAKER_FEE
+    expected_slippage = 1_000.0 * engine_mod.TAKER_SLIP + 900.0 * engine_mod.TAKER_SLIP
+    assert trade.exchange_fees_usdt == round(expected_fees, 2)
+    assert trade.slippage_cost_usdt == round(expected_slippage, 2)
+
+
+def test_stop_risk_uses_exit_notional_at_stop_price():
+    cfg = engine_mod.BotConfig(
+        capital_usdt=10_000.0, max_risk_trade_pct=5.0,
+        leverage_val=5.0, max_concurrent_positions=2,
+    )
+    risk = engine_mod.AdaptiveRiskManager(cfg)
+    _, long_risk = risk.calculate_position_size(
+        100.0, 95.0, order_type="market", risk_budget_usdt=100.0,
+    )
+    _, short_risk = risk.calculate_position_size(
+        100.0, 105.0, order_type="market", risk_budget_usdt=100.0,
+    )
+    long_rate = 0.05 + engine_mod.TAKER_FEE + engine_mod.TAKER_SLIP + 0.95 * (
+        engine_mod.TAKER_FEE + engine_mod.TAKER_SLIP
+    )
+    short_rate = 0.05 + engine_mod.TAKER_FEE + engine_mod.TAKER_SLIP + 1.05 * (
+        engine_mod.TAKER_FEE + engine_mod.TAKER_SLIP
+    )
+    assert long_risk > 0
+    assert short_risk > 0
+    assert short_risk > long_risk
+
+
 def test_close_trade_reconciles_net_pnl_fees_slippage_and_realized_equity():
     e = make_engine()
     pos = make_position(size=1_000.0, order_type="market", maker_exits=False)
     e.open_positions["BTCUSDT"] = pos
     e._last_mark_prices["BTCUSDT"] = 110.0
     gross = 1_000.0 * (110.0 - 100.0) / 100.0
-    expected_fees = 1_000.0 * engine_mod.TAKER_FEE + 1_000.0 * engine_mod.TAKER_FEE
-    expected_slippage = 1_000.0 * engine_mod.TAKER_SLIP + 1_000.0 * engine_mod.TAKER_SLIP
+    # 10 base units: entry notional 1,000; exit notional 1,100 at 110.
+    expected_fees = 1_000.0 * engine_mod.TAKER_FEE + 1_100.0 * engine_mod.TAKER_FEE
+    expected_slippage = 1_000.0 * engine_mod.TAKER_SLIP + 1_100.0 * engine_mod.TAKER_SLIP
 
     e._close_position(
         pos, exit_price=110.0, exit_reason="take_profit",

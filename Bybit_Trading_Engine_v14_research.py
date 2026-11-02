@@ -724,6 +724,7 @@ class PlanBStatePersistence:
                 raise ValueError("saved_at_utc должен содержать явный UTC offset")
             if parsed_saved_at.utcoffset().total_seconds() != 0:
                 raise ValueError("saved_at_utc должен быть указан в UTC")
+            saved_at_ms = int(parsed_saved_at.timestamp() * 1000)
             if not isinstance(data["bot_version"], str) or not data["bot_version"].strip():
                 raise ValueError("bot_version должен быть непустой строкой")
             risk_data = data["risk"]
@@ -826,6 +827,8 @@ class PlanBStatePersistence:
                 entry_ts = pos_dict["entry_ts"]
                 if isinstance(entry_ts, bool) or not isinstance(entry_ts, int) or entry_ts <= 0:
                     raise ValueError(f"позиция {sym}: entry_ts должен быть положительным целым числом")
+                if entry_ts > saved_at_ms:
+                    raise ValueError(f"позиция {sym}: entry_ts не может быть позже saved_at_utc")
                 for field_name in numeric_position_fields.intersection(pos_dict):
                     value = pos_dict[field_name]
                     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
@@ -868,6 +871,8 @@ class PlanBStatePersistence:
                         raise ValueError(f"позиция {sym}: tp1_hit=true требует tp1_ts_ms")
                     if tp1_ts < entry_ts:
                         raise ValueError(f"позиция {sym}: tp1_ts_ms не может быть раньше entry_ts")
+                    if tp1_ts > saved_at_ms:
+                        raise ValueError(f"позиция {sym}: tp1_ts_ms не может быть позже saved_at_utc")
                 elif tp1_ts is not None:
                     raise ValueError(f"позиция {sym}: tp1_ts_ms задан при tp1_hit=false")
                 if "bars_held" in pos_dict:
@@ -900,6 +905,8 @@ class PlanBStatePersistence:
                 signal_ts = signal["signal_ts"]
                 if isinstance(signal_ts, bool) or not isinstance(signal_ts, int) or signal_ts <= 0:
                     raise ValueError(f"pending signal {sym}: signal_ts должен быть положительным целым числом")
+                if signal_ts > saved_at_ms:
+                    raise ValueError(f"pending signal {sym}: signal_ts не может быть позже saved_at_utc")
                 if signal["symbol"] != sym:
                     raise ValueError(f"ключ pending {sym!r} не совпадает с signal.symbol {signal['symbol']!r}")
                 if signal["direction"] not in {"long", "short"}:

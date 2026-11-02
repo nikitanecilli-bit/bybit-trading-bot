@@ -81,3 +81,25 @@
 - Парсер не делает HTTP calls, не использует ключи и не отправляет ордера. Он проверяет только переданные ему страницы, требует integer retCode=0 и непрерывную цепочку cursor; он не доказывает, что вызывающий код получил все страницы.
 - Следующий слой: read-only collector with cursor loop + server-time coherence, затем report-only comparator.
 - Общий статус по-прежнему `UNSUPPORTED_LOCAL_MODEL / BLOCKED`: exact local qty, `positionIdx`, order IDs/link IDs и execution ledger отсутствуют.
+
+
+## ENG-RECON-003 — read-only snapshot collector (implementation in progress)
+
+Добавлен `scripts/bybit_reconciliation_snapshot.py` — сетевой collector, который имеет только GET-запросы и не содержит торговых/mutating endpoints.
+
+Защитные условия:
+- До любых account snapshot endpoints запрашивается `/v5/user/query-api`; ключ должен совпасть с переданным и иметь явный `readOnly == 1`. Иначе выполнение прекращается.
+- Затем читается Bybit server time до и после capture. Время не должно идти назад; длительность окна ограничена 120 секундами.
+- Positions и active orders собираются до завершения cursor pagination; ошибка HTTP, retCode, shape или повтор cursor — BLOCKED, не пустой аккаунт.
+- Execution history разбивается на интервалы не длиннее 7 суток; страницы валидируются parser'ом отдельно по каждому интервалу; итоговые события дедуплицируются по `execId`.
+- Сырые ответы сохраняются в JSON вместе с capture metadata и SHA-256; запись атомарная, с fsync файла и директории на POSIX.
+- CI использует только mocked transport. В workflow нет шага, который читает GitHub Secrets или обращается к Bybit.
+
+Текущие ограничения:
+- Collector не запускался против Bybit и не создавал реальный snapshot; прежний HTTP 403 на GitHub runners остаётся неразрешённым.
+- Сбор execution history не заменяет order history и проверку exchange-side stop/TP.
+- Capture status — только `CAPTURED_READ_ONLY_NOT_RECONCILED`, не `RECONCILED_READ_ONLY`.
+- Локальная модель всё ещё не хранит exact exchange qty, positionIdx и exchange order/execution identity. Открытые позиции/ордера остаются `UNSUPPORTED_LOCAL_MODEL / BLOCKED`.
+- Реальный запуск допустим только с ключом, который Bybit сам подтверждает как read-only; тестовые фикстуры не доказывают доступность API из конкретной сети.
+
+До успешного CI collector не получает ACCEPT. Даже после CI это будет только ACCEPT для кода/fixture coverage, не подтверждение реального API capture или reconciliation.

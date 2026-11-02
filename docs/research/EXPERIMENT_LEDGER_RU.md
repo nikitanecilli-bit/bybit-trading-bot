@@ -461,3 +461,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41445386482](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41445386482), SUCCESS; compile, configured deterministic suites and secret scan passed.
 - Decision: ACCEPT as local position event chronology validation. No market backtest, parameter sweep, production deployment or live order.
 - Limitation: does not establish that TP1 was actually filled at Bybit or reconcile exchange event time.
+
+
+## ENG-STATE-015 — pending signal next-bar chronology (2026-11-02)
+
+- Preregistered card: [ENG-STATE-015](experiment_cards/ENG-STATE-015_PENDING_NEXT_BAR_RU.md).
+- Confirmed lifecycle gap: pending entries were documented as next-candle-only, but restore did not require `signal_ts` and fill logic did not enforce the immediately following candle. After restart/data gap, a stale signal could be filled late.
+- Fix: restore requires positive integer `signal_ts`; unknown pending fields rejected; fill requires `curr.ts == signal_ts + timeframe_ms`. Otherwise pending signal and its allocated entry-risk budget are discarded without opening.
+- Tests: `tests/test_state_persistence.py` 48/48, including malformed/missing timestamps, unknown fields, stale signal discard and immediate-next-bar fill. Existing gap execution and time-model suites also passed after fixtures were made explicit about signal candle time.
+- CI: [Research engine checks #41446661723](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41446661723), SUCCESS; compile, configured deterministic suites and secret scan passed.
+- Decision: ACCEPT as preservation of existing one-next-bar policy; no strategy change intended. No market PnL sweep, production deployment or live order.
+- Limitation: exact timestamp adjacency assumes complete candles for the configured timeframe. A missing candle causes safe cancellation rather than late fill; it does not query exchange-side order state.

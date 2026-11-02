@@ -345,3 +345,11 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - No live order, private API call, or market backtest was made during this continuation. This is an architecture boundary, not a strategy result.
 
 - Follow-up [CI #41511547342](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41511547342) SUCCESS; persistence suite 60 tests. Added regression proves restored state cannot be passed into a fresh `run_simulation_pass()`; the guard fails closed before data validation or replay.
+
+
+## Margin and exchange sizing gate — static code finding (2026-11-02)
+
+- `AdaptiveRiskManager.calculate_position_size()` estimates notional from stop distance plus modeled entry/exit fees and slippage, then caps it at `0.95 * equity * leverage_val / max_concurrent_positions`. This is a notional ceiling, not a margin calculation.
+- It does not calculate initial margin, maintenance margin, Bybit risk tier, liquidation price, margin mode/cross collateral, or fee/funding effects on liquidation distance.
+- `exchange_order_sizing.py` separately validates tick/lot/min-notional constraints, but `_try_fill_pending()` in v14 currently calls `risk_mgr.calculate_position_size()` directly and does not route the resulting order through the exchange sizing helper or dated `instrument_spec_history`.
+- Therefore the existence of correct Decimal rounding utilities must not be mistaken for exchange-valid sizing in the trading engine. Before live execution, wire dated instrument specs into the entry path and add a separate margin/risk-tier model with fail-closed tests. No production change or market backtest was made for this finding.

@@ -13,6 +13,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import tempfile
 import time
 import urllib.error
@@ -35,6 +36,13 @@ FUNDING_WINDOW_MS = 5 * 24 * 60 * 60 * 1000
 FUNDING_LIMIT = 200
 MARK_LIMIT = 900
 INTERVALS = {"1", "3", "5", "15", "30", "60", "120", "240", "360", "720"}
+
+
+def normalize_symbol(value: Any) -> str:
+    symbol = str(value or "").strip().upper()
+    if not re.fullmatch(r"[A-Z0-9]{2,30}", symbol):
+        raise ValueError("symbol must contain only 2-30 ASCII letters or digits")
+    return symbol
 
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -108,8 +116,8 @@ def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
                           fetch_page: Callable[[int, int], list[dict[str, Any]]] | None = None,
                           base_url: str = DEFAULT_BASE_URL, pause: float = 0.1
                           ) -> list[dict[str, Any]]:
-    symbol = symbol.strip().upper()
-    if not symbol or start_ms <= 0 or end_ms <= start_ms or pause < 0:
+    symbol = normalize_symbol(symbol)
+    if start_ms <= 0 or end_ms <= start_ms or pause < 0:
         raise ValueError("valid symbol, range and non-negative pause are required")
     if fetch_page is None:
         fetch_page = lambda start, end: _request_json(
@@ -229,6 +237,7 @@ def _atomic_csv(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]) -
 def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | Path,
                    interval: str = "60", base_url: str = DEFAULT_BASE_URL,
                    pause: float = 0.1) -> dict[str, Any]:
+    symbol = normalize_symbol(symbol)
     validate_base_url(base_url)
     if pause < 0:
         raise ValueError("pause cannot be negative")
@@ -256,7 +265,7 @@ def main() -> None:
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     parser.add_argument("--pause", type=float, default=0.1)
     args = parser.parse_args()
-    symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+    symbols = [normalize_symbol(s) for s in args.symbols.split(",") if s.strip()]
     if not symbols or len(symbols) != len(set(symbols)):
         parser.error("--symbols must contain unique non-empty symbols")
     results = []

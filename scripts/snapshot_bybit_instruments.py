@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import urllib.error
 import os
 import tempfile
 import time
@@ -20,10 +21,37 @@ from typing import Any, Callable
 DEFAULT_BASE_URL = "https://api.bybit.com"
 ENDPOINT = "/v5/market/instruments-info"
 SCHEMA_VERSION = 1
+MAX_PAGES = 1000
+ALLOWED_API_HOSTS = {
+    "api.bybit.com", "api.bytick.com", "api.bybit.kz", "api.bybit.tr",
+    "api.bybitgeorgia.ge", "api.bybit.ae", "api.bybit.eu", "api.bybit.id",
+}
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _validate_base_url(base_url: str) -> None:
+    parsed = urllib.parse.urlsplit(base_url)
+    if (parsed.scheme != "https" or parsed.hostname not in ALLOWED_API_HOSTS
+            or parsed.username or parsed.password or parsed.port not in (None, 443)
+            or parsed.path not in ("", "/") or parsed.query or parsed.fragment):
+        raise ValueError("base URL must be an official HTTPS Bybit API host")
+
+
+def _check_ret_code(payload: Any) -> None:
+    if not isinstance(payload, dict):
+        raise ValueError("Bybit response root must be an object")
+    code = payload.get("retCode")
+    if isinstance(code, bool) or not isinstance(code, int) or code != 0:
+        raise RuntimeError("Bybit instruments-info returned non-zero or invalid retCode")
 
 
 def _request_page(base_url: str, category: str, cursor: str | None,
                   timeout: float = 20.0) -> tuple[list[dict[str, Any]], str | None]:
+    _validate_base_url(base_url)
     params: dict[str, Any] = {"category": category, "limit": 1000}
     if cursor:
         params["cursor"] = cursor
@@ -31,13 +59,15 @@ def _request_page(base_url: str, category: str, cursor: str | None,
     request = urllib.request.Request(
         url, headers={"User-Agent": "bybit-trading-bot-research/1.0"}
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-    if payload.get("retCode") != 0:
-        raise RuntimeError(
-            f"Bybit instruments-info error {payload.get('retCode')}: "
-            f"{payload.get('retMsg', 'unknown error')}"
-        )
+    try:
+        opener = urllib.request.build_opener(_NoRedirectHandler())
+        with opener.open(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"Bybit instruments-info HTTP status {exc.code}; body suppressed") from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise RuntimeError(f"Bybit instruments-info request failed ({type(exc).__name__})") from exc
+    _check_ret_code(payload)
     result = payload.get("result")
     if not isinstance(result, dict) or not isinstance(result.get("list"), list):
         raise ValueError("Unexpected Bybit instruments-info response shape")
@@ -60,7 +90,11 @@ def fetch_all_instruments(
     by_symbol: dict[str, dict[str, Any]] = {}
     seen_cursors: set[str] = set()
     cursor: str | None = None
+    page_count = 0
     while True:
+        page_count += 1
+        if page_count > MAX_PAGES:
+            raise RuntimeError("Bybit instrument pagination exceeded safety limit")
         rows, next_cursor = fetch_page(cursor)
         for row in rows:
             symbol = str(row.get("symbol") or "").strip().upper()

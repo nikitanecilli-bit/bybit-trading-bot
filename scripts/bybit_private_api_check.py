@@ -104,9 +104,33 @@ def main() -> int:
         with opener.open(request, timeout=20) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        print(f"Bybit HTTP request failed with status {exc.code}; response body was suppressed.")
+        print(f"Bybit HTTP request failed with status {exc.code}.")
+        # Emit only non-secret diagnostics. Bybit API JSON errors carry retCode/retMsg;
+        # edge/CDN denials usually return HTML and identifiable response headers.
+        raw_body = exc.read(4096)
+        content_type = exc.headers.get("Content-Type", "") if exc.headers else ""
+        server = exc.headers.get("Server", "") if exc.headers else ""
+        cf_ray = exc.headers.get("CF-Ray", "") if exc.headers else ""
+        if raw_body:
+            try:
+                error_payload = json.loads(raw_body.decode("utf-8", errors="replace"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                error_payload = None
+            if isinstance(error_payload, dict) and ("retCode" in error_payload or "retMsg" in error_payload):
+                print(f"API error retCode: {error_payload.get('retCode', 'not supplied')}")
+                ret_msg = error_payload.get("retMsg")
+                if isinstance(ret_msg, str):
+                    safe_message = " ".join(ret_msg.split())[:240]
+                    print(f"API error retMsg: {safe_message}")
+            else:
+                print("Response format: non-JSON (likely regional edge/CDN or network denial).")
+        print(f"Response Content-Type: {content_type or 'not supplied'}")
+        print(f"Response Server: {server or 'not supplied'}")
+        if cf_ray:
+            print(f"Cloudflare Ray ID: {cf_ray}")
         if exc.code == 403:
-            print("Check the regional API host and whether the runner's network/IP is restricted.")
+            print("A 403 from a non-JSON edge response points to network/region/IP filtering, not HMAC signature validation.")
+            print("If the response is a Bybit JSON error, use its retCode/retMsg to identify the API-side cause.")
         return 1
     except urllib.error.URLError as exc:
         reason_type = type(exc.reason).__name__

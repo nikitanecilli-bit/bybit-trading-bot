@@ -308,3 +308,5 @@ No production/live changes and no market backtests were performed in these corre
 
 - **ENG-RECON-002 accepted:** pure Bybit V5 parser added; 12/12 fixture tests and CI #41448536690 passed. It validates caller-supplied pages only, not live collection.
 - Next: read-only collector with explicit cursor loop, server-time/capture coherence and fail-closed errors. Do not wire restore or trading until exact local qty, positionIdx, exchange IDs and execution ledger exist.
+
+- Parser hardening: only integer `retCode=0` counts as success; boolean false is rejected. Parser tests 13/13; CI #41448898597 passed.

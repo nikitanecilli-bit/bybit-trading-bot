@@ -272,3 +272,7 @@ No production/live changes and no market backtests were performed in these corre
 
 - **ENG-STATE-011 accepted:** backup serialization now uses strict JSON (`allow_nan=False`); NaN/Infinity cannot replace a previously valid backup. Persistence tests 35/35; CI #41436653943 passed.
 - Remaining persistence priorities: explicit legacy schema migration, freshness/reconciliation policy, and durability guarantees beyond atomic rename.
+
+
+- **ENG-STATE-012 accepted:** risk restore checks cross-field identities (current = realized + unrealized, peak >= current, max drawdown covers implied drawdown). Persistence tests 39/39; CI #41444495022 passed. Keep historical max drawdown values above current drawdown; do not "normalize" them down.
+- Next persistence work: validate timestamps/identity semantics and decide explicit versioned migration/freshness/reconciliation. Local consistency still does not prove Bybit state.

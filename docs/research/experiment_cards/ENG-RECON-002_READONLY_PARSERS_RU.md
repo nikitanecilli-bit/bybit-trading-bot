@@ -16,7 +16,7 @@ No HTTP client, credentials, private API call, order mutation or engine restore 
 
 ## Tests
 
-`tests/test_bybit_reconciliation.py`: 12/12:
+`tests/test_bybit_reconciliation.py`: 13/13:
 - complete multi-page positions and hedge-side identities;
 - empty zero-size position rows;
 - duplicate position/order/execution identities;
@@ -29,8 +29,8 @@ No HTTP client, credentials, private API call, order mutation or engine restore 
 
 ## CI
 
-- Parser commit: `fa97a4810e14d5d7590c5c4794ba2f98856127da`.
-- Workflow/test integration commits: `95e5afb46a2869957e90742560f95d21089ddad5`, `b6d2fe255e692fa001fef5cf86274863485ae26d`.
+- Parser commits: `fa97a4810e14d5d7590c5c4794ba2f98856127da`, `b035edbff03a11299b74c3e44eea4fcb027c5bd8`.
+- Workflow/test integration commits: `95e5afb46a2869957e90742560f95d21089ddad5`, `9fdaa02d764495a59747f0930e89fa677d03b890`.
 - [Research engine checks #41448536690](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41448536690): SUCCESS; parser tests 12/12, persistence tests 54/54, compile, configured deterministic suites and secret scan passed.
 
 ## Ограничения

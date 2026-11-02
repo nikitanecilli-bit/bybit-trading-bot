@@ -13,7 +13,7 @@ from exchange_order_sizing import size_to_exchange_constraints
 SNAPSHOT = {
     "instrument": {
         "symbol": "TESTUSDT", "category": "linear", "status": "Trading",
-        "priceFilter": {"tickSize": "0.05"},
+        "priceFilter": {"minPrice": "0.05", "maxPrice": "1000000", "tickSize": "0.05"},
         "lotSizeFilter": {
             "qtyStep": "0.001", "minOrderQty": "0.01",
             "maxOrderQty": "1000", "maxMktOrderQty": "800",
@@ -72,6 +72,15 @@ class ExchangeSizingTests(unittest.TestCase):
             size_to_exchange_constraints(
                 self.spec, "110_000", "100", "100",
                 order_type="limit", side="buy",
+            )
+
+    def test_non_trading_instrument_cannot_be_sized(self):
+        pending = dict(SNAPSHOT["instrument"])
+        pending["status"] = "PendingOpen"
+        spec = InstrumentSpec.from_snapshot({"instrument": pending})
+        with self.assertRaisesRegex(ValueError, "not tradable"):
+            size_to_exchange_constraints(
+                spec, "100", "100", "1", order_type="market", side="buy"
             )
 
     def test_invalid_inputs_rejected(self):

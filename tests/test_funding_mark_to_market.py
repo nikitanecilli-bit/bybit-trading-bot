@@ -101,5 +101,9 @@ def test_tp1_application_records_conservative_candle_close_boundary():
 
 
 if __name__ == "__main__":
-    import unittest
-    unittest.main(verbosity=2)
+    tests = [(name, value) for name, value in sorted(globals().items())
+             if name.startswith("test_") and callable(value)]
+    for name, test in tests:
+        test()
+        print("PASS", name)
+    print(f"{len(tests)}/{len(tests)} tests passed")

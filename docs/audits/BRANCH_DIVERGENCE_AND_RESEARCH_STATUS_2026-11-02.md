@@ -282,3 +282,12 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - Initial post-fix CI exposed an incomplete test fixture (`__new__` engine without persistence stub) in `test_funding_mark_to_market.py`; fixture was corrected.
 - Full Research CI [#41504995009](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41504995009) completed SUCCESS; portfolio accounting and fail-closed state persistence steps passed.
 - Card and experiment ledger updated. No market backtest, optimization, private API request or live order.
+
+
+## Repository snapshot after ENG-PERSIST-001 documentation (2026-11-02)
+
+- Research branch head: `fdaf35ad3ee694ef7197e0a4b6b2349c36972740`.
+- Current `main` ref observed: `e7303f7731a52eb72a2447d0cc060f346a943776`; no writes were made to `main` in this work session.
+- Compare against that `main` ref: diverged, 759 commits ahead / 14 behind; 167 changed files, +15,198 / -110. GitHub reports merge state dirty.
+- PR #4 remains open, Draft, unmerged. Its description now records ENG-FUND-002/003, ENG-PERSIST-001 and current CI status.
+- Latest full successful Research CI: [#41504995009](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41504995009), commit `cc012f0b4df52fb5da0270e08b0a9438bb70762c`. The production fix is `b547cf91139467442a5eabfbaa3df70bd77f95d5`; later commits in this snapshot are test-fixture, workflow-comment or documentation/PR metadata changes.

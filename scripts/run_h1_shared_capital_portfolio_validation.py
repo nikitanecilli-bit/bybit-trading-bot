@@ -16,6 +16,7 @@ from collections import defaultdict
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import Bybit_Trading_Engine_v14_research as em
 from run_uploaded_dataset_backtests import read_zip_datasets
+from multibar_limit_wait import evaluate_limit_wait, prepare_signal_for_next_bar_fill
 
 FOLDS = [(1, 0.50, 0.65), (2, 0.65, 0.80), (3, 0.80, 1.00)]
 VOL_THRESHOLDS = [1.2, 1.6, 2.0, 2.5]
@@ -172,19 +173,32 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
             sig["order_type"] = "limit"
             meta = {"age": 0}
             order_age[sym] = meta
-        meta["age"] += 1
-        ref = float(sig["entry_price"])
-        required_low = ref * (1.0 - ENTRY_PENETRATION_BPS / 10000.0)
-        if float(candle.low) <= required_low:
+        decision, meta["age"] = evaluate_limit_wait(
+            direction=str(sig.get("direction", "long")),
+            low=float(candle.low),
+            high=float(candle.high),
+            limit_price=float(sig["entry_price"]),
+            penetration_bps=ENTRY_PENETRATION_BPS,
+            age=meta["age"],
+            max_wait_bars=WAIT_BARS,
+        )
+        if decision == "fill":
+            # The base engine deliberately accepts only next-bar signals.
+            # Adapt only its freshness guard for this research-only delayed fill;
+            # retain the original signal timestamp separately for provenance.
+            prepare_signal_for_next_bar_fill(
+                sig, int(candle.ts), 3_600_000
+            )
             filled = original_fill(sym, candle)
             order_age.pop(sym, None)
             return filled
-        # No qualifying penetration: age the order without allowing the engine
-        # to treat a mere touch as a fill. Cancel cleanly after WAIT_BARS.
-        engine.pending.pop(sym, None)
-        if meta["age"] < WAIT_BARS:
+        # Retain the pending order only while its explicit TTL is active.
+        if decision == "wait":
+            engine.pending.pop(sym, None)
             engine.pending[sym] = sig
             return False
+        engine.pending.pop(sym, None)
+        getattr(engine, "_bar_entry_risk_budgets", {}).pop(sym, None)
         order_age.pop(sym, None)
         return False
 

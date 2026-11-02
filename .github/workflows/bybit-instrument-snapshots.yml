@@ -2,13 +2,8 @@ name: Archive Bybit instrument specifications
 
 on:
   schedule:
-    - cron: '17 2 * * *'
+    - cron: '17 2 * * 1'
   workflow_dispatch:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - 'scripts/snapshot_bybit_instruments.py'
-      - '.github/workflows/bybit-instrument-snapshots.yml'
 
 permissions:
   contents: write

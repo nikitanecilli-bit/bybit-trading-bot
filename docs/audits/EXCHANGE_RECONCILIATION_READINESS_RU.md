@@ -94,7 +94,7 @@
 - Positions и active orders собираются до завершения cursor pagination; ошибка HTTP, retCode, shape или повтор cursor — BLOCKED, не пустой аккаунт.
 - Execution history разбивается на интервалы не длиннее 7 суток; страницы валидируются parser'ом отдельно по каждому интервалу; итоговые события дедуплицируются по `execId`.
 - Сырые ответы сохраняются в JSON вместе с capture metadata и SHA-256; запись атомарная, с fsync файла и директории на POSIX.
-- CI использует только mocked transport. В workflow нет шага, который читает GitHub Secrets или обращается к Bybit. 15 collector tests + 16 parser tests + 17 report-comparator tests прошли в [Actions #41468736376](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468736376). В collector/comparator добавлена строгая дедупликация `execId`: одинаковые записи на границе интервалов схлопываются, конфликтующие payload с тем же ID блокируют capture/report. ACCEPT относится только к коду и fixture coverage.
+- CI использует только mocked transport. В workflow нет шага, который читает GitHub Secrets или обращается к Bybit. 15 collector tests + 16 parser tests + 17 report-comparator tests прошли в [Actions #41470373006](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41470373006). В collector/comparator добавлена строгая дедупликация `execId`: одинаковые записи на границе интервалов схлопываются, конфликтующие payload с тем же ID блокируют capture/report. ACCEPT относится только к коду и fixture coverage.
 
 Текущие ограничения:
 - Collector не запускался против Bybit и не создавал реальный snapshot; прежний HTTP 403 на GitHub runners остаётся неразрешённым.

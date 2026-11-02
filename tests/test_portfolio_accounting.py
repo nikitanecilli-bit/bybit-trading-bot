@@ -78,6 +78,38 @@ def test_final_close_funding_payment_uses_full_initial_quantity_on_boundary():
     assert e.closed_trades[-1].funding_cost_usdt == 10.0
 
 
+def test_mtm_defers_funding_receipt_at_current_boundary_until_next_mark():
+    e = make_engine()
+    e.funding_dir = "fixture"
+    pos = make_position(size=1_000.0)
+    boundary = pos.entry_ts + 3_600_000
+    e.open_positions["BTCUSDT"] = pos
+    e.funding_by_symbol = {"BTCUSDT": [{"ts": boundary, "rate": "-0.01"}]}
+    e._funding_mark_prices = {"BTCUSDT": {boundary: "100"}}
+    e._last_mark_prices["BTCUSDT"] = 100.0
+
+    at_boundary = e._unrealized_pnl_at_marks(boundary)
+    after_boundary = e._unrealized_pnl_at_marks(boundary + 3_600_000)
+
+    assert abs((after_boundary - at_boundary) - 10.0) < 1e-8
+
+
+def test_mtm_does_not_defer_funding_payments_at_current_boundary():
+    e = make_engine()
+    e.funding_dir = "fixture"
+    pos = make_position(size=1_000.0)
+    boundary = pos.entry_ts + 3_600_000
+    e.open_positions["BTCUSDT"] = pos
+    e.funding_by_symbol = {"BTCUSDT": [{"ts": boundary, "rate": "0.01"}]}
+    e._funding_mark_prices = {"BTCUSDT": {boundary: "100"}}
+    e._last_mark_prices["BTCUSDT"] = 100.0
+
+    at_boundary = e._unrealized_pnl_at_marks(boundary)
+    after_boundary = e._unrealized_pnl_at_marks(boundary + 3_600_000)
+
+    assert abs(at_boundary - after_boundary) < 1e-8
+
+
 def test_mark_to_market_equity_equals_realized_plus_unrealized():
     e = make_engine()
     e.open_positions["BTCUSDT"] = make_position(size=2_000.0)

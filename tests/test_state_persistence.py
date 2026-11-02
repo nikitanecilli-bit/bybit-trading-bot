@@ -1,5 +1,6 @@
 """Fail-closed tests for Plan B state persistence."""
 from pathlib import Path
+import json
 import sys
 import tempfile
 import unittest
@@ -127,6 +128,35 @@ class StatePersistenceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Не удалось безопасно восстановить"):
                 engine.PlanBStatePersistence(str(path)).load_state(risk)
             self.assertEqual(risk.to_dict(), before)
+
+    def _assert_invalid_position_payload(self, mutate):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid-position.json"
+            payload = {
+                "risk": {"realized_equity": 1234.0},
+                "open_positions": {"BTCUSDT": engine.asdict(sample_position())},
+                "pending_orders": {},
+                "trade_seq": 42,
+            }
+            mutate(payload["open_positions"]["BTCUSDT"])
+            path.write_text(json.dumps(payload, allow_nan=True), encoding="utf-8")
+            risk = engine.AdaptiveRiskManager(engine.BotConfig())
+            before = risk.to_dict().copy()
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(risk)
+            self.assertEqual(risk.to_dict(), before)
+
+    def test_unknown_position_field_is_rejected_not_silently_dropped(self):
+        self._assert_invalid_position_payload(lambda position: position.update({"future_field": 1}))
+
+    def test_invalid_position_direction_is_rejected(self):
+        self._assert_invalid_position_payload(lambda position: position.update({"direction": "sideways"}))
+
+    def test_non_finite_position_price_is_rejected(self):
+        self._assert_invalid_position_payload(lambda position: position.update({"entry_price": float("nan")}))
+
+    def test_negative_position_size_is_rejected(self):
+        self._assert_invalid_position_payload(lambda position: position.update({"size_usdt": -100.0}))
 
     def test_pending_non_object_entry_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

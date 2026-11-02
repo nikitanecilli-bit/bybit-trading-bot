@@ -12,6 +12,7 @@ Added `scripts/bybit_reconciliation_snapshot.py`.
 - Credential-bearing requests are restricted to an explicit allowlist of Bybit API hosts. HTTP redirects are disabled.
 - Bybit server time is captured before and after the collection; backwards time or a collection window over 120 seconds fails closed.
 - Positions and active orders are fetched through complete cursor pagination.
+- Historical orders are collected through `/v5/order/history` in <=7-day windows, with cursor pagination and deduplication by orderId/latest updatedTime; coverage is explicitly marked incomplete under Bybit retention rules.
 - Execution history is split into intervals no longer than seven days, each with an independent cursor chain; parsed executions are deduplicated by `execId`.
 - Repeated cursors and more than 1,000 pages per endpoint are rejected.
 - Raw responses, capture metadata and SHA-256 are stored. Snapshot writes use temporary file, fsync, atomic replace and POSIX directory fsync.
@@ -31,7 +32,7 @@ Added `scripts/bybit_reconciliation_snapshot.py`.
 - HTTPS and official-host allowlist enforced before credentials are sent; redirect refusal;
 - future backup timestamp rejection.
 
-CI: [Research engine checks #41457143134](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41457143134), SUCCESS. Compile, all configured deterministic suites, parser tests (14/14), collector tests (12/12), secret scan and persistence tests completed successfully. The preceding #41456956477 run also passed after the host validation and redirect protection were wired into the actual request path.
+CI: [Research engine checks #41460727701](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41460727701), SUCCESS. Compile, all configured deterministic suites, parser tests (14/14), collector tests (15/15), secret scan and persistence tests completed successfully. The preceding #41456956477 run also passed after the host validation and redirect protection were wired into the actual request path.
 
 ## Commits
 
@@ -45,5 +46,5 @@ CI: [Research engine checks #41457143134](https://github.com/nikitanecilli-bit/b
 - Collector output status is `CAPTURED_READ_ONLY_NOT_RECONCILED`, never a reconciliation PASS.
 - Order history and exchange-side stop/TP verification are not included.
 - The local engine still lacks exact exchange qty, `positionIdx`, order identifiers and execution ledger; comparator must remain BLOCKED for open positions/orders.
-- Prior GitHub-runner HTTP 403 remains unresolved. No PnL sweep, live order, production deployment or live resume.
+- Order-history completeness is limited by Bybit's documented 24h/7d status retention rules and asynchronous updates. Prior GitHub-runner HTTP 403 remains unresolved. No PnL sweep, live order, production deployment or live resume.
 - Audit correction: earlier revisions documented the host allowlist/redirect guard before they were wired into `collect_snapshot()` and `_http_json()`. This was caught by the failing host-allowlist test in run #41452045788, fixed in commit `455182c4d0db3f761f35562d542c9a57cad11797`, and re-verified with redirect regression coverage in #41457143134.

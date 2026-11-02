@@ -280,3 +280,6 @@ No production/live changes and no market backtests were performed in these corre
 
 - **ENG-STATE-013 accepted:** backup restore now validates required `saved_at_utc` (ISO-8601, explicit UTC) and non-empty `bot_version`. Persistence tests 40/40; CI #41445058006 passed.
 - Important boundary: this validates metadata shape, not backup age. A stale but correctly timestamped backup can still restore; define a freshness threshold and exchange reconciliation before any live resume.
+
+
+- **ENG-STATE-014 accepted:** TP1-hit state requires a positive event timestamp no earlier than entry; untouched TP1 must not carry a TP1 timestamp. Persistence tests 43/43; CI #41445386482 passed.

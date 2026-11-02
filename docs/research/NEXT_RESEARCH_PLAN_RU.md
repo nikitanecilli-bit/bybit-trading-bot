@@ -247,3 +247,8 @@ No production/live changes and no market backtests were performed in these corre
 
 - **ENG-STATE-006 accepted:** restored pending signals are now validated for required fields, symbol identity, direction, order type, strategy and finite numeric values. Malformed `pending_orders: []` / null containers are no longer silently converted to empty dicts. CI #41433992368 passed; state persistence tests 14/14.
 - This closes local nested-payload validation only. Pending signals are not exchange orders; reconciliation with Bybit active orders remains a separate P0 before any resume.
+
+
+- **ENG-STATE-006 accepted:** nested pending signal payloads are validated (required keys, direction, order type, finite prices/distances) before state commit. CI #41434308834 passed.
+- **ENG-STATE-007 accepted:** restored positions reject unknown fields and invalid required/optional values rather than relying on dataclass annotations. CI #41434308834 passed; combined persistence suite 18/18.
+- The state persistence matrix now tracks both pending and open-position schema validation. Remaining hard blocker is still exchange reconciliation and backup freshness; local JSON validity is not proof of exchange state.

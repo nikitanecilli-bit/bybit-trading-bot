@@ -1,0 +1,36 @@
+name: CryptoFetch uploaded-dataset backtests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/market-regime-v1-main]
+    paths:
+      - 'scripts/run_uploaded_dataset_backtests.py'
+      - '.github/workflows/cryptofetch-backtests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/market-regime-v1-main
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run per-symbol uploaded-data backtests
+        run: |
+          set -o pipefail
+          python scripts/run_uploaded_dataset_backtests.py | tee cryptofetch_backtest_results.txt
+      - name: Upload reproducible results
+        uses: actions/upload-artifact@v4
+        with:
+          name: cryptofetch-per-symbol-backtest-results
+          path: cryptofetch_backtest_results.txt
+          if-no-files-found: error

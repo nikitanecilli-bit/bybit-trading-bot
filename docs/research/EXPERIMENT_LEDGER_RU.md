@@ -437,3 +437,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41444495022](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41444495022), SUCCESS; compile, configured deterministic suites and secret scan passed.
 - Decision: ACCEPT as local risk snapshot integrity. No market backtest, parameter sweep, production deployment or live order.
 - Limitation: internally consistent backup can still be stale vs Bybit; exchange reconciliation remains a hard pre-live gate.
+
+
+## ENG-STATE-013 — backup metadata validation (2026-11-02)
+
+- Preregistered card: [ENG-STATE-013](experiment_cards/ENG-STATE-013_BACKUP_METADATA_RU.md).
+- Confirmed gap: writer persisted `saved_at_utc` and `bot_version`, but restore ignored both.
+- Fix: require both fields; parse timestamp as ISO-8601 with explicit zero UTC offset; require non-empty bot version. No age/freshness threshold was introduced.
+- Tests: `tests/test_state_persistence.py` 40/40; malformed timestamp, timezone-naive timestamp, non-UTC offset and empty version rejected; valid writer output restores.
+- Commits: engine `b25fde3ceb8032cac45a879622d192335979b6cb`; tests `f110f776a06bdde6aa7faa25b0e97a1601a6f989`.
+- CI: [Research engine checks #41445058006](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41445058006), SUCCESS; compile, configured deterministic suites and secret scan passed.
+- Decision: ACCEPT for envelope metadata integrity. No market backtest, parameter sweep, production deployment or live order.
+- Limitation: timestamp syntax is not freshness validation; stale but correctly timestamped backup can still pass. Bybit reconciliation remains mandatory.

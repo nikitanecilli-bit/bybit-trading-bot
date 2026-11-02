@@ -41,6 +41,14 @@ def _validate_base_url(base_url: str) -> None:
         raise ValueError("base URL must be an official HTTPS Bybit API host")
 
 
+def _validate_next_cursor(value: Any) -> str | None:
+    if value in (None, ""):
+        return None
+    if not isinstance(value, str):
+        raise ValueError("Bybit instrument nextPageCursor must be a string")
+    return value
+
+
 def _check_ret_code(payload: Any) -> None:
     if not isinstance(payload, dict):
         raise ValueError("Bybit response root must be an object")
@@ -74,9 +82,7 @@ def _request_page(base_url: str, category: str, cursor: str | None,
     rows = result["list"]
     if not all(isinstance(row, dict) for row in rows):
         raise ValueError("Instrument list contains a non-object row")
-    next_cursor = result.get("nextPageCursor") or None
-    if next_cursor is not None and not isinstance(next_cursor, str):
-        raise ValueError("Bybit instrument nextPageCursor must be a string")
+    next_cursor = _validate_next_cursor(result.get("nextPageCursor"))
     return rows, next_cursor
 
 

@@ -6,6 +6,7 @@ on:
     branches: [research/market-regime-v1-main]
     paths:
       - 'scripts/audit_cryptofetch_archives.py'
+      - 'data/archives/cryptofetch/**'
       - '.github/workflows/cryptofetch-archive-audit.yml'
 
 permissions:
@@ -20,4 +21,11 @@ jobs:
         with:
           ref: research/market-regime-v1-main
       - name: Inspect archived datasets
-        run: python scripts/audit_cryptofetch_archives.py
+        run: python scripts/audit_cryptofetch_archives.py --archive-dir data/archives/cryptofetch --output-dir /tmp/cryptofetch-archive-audit
+      - name: Upload archive comparison report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cryptofetch-archive-consistency-audit
+          path: /tmp/cryptofetch-archive-audit/
+          if-no-files-found: ignore

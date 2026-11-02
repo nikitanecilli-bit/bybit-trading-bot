@@ -104,3 +104,14 @@
 - Реальный запуск допустим только с ключом, который Bybit сам подтверждает как read-only; тестовые фикстуры не доказывают доступность API из конкретной сети.
 
 Реальный API capture не выполнялся. Успешный CI не подтверждает доступность Bybit API, полноту реального снимка или сверку состояния аккаунта.
+
+
+## ENG-RECON-004 — report-only comparator
+
+Добавлен `scripts/bybit_reconciliation_report.py`. Он не обращается к сети: проверяет local backup и уже сохранённый snapshot, сверяет SHA-256, строгие парсеры, counts, server-time bounds и непрерывность execution intervals; формирует диагностический отчёт по символам и направлениям.
+
+CI: [Research engine checks #41458773696](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41458773696), SUCCESS; comparator 12/12, collector 12/12, parser 13/13 и остальные workflow suites прошли.
+
+**Важно:** comparator намеренно не имеет ветки PASS. Он всегда возвращает `BLOCKED_UNSUPPORTED_LOCAL_MODEL`, `reconciliation_pass=false`, `live_resume_allowed=false`. Даже нулевые позиции/ордера на snapshot не разрешают resume без local execution ledger. Локальные pending signals не сопоставляются с биржевыми active orders.
+
+Итоговый статус остаётся `UNSUPPORTED_LOCAL_MODEL / BLOCKED`: нет точного exchange qty, `positionIdx`, order IDs/link IDs и локального execution ledger; order history и exchange-side stop/TP также не проверяются. Ни live resume, ни PnL sweep не разрешены.

@@ -236,3 +236,45 @@ Funding теперь опционально подключается к акти
 Добавлен pure helper `exchange_order_sizing.py`: пересчитывает target notional в контрактный qty после tick rounding для limit, округляет qty вниз по `qtyStep`, выбирает разные max quantity caps для market/limit и пересчитывает notional/risk так, чтобы округление не увеличивало бюджет риска. Если min qty/min notional/max qty не выполняются, helper отклоняет ордер; автоматического split на несколько ордеров нет.
 
 Helper пока не подключён к v14 и не меняет старые результаты. Для полноценной интеграции сначала требуется подтверждённый dated snapshot archive и as-of lookup на timestamp каждой сделки; текущий snapshot нельзя применять к старым историческим периодам.
+
+
+
+## 2026-11-02 — checkpoint: verification against current branch head
+
+Проверка выполнена непосредственно по `research/market-regime-v1-main`, HEAD на момент проверки: `10908cd42bd71a3ac64bde6504023399ab9a0a0b`.
+
+### Current engine identity
+- Current `Bybit_Trading_Engine_v14_research.py` blob SHA: `1a19ae8c3a321cf1efcba85223c2aded13da5868`.
+- SHA в шапке этого отчёта (`e4501bd3666d7fe25ae8c1a10a9813da89b535dd`) не совпадает с текущим файлом. Поэтому старые замечания сверены с текущим кодом ниже; шапка отчёта требует синхронизации.
+
+### Verified fixed in current engine
+- `validate_candle_timeframe()` compares every adjacent candle timestamp delta with configured timeframe; `run_simulation_pass()` invokes it before replay.
+- `_prepare_pending_entry_risk_budgets()` batches same-bar pending entries, allocates equal risk shares to eligible entries and uses descending `vol_ratio` plus symbol tie-break only for scarce position slots.
+- Funding helper `accrued_funding_cost()` is called from both `_unrealized_pnl_at_marks()` and `_close_position()`; the same cumulative cashflow is reflected in MTM and final net PnL. TP1 timestamp boundary and remaining fraction are passed through.
+- CI run `41363939889` on the current HEAD completed successfully. Its logs show successful tests for instrument constraints, dated snapshot collector, as-of history, exchange sizing helper, cumulative funding, realized funding PnL, funding MTM, funding coverage preflight, timeframe validation and portfolio accounting.
+- The simultaneous-entry allocation fix was introduced in commit `15444377b5fcc56296ae5147e0a06cd8585d74a5`; regression evidence is run `41356881313`, commit `3246eb1df4b9d4cfbd109fa6e6a6316e44710200`.
+
+### P1 — dated instrument snapshot archive is blocked, not merely unintegrated
+- `instrument_spec_history.py` and `exchange_order_sizing.py` exist and have offline unit tests, but the as-of history and sizing helper are not wired into v14 position creation / fill.
+- The expected repository path `data/instrument_specs/linear/` is absent on the active branch (GitHub Contents API returns 404). The root `data/` currently contains `archives/`; `data/archives/cryptofetch/` contains market-data ZIP archives, not instrument-spec snapshots.
+- Workflow `.github/workflows/bybit-instrument-snapshots.yml` has six recorded failed runs: `41358102945`, `41358128366`, `41358414340`, `41358634175`, `41362632896`, `41362639497`. Logs from the latest runs show HTTP 403 Forbidden against the configured Bybit public regional hosts, including `api.bybit.kz`; workflow exits nonzero and no snapshot is committed.
+- Consequence: no evidence yet of a real dated snapshot archive. Do not use current instrument specs retrospectively; exchange-valid historical sizing remains unverified.
+
+### P1 — funding coverage is tested as a helper, but no real dataset coverage evidence
+- `validate_funding_coverage.py` verifies that every funding event timestamp has a same-timestamp mark candle for the requested symbols. Its tests are synthetic/offline.
+- No `data/archives/funding/` or `data/archives/mark_price/` directories are present on the active branch. The workflow run proves the helper tests pass, not that real funding and mark datasets exist or cover any tested trade period.
+- The engine uses the mark candle `open` at exact funding timestamp as a proxy, not the exchange's actual settlement mark. Missing exact timestamp fails closed. This is safer than silently dropping events but can reject otherwise usable periods and does not establish exact exchange cashflow.
+- Before any funding-aware strategy result is accepted, run the coverage preflight on actual per-symbol datasets and publish the report with first/last timestamps, event counts and missing-event counts.
+
+### Current execution-integrity limitations
+- `InstrumentSpecHistory.get_spec()` is standalone and has no call site in the v14 engine; quantity sizing therefore remains notional-derived `size_usdt / entry_price`, without historical qtyStep/minQty/minNotional/tickSize validation.
+- Maintenance margin tiers, available collateral, cross/isolated margin, liquidation fees and mark-price liquidation are not modeled in the engine.
+- OHLC maker touch remains optimistic: no order book, queue position, traded volume at limit, latency, partial fill or adverse-selection model.
+- CI run success is technical regression evidence, not market profitability evidence and not exchange execution validation.
+
+### Next safe sequence
+1. Resolve the public-data 403 through an officially permitted data-access path; do not bypass regional restrictions or use proxies to evade them. If unavailable from GitHub runners, a user-controlled local export of public snapshots can later be committed as dated provenance files.
+2. Obtain and archive actual funding and mark-price datasets, run coverage preflight for the full test window and all candidate symbols, retain the machine-readable report.
+3. Add engine-level tests before integrating historical spec as-of sizing; reject any trade where a dated full-universe snapshot is missing/stale or the rounded exchange quantity violates constraints.
+4. Add margin/liquidation modeling from documented historical risk tiers before describing results as exchange-executable.
+5. Keep all changes on this research branch. Do not merge to `main`, do not place live orders, and do not reinterpret historical E01–E13 results as if the new execution constraints had been active.

@@ -788,3 +788,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Параллельный автоматический запуск старого instrument-spec snapshot workflow [#41540268697](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41540268697) завершился HTTP 403 на `api.bybit.com`; snapshot step failed, commit step skipped. После этого push-trigger удалён; новый point-in-time workflow вручную не dispatch-ился. Никакого нового Bybit snapshot не создано и не заявляется.
 - Ограничение: status=Closed retention и соответствие launch/delivery историческому факту торговой доступности ещё не подтверждены реальным capture. Перед использованием universe для бэктеста требуется успешный non-empty capture и cross-check с официальными listing/delisting announcements. E01–E13 не пересчитаны; market backtests не запускались.
 - Code commits: `b424fdae1d2db583b00cce7c3fd47443c8bb44f8` (collector/workflow/CI wiring), `af47dca34628d8556dedbc1712c89508236912a0` (strict lifecycle bounds), `041b7eb2f26d65ff26242e56163529174de538df` (tests); latest docs commit at this note: `ad8bdae12a71472c979f98b576053756051e99d8`.
+
+
+## ENG-DATA-007 — CryptoFetch archive overlap/provenance audit (2026-11-03)
+
+- Confirmed loader behavior in `scripts/run_uploaded_dataset_backtests.py::read_zip_datasets`: for each symbol/timeframe it sorts candidate ZIP members by `(row_count, archive_path)` descending and selects the first. It does not compare overlapping OHLCV values, timestamp-set inclusion, or whether the longest file is a superset of shorter candidates.
+- Added `scripts/audit_cryptofetch_archives.py`, a read-only scanner that inventories ZIP/member SHA-256, bar counts, time bounds and gaps; pairwise compares timestamp overlap and OHLCV equality; and reports whether the legacy longest-file winner actually contains every timestamp in each compared candidate.
+- Added offline tests for identical overlap, a longest-but-not-superset case, conflicting OHLCV, and report writing.
+- Research CI now runs the deterministic tests and scans all checked-in CryptoFetch ZIPs, uploading CSV/JSON/Markdown diagnostics as an artifact. A detected conflicting overlapping candle fails the audit step; non-superset selections are reported for review.
+- No dataset is merged, rewritten, or substituted by this audit. E01–E13 inputs and historical PnL remain unchanged until the report is inspected and a deterministic conflict/coverage policy is approved by evidence.

@@ -122,3 +122,13 @@
 - Research CI run [41540392254](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41540392254) completed SUCCESS on code/test commit `041b7eb2f26d65ff26242e56163529174de538df`; 33/33 job steps passed, including the new point-in-time universe test.
 - Existing instrument-spec workflow run [41540268697](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41540268697) attempted a public request to `https://api.bybit.com` and received HTTP 403. No data snapshot was written. Its push trigger has been removed to prevent ordinary collector-code pushes from making network requests.
 - The new universe archive workflow is manual-only. It has not been dispatched; the collector's actual Bybit response, especially `status=Closed`, remains unverified.
+
+
+## ENG-DATA-007 — duplicate archive selection is not yet proven safe
+
+Static source inspection confirmed that `read_zip_datasets()` in `scripts/run_uploaded_dataset_backtests.py` selects the candidate ZIP member with the greatest row count (then archive path as tie-breaker). It does not check whether:
+- overlapping timestamps have identical OHLCV values;
+- the selected longest file is a superset of timestamps from other candidates;
+- shorter files contain complementary timestamps missing from the selected file.
+
+This is a confirmed provenance/selection limitation, not proof that historical E01–E13 rows are corrupted. Added a read-only audit utility and CI scan; it reports per-archive SHA-256, time coverage, gaps, pairwise overlap equality, and longest-file superset status. The scan must complete before choosing whether to retain the legacy winner, reject conflicts, or build a non-conflicting union. No old experiment input is modified.

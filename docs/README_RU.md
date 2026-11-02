@@ -22,9 +22,10 @@
 18. [ENG-STATE-011 — strict JSON save](research/experiment_cards/ENG-STATE-011_STRICT_JSON_SAVE_RU.md) — запрещает сохранение NaN/Infinity в резервной копии.
 19. [ENG-STATE-008 — risk schema](research/experiment_cards/ENG-STATE-008_RISK_SCHEMA_RU.md) — проверяет числовые и логические поля восстановленного risk manager.
 20. [ENG-STATE-012 — risk snapshot invariants](research/experiment_cards/ENG-STATE-012_RISK_SNAPSHOT_INVARIANTS_RU.md) — проверяет математическую согласованность equity и drawdown.
-21. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
-22. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
-23. [Карта репозитория](REPOSITORY_MAP_RU.md).
+21. [ENG-STATE-013 — backup metadata](research/experiment_cards/ENG-STATE-013_BACKUP_METADATA_RU.md) — проверяет UTC timestamp и версию резервной копии.
+22. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
+23. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
+24. [Карта репозитория](REPOSITORY_MAP_RU.md).
 
 ## Разделы
 

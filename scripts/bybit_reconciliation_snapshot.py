@@ -22,6 +22,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+# Support both `python scripts/...py` and `python -m scripts....` from repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from bybit_reconciliation import (
     SnapshotValidationError,
     parse_active_order_pages,

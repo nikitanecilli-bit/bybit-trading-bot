@@ -1258,7 +1258,19 @@ class UnifiedQuantEngine:
         # благоприятный экстремум этой свечи и ограничиваем MAE фактической модельной
         # ценой стоп-исполнения, а не более глубоким последующим wick.
         stop_hit = (curr.low <= pos.stop_price) if is_long else (curr.high >= pos.stop_price)
-        if stop_hit:
+        kill_switch_hit = bool(self.risk_mgr.kill_switch_triggered)
+        if kill_switch_hit:
+            # The portfolio kill-switch may have been triggered by this bar's
+            # adverse mark before position management. OHLC cannot establish
+            # whether a simultaneous TP touch happened before or after it, so
+            # forced flattening takes priority over every discretionary exit.
+            exit_price = self._intrabar_risk_marks.get(symbol, curr.close)
+            exit_reason = "kill_switch"
+            if is_long:
+                pos.max_adverse_px = min(pos.max_adverse_px, exit_price)
+            else:
+                pos.max_adverse_px = max(pos.max_adverse_px, exit_price)
+        elif stop_hit:
             if fill_bar:
                 exit_price = pos.stop_price
             elif is_long:
@@ -1289,7 +1301,7 @@ class UnifiedQuantEngine:
             mfe_r = (pos.entry_price - pos.max_favorable_px) / stop_dist
             mae_r = (pos.max_adverse_px - pos.entry_price) / stop_dist
 
-        if not stop_hit and not fill_bar:
+        if not stop_hit and not fill_bar and not kill_switch_hit:
             tp2_hit = (curr.high >= pos.tp2_price) if is_long else (curr.low <= pos.tp2_price)
             if tp2_hit:
                 if not pos.tp1_hit:

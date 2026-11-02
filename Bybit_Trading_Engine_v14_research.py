@@ -723,11 +723,68 @@ class PlanBStatePersistence:
             candidate_risk = AdaptiveRiskManager(risk_mgr.cfg)
             candidate_risk.from_dict(risk_data)
             known = {field.name for field in dataclasses.fields(OpenPositionState)}
+            required_position = {
+                "trade_id", "symbol", "direction", "strategy", "entry_ts",
+                "entry_price", "stop_price", "tp1_price", "tp2_price",
+                "initial_stop_dist", "size_usdt", "risk_usdt", "order_type",
+            }
+            numeric_position_fields = {
+                "entry_price", "stop_price", "tp1_price", "tp2_price",
+                "initial_stop_dist", "size_usdt", "risk_usdt",
+                "realized_tp1_gross_usdt", "remaining_fraction",
+                "max_favorable_px", "max_adverse_px", "equity_at_entry",
+            }
+            positive_position_fields = {
+                "entry_price", "stop_price", "tp1_price", "tp2_price",
+                "initial_stop_dist", "size_usdt", "risk_usdt",
+            }
             restored: Dict[str, OpenPositionState] = {}
             for sym, pos_dict in positions_data.items():
                 if not isinstance(sym, str) or not sym or not isinstance(pos_dict, dict):
                     raise ValueError("каждая open_position должна быть объектом с непустым symbol key")
-                pos = OpenPositionState(**{k: v for k, v in pos_dict.items() if k in known})
+                unknown = set(pos_dict).difference(known)
+                if unknown:
+                    raise ValueError(f"позиция {sym}: неизвестные поля backup {sorted(unknown)}")
+                missing = required_position.difference(pos_dict)
+                if missing:
+                    raise ValueError(f"позиция {sym}: отсутствуют поля {sorted(missing)}")
+                if not all(isinstance(pos_dict[field], str) and pos_dict[field] for field in ("trade_id", "symbol", "strategy")):
+                    raise ValueError(f"позиция {sym}: trade_id, symbol и strategy должны быть непустыми строками")
+                if pos_dict["direction"] not in {"long", "short"}:
+                    raise ValueError(f"позиция {sym}: direction должен быть long/short")
+                if pos_dict["order_type"] not in {"market", "limit"}:
+                    raise ValueError(f"позиция {sym}: order_type должен быть market/limit")
+                entry_ts = pos_dict["entry_ts"]
+                if isinstance(entry_ts, bool) or not isinstance(entry_ts, int) or entry_ts <= 0:
+                    raise ValueError(f"позиция {sym}: entry_ts должен быть положительным целым числом")
+                for field_name in numeric_position_fields.intersection(pos_dict):
+                    value = pos_dict[field_name]
+                    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                        raise ValueError(f"позиция {sym}: {field_name} должен быть конечным числом")
+                    if field_name in positive_position_fields and value <= 0:
+                        raise ValueError(f"позиция {sym}: {field_name} должен быть > 0")
+                if pos_dict.get("realized_tp1_gross_usdt", 0.0) < 0:
+                    raise ValueError(f"позиция {sym}: realized_tp1_gross_usdt не может быть отрицательным")
+                fraction = pos_dict.get("remaining_fraction", 1.0)
+                if fraction < 0 or fraction > 1:
+                    raise ValueError(f"позиция {sym}: remaining_fraction должен быть в [0, 1]")
+                for field_name in ("max_favorable_px", "max_adverse_px"):
+                    if field_name in pos_dict and pos_dict[field_name] < 0:
+                        raise ValueError(f"позиция {sym}: {field_name} не может быть отрицательным")
+                for field_name in ("tp1_hit",):
+                    if field_name in pos_dict and not isinstance(pos_dict[field_name], bool):
+                        raise ValueError(f"позиция {sym}: {field_name} должен быть bool")
+                if "maker_exits" in pos_dict and pos_dict["maker_exits"] is not None and not isinstance(pos_dict["maker_exits"], bool):
+                    raise ValueError(f"позиция {sym}: maker_exits должен быть bool или null")
+                if "tp1_ts_ms" in pos_dict and pos_dict["tp1_ts_ms"] is not None:
+                    value = pos_dict["tp1_ts_ms"]
+                    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                        raise ValueError(f"позиция {sym}: tp1_ts_ms должен быть положительным целым числом или null")
+                if "bars_held" in pos_dict:
+                    value = pos_dict["bars_held"]
+                    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                        raise ValueError(f"позиция {sym}: bars_held должен быть неотрицательным целым числом")
+                pos = OpenPositionState(**pos_dict)
                 if pos.symbol != sym:
                     raise ValueError(f"ключ позиции {sym!r} не совпадает с pos.symbol {pos.symbol!r}")
                 restored[sym] = pos

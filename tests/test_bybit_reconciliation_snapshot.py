@@ -24,10 +24,11 @@ def response(rows=None, cursor=""):
 
 
 class FakeTransport:
-    def __init__(self, readonly=1, fail_endpoint=None, cursor_loop=False):
+    def __init__(self, readonly=1, fail_endpoint=None, cursor_loop=False, order_history_rows=None):
         self.readonly = readonly
         self.fail_endpoint = fail_endpoint
         self.cursor_loop = cursor_loop
+        self.order_history_rows = order_history_rows or []
         self.calls = []
 
     def __call__(self, url, headers=None, timeout=20):
@@ -41,8 +42,10 @@ class FakeTransport:
             return {"retCode": 10004, "retMsg": "hidden"}
         if endpoint == "/v5/position/list" and self.cursor_loop:
             return response(cursor="loop")
+        if endpoint == "/v5/order/history":
+            return response(self.order_history_rows)
         if endpoint in ("/v5/position/list", "/v5/order/realtime",
-                        "/v5/order/history", "/v5/execution/list"):
+                        "/v5/execution/list"):
             return response()
         raise AssertionError(f"unexpected endpoint: {endpoint}")
 
@@ -79,6 +82,25 @@ class ReconciliationCollectorTests(unittest.TestCase):
             snapshot["bybit_server_time_before_ms"], 120_000
         )
         self.assertEqual(len(snapshot["raw_sha256"]), 64)
+
+    def test_historical_order_rows_are_parsed_and_counted(self):
+        row = {
+            "orderId": "history-1", "orderLinkId": "bot-1", "symbol": "BTCUSDT",
+            "side": "Buy", "qty": "1", "leavesQty": "0", "cumExecQty": "1",
+            "orderStatus": "Filled", "createdTime": int(time.time() * 1000),
+            "updatedTime": int(time.time() * 1000), "positionIdx": 0,
+        }
+        snapshot = collect_snapshot(
+            "key", "secret", SAVED, request_json=FakeTransport(order_history_rows=[row])
+        )
+        self.assertEqual(snapshot["counts"]["historical_orders"], 1)
+        self.assertEqual(snapshot["raw"]["order_history"][0]["response"]["result"]["list"][0]["orderId"],
+                         "history-1")
+
+    def test_order_history_api_error_is_not_treated_as_empty(self):
+        fake = FakeTransport(fail_endpoint="/v5/order/history")
+        with self.assertRaisesRegex(CollectorError, "retCode must be integer zero"):
+            collect_snapshot("key", "secret", SAVED, request_json=fake)
 
     def test_non_read_only_key_stops_before_account_calls(self):
         fake = FakeTransport(readonly=0)

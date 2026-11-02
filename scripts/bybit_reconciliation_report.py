@@ -70,6 +70,12 @@ def _page_tuples(pages: Any, field: str) -> list[tuple[str, dict[str, Any]]]:
 
 
 def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tuple[tuple, tuple, tuple]:
+    if not isinstance(snapshot, dict):
+        raise ReportError("exchange snapshot root must be an object")
+    if snapshot.get("schema_version") != 1:
+        raise ReportError("unsupported exchange snapshot schema_version")
+    if snapshot.get("category") != "linear" or snapshot.get("settle_coin") != "USDT":
+        raise ReportError("snapshot is not scoped to Bybit linear/USDT")
     if snapshot.get("status") != "CAPTURED_READ_ONLY_NOT_RECONCILED":
         raise ReportError("snapshot status is not CAPTURED_READ_ONLY_NOT_RECONCILED")
     raw = snapshot.get("raw")

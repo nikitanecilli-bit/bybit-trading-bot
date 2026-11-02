@@ -89,8 +89,13 @@ class InstrumentSpecTests(unittest.TestCase):
             self.spec.round_qty("0")
 
     def test_limit_price_respects_exchange_price_bounds(self):
+        low_price_snapshot = {"instrument": dict(SNAPSHOT["instrument"])}
+        low_price_snapshot["instrument"]["priceFilter"] = {
+            "minPrice": "0.10", "maxPrice": "1000000", "tickSize": "0.05"
+        }
+        low_price_spec = InstrumentSpec.from_snapshot(low_price_snapshot)
         with self.assertRaisesRegex(ValueError, "minPrice/maxPrice"):
-            self.spec.validate_order("1", "0.00")
+            low_price_spec.round_price("0.05", side="buy")
         with self.assertRaisesRegex(ValueError, "minPrice/maxPrice"):
             self.spec.validate_order("1", "1000000.05")
         with self.assertRaisesRegex(ValueError, "minPrice/maxPrice"):

@@ -3,7 +3,7 @@
 
 The requested end timestamp is exclusive. Funding requests use bounded
 5-day windows (both startTime and endTime are always sent); a full 200-row
-page is treated as possibly truncated. Mark klines are fetched in bounded
+page triggers recursive window subdivision to avoid silent truncation. Mark klines are fetched in bounded
 900-candle windows and must form a complete timestamp grid. CSVs are written
 atomically and are compatible with scripts/validate_funding_coverage.py.
 """
@@ -127,14 +127,18 @@ def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
              "endTime": end, "limit": FUNDING_LIMIT},
         ).get("list")
     events: dict[int, dict[str, Any]] = {}
-    window_start = start_ms
-    while window_start < end_ms:
-        window_end = min(window_start + FUNDING_WINDOW_MS, end_ms)
+
+    def fetch_window(window_start: int, window_end: int) -> None:
         page = parse_funding_rows(fetch_page(window_start, window_end - 1), symbol)
-        if pause and window_end < end_ms:
-            time.sleep(pause)
         if len(page) >= FUNDING_LIMIT:
-            raise RuntimeError("funding window reached API page limit; reduce window size")
+            if window_end - window_start <= 1:
+                raise RuntimeError("funding page remains saturated at minimum window width")
+            midpoint = window_start + (window_end - window_start) // 2
+            fetch_window(window_start, midpoint)
+            if pause:
+                time.sleep(pause)
+            fetch_window(midpoint, window_end)
+            return
         for row in page:
             ts = row["funding_timestamp_ms"]
             if not (window_start <= ts < window_end):
@@ -142,6 +146,13 @@ def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
             if ts in events and events[ts] != row:
                 raise ValueError(f"conflicting duplicate funding timestamp: {ts}")
             events[ts] = row
+
+    window_start = start_ms
+    while window_start < end_ms:
+        window_end = min(window_start + FUNDING_WINDOW_MS, end_ms)
+        fetch_window(window_start, window_end)
+        if pause and window_end < end_ms:
+            time.sleep(pause)
         window_start = window_end
     if not events:
         raise RuntimeError(f"Bybit returned no funding events for {symbol} in requested range")

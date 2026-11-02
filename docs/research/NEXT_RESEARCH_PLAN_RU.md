@@ -193,3 +193,18 @@ Decision: do not launch another PnL sweep or promote E13. Next step is to obtain
 
 The snapshot collector now supports regional `--base-url` fallback; current runner access remains blocked (HTTP 403). No market data or snapshots were written.
 
+
+
+## 2026-11-02 — переход к непрерывному улучшению
+
+Принят обязательный [протокол непрерывного улучшения](CONTINUOUS_IMPROVEMENT_PROTOCOL_RU.md) и добавлен [шаблон предварительной карточки эксперимента](EXPERIMENT_CARD_TEMPLATE_RU.md).
+
+Применение с этого момента:
+- не искать один универсальный фильтр; измерять вклад каждого слоя системы и его взаимодействие с остальными;
+- до любого рыночного теста фиксировать baseline, гипотезу, один изменяемый фактор, метрики, защитные ограничения и решение ACCEPT/REJECT/INCONCLUSIVE;
+- сохранять все результаты и не использовать holdout для подбора параметров;
+- не объявлять улучшение по aggregate PnL без разрезов по символам, периодам, направлениям, режимам, концентрации и общему капиталу;
+- не запускать новые parameter sweeps и market PnL backtests до прохождения execution/data gate из `EXECUTION_REALISM_READINESS_RU.md`;
+- продолжать безопасные deterministic tests, аудит lifecycle, сверку происхождения данных и восстановление воспроизводимости старых экспериментов.
+
+Текущий приоритет не изменён: получить проверяемые Bybit данные и dated instrument specs, закрыть точный exchange sizing/funding/execution gaps, затем выполнить один заранее зафиксированный execution-aware replay без оптимизации параметров.

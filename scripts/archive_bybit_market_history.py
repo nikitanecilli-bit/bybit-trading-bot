@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Archive official Bybit V5 funding settlements and mark-price klines.
+"""Archive official Bybit V5 trade OHLCV, funding settlements and mark-price klines.
 
 The requested end timestamp is exclusive. Funding requests use bounded
 5-day windows (both startTime and endTime are always sent); a full 200-row
@@ -369,7 +369,7 @@ def main() -> None:
             args.interval, args.base_url, args.pause,
         ))
     report = {
-        "source": "Bybit V5 funding history + mark price kline",
+        "source": "Bybit V5 trade kline + funding history + mark price kline",
         "category": "linear", "interval": args.interval,
         "fetched_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "results": results,

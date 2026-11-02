@@ -18,10 +18,11 @@
 14. [ENG-STATE-007 — position schema](research/experiment_cards/ENG-STATE-007_POSITION_SCHEMA_RU.md) — проверяет типы, обязательные поля и инварианты восстановленных позиций.
 15. [ENG-STATE-008 — TP1 invariants](research/experiment_cards/ENG-STATE-008_TP1_INVARIANTS_RU.md) — проверяет согласованность частичного закрытия TP1 и целей.
 16. [ENG-STATE-009 — restore identity](research/experiment_cards/ENG-STATE-009_RESTORE_IDENTITY_RU.md) — исключает конфликт открытых позиций, pending и повторяющихся trade_id.
+17. [ENG-STATE-010 — complete envelope](research/experiment_cards/ENG-STATE-010_COMPLETE_ENVELOPE_RU.md) — не допускает восстановления неполного JSON как пустого портфеля.
 15. [ENG-STATE-008 — risk schema](research/experiment_cards/ENG-STATE-008_RISK_SCHEMA_RU.md) — проверяет числовые и логические поля восстановленного risk manager.
-17. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
-18. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
-19. [Карта репозитория](REPOSITORY_MAP_RU.md).
+18. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
+19. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
+20. [Карта репозитория](REPOSITORY_MAP_RU.md).
 
 ## Разделы
 

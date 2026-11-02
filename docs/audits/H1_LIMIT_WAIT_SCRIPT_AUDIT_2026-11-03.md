@@ -47,3 +47,25 @@
 ## Решение
 
 `REJECT / DO NOT USE FOR MULTI-BAR LIMIT CONCLUSIONS` до исправления и прохождения регрессионных тестов. Базовый engine не менялся. Рыночные тесты не запускались.
+
+## Исправление — 2026-11-03
+
+Статус исходного дефекта: **FIX IMPLEMENTED; full Research CI awaiting final job completion at documentation update time**.
+
+Изменения в исследовательской ветке:
+- Добавлен чистый policy helper `multibar_limit_wait.py` с явными состояниями `fill / wait / expire`, TTL и симметричной проверкой long/short penetration.
+- В H1 wrapper отложенная заявка перед передачей в неизменённый `_try_fill_pending()` адаптирует только freshness guard к текущей свече исполнения. Исходное время сигнала сохраняется отдельно в `signal_origin_ts`; фактическое время входа по-прежнему записывается движком как timestamp свечи исполнения.
+- На ожидании заявка остаётся pending; по истечении TTL очищаются pending, возраст заявки и выделенный risk budget.
+- Добавлены 8 regression tests: fill на второй/третьей свече, ожидание, expiry, long/short симметрия, некорректное направление и сохранение origin timestamp.
+- Новый test file включён в Research CI; сам H1 validation script добавлен в py_compile список.
+
+Проверенный CI:
+- Run [#41538728693](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41538728693), commit `8158c617258896016213108c9043fbe5c875032c`.
+- Compile step и все 27 тестовых шагов, включая multi-bar lifecycle, portfolio accounting и persistence, завершились SUCCESS.
+- На момент записи GitHub ещё показывал job в статусе `in_progress` на post-job cleanup. Поэтому итоговый conclusion run не объявляется успешным до terminal status.
+
+Ограничения:
+- Это исправляет исследовательский TTL lifecycle, но не моделирует очередь лимиток, частичные исполнения, latency или adverse selection.
+- Условие OHLC penetration остаётся упрощённым fill proxy; позднее касание не доказывает maker execution.
+- Базовый engine и его строгая next-bar семантика не изменялись.
+- Исторические E09–E13 не пересчитывались и не объявляются затронутыми: ledger не связывает их с этим скриптом.

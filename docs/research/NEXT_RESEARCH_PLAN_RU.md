@@ -294,3 +294,6 @@ No production/live changes and no market backtests were performed in these corre
 
 
 - **ENG-STATE-017 accepted:** enabled backup writes now flush/fsync the temp file before atomic replace and fsync the parent directory on POSIX. Persistence tests 53/53; CI #41447569454 passed. This improves crash durability but is not an absolute hardware guarantee.
+
+
+- ENG-STATE-017 follow-up: POSIX parent-directory fsync failure after rename is explicitly tested; save raises even though the replacement file may be visible. Persistence suite now 54/54; CI #41447862710 passed.

@@ -115,3 +115,22 @@ CI: [Research engine checks #41458773696](https://github.com/nikitanecilli-bit/b
 **Важно:** comparator намеренно не имеет ветки PASS. Он всегда возвращает `BLOCKED_UNSUPPORTED_LOCAL_MODEL`, `reconciliation_pass=false`, `live_resume_allowed=false`. Даже нулевые позиции/ордера на snapshot не разрешают resume без local execution ledger. Локальные pending signals не сопоставляются с биржевыми active orders.
 
 Итоговый статус остаётся `UNSUPPORTED_LOCAL_MODEL / BLOCKED`: нет точного exchange qty, `positionIdx`, order IDs/link IDs и локального execution ledger; order history и exchange-side stop/TP также не проверяются. Ни live resume, ни PnL sweep не разрешены.
+
+
+## ENG-RECON-005 — position-level TP/SL visibility
+
+Parser preserves optional Bybit position fields `takeProfit`, `stopLoss`, `trailingStop`, `tpslMode`; comparator reports `EXCHANGE_STOP_CONFIGURED`, `NO_EXCHANGE_STOP` or `UNKNOWN_FIELDS_MISSING`. Official source: [Get Position Info](https://bybit-exchange.github.io/docs/v5/position). CI #41459486381 passed: parser 14/14, collector 12/12, comparator 14/14.
+
+This is visibility into position response fields, not proof that conditional orders are healthy or will trigger. No live API snapshot was captured.
+
+## Order-history endpoint limitation (official V5 contract)
+
+The official [Get Order History](https://bybit-exchange.github.io/docs/v5/order/order-list) documentation states:
+- `startTime` and `endTime` may span at most 7 days per request;
+- in the last 7 days, closed statuses are queryable except `Cancelled`, `Rejected`, `Deactivated`;
+- those statuses are queryable only within the last 24 hours;
+- beyond 7 days, only orders with fills are queryable.
+
+Therefore order history cannot be treated as a complete event journal for a long outage. It can supplement executions and current active orders, but it cannot prove that every cancelled/rejected/deactivated unfilled order has been captured across arbitrary downtime. The next collector extension must preserve this coverage limitation explicitly, not report an exhaustive order history.
+
+Final state remains `UNSUPPORTED_LOCAL_MODEL / BLOCKED`: no exact local exchange qty, `positionIdx`, order ID/link-ID map, full execution ledger, or complete historical order journal. No live resume or PnL sweep.

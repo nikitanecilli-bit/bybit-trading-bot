@@ -449,3 +449,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - CI: [Research engine checks #41445058006](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41445058006), SUCCESS; compile, configured deterministic suites and secret scan passed.
 - Decision: ACCEPT for envelope metadata integrity. No market backtest, parameter sweep, production deployment or live order.
 - Limitation: timestamp syntax is not freshness validation; stale but correctly timestamped backup can still pass. Bybit reconciliation remains mandatory.
+
+
+## ENG-STATE-014 — TP1 timestamp consistency (2026-11-02)
+
+- Preregistered card: [ENG-STATE-014](experiment_cards/ENG-STATE-014_TP1_TIMESTAMP_RU.md).
+- Confirmed gap: `tp1_hit` could be restored without an event timestamp, or with a timestamp before entry / while TP1 was marked untouched.
+- Fix: TP1 hit requires positive integer `tp1_ts_ms >= entry_ts`; untouched TP1 requires timestamp absent/null.
+- Tests: `tests/test_state_persistence.py` 43/43; valid partial TP1 round-trip plus missing, pre-entry and contradictory timestamp cases.
+- Commits: engine `adc68a7c413abe5f642a10cd91348c81d15ea746`; tests `e128b6865e290a9b597e4c1749d1fbeb99efd188`.
+- CI: [Research engine checks #41445386482](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41445386482), SUCCESS; compile, configured deterministic suites and secret scan passed.
+- Decision: ACCEPT as local position event chronology validation. No market backtest, parameter sweep, production deployment or live order.
+- Limitation: does not establish that TP1 was actually filled at Bybit or reconcile exchange event time.

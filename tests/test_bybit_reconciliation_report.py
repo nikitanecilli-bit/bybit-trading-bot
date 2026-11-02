@@ -142,13 +142,22 @@ class ReportOnlyComparatorTests(unittest.TestCase):
         order = {
             "orderId": "order-1", "orderLinkId": "", "symbol": "ETHUSDT",
             "side": "Buy", "qty": "1", "leavesQty": "1", "cumExecQty": "0",
-            "orderStatus": "New", "createdTime": CAPTURE_MS,
+            "orderStatus": "Untriggered", "createdTime": CAPTURE_MS,
             "updatedTime": CAPTURE_MS, "positionIdx": 0,
+            "orderType": "Market", "stopOrderType": "StopLoss",
+            "triggerPrice": "62000", "stopLoss": "62000",
+            "takeProfit": "0", "tpslMode": "Full",
+            "reduceOnly": True, "closeOnTrigger": True,
+            "parentOrderLinkId": "parent-1",
         }
         local = backup(pending={"ETHUSDT": {"signal_ts": SAVED_MS}})
         report = build_report(local, snapshot(order_rows=[order]))
         self.assertEqual(report["exchange"]["active_order_ids"], ["order-1"])
         self.assertEqual(report["exchange"]["historical_order_ids"], ["order-1"])
+        self.assertEqual(report["exchange"]["active_orders"][0]["position_idx"], 0)
+        self.assertEqual(report["exchange"]["active_orders"][0]["parent_order_link_id"], "parent-1")
+        self.assertEqual(len(report["exchange"]["conditional_orders"]), 1)
+        self.assertEqual(report["exchange"]["conditional_orders"][0]["stop_order_type"], "StopLoss")
         self.assertEqual(report["local"]["pending_signal_count"], 1)
         self.assertFalse(report["live_resume_allowed"])
 

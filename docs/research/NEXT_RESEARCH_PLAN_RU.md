@@ -310,3 +310,12 @@ No production/live changes and no market backtests were performed in these corre
 - Next: read-only collector with explicit cursor loop, server-time/capture coherence and fail-closed errors. Do not wire restore or trading until exact local qty, positionIdx, exchange IDs and execution ledger exist.
 
 - Parser hardening: only integer `retCode=0` counts as success; boolean false is rejected. Parser tests 13/13; CI #41448898597 passed.
+
+
+## ENG-RECON-003 — read-only collector (2026-11-02, CI pending)
+
+- Добавлен `scripts/bybit_reconciliation_snapshot.py`: только GET, обязательная проверка read-only API key до account endpoints, cursor pagination, server-time bounds, execution windows <= 7 days, SHA-256 raw capture и атомарная fsync-запись.
+- Добавлены mocked tests и CI compile/test steps. CI acceptance пока не подтверждён.
+- Не запускать collector с GitHub Secrets и не делать реальные API-вызовы в рамках CI. Нужен отдельный, осознанный ручной запуск только с ключом, который Bybit подтвердил как read-only; до него не заявлять, что snapshot существует.
+- После успешного CI: провести дополнительный review схем/пагинации и только затем report-only comparator. Comparator обязан возвращать BLOCKED при любом открытом exchange position/order, пока local model не содержит exact qty, positionIdx и order/execution identities.
+- Ни новые PnL sweeps, ни live resume не разрешены этим этапом.

@@ -648,3 +648,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Проверки: long/short receipt, TP1 reduced quantity и payment boundary. Полный Research CI [#41503287534](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41503287534), SUCCESS, commit `037aabd80769be88ea6ed99b05855665da92230d`.
 - Отдельно проверен CI harness: все 21 тестовых файла, вызываемых workflow напрямую через `python tests/...`, имеют исполняемый `__main__`; plain-function suites имеют явные runners, unittest suites запускают `unittest.main()`. В логах подтверждены 27/27 gap, 38/38 time model, 5/5 timeframe, 16/16 portfolio accounting и 54 persistence tests.
 - Решение: ACCEPT только для консервативного funding/MTM учёта. Не доказывает рыночную доходность; backtest и live execution не запускались.
+
+
+## ENG-PERSIST-001 — немедленное сохранение MTM risk-stop latch (2026-11-02)
+
+- Карточка: [ENG-PERSIST-001](experiment_cards/ENG-PERSIST-001_MTM_RISK_STOP_PERSISTENCE_RU.md).
+- Подтверждён дефект: `_update_mark_to_market()` мог установить `daily_stop_triggered` / `kill_switch_triggered`, но не сохранял backup, если в этом событии не происходило закрытие позиции или изменение pending. При аварийном рестарте latch мог быть потерян.
+- Test-first CI [#41504537789](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41504537789) упал на новом тесте daily-stop с AssertionError: persistence spy не был вызван.
+- Исправление: `_update_mark_to_market()` вызывает `_persist()` при новом переходе daily-stop или kill-switch в true. Запись на каждом обычном candle MTM не добавлена.
+- Первый post-fix прогон выявил неполную тестовую фикстуру `test_funding_mark_to_market.py` (объект `__new__` без persistence stub); фикстура исправлена отдельно, без изменения production-логики.
+- Full Research CI [#41504995009](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41504995009), SUCCESS; portfolio accounting и state persistence прошли.
+- Решение: ACCEPT для durability risk-stop latch. Никакого market backtest, parameter search, private API request или live order.

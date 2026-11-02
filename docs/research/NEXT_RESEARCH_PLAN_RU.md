@@ -225,3 +225,13 @@ Remaining execution/lifecycle limitations:
 5. Continue deterministic lifecycle tests and source audit; do not run new market PnL sweeps until the execution/data gate is closed.
 
 No production/live changes and no market backtests were performed in these corrections.
+
+
+## 2026-11-02 — state restore and leverage/margin audit
+
+- **ENG-STATE-003 accepted:** existing but unreadable/incompatible Plan B backup now raises a fatal `RuntimeError`; only a genuinely missing file is treated as clean cold start. CI #41432693641 passed; `tests/test_state_persistence.py` 4/4.
+- Important boundary: this is local file integrity only. There is still no reconciliation of restored positions/pending orders against Bybit open positions and active orders. A valid backup can be stale; do not treat this as permission for live resume.
+- **Funding coverage matrix corrected:** the current research engine does support optional funding inputs via `--funding-dir` and `--mark-price-dir`; cumulative funding is included in MTM and close PnL when supplied. However quantity is still a notional/entry-price proxy and hourly mark candle open is not verified settlement mark. Historical E11/E13 results without these inputs remain unadjusted.
+- **Leverage/margin remains unverified:** `calculate_position_size()` applies a notional ceiling of `current_equity * leverage / max_concurrent_positions * 0.95` per new position. The Bybit Decimal sizing helper is not wired into the engine. There is no aggregate margin ledger, maintenance-margin tier model, liquidation price/fee simulation, or exchange quantity in `OpenPositionState`. Do not interpret the leverage cap as a liquidation model.
+- Next P0/P1: (1) exchange position/order reconciliation before any restore/live-resume; (2) exact exchange quantity integrated consistently into position gross PnL, fees, funding and risk; (3) isolated margin/maintenance tier and liquidation simulation using dated Bybit specs. These require verified point-in-time snapshots and must remain deterministic tests before any market backtest.
+- No market backtest or parameter search was run in this audit cycle.

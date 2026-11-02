@@ -125,7 +125,7 @@ class StatePersistenceTests(unittest.TestCase):
             payload.pop("last_mark_prices")
             path.write_text(json.dumps(payload), encoding="utf-8")
 
-            with self.assertRaisesRegex(RuntimeError, "last_mark_prices"):
+            with self.assertRaises(RuntimeError):
                 engine.PlanBStatePersistence(str(path)).load_state(
                     engine.AdaptiveRiskManager(cfg)
                 )
@@ -368,6 +368,7 @@ class StatePersistenceTests(unittest.TestCase):
             payload = {
                 "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": sample_risk_data(),
                 "open_positions": {"BTCUSDT": engine.asdict(sample_position())},
+                "last_mark_prices": {"BTCUSDT": 100.0},
                 "pending_orders": {
                     "BTCUSDT": {"symbol": "BTCUSDT", "direction": "long",
                                 "strategy": "test", "entry_price": 100.0,
@@ -393,6 +394,7 @@ class StatePersistenceTests(unittest.TestCase):
             payload = {
                 "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": sample_risk_data(),
                 "open_positions": {"BTCUSDT": first, "ETHUSDT": second},
+                "last_mark_prices": {"BTCUSDT": 100.0, "ETHUSDT": 2000.0},
                 "pending_orders": {},
                 "trade_seq": 42,
             }

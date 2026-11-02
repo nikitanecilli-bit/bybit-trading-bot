@@ -101,5 +101,56 @@ class AccruedFundingTests(unittest.TestCase):
         )
 
 
+    def test_final_close_boundary_funding_receipts_are_excluded(self):
+        pos_long = position("long", tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
+        pos_short = position("short", tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
+        negative_rate = [{"ts": SETTLE_1, "rate": "-0.01"}]
+        positive_rate = [{"ts": SETTLE_1, "rate": "0.01"}]
+        self.assertEqual(
+            accrued_funding_cost(pos_long, negative_rate, MARKS, SETTLE_1,
+                                 closed_ts_ms=SETTLE_1),
+            Decimal("0.00"),
+        )
+        self.assertEqual(
+            accrued_funding_cost(pos_short, positive_rate, MARKS, SETTLE_1,
+                                 closed_ts_ms=SETTLE_1),
+            Decimal("0.00"),
+        )
+
+    def test_final_close_boundary_funding_payments_charge_full_quantity(self):
+        pos_long = position("long", tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
+        pos_short = position("short", tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
+        positive_rate = [{"ts": SETTLE_1, "rate": "0.01"}]
+        negative_rate = [{"ts": SETTLE_1, "rate": "-0.01"}]
+        self.assertEqual(
+            accrued_funding_cost(pos_long, positive_rate, MARKS, SETTLE_1,
+                                 closed_ts_ms=SETTLE_1),
+            Decimal("10.00"),
+        )
+        self.assertEqual(
+            accrued_funding_cost(pos_short, negative_rate, MARKS, SETTLE_1,
+                                 closed_ts_ms=SETTLE_1),
+            Decimal("10.00"),
+        )
+
+    def test_full_close_without_tp1_excludes_boundary_receipt(self):
+        pos = position("long", tp1=False, tp1_ts=None, remaining="1")
+        negative_rate = [{"ts": SETTLE_1, "rate": "-0.01"}]
+        self.assertEqual(
+            accrued_funding_cost(pos, negative_rate, MARKS, SETTLE_1,
+                                 closed_ts_ms=SETTLE_1),
+            Decimal("0.00"),
+        )
+
+    def test_settlement_before_final_close_keeps_pre_exit_exposure(self):
+        pos = position("long", tp1=False, tp1_ts=None, remaining="1")
+        positive_rate = [{"ts": SETTLE_1, "rate": "0.01"}]
+        self.assertEqual(
+            accrued_funding_cost(pos, positive_rate, MARKS, SETTLE_2,
+                                 closed_ts_ms=SETTLE_2),
+            Decimal("10.00"),
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

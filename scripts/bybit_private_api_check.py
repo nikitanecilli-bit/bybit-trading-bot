@@ -14,11 +14,26 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any
 
 ENDPOINT = "/v5/user/query-api"
 RECV_WINDOW = "5000"
+ALLOWED_API_HOSTS = {"api.bybit.kz", "api.bybit.com", "api.bytick.com"}
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def validate_base_url(base_url: str) -> None:
+    parsed = urllib.parse.urlsplit(base_url)
+    if (parsed.scheme != "https" or parsed.hostname not in ALLOWED_API_HOSTS
+            or parsed.username or parsed.password or parsed.port not in (None, 443)
+            or parsed.path not in ("", "/") or parsed.query or parsed.fragment):
+        raise ValueError("API base URL must be an official HTTPS Bybit host")
 
 
 def make_signature(timestamp: str, api_key: str, api_secret: str,
@@ -45,17 +60,19 @@ def build_headers(api_key: str, api_secret: str,
 
 
 def verify_response(payload: dict[str, Any], api_key: str) -> tuple[bool, str]:
-    if payload.get("retCode") != 0:
-        code = payload.get("retCode", "unknown")
-        message = str(payload.get("retMsg", "Bybit returned an error"))
-        return False, f"Bybit rejected the request (retCode={code}, retMsg={message})."
+    if not isinstance(payload, dict):
+        return False, "Bybit response root is not an object."
+    code = payload.get("retCode")
+    if isinstance(code, bool) or not isinstance(code, int) or code != 0:
+        return False, "Bybit returned a non-zero or invalid retCode."
 
     result = payload.get("result")
     if not isinstance(result, dict):
         return False, "Bybit response has no valid result object."
     if result.get("apiKey") != api_key:
         return False, "The authenticated response did not match the configured API key."
-    if result.get("readOnly") != 1:
+    read_only = result.get("readOnly")
+    if isinstance(read_only, bool) or not isinstance(read_only, int) or read_only != 1:
         return False, "SECURITY CHECK FAILED: this API key is not marked read-only."
 
     return True, "Authenticated successfully; API key is marked read-only."
@@ -69,8 +86,10 @@ def main() -> int:
     if not key_from_env or not secret_from_env:
         print("Missing required GitHub Secrets: BYBIT_API_KEY and/or BYBIT_API_SECRET.")
         return 2
-    if not base_url.startswith("https://"):
-        print("Invalid API base URL: HTTPS is required.")
+    try:
+        validate_base_url(base_url)
+    except ValueError as exc:
+        print(f"Invalid API base URL: {exc}")
         return 2
 
     headers = build_headers(key_from_env, secret_from_env)
@@ -81,7 +100,8 @@ def main() -> int:
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
+        opener = urllib.request.build_opener(_NoRedirectHandler())
+        with opener.open(request, timeout=20) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         print(f"Bybit HTTP request failed with status {exc.code}; response body was suppressed.")

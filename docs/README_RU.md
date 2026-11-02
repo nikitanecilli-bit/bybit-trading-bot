@@ -16,9 +16,10 @@
 12. [ENG-STATE-005 — transactional restore](research/experiment_cards/ENG-STATE-005_TRANSACTIONAL_RESTORE_RU.md) — не допускает частичного применения повреждённого backup.
 13. [ENG-STATE-006 — pending schema](research/experiment_cards/ENG-STATE-006_PENDING_SCHEMA_RU.md) — проверяет содержимое восстановленных pending signals.
 14. [ENG-STATE-007 — position schema](research/experiment_cards/ENG-STATE-007_POSITION_SCHEMA_RU.md) — проверяет типы, обязательные поля и инварианты восстановленных позиций.
-15. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
-16. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
-17. [Карта репозитория](REPOSITORY_MAP_RU.md).
+15. [ENG-STATE-008 — risk schema](research/experiment_cards/ENG-STATE-008_RISK_SCHEMA_RU.md) — проверяет числовые и логические поля восстановленного risk manager.
+16. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
+17. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
+18. [Карта репозитория](REPOSITORY_MAP_RU.md).
 
 ## Разделы
 

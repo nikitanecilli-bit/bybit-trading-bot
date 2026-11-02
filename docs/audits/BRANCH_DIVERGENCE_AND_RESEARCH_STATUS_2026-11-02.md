@@ -99,3 +99,30 @@ The separate instrument snapshot run `41468304134` failed on HTTP 403; that fail
 ## Final status
 
 The research branch has passed deterministic technical CI, but the strategy is not profitable by demonstrated shared-capital evidence and the execution model is not exchange-complete. E13 reduces historical losses modestly but does not produce a robust positive edge. Main and research histories are diverged; PR #4 is draft/dirty and must not be merged automatically.
+
+
+## E01–E09 primary workflow provenance cross-check
+
+Run metadata was re-read from GitHub Actions and compared with the experiment ledger. All successful artifact runs below still have non-expired artifacts as of this audit.
+
+| ID | Workflow run | Result | Run commit | Artifact |
+|---|---:|---|---|---|
+| E01 | [40578394090](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/40578394090) | success | `4e27b6adf8c3199ce78446d33703984394c94152` | `12768870777`, h1-direction-execution-ablation |
+| E02 | [40578394009](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/40578394009) | success | `4e27b6adf8c3199ce78446d33703984394c94152` | `12767913281`, execution-policy-walk-forward |
+| E03 | [40578393971](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/40578393971) | success | `4e27b6adf8c3199ce78446d33703984394c94152` | `12768457441`, execution-cost-ablation-report |
+| E04 | [40588753444](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/40588753444) | success | `4b291265976d66f77b692d057a921d170be865da` | `12773465436`, h1-chase-limit-ablation |
+| E05 | [40541270994](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/40541270994) | failure | `c0b61c2e87c46b347179d811c1410a6ad84478b0` | none |
+| E06 | [40587243295](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/40587243295) | success | `9601f4d855f69d58e7353655a0c62060f519de13` | `12772483348`, h1-signal-trade-diagnostics |
+| E07 | [40566687595](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/40566687595) | success | `a5a9851622544b4d16a0aec7f9ccab7d612cc608` | `12764160379` primary; `12764110430` reserve |
+| E08 | [40650477230](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/40650477230) | success | `17c31df587e802da7c74d3c8e2f53a656a632668` | `12799089180`, h1-chase-gate-decoupling |
+| E09 | [41355171678](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41355171678) | success | `a11606b2e37c750b3b39ab6fb7201916a554efac` | `13103031404`, e09-h1-gate-factorial |
+
+### What this establishes and what it does not
+
+- E01–E03 were run from the same code commit; they are distinct workflows/experiments, not three code revisions.
+- E04, E06, E07, E08 and E09 have separate recorded run commits and retrievable artifacts.
+- E05 is an actual failed Bybit recent-data validation run with no artifact. It is not a successful market holdout.
+- E08's ledger explicitly identifies a confound: for limit mode the chase parameter also gates signal candle body; for market mode it is applied to next-open gap. Its market/limit table is not a clean causal body-vs-gap comparison. E09 was designed to separate those factors.
+- E09's gap gate at 2% did not change any trades in its sample; body gate was the active factor. This does not prove all gap protection is useless, only that this threshold never fired in those data.
+- Artifact existence and run success establish reproducibility inputs, not profitability or correctness of the execution model. Artifact SHA-256 is recorded in the E09–E13 reports where available; older E01–E08 report entries do not consistently include hashes or a complete dataset manifest.
+- This cross-check is run-level provenance only. It does not yet verify that every artifact's embedded CSV/config hashes match the report's numbers. That remains the next artifact-level audit.

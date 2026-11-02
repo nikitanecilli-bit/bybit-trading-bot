@@ -95,6 +95,49 @@ class StatePersistenceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Не удалось безопасно восстановить"):
                 engine.PlanBStatePersistence(str(path)).load_state(risk)
 
+    def test_failed_position_restore_does_not_mutate_risk_manager(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "partial.json"
+            path.write_text(
+                '{"risk": {"realized_equity": 1234.0, "current_equity": 1234.0}, '
+                '"open_positions": {"BTCUSDT": {"symbol": "BTCUSDT"}}}',
+                encoding="utf-8",
+            )
+            cfg = engine.BotConfig()
+            risk = engine.AdaptiveRiskManager(cfg)
+            before = risk.to_dict().copy()
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(risk)
+            self.assertEqual(risk.to_dict(), before)
+
+    def test_invalid_pending_payload_does_not_mutate_risk_manager(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "pending.json"
+            path.write_text(
+                '{"risk": {"realized_equity": 1234.0}, '
+                '"open_positions": {}, "pending_orders": []}',
+                encoding="utf-8",
+            )
+            cfg = engine.BotConfig()
+            risk = engine.AdaptiveRiskManager(cfg)
+            before = risk.to_dict().copy()
+            with self.assertRaisesRegex(RuntimeError, "Не удалось безопасно восстановить"):
+                engine.PlanBStatePersistence(str(path)).load_state(risk)
+            self.assertEqual(risk.to_dict(), before)
+
+    def test_invalid_trade_sequence_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "sequence.json"
+            path.write_text(
+                '{"risk": {}, "open_positions": {}, "pending_orders": {}, "trade_seq": -1}',
+                encoding="utf-8",
+            )
+            risk = engine.AdaptiveRiskManager(engine.BotConfig())
+            before = risk.to_dict().copy()
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(risk)
+            self.assertEqual(risk.to_dict(), before)
+
     def test_invalid_position_shape_raises_instead_of_dropping_positions(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "invalid.json"

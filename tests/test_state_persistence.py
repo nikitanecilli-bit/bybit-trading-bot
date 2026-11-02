@@ -60,7 +60,7 @@ class StatePersistenceTests(unittest.TestCase):
                 }
             }
             writer = engine.PlanBStatePersistence(str(path), enabled=True)
-            writer.save_state(cfg, risk, {"BTCUSDT": position}, pending, trade_seq=42)
+            writer.save_state(cfg, risk, {"BTCUSDT": position}, pending, trade_seq=42,\n                               last_mark_prices={"BTCUSDT": 87.5})
 
             restored_risk = engine.AdaptiveRiskManager(engine.BotConfig())
             positions, restored_pending, seq = engine.PlanBStatePersistence(str(path)).load_state(restored_risk)
@@ -74,6 +74,58 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertEqual(restored_risk.peak_equity, 10_200.0)
             self.assertTrue(restored_risk.kill_switch_triggered)
             self.assertTrue(restored_risk.daily_stop_triggered)
+
+
+    def test_restored_engine_uses_persisted_mark_before_first_new_candle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "marked-state.json"
+            cfg = engine.BotConfig()
+            position = sample_position()
+            mark_price = 87.5
+            mark_ts = position.entry_ts + 3_600_000
+
+            source = engine.UnifiedQuantEngine.__new__(engine.UnifiedQuantEngine)
+            source.open_positions = {"BTCUSDT": position}
+            source._last_mark_prices = {"BTCUSDT": mark_price}
+            source._intrabar_risk_marks = {}
+            source._intrabar_risk_marks_ts = mark_ts
+            source.funding_dir = None
+            unrealized = source._unrealized_pnl_at_marks(mark_ts)
+            risk = engine.AdaptiveRiskManager(cfg)
+            risk.mark_to_market(unrealized, mark_ts)
+
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {"BTCUSDT": position}, {}, 42,
+                last_mark_prices={"BTCUSDT": mark_price},
+            )
+            restored = engine.UnifiedQuantEngine(
+                restore_plan_b=True, state_path=str(path),
+            )
+
+            self.assertEqual(restored._last_mark_prices, {"BTCUSDT": mark_price})
+            self.assertAlmostEqual(
+                restored._unrealized_pnl_at_marks(mark_ts), unrealized, places=8,
+            )
+            self.assertAlmostEqual(restored.risk_mgr.current_equity, risk.current_equity, places=4)
+
+    def test_open_position_backup_without_last_mark_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "missing-mark.json"
+            cfg = engine.BotConfig()
+            position = sample_position()
+            risk = engine.AdaptiveRiskManager(cfg)
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {"BTCUSDT": position}, {}, 42,
+                last_mark_prices={"BTCUSDT": position.entry_price},
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload.pop("last_mark_prices")
+            path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "last_mark_prices"):
+                engine.PlanBStatePersistence(str(path)).load_state(
+                    engine.AdaptiveRiskManager(cfg)
+                )
 
     def test_disabled_persistence_is_a_noop(self):
         with tempfile.TemporaryDirectory() as tmp:

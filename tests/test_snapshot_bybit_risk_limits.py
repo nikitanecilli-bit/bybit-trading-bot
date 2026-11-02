@@ -35,7 +35,7 @@ class RiskLimitSnapshotTests(unittest.TestCase):
 
     def test_repeated_cursor_fails_closed(self):
         def fetch(cursor):
-            return [row()], "same"
+            return ([row()], "same") if cursor is None else ([], "same")
         with self.assertRaisesRegex(RuntimeError, "cursor repeated"):
             fetch_all_tiers("linear", fetch)
 

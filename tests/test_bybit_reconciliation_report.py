@@ -35,6 +35,9 @@ def snapshot(position_rows=None, order_rows=None, execution_rows=None):
         allow_nan=False,
     ).encode("utf-8")).hexdigest()
     return {
+        "schema_version": 1,
+        "category": "linear",
+        "settle_coin": "USDT",
         "status": "CAPTURED_READ_ONLY_NOT_RECONCILED",
         "saved_at_utc": SAVED,
         "raw": raw,
@@ -118,6 +121,16 @@ class ReportOnlyComparatorTests(unittest.TestCase):
         report = build_report(backup(), snapshot(execution_rows=[execution]))
         self.assertEqual(report["exchange"]["execution_ids"], ["exec-1"])
         self.assertTrue(any("local execution ledger" in reason for reason in report["block_reasons"]))
+
+    def test_non_object_snapshot_is_rejected(self):
+        with self.assertRaisesRegex(ReportError, "snapshot root must be an object"):
+            build_report(backup(), [])
+
+    def test_wrong_market_scope_is_rejected(self):
+        data = snapshot()
+        data["settle_coin"] = "USDC"
+        with self.assertRaisesRegex(ReportError, "not scoped to Bybit linear/USDT"):
+            build_report(backup(), data)
 
     def test_raw_hash_tampering_is_rejected(self):
         data = snapshot()

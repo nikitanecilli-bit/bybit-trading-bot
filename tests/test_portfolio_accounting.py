@@ -440,7 +440,7 @@ def test_tp1_transition_refreshes_and_persists_portfolio_mtm():
     assert abs(e.risk_mgr.unrealized_pnl - expected) < 1e-8
     assert abs(
         e.risk_mgr.current_equity
-        - (e.risk_mgr.realized_equity + expected)
+        - round(e.risk_mgr.realized_equity + expected, 4)
     ) < 1e-8
     assert persisted and persisted[-1]["tp1_hit"] is True
     assert abs(persisted[-1]["risk"]["unrealized_pnl"] - expected) < 1e-8

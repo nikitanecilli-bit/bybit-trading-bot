@@ -1,6 +1,6 @@
 # ENG-PERSIST-002 — synchronize portfolio MTM after TP1 state transition
 
-Статус: PREREGISTERED — test-first reproduction pending.
+Статус: ACCEPT — test-first reproduction and full Research CI passed.
 Дата: 2026-11-02.
 Тип: portfolio accounting / risk-state synchronization.
 
@@ -24,3 +24,13 @@ On a candle where TP1 is reached but TP2/stop/time-stop are not, the engine leav
 After a surviving TP1 transition, recalculate portfolio MTM at the same bar-close timestamp and persist the changed position/risk snapshot. Preserve funding boundary policy (receipt deferred at exact MTM boundary, payment charged) and avoid duplicate persistence if the position closes on the same candle.
 
 No market backtest or live order until test-first and full CI acceptance. No profitability claim.
+
+
+## Реализация и результат
+
+- Test-first commit: `3888dbee467aaec71764209610a4f73412baba56`.
+- Full Research CI [#41506138601](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41506138601) failed exactly at the new assertion that MTM unrealized PnL must match the post-TP1 position state. Traceback: `test_tp1_transition_refreshes_and_persists_portfolio_mtm`, line 400.
+- Fix commit: `7734fecaee62d84dd40039c36e2b0fede0386387`. After surviving TP1 transition, the engine recalculates MTM at the same close timestamp; it persists each surviving open position after candle management so bars-held, MFE/MAE and protective trailing-stop evolution survive restart. Closed positions continue to use `_close_position()` persistence.
+- Gap-execution tests initially exposed an outdated `RiskSpy` fixture without MTM support; the fixture was updated, not the production code weakened.
+- Full Research CI [#41506990147](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41506990147) completed SUCCESS on commit `300af4a35ba7c3cb30d75a66e99eeb349ba7a44d`. Logs confirm the new TP1 sync test, surviving-position persistence test, and same-bar TP1/stop order-independence test all passed; portfolio suite 21/21.
+- Decision: ACCEPT for TP1/MTM consistency and persistence of open-position lifecycle state. No market backtest or live order; no profitability claim.

@@ -203,6 +203,17 @@ def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict
             "side": item.side,
             "qty": str(item.size),
             "avg_price": str(item.avg_price),
+            "take_profit": str(item.take_profit) if item.take_profit is not None else None,
+            "stop_loss": str(item.stop_loss) if item.stop_loss is not None else None,
+            "trailing_stop": str(item.trailing_stop) if item.trailing_stop is not None else None,
+            "tpsl_mode": item.tpsl_mode,
+            "protection_status": (
+                "UNKNOWN_FIELDS_MISSING"
+                if item.stop_loss is None or item.trailing_stop is None
+                else "NO_EXCHANGE_STOP"
+                if item.stop_loss == 0 and item.trailing_stop == 0
+                else "EXCHANGE_STOP_CONFIGURED"
+            ),
         }
         for item in positions
     ]
@@ -228,6 +239,10 @@ def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict
     ]
     if local_position_rows or exchange_position_rows:
         reasons.append("Open positions exist on at least one side; exact position reconciliation is unsupported.")
+    if any(row["protection_status"] == "UNKNOWN_FIELDS_MISSING" for row in exchange_position_rows):
+        reasons.append("Bybit position response omitted stopLoss/trailingStop fields; exchange protection state is unknown.")
+    if any(row["protection_status"] == "NO_EXCHANGE_STOP" for row in exchange_position_rows):
+        reasons.append("At least one exchange position has neither stopLoss nor trailingStop configured.")
     if orders:
         reasons.append("Exchange active orders exist but cannot be mapped to local exchange order identities.")
     if executions:

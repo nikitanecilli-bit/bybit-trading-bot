@@ -25,9 +25,9 @@ The writer flushes JSON through Python's buffered file object and atomically rep
 Решение: ACCEPT для повышения локальной crash-durability.
 
 - Engine commit: `3f2df9b78b9149e9f820dfc8d67140dbff7ba866`.
-- Test commit: `8d41fe9823d2465fe1ae64d674ed94a18027e4a2`.
-- CI: [Research engine checks #41447569454](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41447569454), SUCCESS.
-- `tests/test_state_persistence.py`: 53/53; verifies file + parent-directory fsync on POSIX, and previous backup preservation when file fsync fails.
+- Test commit: `dd808b3cb83e1308a26490f16582d26498fe0709`.
+- CI: [Research engine checks #41447862710](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41447569454), SUCCESS.
+- `tests/test_state_persistence.py`: 54/54; verifies file + parent-directory fsync on POSIX, and previous backup preservation when file fsync fails.
 - Compile, configured deterministic suites and secret scan passed.
 
 No market backtest, parameter sweep, production deployment or live order.

@@ -286,3 +286,12 @@ def test_stopped_short_mae_uses_stop_fill_and_does_not_count_later_wick_as_mfe()
     assert captured["exit_price"] == 105.0
     assert captured["mae"] == 1.0
     assert captured["mfe"] == 0.0
+
+
+if __name__ == "__main__":
+    tests = [(name, value) for name, value in sorted(globals().items())
+             if name.startswith("test_") and callable(value)]
+    for name, test in tests:
+        test()
+        print("PASS", name)
+    print(f"{len(tests)}/{len(tests)} tests passed")

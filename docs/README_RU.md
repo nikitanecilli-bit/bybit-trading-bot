@@ -4,33 +4,33 @@
 
 1. [Инструкции агенту](../AGENTS.md) — обязательные правила.
 2. [Exchange reconciliation readiness](audits/EXCHANGE_RECONCILIATION_READINESS_RU.md) — read-only V5 snapshot contract и причина текущего BLOCKED.
-2. [Рабочие правила проекта](../PROJECT_WORKING_RULES_RU.md) — автономность, безопасность и методика.
-3. [Технический аудит](audits/PROJECT_AUDIT_RU.md).
-4. [Аудит движка](audits/ENGINE_AUDIT_FINDINGS_RU.md).
-5. [Журнал экспериментов](research/EXPERIMENT_LEDGER_RU.md) — исторический источник результатов.
-6. [Протокол непрерывного улучшения](research/CONTINUOUS_IMPROVEMENT_PROTOCOL_RU.md) — гипотезы, контрольная версия, критерии ACCEPT/REJECT и защита от переобучения.
-7. [Шаблон карточки эксперимента](research/EXPERIMENT_CARD_TEMPLATE_RU.md) — заполняется до каждого нового запуска.
-8. [ENG-KS-001 — kill-switch priority](research/experiment_cards/ENG-KS-001_KILL_SWITCH_PRIORITY_RU.md) — исправление внутрисвечной конкуренции kill-switch и TP.
-9. [ENG-EXEC-002 — marketable limit costs](research/experiment_cards/ENG-EXEC-002_MARKETABLE_LIMIT_FEE_RU.md) — taker-классификация лимитных gap-through fills.
-10. [ENG-STATE-003 — fail-closed restore](research/experiment_cards/ENG-STATE-003_FAIL_CLOSED_RESTORE_RU.md) — не допускает тихой потери локального состояния при повреждённом backup.
-11. [ENG-STATE-004 — fail-closed save](research/experiment_cards/ENG-STATE-004_FAIL_CLOSED_SAVE_RU.md) — останавливает цикл при неудачной записи резервного состояния.
-12. [ENG-STATE-005 — transactional restore](research/experiment_cards/ENG-STATE-005_TRANSACTIONAL_RESTORE_RU.md) — не допускает частичного применения повреждённого backup.
-13. [ENG-STATE-006 — pending schema](research/experiment_cards/ENG-STATE-006_PENDING_SCHEMA_RU.md) — проверяет содержимое восстановленных pending signals.
-14. [ENG-STATE-007 — position schema](research/experiment_cards/ENG-STATE-007_POSITION_SCHEMA_RU.md) — проверяет типы, обязательные поля и инварианты восстановленных позиций.
-15. [ENG-STATE-008 — TP1 invariants](research/experiment_cards/ENG-STATE-008_TP1_INVARIANTS_RU.md) — проверяет согласованность частичного закрытия TP1 и целей.
-16. [ENG-STATE-009 — restore identity](research/experiment_cards/ENG-STATE-009_RESTORE_IDENTITY_RU.md) — исключает конфликт открытых позиций, pending и повторяющихся trade_id.
-17. [ENG-STATE-010 — complete envelope](research/experiment_cards/ENG-STATE-010_COMPLETE_ENVELOPE_RU.md) — не допускает восстановления неполного JSON как пустого портфеля.
-18. [ENG-STATE-011 — strict JSON save](research/experiment_cards/ENG-STATE-011_STRICT_JSON_SAVE_RU.md) — запрещает сохранение NaN/Infinity в резервной копии.
-19. [ENG-STATE-008 — risk schema](research/experiment_cards/ENG-STATE-008_RISK_SCHEMA_RU.md) — проверяет числовые и логические поля восстановленного risk manager.
-20. [ENG-STATE-012 — risk snapshot invariants](research/experiment_cards/ENG-STATE-012_RISK_SNAPSHOT_INVARIANTS_RU.md) — проверяет математическую согласованность equity и drawdown.
-21. [ENG-STATE-013 — backup metadata](research/experiment_cards/ENG-STATE-013_BACKUP_METADATA_RU.md) — проверяет UTC timestamp и версию резервной копии.
-22. [ENG-STATE-014 — TP1 timestamp](research/experiment_cards/ENG-STATE-014_TP1_TIMESTAMP_RU.md) — проверяет время события TP1 относительно входа.
-23. [ENG-STATE-015 — pending next-bar chronology](research/experiment_cards/ENG-STATE-015_PENDING_NEXT_BAR_RU.md) — исключает исполнение устаревших pending-сигналов после пропуска свечи/перезапуска.
-24. [ENG-STATE-016 — backup event chronology](research/experiment_cards/ENG-STATE-016_BACKUP_EVENT_TIME_RU.md) — запрещает событиям позиции/сигнала датироваться позже сохранения backup.
-25. [ENG-STATE-017 — fsync backup durability](research/experiment_cards/ENG-STATE-017_FSYNC_BACKUP_RU.md) — fsync содержимого backup и каталога после atomic replace на POSIX.
-26. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
-27. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
-28. [Карта репозитория](REPOSITORY_MAP_RU.md).
+3. [Рабочие правила проекта](../PROJECT_WORKING_RULES_RU.md) — автономность, безопасность и методика.
+4. [Технический аудит](audits/PROJECT_AUDIT_RU.md).
+5. [Аудит движка](audits/ENGINE_AUDIT_FINDINGS_RU.md).
+6. [Журнал экспериментов](research/EXPERIMENT_LEDGER_RU.md) — исторический источник результатов.
+7. [Протокол непрерывного улучшения](research/CONTINUOUS_IMPROVEMENT_PROTOCOL_RU.md) — гипотезы, контрольная версия, критерии ACCEPT/REJECT и защита от переобучения.
+8. [Шаблон карточки эксперимента](research/EXPERIMENT_CARD_TEMPLATE_RU.md) — заполняется до каждого нового запуска.
+9. [ENG-KS-001 — kill-switch priority](research/experiment_cards/ENG-KS-001_KILL_SWITCH_PRIORITY_RU.md) — исправление внутрисвечной конкуренции kill-switch и TP.
+10. [ENG-EXEC-002 — marketable limit costs](research/experiment_cards/ENG-EXEC-002_MARKETABLE_LIMIT_FEE_RU.md) — taker-классификация лимитных gap-through fills.
+11. [ENG-STATE-003 — fail-closed restore](research/experiment_cards/ENG-STATE-003_FAIL_CLOSED_RESTORE_RU.md) — не допускает тихой потери локального состояния при повреждённом backup.
+12. [ENG-STATE-004 — fail-closed save](research/experiment_cards/ENG-STATE-004_FAIL_CLOSED_SAVE_RU.md) — останавливает цикл при неудачной записи резервного состояния.
+13. [ENG-STATE-005 — transactional restore](research/experiment_cards/ENG-STATE-005_TRANSACTIONAL_RESTORE_RU.md) — не допускает частичного применения повреждённого backup.
+14. [ENG-STATE-006 — pending schema](research/experiment_cards/ENG-STATE-006_PENDING_SCHEMA_RU.md) — проверяет содержимое восстановленных pending signals.
+15. [ENG-STATE-007 — position schema](research/experiment_cards/ENG-STATE-007_POSITION_SCHEMA_RU.md) — проверяет типы, обязательные поля и инварианты восстановленных позиций.
+16. [ENG-STATE-008 — TP1 invariants](research/experiment_cards/ENG-STATE-008_TP1_INVARIANTS_RU.md) — проверяет согласованность частичного закрытия TP1 и целей.
+17. [ENG-STATE-009 — restore identity](research/experiment_cards/ENG-STATE-009_RESTORE_IDENTITY_RU.md) — исключает конфликт открытых позиций, pending и повторяющихся trade_id.
+18. [ENG-STATE-010 — complete envelope](research/experiment_cards/ENG-STATE-010_COMPLETE_ENVELOPE_RU.md) — не допускает восстановления неполного JSON как пустого портфеля.
+19. [ENG-STATE-011 — strict JSON save](research/experiment_cards/ENG-STATE-011_STRICT_JSON_SAVE_RU.md) — запрещает сохранение NaN/Infinity в резервной копии.
+20. [ENG-STATE-018 — risk schema](research/experiment_cards/ENG-STATE-018_RISK_SCHEMA_RU.md) — проверяет числовые и логические поля восстановленного risk manager.
+21. [ENG-STATE-012 — risk snapshot invariants](research/experiment_cards/ENG-STATE-012_RISK_SNAPSHOT_INVARIANTS_RU.md) — проверяет математическую согласованность equity и drawdown.
+22. [ENG-STATE-013 — backup metadata](research/experiment_cards/ENG-STATE-013_BACKUP_METADATA_RU.md) — проверяет UTC timestamp и версию резервной копии.
+23. [ENG-STATE-014 — TP1 timestamp](research/experiment_cards/ENG-STATE-014_TP1_TIMESTAMP_RU.md) — проверяет время события TP1 относительно входа.
+24. [ENG-STATE-015 — pending next-bar chronology](research/experiment_cards/ENG-STATE-015_PENDING_NEXT_BAR_RU.md) — исключает исполнение устаревших pending-сигналов после пропуска свечи/перезапуска.
+25. [ENG-STATE-016 — backup event chronology](research/experiment_cards/ENG-STATE-016_BACKUP_EVENT_TIME_RU.md) — запрещает событиям позиции/сигнала датироваться позже сохранения backup.
+26. [ENG-STATE-017 — fsync backup durability](research/experiment_cards/ENG-STATE-017_FSYNC_BACKUP_RU.md) — fsync содержимого backup и каталога после atomic replace на POSIX.
+27. [Матрица покрытия тестами](research/TEST_COVERAGE_MATRIX_RU.md).
+28. [Следующий план исследований](research/NEXT_RESEARCH_PLAN_RU.md).
+29. [Карта репозитория](REPOSITORY_MAP_RU.md).
 
 ## Разделы
 

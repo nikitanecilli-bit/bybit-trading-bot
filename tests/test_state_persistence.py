@@ -1,8 +1,11 @@
 """Fail-closed tests for Plan B state persistence."""
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 import Bybit_Trading_Engine_v14_research as engine
 
 

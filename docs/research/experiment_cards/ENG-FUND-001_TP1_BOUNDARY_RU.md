@@ -1,6 +1,6 @@
 # ENG-FUND-001 — conservative funding when settlement shares TP1 boundary
 
-Статус: FIXED — regression suite passes; workflow post-job cleanup still pending at last check.
+Статус: ACCEPT — confirmed defect fixed; full regression workflow passed.
 Дата: 2026-11-02.
 Тип: deterministic funding-accounting correctness; не рыночный эксперимент.
 

@@ -708,7 +708,7 @@ class PlanBStatePersistence:
                 raise ValueError("корень backup должен быть JSON-объектом")
             risk_data = data.get("risk", {})
             positions_data = data.get("open_positions", {})
-            pending = data.get("pending_orders", {}) or {}
+            pending = data.get("pending_orders", {})
             raw_seq = data.get("trade_seq", 0)
             if not isinstance(risk_data, dict):
                 raise ValueError("risk state должен быть JSON-объектом")

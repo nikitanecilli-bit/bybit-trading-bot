@@ -60,10 +60,13 @@ class StatePersistenceTests(unittest.TestCase):
                 }
             }
             writer = engine.PlanBStatePersistence(str(path), enabled=True)
-            writer.save_state(cfg, risk, {"BTCUSDT": position}, pending, trade_seq=42,\n                               last_mark_prices={"BTCUSDT": 87.5})
+            writer.save_state(cfg, risk, {"BTCUSDT": position}, pending, trade_seq=42,
+                               last_mark_prices={"BTCUSDT": 87.5})
 
             restored_risk = engine.AdaptiveRiskManager(engine.BotConfig())
-            positions, restored_pending, seq = engine.PlanBStatePersistence(str(path)).load_state(restored_risk)
+            restored_writer = engine.PlanBStatePersistence(str(path))
+            positions, restored_pending, seq = restored_writer.load_state(restored_risk)
+            self.assertEqual(restored_writer.last_mark_prices, {"BTCUSDT": 87.5})
 
             self.assertEqual(seq, 42)
             self.assertEqual(restored_pending, pending)
@@ -200,6 +203,7 @@ class StatePersistenceTests(unittest.TestCase):
                     writer.save_state(
                         engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
                         {"BTCUSDT": sample_position()}, {}, 42,
+                        last_mark_prices={"BTCUSDT": sample_position().entry_price},
                     )
             self.assertFalse(path.exists())
             self.assertFalse(Path(str(path) + ".tmp").exists())
@@ -226,7 +230,8 @@ class StatePersistenceTests(unittest.TestCase):
             writer = engine.PlanBStatePersistence(str(path), enabled=True)
             with self.assertRaisesRegex(RuntimeError, "Не удалось сохранить"):
                 writer.save_state(engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
-                                  {"BTCUSDT": position}, {}, 42)
+                                  {"BTCUSDT": position}, {}, 42,
+                                  last_mark_prices={"BTCUSDT": position.entry_price})
             self.assertFalse(path.exists())
             self.assertFalse(Path(str(path) + ".tmp").exists())
 
@@ -306,7 +311,8 @@ class StatePersistenceTests(unittest.TestCase):
             position.tp1_ts_ms = 1_790_000_003_600
             writer = engine.PlanBStatePersistence(str(path), enabled=True)
             writer.save_state(engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
-                              {"BTCUSDT": position}, {}, 42)
+                              {"BTCUSDT": position}, {}, 42,
+                              last_mark_prices={"BTCUSDT": position.entry_price})
             restored, _, _ = engine.PlanBStatePersistence(str(path)).load_state(
                 engine.AdaptiveRiskManager(engine.BotConfig())
             )

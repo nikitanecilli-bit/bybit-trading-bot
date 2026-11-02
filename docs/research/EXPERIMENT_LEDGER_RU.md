@@ -285,3 +285,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Per-symbol independent sums (not shared-capital portfolio): screen net baseline -1,886.09; signal-US-block +9,959.67; entry-US-block +7,440.00; aligned-entry-US-block +8,543.31. Forward net baseline -14,789.82; signal-US-block -5,020.33; entry-US-block -5,341.50; aligned-entry-US-block -2,819.98. The signal-session variant still recorded 134 US-session entries in screen and 125 in forward; the entry-session variant recorded zero.
 - Interpretation: signal-time and entry-time filters are different policies. The existing config field is signal-time semantics; do not describe it as an entry-session block. No automatic code change is made because changing the timestamp basis changes strategy behavior and the audit used independent per-symbol simulations. Any future adoption requires a separately preregistered experiment and shared-capital validation after the execution/data gate.
 - Decision: diagnostic only; no filter promoted. Binance OHLCV proxy, static costs, per-symbol independent accounts; not evidence of portfolio profitability.
+
+
+## ENG-STATE-003 — fail-closed state restore (2026-11-02)
+
+- Preregistered card: [ENG-STATE-003](experiment_cards/ENG-STATE-003_FAIL_CLOSED_RESTORE_RU.md).
+- Confirmed defect: `PlanBStatePersistence.load_state()` caught every exception and returned empty positions/pending/sequence. This conflated a missing file (valid cold start) with an existing but unreadable/incompatible backup (possible lost local record of open exchange positions).
+- Fix: missing file still returns empty cold-start state; if an existing backup cannot be parsed or restored, loader logs CRITICAL and raises `RuntimeError` chained from the original exception. It no longer silently returns an empty state.
+- Tests: `tests/test_state_persistence.py` covers missing file, full valid round-trip of risk flags/open position/pending/trade sequence, corrupt JSON, and malformed position object.
+- Commits: engine `ce6f3a1b3ba7b3277c9e8180fee799bf7dc67a9f`; tests `1706cd3cf9f8e8022361b02c8e62516932f50dfc`; CI wiring `d6f6d2374f93979e1253f6bf22fe5192f18ae471`; test import fix `3bff014673d77ae7b6eddaa63aa010f6b89f08a0`.
+- CI: [Research engine checks #41432693641](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41432693641), SUCCESS. New persistence tests 4/4; compile, all configured deterministic suites and secret scan passed.
+- Decision: ACCEPT as a state-integrity correction. No market backtest, parameter sweep, production deployment or live order.
+- Limitation: a valid backup may still be stale relative to Bybit. This fix does not implement exchange position/order reconciliation and must not be described as safe live-resume.

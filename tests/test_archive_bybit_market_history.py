@@ -5,8 +5,8 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.archive_bybit_market_history import (
-    FUNDING_WINDOW_MS, fetch_funding_history, fetch_mark_klines,
-    normalize_symbol, parse_funding_rows, parse_mark_rows, validate_base_url,
+    FUNDING_WINDOW_MS, fetch_funding_history, fetch_mark_klines, fetch_trade_klines,
+    normalize_symbol, parse_funding_rows, parse_mark_rows, parse_trade_rows, validate_base_url,
 )
 
 
@@ -43,6 +43,28 @@ class BybitMarketHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid funding rate"):
             parse_funding_rows([{"symbol":"BTCUSDT","fundingRateTimestamp":"1000",
                                  "fundingRate":"NaN"}], "BTCUSDT")
+
+    def test_trade_kline_fetch_sorts_and_requires_complete_hour_grid(self):
+        hour = 3_600_000
+        start, end = hour, hour * 4
+        source = [
+            [str(hour*3), "103", "105", "102", "104", "12", "1248"],
+            [str(hour*2), "102", "104", "101", "103", "11", "1133"],
+            [str(hour), "101", "103", "100", "102", "10", "1020"],
+        ]
+        rows = fetch_trade_klines("BTCUSDT", start, end, "60",
+                                  lambda a, b, limit: source)
+        self.assertEqual([x["timestamp_ms"] for x in rows], [hour, hour*2, hour*3])
+        self.assertEqual(rows[0]["volume"], "10")
+        self.assertEqual(rows[0]["turnover"], "1020")
+
+    def test_trade_kline_gap_and_invalid_ohlcv_fail_closed(self):
+        hour = 3_600_000
+        with self.assertRaisesRegex(RuntimeError, "incomplete trade kline coverage"):
+            fetch_trade_klines("BTCUSDT", hour, hour*4, "60",
+                               lambda a,b,l: [[str(hour), "100","101","99","100","1","100"]])
+        with self.assertRaisesRegex(ValueError, "volume and turnover"):
+            parse_trade_rows([[str(hour),"100","101","99","100","-1","100"]], "BTCUSDT", hour)
 
     def test_mark_fetch_sorts_and_requires_complete_hour_grid(self):
         hour = 3_600_000

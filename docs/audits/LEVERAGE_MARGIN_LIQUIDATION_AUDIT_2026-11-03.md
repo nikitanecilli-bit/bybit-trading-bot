@@ -67,3 +67,24 @@ The risk-tier snapshot collector now validates each symbol's tier sequence befor
 **Implementation decision:** do not wire a single liquidation formula into the engine yet. The config string `ISOLATED_5X` indicates intended leverage/mode but does not establish whether the actual account is Classic isolated or Unified Trading Account isolated, nor extra-margin/auto-add-margin settings. The current official UTA formula cannot safely be assumed to match a Classic account. Implement isolated UTA only as an explicitly selected model after account mode is known; keep Cross and Portfolio Margin out of scope until their account-level inputs are available. The mark-price trigger must remain distinct from trade/last-price OHLC.
 
 No live account or private API was queried for this decision.
+
+
+## 7. Risk-tier sequence validation and CI evidence
+
+The risk-limit collector now validates complete per-symbol tier groups before accepting a snapshot:
+- exactly one `isLowestRisk=1`, on the lowest tier;
+- strictly increasing `riskLimitValue`;
+- non-decreasing maintenance and initial margin rates;
+- non-increasing max leverage;
+- `mmDeduction` recurrence per Bybit's published USDT maintenance-margin formula.
+
+Research CI [#41543899344](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41543899344) completed **SUCCESS** on commit `93d6dca3fde3b59d1c8d9e9727af660623b5d3b4`; all 12 risk-tier collector tests and the complete Research suite passed.
+
+The push-triggered official risk-tier snapshot attempt [#41543899223](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41543899223) failed at the API download step with HTTP 403; no snapshot was written. This is an external data-access blocker, not a parser/test failure. The snapshot collector remains ready but no current or historical Bybit risk-tier values are available in the repository.
+
+Official references checked:
+- [Bybit V5 Get Risk Limit](https://bybit-exchange.github.io/docs/v5/market/risk-limit): linear endpoint pagination and fields `riskLimitValue`, `maintenanceMargin`, `initialMargin`, `maxLeverage`, `mmDeduction`.
+- [Bybit Maintenance Margin — USDT contracts](https://www.bybit.com/en/help-center/article/Maintenance-Margin-USDT-Contract), last updated 2026-04-16: tier-based maintenance margin, live mark-price tier changes, and deduction recurrence.
+- [Bybit Isolated Liquidation — UTA](https://www.bybit.kz/en-KAZ/help-center/article/Liquidation-Price-Calculation-under-Isolated-Mode-Unified-Trading-Account): UTA isolated long/short formulas and close-fee adjustments.
+
+The collector's sequence checks are now covered by tests; the liquidation calculator itself remains deliberately unimplemented until account mode and dated risk-tier snapshots are known.

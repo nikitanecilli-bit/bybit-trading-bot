@@ -37,6 +37,13 @@ def make_engine(max_chase_pct=1.5):
             self.order_types.append(order_type)
             return 1000.0, min(10.0, risk_budget_usdt) if risk_budget_usdt is not None else 10.0
 
+        @staticmethod
+        def mark_to_market(unrealized_pnl_usdt, ts_ms):
+            return {"daily_stop_hit": False, "kill_switch_hit": False}
+
+    e._last_mark_prices = {}
+    e._intrabar_risk_marks = {}
+    e._intrabar_risk_marks_ts = None
     e.risk_mgr = RiskSpy()
     return e
 

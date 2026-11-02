@@ -1433,7 +1433,7 @@ class UnifiedQuantEngine:
         )
         if expected_entry_bar_ts is None or curr.ts != expected_entry_bar_ts:
             self.pending.pop(symbol, None)
-            self._bar_entry_risk_budgets.pop(symbol, None)
+            getattr(self, "_bar_entry_risk_budgets", {}).pop(symbol, None)
             self._persist()
             logger.warning(
                 "Discard stale pending signal %s: signal_ts=%r current_bar_ts=%r timeframe=%s",

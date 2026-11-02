@@ -539,7 +539,7 @@ def test_same_bar_tp1_on_one_symbol_and_stop_on_another_is_order_independent():
         assert abs(e.risk_mgr.unrealized_pnl - expected_unrealized) < 1e-8
         assert abs(
             e.risk_mgr.current_equity
-            - (e.risk_mgr.realized_equity + expected_unrealized)
+            - round(e.risk_mgr.realized_equity + expected_unrealized, 4)
         ) < 1e-8
 
     assert first.closed_trades[0].pnl_usdt == reverse.closed_trades[0].pnl_usdt

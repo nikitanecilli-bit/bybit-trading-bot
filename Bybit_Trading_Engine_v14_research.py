@@ -879,13 +879,27 @@ class PlanBStatePersistence:
                     raise ValueError(f"ключ позиции {sym!r} не совпадает с pos.symbol {pos.symbol!r}")
                 restored[sym] = pos
 
-            required_pending = {"symbol", "direction", "strategy", "entry_price", "stop_dist", "order_type"}
+            required_pending = {
+                "symbol", "direction", "strategy", "signal_ts", "entry_price",
+                "stop_dist", "order_type",
+            }
+            allowed_pending = {
+                "symbol", "direction", "strategy", "signal_ts", "entry_price",
+                "stop_price", "tp1_price", "tp2_price", "stop_dist", "atr",
+                "vol_ratio", "session", "order_type",
+            }
             for sym, signal in pending.items():
                 if not isinstance(sym, str) or not sym or not isinstance(signal, dict):
                     raise ValueError("каждый pending signal должен быть объектом с непустым symbol key")
+                unknown = set(signal).difference(allowed_pending)
+                if unknown:
+                    raise ValueError(f"pending signal {sym}: неизвестные поля backup {sorted(unknown)}")
                 missing = required_pending.difference(signal)
                 if missing:
                     raise ValueError(f"pending signal {sym}: отсутствуют поля {sorted(missing)}")
+                signal_ts = signal["signal_ts"]
+                if isinstance(signal_ts, bool) or not isinstance(signal_ts, int) or signal_ts <= 0:
+                    raise ValueError(f"pending signal {sym}: signal_ts должен быть положительным целым числом")
                 if signal["symbol"] != sym:
                     raise ValueError(f"ключ pending {sym!r} не совпадает с signal.symbol {signal['symbol']!r}")
                 if signal["direction"] not in {"long", "short"}:
@@ -1401,7 +1415,31 @@ class UnifiedQuantEngine:
         return self._bar_entry_risk_budgets
 
     def _try_fill_pending(self, symbol: str, curr: Candle) -> bool:
-        """Исполняет отложенный сигнал на свече, следующей за сигнальной. True если позиция открыта."""
+        """Fill only on the immediately following candle; stale signals are discarded."""
+        sig = self.pending[symbol]
+        timeframe_ms = {
+            "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
+            "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
+            "4h": 14_400_000, "6h": 21_600_000, "12h": 43_200_000,
+            "1d": 86_400_000,
+        }
+        timeframe = str(self.cfg.timeframe).strip().lower()
+        signal_ts = sig.get("signal_ts")
+        expected_entry_bar_ts = (
+            signal_ts + timeframe_ms[timeframe]
+            if timeframe in timeframe_ms
+            and isinstance(signal_ts, int) and not isinstance(signal_ts, bool)
+            else None
+        )
+        if expected_entry_bar_ts is None or curr.ts != expected_entry_bar_ts:
+            self.pending.pop(symbol, None)
+            self._bar_entry_risk_budgets.pop(symbol, None)
+            self._persist()
+            logger.warning(
+                "Discard stale pending signal %s: signal_ts=%r current_bar_ts=%r timeframe=%s",
+                symbol, signal_ts, curr.ts, timeframe,
+            )
+            return False
         sig = self.pending.pop(symbol)
         ok, _ = self.risk_mgr.can_open_new_trade(len(self.open_positions))
         if not ok:

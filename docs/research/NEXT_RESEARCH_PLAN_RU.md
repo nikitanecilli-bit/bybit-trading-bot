@@ -345,3 +345,12 @@ No production/live changes and no market backtests were performed in these corre
 5. No PnL sweeps, live resume, order mutations or production deployment until execution/data gates are closed.
 
 Do not infer exchange qty from `size_usdt / entry_price`.
+
+
+## ENG-DATA-001 — instrument snapshot collector
+
+- Hardened public metadata collector: official HTTPS host allowlist, redirects disabled, strict integer response code, cursor type validation and pagination safety cap.
+- 13 mocked tests passed in full CI [#41468327832](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468327832).
+- Live regional endpoint workflow [#41468304134](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468304134) returned HTTP 403. No dated snapshot was created; this is blocked access, not an empty instrument universe.
+- Snapshot workflow is weekly/manual, not triggered by every code push. Do not substitute guessed instrument specs.
+- Execution-aware sizing remains blocked until a real dated Bybit snapshot is archived and provenance/age validated.

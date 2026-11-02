@@ -603,6 +603,24 @@ def test_drawdown_uses_exit_chronology_not_input_list_order():
     assert chronological["max_dd_pct"] == shuffled["max_dd_pct"] == 2.0
 
 
+def test_finalize_rejects_missing_open_position_marks():
+    e = make_engine()
+    e.open_positions["BTCUSDT"] = make_position(symbol="BTCUSDT", size=1_000.0)
+    incomplete_marks = {
+        "ETHUSDT": engine_mod.Candle(
+            ts=1_800_003_600_000, open=100.0, high=101.0,
+            low=99.0, close=100.0, volume=10.0,
+        )
+    }
+
+    try:
+        e.finalize_open_positions(incomplete_marks)
+    except ValueError as exc:
+        assert "BTCUSDT" in str(exc)
+    else:
+        raise AssertionError("finalization must reject missing marks for an open position")
+
+
 if __name__ == "__main__":
     tests = [(name, value) for name, value in sorted(globals().items())
              if name.startswith("test_") and callable(value)]

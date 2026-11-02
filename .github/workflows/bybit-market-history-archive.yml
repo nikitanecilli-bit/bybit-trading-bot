@@ -63,7 +63,7 @@ jobs:
         env:
           SYMBOLS: ${{ inputs.symbols }}
         run: |
-          python scripts/validate_funding_coverage.py --funding-dir "data/archives/bybit/${{ inputs.start_ms }}_${{ inputs.end_ms }}_${GITHUB_RUN_ID}/funding" --mark-dir "data/archives/bybit/${{ inputs.start_ms }}_${{ inputs.end_ms }}_${GITHUB_RUN_ID}/mark_price" --symbols "$SYMBOLS"
+          python scripts/validate_funding_coverage.py --funding-dir "data/archives/bybit/${{ inputs.start_ms }}_${{ inputs.end_ms }}_${GITHUB_RUN_ID}/funding" --mark-dir "data/archives/bybit/${{ inputs.start_ms }}_${{ inputs.end_ms }}_${GITHUB_RUN_ID}/mark_price" --trade-kline-dir "data/archives/bybit/${{ inputs.start_ms }}_${{ inputs.end_ms }}_${GITHUB_RUN_ID}/kline" --symbols "$SYMBOLS"
       - name: Commit verified archive
         run: |
           if [[ -n "$(git status --porcelain data/archives/bybit)" ]]; then

@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import math
 import os
 import tempfile
 import time
@@ -106,14 +105,15 @@ def parse_funding_rows(rows: Any, symbol: str) -> list[dict[str, Any]]:
 
 
 def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
-                          fetch_page: Callable[[int, int], list[dict[str, Any]]] | None = None
+                          fetch_page: Callable[[int, int], list[dict[str, Any]]] | None = None,
+                          base_url: str = DEFAULT_BASE_URL
                           ) -> list[dict[str, Any]]:
     symbol = symbol.strip().upper()
     if not symbol or start_ms <= 0 or end_ms <= start_ms:
         raise ValueError("valid symbol and start_ms < end_ms are required")
     if fetch_page is None:
         fetch_page = lambda start, end: _request_json(
-            DEFAULT_BASE_URL, FUNDING_ENDPOINT,
+            base_url, FUNDING_ENDPOINT,
             {"category": "linear", "symbol": symbol, "startTime": start,
              "endTime": end, "limit": FUNDING_LIMIT},
         ).get("list")
@@ -132,6 +132,8 @@ def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
                 raise ValueError(f"conflicting duplicate funding timestamp: {ts}")
             events[ts] = row
         window_start = window_end
+    if not events:
+        raise RuntimeError(f"Bybit returned no funding events for {symbol} in requested range")
     return [events[ts] for ts in sorted(events)]
 
 
@@ -159,7 +161,8 @@ def parse_mark_rows(rows: Any, symbol: str, interval_ms: int) -> list[dict[str, 
 
 
 def fetch_mark_klines(symbol: str, start_ms: int, end_ms: int, interval: str = "60",
-                      fetch_page: Callable[[int, int, int], list[Any]] | None = None
+                      fetch_page: Callable[[int, int, int], list[Any]] | None = None,
+                      base_url: str = DEFAULT_BASE_URL
                       ) -> list[dict[str, Any]]:
     symbol = symbol.strip().upper()
     if not symbol or interval not in INTERVALS or start_ms <= 0 or end_ms <= start_ms:
@@ -169,13 +172,13 @@ def fetch_mark_klines(symbol: str, start_ms: int, end_ms: int, interval: str = "
         raise ValueError("mark range boundaries must align to the selected interval")
     if fetch_page is None:
         fetch_page = lambda start, end, limit: _request_json(
-            DEFAULT_BASE_URL, MARK_ENDPOINT,
+            base_url, MARK_ENDPOINT,
             {"category": "linear", "symbol": symbol, "interval": interval,
              "start": start, "end": end, "limit": limit},
         ).get("list")
     candles: dict[int, dict[str, Any]] = {}
     cursor = start_ms
-    chunk_ms = MARK_LIMIT * interval_ms
+    chunk_ms = (MARK_LIMIT - 1) * interval_ms
     while cursor < end_ms:
         chunk_end = min(cursor + chunk_ms, end_ms)
         page = parse_mark_rows(fetch_page(cursor, chunk_end - 1, MARK_LIMIT), symbol, interval_ms)
@@ -222,15 +225,13 @@ def _atomic_csv(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]) -
 def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | Path,
                    interval: str = "60", base_url: str = DEFAULT_BASE_URL,
                    pause: float = 0.1) -> dict[str, Any]:
-    global DEFAULT_BASE_URL
     validate_base_url(base_url)
     if pause < 0:
         raise ValueError("pause cannot be negative")
-    DEFAULT_BASE_URL = base_url
-    funding = fetch_funding_history(symbol, start_ms, end_ms)
+    funding = fetch_funding_history(symbol, start_ms, end_ms, base_url=base_url)
     if pause:
         time.sleep(pause)
-    marks = fetch_mark_klines(symbol, start_ms, end_ms, interval)
+    marks = fetch_mark_klines(symbol, start_ms, end_ms, interval, base_url=base_url)
     root = Path(output_root)
     funding_path = root / "funding" / f"{symbol.upper()}.csv"
     mark_path = root / "mark_price" / f"{symbol.upper()}.csv"

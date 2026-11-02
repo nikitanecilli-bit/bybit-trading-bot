@@ -115,3 +115,10 @@
 - Extended the existing instrument-spec collector's request helper with an optional validated status parameter; its default behavior is unchanged.
 - Added offline tests and Research CI wiring. The capture workflow is manual-only; a push does not call Bybit.
 - Limitations: current status plus launch/delivery bounds do not prove full historical trading availability or temporary suspension history. Closed-status retention and API access must be confirmed from a real capture. Previous Bybit requests from Actions returned HTTP 403; no real snapshot is claimed. Cross-check captured records against official listing/delisting announcements before calling the universe complete.
+
+
+## Verification record
+
+- Research CI run [41540392254](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41540392254) completed SUCCESS on code/test commit `041b7eb2f26d65ff26242e56163529174de538df`; 33/33 job steps passed, including the new point-in-time universe test.
+- Existing instrument-spec workflow run [41540268697](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41540268697) attempted a public request to `https://api.bybit.com` and received HTTP 403. No data snapshot was written. Its push trigger has been removed to prevent ordinary collector-code pushes from making network requests.
+- The new universe archive workflow is manual-only. It has not been dispatched; the collector's actual Bybit response, especially `status=Closed`, remains unverified.

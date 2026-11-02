@@ -67,11 +67,16 @@ class ReconciliationCollectorTests(unittest.TestCase):
                                     base_url="https://api.bybit.kz",
                                     request_json=fake)
         endpoints = [call[0] for call in fake.calls]
-        self.assertEqual(endpoints[0], "/v5/user/query-api")
-        self.assertEqual(endpoints[1], "/v5/market/time")
-        self.assertEqual(endpoints[2:6], [
-            "/v5/position/list", "/v5/order/realtime", "/v5/order/history", "/v5/execution/list"
+        self.assertEqual(endpoints[:4], [
+            "/v5/user/query-api", "/v5/market/time",
+            "/v5/position/list", "/v5/order/realtime",
         ])
+        interval_count = len({
+            (item["interval_start_ms"], item["interval_end_ms"])
+            for item in snapshot["raw"]["order_history"]
+        })
+        self.assertEqual(endpoints.count("/v5/order/history"), interval_count)
+        self.assertEqual(endpoints.count("/v5/execution/list"), interval_count)
         self.assertEqual(endpoints[-1], "/v5/market/time")
         self.assertEqual(snapshot["status"], "CAPTURED_READ_ONLY_NOT_RECONCILED")
         self.assertEqual(snapshot["counts"]["positions"], 0)

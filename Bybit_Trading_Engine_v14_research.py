@@ -710,8 +710,13 @@ class PlanBStatePersistence:
                             len(restored), risk_mgr.kill_switch_triggered, risk_mgr.daily_stop_triggered)
             return restored, pending, seq
         except Exception as e:
-            logger.error("Ошибка загрузки состояния План Б: %s", e)
-            return {}, {}, 0
+            # A missing file is a clean cold start; an existing but unreadable
+            # backup is not. Never silently discard possibly-open exchange state.
+            logger.critical("Критическая ошибка загрузки состояния План Б; запуск запрещён: %s", e)
+            raise RuntimeError(
+                f"Не удалось безопасно восстановить состояние из {self.backup_filepath!r}; "
+                "пустое состояние не будет подставлено вместо повреждённого backup"
+            ) from e
 
 
 class CarDashboardTelegramNotifier:

@@ -197,6 +197,7 @@ def main() -> int:
         "valid_files": sum(bool(x["valid"]) for x in inventory),
         "backtest_eligible_files": sum(bool(x.get("backtest_eligible")) for x in inventory),
         "too_short_for_backtest_files": sum(bool(x["valid"]) and not bool(x.get("backtest_eligible")) for x in inventory),
+        "empty_files": sum(bool(x["valid"]) and not bool(x.get("has_data")) for x in inventory),
         "rejected_files": sum(not bool(x["valid"]) for x in inventory),
         **pair_summary,
     }

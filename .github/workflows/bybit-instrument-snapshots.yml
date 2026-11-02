@@ -1,12 +1,6 @@
 name: Archive Bybit instrument specifications
 
 on:
-  push:
-    branches:
-      - research/market-regime-v1-main
-    paths:
-      - .github/workflows/bybit-instrument-snapshots.yml
-      - scripts/snapshot_bybit_instruments.py
   schedule:
     - cron: '17 2 3,17 * *'
   workflow_dispatch:

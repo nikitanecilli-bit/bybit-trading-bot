@@ -189,10 +189,11 @@ def fetch_all_tiers(category: str = "linear",
 def build_snapshot(rows: list[dict[str, Any]], category: str,
                    fetched_at: str | None = None) -> dict[str, Any]:
     timestamp = fetched_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    validated = validate_tier_groups(rows)
-    keys = [(row["symbol"], row["id"]) for row in validated]
-    if not validated or len(keys) != len(set(keys)):
+    individually_validated = [validate_tier(row) for row in rows]
+    keys = [(row["symbol"], row["id"]) for row in individually_validated]
+    if not individually_validated or len(keys) != len(set(keys)):
         raise ValueError("snapshot requires non-empty unique symbol/risk-tier rows")
+    validated = validate_tier_groups(individually_validated)
     symbols = sorted({row["symbol"] for row in validated})
     return {
         "schema_version": 1,

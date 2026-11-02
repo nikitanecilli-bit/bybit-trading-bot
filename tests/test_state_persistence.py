@@ -289,7 +289,9 @@ class StatePersistenceTests(unittest.TestCase):
                 engine.PlanBStatePersistence(str(path)).load_state(risk)
             self.assertEqual(risk.to_dict(), before)
 
-    def _write_pending_fixture(self, path, signal):
+    def _write_pending_fixture(self, path, signal, add_signal_ts=True):
+        if isinstance(signal, dict) and add_signal_ts:
+            signal = {"signal_ts": 1_800_000_000_000, **signal}
         path.write_text(json.dumps({
             "saved_at_utc": "2026-11-02T00:00:00+00:00", "bot_version": "test", "risk": sample_risk_data(), "open_positions": {},
             "pending_orders": {"BTCUSDT": signal}, "trade_seq": 0,
@@ -315,6 +317,81 @@ class StatePersistenceTests(unittest.TestCase):
             risk = engine.AdaptiveRiskManager(engine.BotConfig())
             with self.assertRaisesRegex(RuntimeError, "Не удалось безопасно восстановить"):
                 engine.PlanBStatePersistence(str(path)).load_state(risk)
+
+    def test_pending_signal_timestamp_must_be_positive_integer(self):
+        for bad_ts in (None, 0, -1, True, "1800000000000"):
+            with self.subTest(signal_ts=bad_ts), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "pending-ts.json"
+                self._write_pending_fixture(path, {
+                    "symbol": "BTCUSDT", "direction": "long",
+                    "strategy": "test", "entry_price": 100, "stop_dist": 2,
+                    "order_type": "market", "signal_ts": bad_ts,
+                })
+                with self.assertRaises(RuntimeError):
+                    engine.PlanBStatePersistence(str(path)).load_state(
+                        engine.AdaptiveRiskManager(engine.BotConfig())
+                    )
+
+    def test_pending_unknown_field_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "pending-unknown.json"
+            self._write_pending_fixture(path, {
+                "symbol": "BTCUSDT", "direction": "long", "strategy": "test",
+                "entry_price": 100, "stop_dist": 2, "order_type": "market",
+                "future_field": 1,
+            })
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(
+                    engine.AdaptiveRiskManager(engine.BotConfig())
+                )
+
+    def test_pending_signal_timestamp_is_required(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "pending-no-ts.json"
+            self._write_pending_fixture(path, {
+                "symbol": "BTCUSDT", "direction": "long", "strategy": "test",
+                "entry_price": 100, "stop_dist": 2, "order_type": "market",
+            }, add_signal_ts=False)
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(
+                    engine.AdaptiveRiskManager(engine.BotConfig())
+                )
+
+    def test_stale_pending_signal_is_discarded_instead_of_filled(self):
+        bot = engine.UnifiedQuantEngine(persist_state=False)
+        bot.cfg.timeframe = "1h"
+        signal_ts = 1_800_000_000_000
+        bot.pending["BTCUSDT"] = {
+            "symbol": "BTCUSDT", "direction": "long", "strategy": "test",
+            "signal_ts": signal_ts, "entry_price": 100.0, "stop_dist": 5.0,
+            "order_type": "market",
+        }
+        stale_candle = engine.Candle(
+            ts=signal_ts + 2 * 3_600_000, open=100.0, high=101.0,
+            low=99.0, close=100.0, volume=10.0,
+        )
+        self.assertFalse(bot._try_fill_pending("BTCUSDT", stale_candle))
+        self.assertNotIn("BTCUSDT", bot.pending)
+        self.assertNotIn("BTCUSDT", bot.open_positions)
+
+    def test_pending_signal_fills_only_on_immediately_next_bar(self):
+        bot = engine.UnifiedQuantEngine(persist_state=False)
+        bot.cfg.timeframe = "1h"
+        signal_ts = 1_800_000_000_000
+        bot.pending["BTCUSDT"] = {
+            "symbol": "BTCUSDT", "direction": "long", "strategy": "test",
+            "signal_ts": signal_ts, "entry_price": 100.0, "stop_dist": 5.0,
+            "order_type": "market",
+        }
+        next_candle = engine.Candle(
+            ts=signal_ts + 3_600_000, open=100.0, high=101.0,
+            low=99.0, close=100.0, volume=10.0,
+        )
+        with patch.object(bot.risk_mgr, "can_open_new_trade", return_value=(True, "ok")), \\
+             patch.object(bot.risk_mgr, "calculate_position_size", return_value=(1_000.0, 50.0)):
+            self.assertTrue(bot._try_fill_pending("BTCUSDT", next_candle))
+        self.assertNotIn("BTCUSDT", bot.pending)
+        self.assertIn("BTCUSDT", bot.open_positions)
 
     def test_pending_invalid_direction_and_numeric_values_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

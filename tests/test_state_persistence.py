@@ -97,6 +97,33 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertEqual(fsync_mock.call_count, 2 if os.name == "posix" else 1)
             self.assertTrue(path.exists())
 
+    @unittest.skipUnless(os.name == "posix", "parent-directory fsync is POSIX-only")
+    def test_parent_directory_fsync_failure_raises_after_atomic_replace(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            writer = engine.PlanBStatePersistence(str(path), enabled=True)
+            real_fsync = os.fsync
+            calls = {"count": 0}
+
+            def fail_directory_fsync(fd):
+                calls["count"] += 1
+                if calls["count"] == 1:
+                    return real_fsync(fd)
+                raise OSError("simulated directory fsync failure")
+
+            with patch("os.fsync", side_effect=fail_directory_fsync):
+                with self.assertRaisesRegex(RuntimeError, "Не удалось сохранить"):
+                    writer.save_state(
+                        engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
+                        {}, {}, 0,
+                    )
+            # Rename already happened before directory fsync failed; caller must
+            # still stop because durability of the directory entry was not confirmed.
+            self.assertTrue(path.exists())
+            json.loads(path.read_text(encoding="utf-8"))
+            self.assertFalse(Path(str(path) + ".tmp").exists())
+            self.assertEqual(calls["count"], 2)
+
     def test_file_fsync_failure_preserves_previous_backup_and_cleans_temp(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "state.json"

@@ -387,8 +387,10 @@ class StatePersistenceTests(unittest.TestCase):
             ts=signal_ts + 3_600_000, open=100.0, high=101.0,
             low=99.0, close=100.0, volume=10.0,
         )
-        with patch.object(bot.risk_mgr, "can_open_new_trade", return_value=(True, "ok")), \\
-             patch.object(bot.risk_mgr, "calculate_position_size", return_value=(1_000.0, 50.0)):
+        with (
+            patch.object(bot.risk_mgr, "can_open_new_trade", return_value=(True, "ok")),
+            patch.object(bot.risk_mgr, "calculate_position_size", return_value=(1_000.0, 50.0)),
+        ):
             self.assertTrue(bot._try_fill_pending("BTCUSDT", next_candle))
         self.assertNotIn("BTCUSDT", bot.pending)
         self.assertIn("BTCUSDT", bot.open_positions)

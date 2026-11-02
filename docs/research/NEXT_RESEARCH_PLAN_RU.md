@@ -291,3 +291,6 @@ No production/live changes and no market backtests were performed in these corre
 
 - **ENG-STATE-016 accepted:** restored position entry, TP1 and pending signal timestamps cannot be later than the backup's own UTC save timestamp. Persistence tests 51/51; CI #41447112303 passed.
 - This is internal chronology only. Still define a conservative maximum backup age and reconcile against Bybit before any restart can be considered safe.
+
+
+- **ENG-STATE-017 accepted:** enabled backup writes now flush/fsync the temp file before atomic replace and fsync the parent directory on POSIX. Persistence tests 53/53; CI #41447569454 passed. This improves crash durability but is not an absolute hardware guarantee.

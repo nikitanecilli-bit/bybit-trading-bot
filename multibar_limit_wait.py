@@ -5,6 +5,8 @@ It only decides whether an OHLC candle penetrated a configured limit threshold.
 """
 from __future__ import annotations
 
+import math
+
 
 def evaluate_limit_wait(
     direction: str,
@@ -22,7 +24,7 @@ def evaluate_limit_wait(
     values = (low, high, limit_price, penetration_bps)
     if any(not isinstance(value, (int, float)) for value in values):
         raise TypeError("OHLC and limit parameters must be numeric")
-    if not all(__import__("math").isfinite(float(value)) for value in values):
+    if not all(math.isfinite(float(value)) for value in values):
         raise ValueError("OHLC and limit parameters must be finite")
     if low <= 0 or high <= 0 or limit_price <= 0 or low > high:
         raise ValueError("invalid OHLC/limit price range")

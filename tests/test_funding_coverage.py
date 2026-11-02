@@ -16,8 +16,10 @@ class FundingCoverageTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.funding = self.root / "funding"
         self.marks = self.root / "marks"
+        self.trades = self.root / "trades"
         self.funding.mkdir()
         self.marks.mkdir()
+        self.trades.mkdir()
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -35,6 +37,29 @@ class FundingCoverageTests(unittest.TestCase):
             "".join(f"BTCUSDT,{ts},{price}\n" for ts, price in rows),
             encoding="utf-8",
         )
+
+    def write_trades(self, rows):
+        (self.trades / "BTCUSDT.csv").write_text(
+            "symbol,timestamp_ms,open,high,low,close,volume,turnover\\n" +
+            "".join(f"BTCUSDT,{ts},100,102,99,101,10,1010\\n" for ts in rows),
+            encoding="utf-8",
+        )
+
+    def test_trade_ohlcv_and_mark_timestamp_grids_must_match(self):
+        self.write_funding([(1000, "0.001")])
+        self.write_marks([(1000, 100), (2000, 101)])
+        self.write_trades([1000, 2000])
+        report = validate_coverage(self.funding, self.marks, trade_kline_dir=self.trades)
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["results"][0]["trade_candles"], 2)
+
+    def test_trade_ohlcv_missing_timestamp_fails_preflight(self):
+        self.write_funding([(1000, "0.001")])
+        self.write_marks([(1000, 100), (2000, 101)])
+        self.write_trades([1000])
+        report = validate_coverage(self.funding, self.marks, trade_kline_dir=self.trades)
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["results"][0]["trade_mark_timestamp_mismatch"], 1)
 
     def test_full_timestamp_coverage_passes(self):
         self.write_funding([(1000, "0.001"), (2000, "-0.002")])

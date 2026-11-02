@@ -749,7 +749,7 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 
 - Добавлен scripts/archive_bybit_market_history.py для GET /v5/market/funding/history и GET /v5/market/mark-price-kline (linear).
 - Funding выгружается короткими непересекающимися окнами с обязательными startTime + endTime; насыщение лимита 200 строк приводит к ошибке, а не к тихо неполному архиву. Mark klines запрашиваются окнами до 899 H1-свечей, сортируются по времени и сверяются с полной ожидаемой часовой сеткой; любой пропуск останавливает сбор.
-- Сборщик проверяет числовые значения, OHLC-инварианты, символ, временные границы, запрещает редиректы и неофициальные API-хосты, ограничивает имена символов безопасным ASCII-форматом, пишет CSV атомарно и выдерживает паузу между окнами.
+- Сборщик проверяет числовые значения, OHLC-инварианты, символ, временные границы, запрещает редиректы и неофициальные API-хосты, ограничивает имена символов безопасным ASCII-форматом, пишет CSV атомарно, выдерживает паузу между окнами и отбрасывает текущую незакрытую H1-свечу.
 - Формат funding CSV совместим с scripts/validate_funding_coverage.py; после загрузки workflow требует точного совпадения каждого funding settlement timestamp с open timestamp mark-price H1 candle.
 - Добавлен manual workflow .github/workflows/bybit-market-history-archive.yml. Каждый запуск сохраняет отдельную папку с start_ms, end_ms, GitHub run id, чтобы повторная выгрузка не затирала предыдущий архив. После preflight архив коммитится только в research branch.
 - 11/11 новых offline tests прошли в CI #41518707514 (SUCCESS). Последующий кодовый commit 83af4e662e1f66a28a8dce5e064fbedb54347c0c прошёл тестовые шаги полного CI #41518737084 без ошибок; завершение runner cleanup проверялось отдельно.

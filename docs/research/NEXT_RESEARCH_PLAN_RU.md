@@ -433,3 +433,13 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Скрипт и его multi-bar выводы запрещены к повторному использованию до отдельного исправления и регрессий для fill на 1/2/3-й свече, expiry, long/short, gap/taker и risk budget.
 - Аудит: `docs/audits/H1_LIMIT_WAIT_SCRIPT_AUDIT_2026-11-03.md`. Матрица покрытия обновлена. Связь с E01–E13 не установлена; не аннулировать их без provenance.
 - Следующая работа: продолжить независимый аудит метрик и портфельной бухгалтерии; не запускать рыночные прогоны до закрытия технического аудита. Базовый движок и торговая логика не менялись.
+
+
+## Дополнение 2026-11-03 — аудит Net R / MAE-MFE / portfolio MTM
+
+- Статически проверены `TradeRecord`, `_close_position`, `_manage_position`, `_apply_tp1`, `_unrealized_pnl_at_marks`, `AdaptiveRiskManager`, `MaintenanceGateAuditor` и regression test inventory.
+- Подтверждённого дефекта, завышающего закрытый net PnL или Net R, не найдено. TP1 partial gross, per-leg costs, funding, realized/unrealized equity и chronology drawdown имеют отдельные regression tests.
+- Обнаружена консервативная асимметрия: MTM всегда резервирует taker fee + taker slippage для оставшейся позиции, тогда как финальный TP close может быть maker. При maker TP это занижает открытое MTM equity на 0.0575% оставшегося notional при текущих ставках и может преждевременно активировать daily stop/kill switch. Это не завышение прибыли и не подтверждённый дефект закрытого PnL.
+- Аудит: `docs/audits/PORTFOLIO_ACCOUNTING_NET_R_MAE_MFE_AUDIT_2026-11-03.md`; матрица покрытия обновлена.
+- Следующий шаг: отдельные deterministic threshold-boundary tests для MTM cost asymmetry; затем продолжить margin/liquidation, dataset alignment и execution realism. Не менять текущую консервативную модель и не запускать рыночные бэктесты без тестов/CI.
+- Полный CI #41520724088 — последнее ранее подтверждённое успешное выполнение; новый CI в этой сессии не dispatch-ился и не заявляется.

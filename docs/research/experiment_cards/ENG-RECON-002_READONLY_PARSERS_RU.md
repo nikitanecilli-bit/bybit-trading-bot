@@ -31,7 +31,7 @@ No HTTP client, credentials, private API call, order mutation or engine restore 
 
 - Parser commits: `fa97a4810e14d5d7590c5c4794ba2f98856127da`, `b035edbff03a11299b74c3e44eea4fcb027c5bd8`.
 - Workflow/test integration commits: `95e5afb46a2869957e90742560f95d21089ddad5`, `9fdaa02d764495a59747f0930e89fa677d03b890`.
-- [Research engine checks #41448536690](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41448536690): SUCCESS; parser tests 12/12, persistence tests 54/54, compile, configured deterministic suites and secret scan passed.
+- Initial parser CI: #41448536690 passed (12/12). Subsequent parser hardening added strict cross-interval execution deduplication and a 1,000-page cap. Latest parser CI: [#41468736376](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468736376), SUCCESS; 16/16 parser tests and full configured workflow passed.
 
 ## Ограничения
 

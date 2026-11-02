@@ -47,6 +47,8 @@ from datetime import datetime, timezone
 from typing import List, Dict, Optional, Tuple, Any
 
 from funding_accounting import accrued_funding_cost
+from instrument_spec_history import InstrumentSpecHistory
+from exchange_order_sizing import size_to_exchange_constraints
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1191,10 +1193,19 @@ class UnifiedQuantEngine:
         state_path: str = "bot_state_backup.json",
         funding_dir: Optional[str] = None,
         mark_price_dir: Optional[str] = None,
+        instrument_specs_dir: Optional[str] = None,
+        max_instrument_spec_age_ms: Optional[int] = 30 * 24 * 60 * 60 * 1000,
     ):
         self._explicit_config = config_path
         self.funding_dir = funding_dir
         self.mark_price_dir = mark_price_dir
+        self.instrument_spec_history = (
+            InstrumentSpecHistory.from_directory(instrument_specs_dir)
+            if instrument_specs_dir else None
+        )
+        if max_instrument_spec_age_ms is not None and max_instrument_spec_age_ms < 0:
+            raise ValueError("max_instrument_spec_age_ms cannot be negative")
+        self.max_instrument_spec_age_ms = max_instrument_spec_age_ms
         if bool(funding_dir) != bool(mark_price_dir):
             raise ValueError("--funding-dir and --mark-price-dir must be provided together")
         self.funding_by_symbol: Dict[str, List[Dict[str, Any]]] = {}
@@ -1574,6 +1585,31 @@ class UnifiedQuantEngine:
         if size_usdt <= 0 or risk_usdt <= 0:
             self._persist()
             return False
+
+        # Optional strict execution path. When a dated Bybit snapshot directory
+        # is supplied, missing/stale symbols, leverage mismatches and exchange
+        # lot constraints reject the entry; there is deliberately no proxy fallback.
+        if self.instrument_spec_history is not None:
+            try:
+                instrument_spec = self.instrument_spec_history.get_spec(
+                    symbol, curr.ts, max_age_ms=self.max_instrument_spec_age_ms,
+                )
+                instrument_spec.validate_leverage(Decimal(str(self.cfg.leverage_val)))
+                exchange_order = size_to_exchange_constraints(
+                    instrument_spec, size_usdt, fill, risk_usdt,
+                    order_type=effective_order_type,
+                    side="buy" if is_long else "sell",
+                    price_is_execution=True,
+                )
+            except ValueError as exc:
+                logger.warning(
+                    "Reject entry %s: dated Bybit execution constraints unavailable: %s",
+                    symbol, exc,
+                )
+                self._persist()
+                return False
+            size_usdt = float(exchange_order.notional_usdt)
+            risk_usdt = float(exchange_order.risk_usdt)
 
         self.trade_seq += 1
         self.open_positions[symbol] = OpenPositionState(

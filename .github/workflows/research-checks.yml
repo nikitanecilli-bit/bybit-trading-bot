@@ -10,6 +10,9 @@ on:
       - 'bybit_instrument_specs.py'
       - 'instrument_spec_history.py'
       - 'exchange_order_sizing.py'
+      - 'bybit_instrument_specs.py'
+      - 'instrument_spec_history.py'
+      - 'exchange_order_sizing.py'
       - 'funding_accounting.py'
       - 'bybit_reconciliation.py'
       - 'scripts/bybit_reconciliation_snapshot.py'
@@ -58,6 +61,8 @@ jobs:
         run: python tests/test_instrument_spec_history.py
       - name: Test exchange-valid quantity sizing
         run: python tests/test_exchange_order_sizing.py
+      - name: Test portfolio engine exchange sizing integration
+        run: python tests/test_portfolio_accounting.py
       - name: Test cumulative funding accounting boundaries
         run: python tests/test_funding_accounting.py
       - name: Test v14 realized funding accounting

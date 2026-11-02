@@ -229,3 +229,18 @@ Static call-site mapping for the next implementation (not yet coded):
 Required tests before market PnL sweeps: arbitrary qtyStep (including odd step counts), minQty/minNotional boundary, market-vs-limit max caps, long/short entry sizing after qty rounding, TP1 split valid/invalid, TP1+final quantity conservation, gap exit, mark-to-market, funding at entry/TP1/close boundary, save/restore schema migration, and portfolio multi-symbol order invariance.
 
 Current blocker: no committed dated Bybit instrument/risk-limit snapshots; both snapshot workflows fail HTTP 403 on the configured default host. Therefore this section is a design checklist only; do not substitute invented instrument specs or risk tiers.
+
+
+## 16. Optional strict integration into research engine
+
+The research engine now accepts `instrument_specs_dir` and loads `InstrumentSpecHistory` only when this explicit argument is supplied. In that mode, each entry:
+1. selects the newest complete linear snapshot at or before the entry candle timestamp, with a default maximum age of 30 days;
+2. rejects missing/stale symbols and non-Trading instruments;
+3. validates configured leverage against dated min/max/step;
+4. converts the risk-sized notional to Decimal quantity, floors to qtyStep, and applies the correct market/limit maximum, minOrderQty and minNotionalValue;
+5. uses the actual modeled fill price (not a newly rounded quote) and still enforces tick alignment for limit fills;
+6. reduces stored position notional and risk in proportion to the floored quantity, so downstream linear PnL/funding calculations derive the same contract quantity from notional / entry price.
+
+There is intentionally no silent fallback: if the directory is supplied but the dated spec is absent, stale, non-trading, leverage-invalid, or violates exchange constraints, the entry is rejected. If no directory is supplied, legacy notional-proxy mode remains for backwards-compatible research and is explicitly **not contract-accurate**.
+
+The H1 runner has not yet been switched to strict mode because the repository currently contains no archived `data/instrument_specs/linear/*.json` snapshots and the Bybit snapshot workflow has repeatedly received HTTP 403. Therefore no existing H1 PnL or experiment result is retroactively upgraded by this integration. Synthetic regression tests exercise the strict path; an actual market replay remains blocked on dated official snapshots.

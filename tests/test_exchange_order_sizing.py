@@ -47,6 +47,28 @@ class ExchangeSizingTests(unittest.TestCase):
         self.assertLessEqual(order.notional_usdt, Decimal("1000"))
         self.assertLessEqual(order.risk_usdt, Decimal("10"))
 
+    def test_execution_price_is_not_rounded_to_a_different_limit_quote(self):
+        order = size_to_exchange_constraints(
+            self.spec, "1000", "100.05", "10",
+            order_type="limit", side="buy", price_is_execution=True,
+        )
+        self.assertEqual(order.price, Decimal("100.05"))
+        self.assertEqual(order.qty, Decimal("9.995"))
+
+    def test_execution_limit_price_must_still_align_to_tick(self):
+        with self.assertRaisesRegex(ValueError, "aligned to tickSize"):
+            size_to_exchange_constraints(
+                self.spec, "1000", "100.03", "10",
+                order_type="limit", side="buy", price_is_execution=True,
+            )
+
+    def test_leverage_filter_is_enforced(self):
+        self.assertEqual(self.spec.validate_leverage("5"), Decimal("5"))
+        with self.assertRaisesRegex(ValueError, "outside exchange"):
+            self.spec.validate_leverage("60")
+        with self.assertRaisesRegex(ValueError, "leverageStep"):
+            self.spec.validate_leverage("5.001")
+
     def test_sell_limit_rounds_up_without_exceeding_notional_budget(self):
         order = size_to_exchange_constraints(
             self.spec, "1000", "100.051", "10",

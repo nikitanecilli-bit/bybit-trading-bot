@@ -119,6 +119,17 @@ class InstrumentSpec:
             leverage_step=lev_step,
         )
 
+    def validate_leverage(self, leverage: Any) -> Decimal:
+        """Validate configured leverage against the dated exchange leverage filter."""
+        value = _positive(leverage, "leverage")
+        if self.min_leverage is None or self.max_leverage is None or self.leverage_step is None:
+            raise ValueError("leverageFilter min/max/step is missing; cannot validate leverage")
+        if value < self.min_leverage or value > self.max_leverage:
+            raise ValueError("configured leverage is outside exchange min/max leverage")
+        if value % self.leverage_step != 0:
+            raise ValueError("configured leverage is not aligned to leverageStep")
+        return value
+
     def round_price(self, price: Any, *, side: str) -> Decimal:
         """Round a buy limit down and a sell limit up, never making it more aggressive."""
         value = _positive(price, "price")

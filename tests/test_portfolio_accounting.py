@@ -37,6 +37,8 @@ def make_engine():
     e.pending = {}
     e.trade_seq = 0
     e._bar_entry_risk_budgets = {}
+    e.instrument_spec_history = None
+    e.max_instrument_spec_age_ms = 30 * 24 * 60 * 60 * 1000
     e._last_mark_prices = {}
     e._intrabar_risk_marks = {}
     e.closed_trades = []
@@ -308,6 +310,71 @@ def test_simultaneous_entries_share_risk_budget_independent_of_symbol_order():
     assert first_risk <= 200.0
     assert reverse_risk <= 200.0
     assert abs(first_risk - reverse_risk) < 0.01
+
+
+def test_engine_applies_dated_bybit_qty_step_and_minimums_when_spec_history_enabled():
+    from bybit_instrument_specs import InstrumentSpec
+
+    instrument = {
+        "symbol": "BTCUSDT", "category": "linear", "status": "Trading",
+        "priceFilter": {"minPrice": "0.05", "maxPrice": "1000000", "tickSize": "0.05"},
+        "lotSizeFilter": {
+            "qtyStep": "0.1", "minOrderQty": "0.1",
+            "maxOrderQty": "1000", "maxMktOrderQty": "800",
+            "minNotionalValue": "5",
+        },
+        "leverageFilter": {
+            "minLeverage": "1", "maxLeverage": "50", "leverageStep": "0.01",
+        },
+    }
+    spec = InstrumentSpec.from_snapshot({"instrument": instrument})
+
+    class History:
+        def get_spec(self, symbol, as_of_ts, *, max_age_ms):
+            assert symbol == "BTCUSDT"
+            assert as_of_ts == 1_800_000_000_000
+            assert max_age_ms is not None
+            return spec
+
+    e = make_engine()
+    e.instrument_spec_history = History()
+    e.pending["BTCUSDT"] = {
+        "direction": "long", "entry_price": 100.0, "order_type": "market",
+        "strategy": "exchange-sizing-test", "stop_dist": 5.0,
+        "signal_ts": 1_799_996_400_000,
+    }
+    bar = engine_mod.Candle(
+        ts=1_800_000_000_000, open=100.0, high=101.0,
+        low=99.0, close=100.5, volume=10.0,
+    )
+    e._prepare_pending_entry_risk_budgets()
+    assert e._try_fill_pending("BTCUSDT", bar)
+    position = e.open_positions["BTCUSDT"]
+    quantity = position.size_usdt / position.entry_price
+    assert abs(quantity / 0.1 - round(quantity / 0.1)) < 1e-8
+    assert position.size_usdt >= 5.0
+    assert position.risk_usdt <= 100.0
+
+
+def test_engine_fails_closed_when_dated_instrument_spec_is_missing():
+    class MissingHistory:
+        def get_spec(self, symbol, as_of_ts, *, max_age_ms):
+            raise ValueError("no dated snapshot for symbol")
+
+    e = make_engine()
+    e.instrument_spec_history = MissingHistory()
+    e.pending["BTCUSDT"] = {
+        "direction": "long", "entry_price": 100.0, "order_type": "market",
+        "strategy": "exchange-sizing-test", "stop_dist": 5.0,
+        "signal_ts": 1_799_996_400_000,
+    }
+    bar = engine_mod.Candle(
+        ts=1_800_000_000_000, open=100.0, high=101.0,
+        low=99.0, close=100.5, volume=10.0,
+    )
+    e._prepare_pending_entry_risk_budgets()
+    assert not e._try_fill_pending("BTCUSDT", bar)
+    assert "BTCUSDT" not in e.open_positions
 
 
 def test_position_slot_priority_uses_signal_strength_not_iteration_order():

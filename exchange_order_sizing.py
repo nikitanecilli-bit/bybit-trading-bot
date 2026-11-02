@@ -27,6 +27,7 @@ def size_to_exchange_constraints(
     *,
     order_type: Literal["market", "limit"],
     side: Literal["buy", "sell"],
+    price_is_execution: bool = False,
 ) -> ExchangeSizedOrder:
     """Floor quantity to qtyStep and reject all min/max exchange constraints.
 
@@ -49,7 +50,14 @@ def size_to_exchange_constraints(
     if side not in {"buy", "sell"}:
         raise ValueError("side must be buy or sell")
 
-    price = spec.round_price(ref, side=side) if order_type == "limit" else ref
+    # A simulated/observed fill price is already the execution price; do not
+    # round it to a different quote. validate_order still enforces tick alignment
+    # for limit fills and the correct order-type quantity cap.
+    price = (
+        ref if price_is_execution
+        else spec.round_price(ref, side=side) if order_type == "limit"
+        else ref
+    )
     raw_qty = target / price
     qty = spec.validate_order(raw_qty, price, order_type=order_type)
     notional = qty * price

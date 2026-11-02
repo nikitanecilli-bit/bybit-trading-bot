@@ -706,10 +706,26 @@ class PlanBStatePersistence:
                 data = json.load(f)
             if not isinstance(data, dict):
                 raise ValueError("корень backup должен быть JSON-объектом")
-            required_envelope = {"risk", "open_positions", "pending_orders", "trade_seq"}
+            required_envelope = {
+                "saved_at_utc", "bot_version", "risk", "open_positions",
+                "pending_orders", "trade_seq",
+            }
             missing_envelope = required_envelope.difference(data)
             if missing_envelope:
                 raise ValueError(f"backup неполный: отсутствуют поля {sorted(missing_envelope)}")
+            saved_at = data["saved_at_utc"]
+            if not isinstance(saved_at, str) or not saved_at:
+                raise ValueError("saved_at_utc должен быть непустой ISO-8601 строкой")
+            try:
+                parsed_saved_at = datetime.fromisoformat(saved_at.replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise ValueError("saved_at_utc должен быть корректной ISO-8601 датой") from exc
+            if parsed_saved_at.tzinfo is None or parsed_saved_at.utcoffset() is None:
+                raise ValueError("saved_at_utc должен содержать явный UTC offset")
+            if parsed_saved_at.utcoffset().total_seconds() != 0:
+                raise ValueError("saved_at_utc должен быть указан в UTC")
+            if not isinstance(data["bot_version"], str) or not data["bot_version"].strip():
+                raise ValueError("bot_version должен быть непустой строкой")
             risk_data = data["risk"]
             positions_data = data["open_positions"]
             pending = data["pending_orders"]

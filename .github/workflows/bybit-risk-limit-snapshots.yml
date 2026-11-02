@@ -27,7 +27,7 @@ jobs:
       - name: Download dated linear risk-limit tiers
         run: |
           SUCCESS=0
-          for BASE_URL in https://api.bybit.com https://api.bytick.com https://api.bybit.kz https://api.bybit.nl https://api.bybit.ae https://api.bybit-tr.com; do
+          for BASE_URL in https://api.bybit.com https://api.bytick.com https://api.bybit.kz https://api.bybit.tr https://api.bybitgeorgia.ge https://api.bybit.ae https://api.bybit.id; do
             echo "Trying official Bybit public API endpoint: $BASE_URL"
             if python scripts/snapshot_bybit_risk_limits.py --category linear --base-url "$BASE_URL"; then
               SUCCESS=1

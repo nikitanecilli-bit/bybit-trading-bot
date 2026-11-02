@@ -680,3 +680,5 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Исправление: `_persist()` передаёт цены последней отметки; `save_state()` валидирует и сохраняет конечные положительные цены для каждого open position; `load_state()` требует точное покрытие символов и восстанавливает карту в engine. Старые backups с открытыми позициями без last marks отклоняются fail-closed.
 - Full Research CI [#41509504557](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509504557), SUCCESS; 58 state-persistence tests. Проверены restore mark/equity, отсутствие mark и invalid values (zero/negative/NaN/Inf/bool).
 - Ограничение: last mark — сохранённый recovery snapshot, а не свежая биржевая цена; он не заменяет exchange reconciliation и не гарантирует актуальность после длительного downtime. Live trading не запускался.
+
+- Дополнительный engine-path тест подтвердил, что `_persist()` реально передаёт last marks в backup и новая persistence instance их восстанавливает. Full Research CI [#41509795468](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41509795468), SUCCESS; state-persistence suite 59 tests.

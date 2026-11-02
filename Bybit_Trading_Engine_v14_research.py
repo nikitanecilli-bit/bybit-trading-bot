@@ -1306,6 +1306,11 @@ class UnifiedQuantEngine:
 
     def _update_mark_to_market(self, ts_ms: int) -> None:
         alerts = self.risk_mgr.mark_to_market(self._unrealized_pnl_at_marks(ts_ms), ts_ms)
+        # Protective latches must survive a process restart even when this MTM
+        # update does not close the currently stepped symbol. Persist only on the
+        # false->true transition, not on every candle.
+        if alerts.get("kill_switch_hit") or alerts.get("daily_stop_hit"):
+            self._persist()
         if alerts.get("kill_switch_hit"):
             self.tg.send_message(
                 f"🚨 KILL-SWITCH [{self.cfg.bot_version}]: mark-to-market drawdown достиг лимита "

@@ -81,11 +81,14 @@ class ReportOnlyComparatorTests(unittest.TestCase):
             "symbol": "BTCUSDT", "positionIdx": 0, "side": "Buy",
             "size": "0.1", "avgPrice": "50000",
             "updatedTime": CAPTURE_MS, "positionStatus": "Normal",
+            "takeProfit": "70000", "stopLoss": "62000",
+            "trailingStop": "0", "tpslMode": "Full",
         }
         local = backup({"BTCUSDT": {"symbol": "BTCUSDT", "direction": "long"}})
         report = build_report(local, snapshot(position_rows=[exchange_position]))
         self.assertEqual(report["exchange"]["position_count"], 1)
         self.assertEqual(report["exchange"]["positions"][0]["qty"], "0.1")
+        self.assertEqual(report["exchange"]["positions"][0]["protection_status"], "EXCHANGE_STOP_CONFIGURED")
         self.assertFalse(report["reconciliation_pass"])
         self.assertIn("BTCUSDT", report["diagnostics"]["local_symbols"])
 
@@ -98,6 +101,28 @@ class ReportOnlyComparatorTests(unittest.TestCase):
         local = backup({"BTCUSDT": {"symbol": "BTCUSDT", "direction": "long"}})
         report = build_report(local, snapshot(position_rows=[exchange_position]))
         self.assertEqual(report["diagnostics"]["direction_conflicts"], ["BTCUSDT"])
+
+    def test_missing_exchange_stop_is_reported(self):
+        exchange_position = {
+            "symbol": "ETHUSDT", "positionIdx": 0, "side": "Buy",
+            "size": "1", "avgPrice": "2500",
+            "updatedTime": CAPTURE_MS, "positionStatus": "Normal",
+            "takeProfit": "2600", "stopLoss": "0", "trailingStop": "0",
+            "tpslMode": "Full",
+        }
+        report = build_report(backup(), snapshot(position_rows=[exchange_position]))
+        self.assertEqual(report["exchange"]["positions"][0]["protection_status"], "NO_EXCHANGE_STOP")
+        self.assertTrue(any("neither stopLoss nor trailingStop" in reason
+                            for reason in report["block_reasons"]))
+
+    def test_missing_stop_fields_are_reported_as_unknown(self):
+        exchange_position = {
+            "symbol": "ETHUSDT", "positionIdx": 0, "side": "Buy",
+            "size": "1", "avgPrice": "2500",
+            "updatedTime": CAPTURE_MS, "positionStatus": "Normal",
+        }
+        report = build_report(backup(), snapshot(position_rows=[exchange_position]))
+        self.assertEqual(report["exchange"]["positions"][0]["protection_status"], "UNKNOWN_FIELDS_MISSING")
 
     def test_active_order_blocks_and_is_not_matched_to_pending_signal(self):
         order = {

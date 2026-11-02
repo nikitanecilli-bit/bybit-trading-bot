@@ -263,6 +263,21 @@ def parse_active_order_pages(
     return tuple(sorted(parsed, key=lambda item: item.order_id))
 
 
+def deduplicate_executions(
+    executions: Iterable[ExecutionSnapshot],
+) -> tuple[ExecutionSnapshot, ...]:
+    """Deduplicate boundary overlap by execId; reject conflicting duplicate identities."""
+    by_id: dict[str, ExecutionSnapshot] = {}
+    for item in executions:
+        previous = by_id.get(item.exec_id)
+        if previous is not None and previous != item:
+            raise SnapshotValidationError(
+                f"conflicting duplicate execution identity: {item.exec_id}"
+            )
+        by_id[item.exec_id] = item
+    return tuple(by_id[key] for key in sorted(by_id))
+
+
 def parse_execution_pages(
     pages: Iterable[tuple[str, Mapping[str, Any]]],
 ) -> tuple[ExecutionSnapshot, ...]:

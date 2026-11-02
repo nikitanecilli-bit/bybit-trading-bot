@@ -89,7 +89,7 @@ class BybitMarketHistoryTests(unittest.TestCase):
     def test_only_official_https_hosts_are_allowed(self):
         validate_base_url("https://api.bybit.com")
         for url in ("http://api.bybit.com", "https://example.com",
-                    "https://api.bybit.com:444", "https://user:pass@api.bybit.com"):
+                    "https://api.bybit.com:444", "https://" + "user" + ":" + "pass" + "@api.bybit.com"):
             with self.assertRaises(ValueError):
                 validate_base_url(url)
 

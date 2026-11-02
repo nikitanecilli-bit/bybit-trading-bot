@@ -354,3 +354,11 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Live regional endpoint workflow [#41468304134](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41468304134) returned HTTP 403. No dated snapshot was created; this is blocked access, not an empty instrument universe.
 - Snapshot workflow is weekly/manual, not triggered by every code push. Do not substitute guessed instrument specs.
 - Execution-aware sizing remains blocked until a real dated Bybit snapshot is archived and provenance/age validated.
+
+
+## ENG-SEC-001 — private API preflight hardening
+
+- Hardened `scripts/bybit_private_api_check.py`: official HTTPS host allowlist, no redirects, strict integer `retCode` and `readOnly`, suppressed response bodies.
+- 10 mocked tests and secret scan passed in [Actions #41469608200](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41469608200).
+- No real key or private API request was used. The manual workflow remains the only step that can verify an actual key's Bybit-reported read-only status.
+- Continue full repository/branch audit for any order mutation endpoints before considering live execution; no live order or deployment.

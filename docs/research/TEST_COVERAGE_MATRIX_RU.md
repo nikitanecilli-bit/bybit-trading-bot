@@ -8,7 +8,7 @@
 | Live execution / безопасность | PARTIAL | README утверждает, что v14 research engine не отправляет ордера | Проверить весь репозиторий/ветки на API order endpoints |
 | Свечи и временные метки | PARTIAL / P1 | Есть `test_time_model.py`; обнаружено, что CSV равномерность проверяет, но интервал не сравнивает с `cfg.timeframe` | Добавить тесты mismatch и уточнить open/close timestamp semantics |
 | Look-ahead | PARTIAL | Основной signal core использует только предыдущие бары для Donchian/ATR; полный аудит scripts/features/folds не завершён | Статический аудит всех сигналов/фич/выходов и fold construction |
-| Stop/TP внутри свечи | NOT_TESTED | Есть общие тесты времени и гэпов | Проверить collision и OHLC path assumptions |
+| Stop/TP внутри свечи | PARTIAL | `test_gap_execution.py`: long/short stop-vs-TP1/TP2 collision, fill-bar stop, trailing-stop timing; `test_time_model.py`: kill-switch vs TP2 same-bar collision (ENG-KS-001) | OHLC не раскрывает реальный порядок high/low; проверить time-stop/TP collisions, multi-position risk-trigger sequencing и execution proxy |
 | Market gap execution | PARTIAL | `test_gap_execution.py` и gap report существуют | Повторить тесты, проверить точное покрытие |
 | Limit fills | PARTIAL | E03/E07/E09 моделируют лимитное касание | Нет queue/partial fill/spread/adverse selection |
 | Fees | PARTIAL | В v14 есть maker/taker fees per leg; в v15 отдельная модель fee/slippage | Сопоставить тарифы, maker/taker по каждой ноге и rounding |
@@ -26,7 +26,7 @@
 | E09 factorial | PARTIAL | 24 клетки заявлены в журнале | Сверить run commit SHA, job logs, 3 CSV и фактические различия факторов |
 
 ## Ключевые непроверенные риски
-1. Корректность порядка исполнения входа/выхода на одной OHLC-свече.
+1. Оставшиеся OHLC path ambiguities для time-stop/TP и межсимвольной portfolio sequencing; текущие stop/TP collision cases имеют regression coverage.
 2. Влияние funding и реальных Bybit комиссий.
 3. Реалистичность maker fills.
 4. Look-ahead и leakage через market context / universe.

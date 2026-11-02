@@ -10,7 +10,7 @@ from pathlib import Path
 
 from scripts.snapshot_bybit_linear_universe import (
     CAPTURED_STATUSES, STATUSES, build_universe_snapshot, fetch_linear_universe,
-    fetch_status, is_linear_usdt_perpetual_available_at, validate_instrument_row,
+    fetch_status, is_linear_usdt_perpetual_within_lifecycle_at, validate_instrument_row,
 )
 from scripts.snapshot_bybit_instruments import write_snapshot
 
@@ -64,18 +64,23 @@ class PointInTimeUniverseTests(unittest.TestCase):
             validate_instrument_row(row("BTCUSDT", "Trading", launch="0"), None)
         with self.assertRaisesRegex(ValueError, "precedes launchTime"):
             validate_instrument_row(row("BTCUSDT", "Closed", launch="2000", delivery="1000"), "Closed")
+        missing_delivery = row("BTCUSDT", "Trading")
+        missing_delivery.pop("deliveryTime")
+        with self.assertRaisesRegex(ValueError, "invalid deliveryTime"):
+            validate_instrument_row(missing_delivery, None)
 
-    def test_point_in_time_availability_respects_launch_and_delivery_boundaries(self):
+    def test_point_in_time_lifecycle_respects_launch_and_delivery_boundaries(self):
         closed = row("BTCUSDT", "Closed", launch="1000", delivery="3000")
-        self.assertFalse(is_linear_usdt_perpetual_available_at(closed, 999))
-        self.assertTrue(is_linear_usdt_perpetual_available_at(closed, 1000))
-        self.assertTrue(is_linear_usdt_perpetual_available_at(closed, 2999))
-        self.assertFalse(is_linear_usdt_perpetual_available_at(closed, 3000))
-        self.assertFalse(is_linear_usdt_perpetual_available_at(row("NEWUSDT", "PreLaunch"), 2000))
-        self.assertFalse(is_linear_usdt_perpetual_available_at(row("PENDUSDT", "PendingOpen"), 2000))
-        self.assertFalse(is_linear_usdt_perpetual_available_at(
+        self.assertFalse(is_linear_usdt_perpetual_within_lifecycle_at(closed, 999))
+        self.assertTrue(is_linear_usdt_perpetual_within_lifecycle_at(closed, 1000))
+        self.assertTrue(is_linear_usdt_perpetual_within_lifecycle_at(closed, 2999))
+        self.assertFalse(is_linear_usdt_perpetual_within_lifecycle_at(closed, 3000))
+        self.assertFalse(is_linear_usdt_perpetual_within_lifecycle_at(row("NEWUSDT", "PreLaunch"), 2000))
+        self.assertFalse(is_linear_usdt_perpetual_within_lifecycle_at(row("PENDUSDT", "PendingOpen"), 2000))
+        self.assertFalse(is_linear_usdt_perpetual_within_lifecycle_at(row("DELISTEDUSDT", "Closed", delivery="0"), 2000))
+        self.assertFalse(is_linear_usdt_perpetual_within_lifecycle_at(
             row("BTCUSDC", "Trading", quote="USDC", settle="USDC"), 2000))
-        self.assertFalse(is_linear_usdt_perpetual_available_at(
+        self.assertFalse(is_linear_usdt_perpetual_within_lifecycle_at(
             row("BTCUSDT-30DEC", "Trading", contract="LinearFutures", delivery="3000"), 2000))
 
     def test_snapshot_requires_complete_status_counts(self):

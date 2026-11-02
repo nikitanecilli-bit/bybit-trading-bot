@@ -1,6 +1,11 @@
 """Strict parser tests for read-only Bybit V5 reconciliation snapshots."""
 import unittest
 from decimal import Decimal
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
 from bybit_reconciliation import (
     SnapshotValidationError,

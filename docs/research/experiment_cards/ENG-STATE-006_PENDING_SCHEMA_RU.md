@@ -30,7 +30,14 @@ Keep valid generated signal payloads unchanged. No strategy or fill behavior cha
 
 ## Границы
 
-Validating local pending data does not reconcile it with exchange active orders. Market backtests are not required.
+Validating local pending data does not reconcile it with exchange active orders. Решение: ACCEPT для локального state restore.
+
+- Validator commit: `c76ad2ed897bc05b7e59be5deff66ba74418aa9c`.
+- CI: [Research engine checks #41434308834](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41434308834), SUCCESS.
+- `tests/test_state_persistence.py`: 18/18; валидный pending round-trip сохранён, malformed entry, missing field, invalid direction/order type, NaN и отрицательная цена отклоняются.
+- Compile, все configured deterministic suites и secret scan прошли.
+
+No market backtest or parameter sweep. Local pending validation still does not prove that the signal corresponds to an active exchange order.
 
 
 ## Результат

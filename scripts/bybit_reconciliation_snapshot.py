@@ -255,6 +255,21 @@ def collect_snapshot(
         api_key, secret, request_json,
     )
 
+    order_history_pages: list[dict[str, Any]] = []
+    for start_ms, end_ms in _execution_intervals(saved_ms, capture_now_ms):
+        interval_pages = _collect_pages(
+            base_url, "/v5/order/history",
+            {"category": "linear", "settleCoin": "USDT",
+             "startTime": start_ms, "endTime": end_ms, "limit": 50},
+            api_key, secret, request_json,
+        )
+        for page in interval_pages:
+            order_history_pages.append({
+                "interval_start_ms": start_ms,
+                "interval_end_ms": end_ms,
+                **page,
+            })
+
     execution_pages: list[dict[str, Any]] = []
     for start_ms, end_ms in _execution_intervals(saved_ms, capture_now_ms):
         interval_pages = _collect_pages(
@@ -277,6 +292,23 @@ def collect_snapshot(
         parsed_orders = parse_active_order_pages(
             (p["requested_cursor"], p["response"]) for p in order_pages
         )
+        # Validate each historical-order interval independently: each has its own cursor chain.
+        history_by_id = {}
+        for start_ms, end_ms in _execution_intervals(saved_ms, capture_now_ms):
+            interval = [p for p in order_history_pages
+                        if p["interval_start_ms"] == start_ms and p["interval_end_ms"] == end_ms]
+            for item in parse_active_order_pages(
+                (p["requested_cursor"], p["response"]) for p in interval
+            ):
+                previous = history_by_id.get(item.order_id)
+                if previous is None or item.updated_time_ms > previous.updated_time_ms:
+                    history_by_id[item.order_id] = item
+                elif item.updated_time_ms == previous.updated_time_ms and item != previous:
+                    raise CollectorError(
+                        f"Historical order {item.order_id} has conflicting records at the same update time"
+                    )
+        parsed_order_history = tuple(history_by_id[key] for key in sorted(history_by_id))
+
         # Validate each execution interval independently: each has its own cursor chain.
         parsed_executions = []
         for start_ms, end_ms in _execution_intervals(saved_ms, capture_now_ms):
@@ -300,6 +332,7 @@ def collect_snapshot(
     raw = {
         "positions": position_pages,
         "active_orders": order_pages,
+        "order_history": order_history_pages,
         "executions": execution_pages,
     }
     digest = hashlib.sha256(_canonical_json_bytes(raw)).hexdigest()
@@ -321,10 +354,24 @@ def collect_snapshot(
         "counts": {
             "positions": len(parsed_positions),
             "active_orders": len(parsed_orders),
+            "historical_orders": len(parsed_order_history),
             "executions": len(parsed_executions),
             "position_pages": len(position_pages),
             "active_order_pages": len(order_pages),
+            "order_history_pages": len(order_history_pages),
             "execution_pages": len(execution_pages),
+        },
+        "order_history_coverage": {
+            "status": "QUERYABLE_WINDOW_ONLY_NOT_COMPLETE",
+            "start_ms": saved_ms,
+            "end_ms": capture_now_ms,
+            "duration_ms": capture_now_ms - saved_ms,
+            "limitations": [
+                "Bybit order history is delayed/asynchronous.",
+                "Cancelled, Rejected and Deactivated orders are queryable only within the last 24 hours.",
+                "Beyond 7 days, only orders with fills are queryable.",
+                "This endpoint is not a complete order event journal for arbitrary outage windows.",
+            ],
         },
         "raw_sha256": digest,
         "raw": raw,

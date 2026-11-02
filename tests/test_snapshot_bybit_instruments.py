@@ -78,14 +78,9 @@ class SnapshotCollectorTests(unittest.TestCase):
             collector.MAX_PAGES = previous
 
     def test_pagination_cursor_must_be_string(self):
-        def fetch(cursor):
-            if cursor is None:
-                return ([{"symbol": "BTCUSDT"}], 123)
-            return ([{"symbol": "ETHUSDT"}], None)
-        with self.assertRaisesRegex(ValueError, "missing symbol|cursor"):
-            # Direct transport validates the cursor type before the next request.
-            collector._check_cursor_type(123)
-
+        with self.assertRaisesRegex(ValueError, "nextPageCursor must be a string"):
+            collector._validate_next_cursor(123)
+        self.assertIsNone(collector._validate_next_cursor(""))
     def test_snapshot_has_provenance_and_exact_timestamp(self):
         snapshot = build_snapshot(
             [{"symbol": "BTCUSDT"}], "linear", "2026-11-02T00:00:00Z"

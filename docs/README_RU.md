@@ -57,6 +57,9 @@
 
 ## Технические блокеры перед execution-aware replay
 
+- [ENG-DATA-006 — point-in-time linear universe](audits/POINT_IN_TIME_UNIVERSE_AND_ARCHIVE_AUDIT_2026-11-03.md) — сбор статусов Trading/PendingOpen/PreLaunch/Settling/Delivering/Closed и launch/delivery bounds.
+
+
 - [Portfolio accounting, Net R и MAE/MFE audit](audits/PORTFOLIO_ACCOUNTING_NET_R_MAE_MFE_AUDIT_2026-11-03.md) — сверка бухгалтерских инвариантов и fixed-trade sensitivity E11/E13 после exit-notional correction.
 
 

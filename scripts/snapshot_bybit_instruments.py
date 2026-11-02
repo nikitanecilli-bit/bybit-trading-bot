@@ -58,9 +58,14 @@ def _check_ret_code(payload: Any) -> None:
 
 
 def _request_page(base_url: str, category: str, cursor: str | None,
-                  timeout: float = 20.0) -> tuple[list[dict[str, Any]], str | None]:
+                  timeout: float = 20.0, status: str | None = None
+                  ) -> tuple[list[dict[str, Any]], str | None]:
     _validate_base_url(base_url)
     params: dict[str, Any] = {"category": category, "limit": 1000}
+    if status is not None:
+        if status not in {"PreLaunch", "Trading", "Settling", "Delivering", "Closed"}:
+            raise ValueError("unsupported instrument status")
+        params["status"] = status
     if cursor:
         params["cursor"] = cursor
     url = f"{base_url.rstrip('/')}{ENDPOINT}?{urllib.parse.urlencode(params)}"

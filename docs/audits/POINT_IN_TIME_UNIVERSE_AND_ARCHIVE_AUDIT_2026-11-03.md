@@ -105,3 +105,13 @@
 - Не продвигать E13 compression gate и старый top-symbol shortlist.
 - Сохранить E01–E13 как исторические диагностические результаты с ограничениями.
 - Следующий безопасный этап — point-in-time universe/data provenance; если источник исторических Bybit listings недоступен, это остаётся явным blocker, а не поводом подменять его сегодняшним списком инструментов.
+
+
+## ENG-DATA-006 — point-in-time linear universe collector (2026-11-03)
+
+- Official Bybit API Explorer documents status filters `PreLaunch`, `Trading`, `Settling`, `Delivering`, and `Closed`; linear records include `launchTime` and `deliveryTime`. The default response is documented as `Trading` + `PendingOpen`, so the collector captures the default response plus all four non-default status filters.
+- Added `scripts/snapshot_bybit_linear_universe.py` to paginate each response, validate status/symbol/launch/delivery fields, reject conflicting duplicate symbols, and save an immutable timestamped snapshot under `data/universe_history/linear/`.
+- Added `is_linear_usdt_perpetual_available_at()` as a deterministic interval predicate: only LinearPerpetual USDT-settled records, after launch and before nonzero delivery; PreLaunch and PendingOpen are excluded.
+- Extended the existing instrument-spec collector's request helper with an optional validated status parameter; its default behavior is unchanged.
+- Added offline tests and Research CI wiring. The capture workflow is manual-only; a push does not call Bybit.
+- Limitations: current status plus launch/delivery bounds do not prove full historical trading availability or temporary suspension history. Closed-status retention and API access must be confirmed from a real capture. Previous Bybit requests from Actions returned HTTP 403; no real snapshot is claimed. Cross-check captured records against official listing/delisting announcements before calling the universe complete.

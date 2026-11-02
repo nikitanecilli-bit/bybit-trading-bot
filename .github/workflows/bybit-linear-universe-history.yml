@@ -1,0 +1,39 @@
+name: Archive Bybit linear universe history
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bybit-linear-universe-history
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/market-regime-v1-main
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Capture all documented instrument statuses
+        env:
+          BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}
+        run: python scripts/snapshot_bybit_linear_universe.py --base-url "$BYBIT_API_BASE_URL"
+      - name: Commit immutable dated universe snapshot
+        run: |
+          if [[ -n "$(git status --porcelain data/universe_history/linear)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/universe_history/linear
+            git commit -m "data: archive Bybit linear point-in-time universe"
+            git push
+          else
+            echo "Universe snapshot unchanged; no commit needed."
+          fi

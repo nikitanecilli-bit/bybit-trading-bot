@@ -532,3 +532,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - A prior run #41452045788 failed on the non-Bybit host test because the allowlist validation was not yet called from `collect_snapshot()`. Fixed by wiring `_validate_base_url()` into the entry point and using a no-redirect opener; regression run #41457143134 passed.
 - Decision: ACCEPT for collector code + fixture/CI coverage only. No live Bybit call was made and no real snapshot exists.
 - Limitations: no order history or exchange-side stop/TP verification; local model still lacks exact qty, positionIdx and order/execution identities. Reconciliation and live resume remain BLOCKED. No PnL sweep.
+
+
+## ENG-RECON-004 — report-only comparator (2026-11-02)
+
+- Card: [ENG-RECON-004](experiment_cards/ENG-RECON-004_REPORT_ONLY_COMPARATOR_RU.md).
+- Added `scripts/bybit_reconciliation_report.py`: validates backup/snapshot schema, canonical raw SHA-256, parsed positions/orders/executions, counts, server-time chronology and contiguous <=7-day execution windows; reports symbol/direction diagnostics.
+- Comparator intentionally **always blocks**: `BLOCKED_UNSUPPORTED_LOCAL_MODEL`, `reconciliation_pass=false`, `live_resume_allowed=false`. It does not infer exchange qty from notional, match pending signal intents to orders, or declare empty-state reconciliation without a local execution ledger.
+- Tests: 12/12 passed. CI: [Research engine checks #41458773696](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41458773696), SUCCESS; parser 13/13, collector 12/12, comparator 12/12, configured deterministic suites and secret scan passed.
+- No real Bybit snapshot was captured or compared. No order history or exchange-side stop/TP check. Overall reconciliation/live resume remain BLOCKED. No PnL sweep.

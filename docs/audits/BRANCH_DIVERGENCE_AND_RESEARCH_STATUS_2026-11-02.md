@@ -194,3 +194,23 @@ A direct row-by-row comparison of the downloaded E10, E11 and E13 universe manif
 The six source ZIP SHA-256 values embedded in E10, E11 and E13 are also identical. Thus the E10 vs E11 difference is not explained by a different symbol list or different per-symbol bar coverage in the manifests: it is primarily the accounting/simulation design difference (independent 10k accounts per symbol versus one shared-capital portfolio, plus synchronized event ordering). This makes E11 the more relevant portfolio result.
 
 Caveat remains: the 50-symbol CryptoFetch archive is a fixed uploaded universe, not a verified point-in-time historical Bybit listing universe. New listings with insufficient first-fold history were excluded; delisted, renamed or unavailable historical instruments may be absent. Survivorship/universe-selection bias is therefore not fully ruled out.
+
+
+## ENG-RISK-001 — fill-bar portfolio mark-to-market gap (confirmed and fixed)
+
+### Confirmed defect
+
+The pre-entry mark was calculated while the symbol had no open position, so its intrabar risk mark was the candle close. A successful pending fill then opened a position, but the engine did not refresh that symbol's adverse mark or rerun portfolio MTM before managing the new position. The entry-bar adverse wick could be recorded in trade MAE while being omitted from portfolio equity, daily-stop and kill-switch evaluation. The next bar replaced the old mark, so the excursion could be permanently missed by portfolio drawdown tracking.
+
+### Evidence and correction
+
+- Preregistered card: [ENG-RISK-001](../research/experiment_cards/ENG-RISK-001_FILL_BAR_MTM_RU.md).
+- Regression tests committed first: `bf0b556f7cb0b88620c62af22634b6d95612dfc9`.
+- Test-only CI [#41475914811](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41475914811) failed at the new long test with only one pre-fill mark observed: `[(0, bar_close_ts)]`, instead of the expected pre-fill and post-fill marks.
+- Fix commit: `f65c08bec78b179a9a89832ce31b574740f4dce3`. After successful fill, engine now calculates `_risk_mark_for_position(new_position, curr)`, updates `_intrabar_risk_marks[symbol]`, and calls `_update_mark_to_market(bar_close_ts)` before position management.
+- Passing CI [#41475941543](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41475941543): SUCCESS. New long and short cases pass; gap execution suite 27/27, time model 38/38, persistence 54/54; compile, portfolio-risk suite and secret scan pass. All workflow steps completed successfully.
+- Card status: ACCEPT for research-engine risk accounting only.
+
+### Remaining boundary
+
+For intrabar limit fills, OHLC cannot prove whether the adverse extreme happened before or after the fill. The full adverse wick is intentionally conservative and consistent with the existing fill-bar MAE convention. This fix makes risk accounting safer; it does not make OHLC execution realistic or establish profitability. No market backtests were run.

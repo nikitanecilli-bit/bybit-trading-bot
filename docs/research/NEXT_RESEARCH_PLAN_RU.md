@@ -239,3 +239,7 @@ No production/live changes and no market backtests were performed in these corre
 
 - **ENG-STATE-004 accepted:** when persistence is enabled, failed JSON write/atomic replace now raises `RuntimeError` and cleans up the current temporary file best-effort. CI #41432914403 passed; state persistence tests 6/6. A caller must stop rather than proceed with a stale recovery point.
 - Durability remains incomplete: no explicit fsync of file/directory, remote backup, or exchange reconciliation. Do not equate atomic rename with guaranteed survival of power loss.
+
+
+- **ENG-STATE-005 accepted:** restore now stages risk state in a temporary manager and validates root, positions, pending orders and trade sequence before mutating the caller's risk manager. Malformed backups leave the original risk state unchanged. CI #41433598794 passed; state persistence tests 9/9.
+- Remaining persistence P0: compare restored local positions and active orders with Bybit before any resume; define stale-backup detection/schema versioning; fsync/remote durability. Transactional in-memory restore alone is not sufficient for live recovery.

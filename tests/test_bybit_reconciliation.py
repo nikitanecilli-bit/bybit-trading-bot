@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT))
 
 from bybit_reconciliation import (
     SnapshotValidationError,
+    deduplicate_executions,
     parse_active_order_pages,
     parse_execution_pages,
     parse_position_pages,
@@ -165,6 +166,26 @@ class BybitReconciliationParserTests(unittest.TestCase):
                "execQty": "0.1", "execPrice": "65000", "execFee": "0.1"}
         with self.assertRaisesRegex(SnapshotValidationError, "duplicate execId"):
             parse_execution_pages([("", page([row, row]))])
+
+    def test_identical_execution_id_across_adjacent_intervals_is_deduplicated(self):
+        row = {"execId": "exec-boundary", "orderId": "order-1", "symbol": "BTCUSDT",
+               "execType": "Trade", "execTime": "1800000000100", "side": "Buy",
+               "execQty": "0.1", "execPrice": "65000", "execFee": "0.1"}
+        first = parse_execution_pages([("", page([row]))])
+        second = parse_execution_pages([("", page([dict(row)]))])
+        combined = deduplicate_executions(first + second)
+        self.assertEqual(len(combined), 1)
+        self.assertEqual(combined[0].exec_id, "exec-boundary")
+
+    def test_conflicting_execution_id_across_intervals_is_rejected(self):
+        row = {"execId": "exec-boundary", "orderId": "order-1", "symbol": "BTCUSDT",
+               "execType": "Trade", "execTime": "1800000000100", "side": "Buy",
+               "execQty": "0.1", "execPrice": "65000", "execFee": "0.1"}
+        changed = dict(row, execFee="0.2")
+        first = parse_execution_pages([("", page([row]))])
+        second = parse_execution_pages([("", page([changed]))])
+        with self.assertRaisesRegex(SnapshotValidationError, "conflicting duplicate execution identity"):
+            deduplicate_executions(first + second)
 
     def test_funding_execution_can_have_no_trade_side_or_price(self):
         row = {"execId": "fund-1", "orderId": "", "symbol": "BTCUSDT",

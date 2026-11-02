@@ -50,7 +50,7 @@
 
 ## Исправление — 2026-11-03
 
-Статус исходного дефекта: **FIX IMPLEMENTED; full Research CI awaiting final job completion at documentation update time**.
+Статус исходного дефекта: **FIX IMPLEMENTED; full Research CI SUCCESS**.
 
 Изменения в исследовательской ветке:
 - Добавлен чистый policy helper `multibar_limit_wait.py` с явными состояниями `fill / wait / expire`, TTL и симметричной проверкой long/short penetration.
@@ -62,7 +62,7 @@
 Проверенный CI:
 - Run [#41538728693](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41538728693), commit `8158c617258896016213108c9043fbe5c875032c`.
 - Compile step и все 27 тестовых шагов, включая multi-bar lifecycle, portfolio accounting и persistence, завершились SUCCESS.
-- На момент записи GitHub ещё показывал job в статусе `in_progress` на post-job cleanup. Поэтому итоговый conclusion run не объявляется успешным до terminal status.
+- Run завершился terminal status `completed / success` после post-job cleanup.
 
 Ограничения:
 - Это исправляет исследовательский TTL lifecycle, но не моделирует очередь лимиток, частичные исполнения, latency или adverse selection.

@@ -70,3 +70,8 @@ The following guardrails have now been added on this research branch:
 - Offline regression tests cover pagination metadata, incremental manifest preservation, hash tampering, query-window gaps, and fail-closed runner behavior.
 
 **Important remaining limitation:** the collector deliberately writes `settlement_schedule_verified: false`. Query logs and a CSV hash prove what was requested/received and whether the CSV changed; they do not independently prove that Bybit returned every settlement event. No code path should set this flag to true until a dated, source-backed funding interval schedule is reconstructed and validated over the scored period. Thus this implementation improves provenance and blocks unverified archives, but it does not yet close the schedule-completeness requirement. Market PnL replay remains prohibited.
+
+
+### Stronger schedule-evidence validation
+
+The initial boolean schedule flag was replaced by a required sidecar reference to a separately hashed schedule JSON. The validator now checks the schedule file hash, symbol/category/source identity, coverage boundaries, ordered source-snapshot references and hashes, each referenced raw Bybit instrument snapshot's schema/category/fetched_at/symbol/fundingInterval, and exact equality between expected and observed settlement timestamps inside the scored interval. The H1 gate therefore cannot be satisfied by setting a bare boolean. A schedule-generation process based on complete dated snapshots is still not available for the historical archive, so replay remains blocked.

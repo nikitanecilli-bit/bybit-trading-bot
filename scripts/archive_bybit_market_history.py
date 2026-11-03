@@ -322,12 +322,14 @@ def load_universe_lifecycle(path: str | Path) -> tuple[dict[str, dict[str, Any]]
     if not isinstance(fetched_at, str) or not fetched_at:
         raise ValueError("universe snapshot is missing fetched_at provenance")
     by_symbol: dict[str, dict[str, Any]] = {}
+    seen_symbols: set[str] = set()
     for row in instruments:
         if not isinstance(row, dict):
             raise ValueError("universe snapshot instrument must be an object")
         symbol = normalize_symbol(row.get("symbol"))
-        if symbol in by_symbol:
+        if symbol in seen_symbols:
             raise ValueError(f"duplicate symbol in universe snapshot: {symbol}")
+        seen_symbols.add(symbol)
         if row.get("contractType") != "LinearPerpetual" or row.get("quoteCoin") != "USDT" or row.get("settleCoin") != "USDT":
             continue
         status = row.get("status")
@@ -348,6 +350,13 @@ def load_universe_lifecycle(path: str | Path) -> tuple[dict[str, dict[str, Any]]
     if not by_symbol:
         raise ValueError("universe snapshot contains no USDT linear perpetual instruments")
     return by_symbol, hashlib.sha256(raw_bytes).hexdigest(), fetched_at
+
+
+def validate_archive_range(start_ms: int, end_ms: int, interval_ms: int) -> None:
+    if interval_ms <= 0 or start_ms <= 0 or end_ms <= start_ms:
+        raise ValueError("valid archive range and interval are required")
+    if start_ms % interval_ms or end_ms % interval_ms:
+        raise ValueError("requested archive range boundaries must align to the selected interval")
 
 
 def clip_range_to_lifecycle(symbol: str, start_ms: int, end_ms: int, interval_ms: int,
@@ -431,6 +440,10 @@ def main() -> None:
         parser.error("--symbols must contain unique non-empty symbols")
     lifecycle, universe_sha256, universe_fetched_at = load_universe_lifecycle(args.universe_snapshot)
     interval_ms = int(args.interval) * 60_000
+    try:
+        validate_archive_range(args.start_ms, args.end_ms, interval_ms)
+    except ValueError as exc:
+        parser.error(str(exc))
     prepared = []
     for symbol in symbols:
         effective_start, effective_end = clip_range_to_lifecycle(

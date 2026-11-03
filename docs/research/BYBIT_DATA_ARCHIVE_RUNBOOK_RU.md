@@ -59,8 +59,17 @@ Workflow публикует два артефакта: итоговый `h1_shar
 
 ## 7. Что требуется до первого запуска
 
-- [ ] Выборочно перенести collector workflows и их Python-модули/зависимости в отдельную ветку от актуального `main`; не переносить весь PR #4.
-- [x] Добавить три collector workflow в default branch (PR #8, merge commit `a0ceb66d9b2cf818b3a24d723130d1125c8ca382`). H1 validation workflow остаётся только в research branch.
+- [x] Выборочно опубликовать три collector workflow из актуального `main` (PR #8, merge commit `a0ceb66d9b2cf818b3a24d723130d1125c8ca382`). Они намеренно checkout-ят `research/market-regime-v1-main`, где остаются Python-модули и зависимости; переносить весь PR #4 нельзя.
+- [x] Добавить три collector workflow в default branch. H1 validation workflow остаётся только в research branch.
 - [ ] Отдельно решить и реализовать расписание snapshots после успешного первого ручного сбора; сейчас `schedule`/cron отсутствует.
 - [ ] Проверить, что self-hosted runner зарегистрирован и имеет label `self-hosted`, а egress country не US/CN. Доступных через текущую GitHub-интеграцию сведений о registered runners нет, поэтому этот пункт пока UNVERIFIED.
 - [ ] Запустить сначала snapshots, затем ограниченный архив H1 и проверить coverage/artifacts до любого PnL.
+
+
+## 8. Статическая перепроверка 2026-11-03
+
+- Collector YAML в `main` существует и остаётся manual-only. В доступной GitHub-интеграции этой сессии нет операции `workflow_dispatch` и нет чтения списка зарегистрированных self-hosted runners; поэтому фактический запуск и runner availability не подтверждены.
+- Archive downloader запрашивает Bybit V5 trade klines, funding history и mark-price klines, использует end-exclusive UTC диапазон, проверяет alignment/полноту H1 grid, режет запросы на bounded windows и атомарно пишет CSV. Funding pagination рекурсивно делит насыщенные 200-row windows.
+- Coverage gate проверяет наличие funding событий, mark candles на каждом funding timestamp и полное совпадение timestamp sets trade/mark H1. Это необходимая проверка целостности, но не проверка корректности самих рыночных цен/ставок и не доказательство exchange fills.
+- Instrument/risk-limit snapshots являются point-in-time наблюдениями; они не восстанавливают исторические параметры до первого сохранённого снимка.
+- Никаких новых PnL запусков не выполнялось: Bybit archive и датированные snapshots пока отсутствуют. Следующий реальный эксперимент не запускать до появления этих данных.

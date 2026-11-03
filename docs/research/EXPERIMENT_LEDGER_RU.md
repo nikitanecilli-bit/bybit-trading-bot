@@ -880,6 +880,7 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 
 ## E14 — H-A signal and post-break attribution (2026-11-03; diagnostic only)
 
+- Financial replay summary: [H-A results report](../reports/H_A_RELATIVE_STRENGTH_BREAKOUT_RESULTS_2026-11-03_RU.md). Across the three reset-capital folds, baseline net PnL was −5,635.98 USDT (1,022 trades) and H-A was −6,135.26 USDT (1,033 trades); H-A underperformed by 499.28 USDT. Both variants were negative in every fold. Fold 3 accounts for the relative deterioration (H-A −2,307.78 vs baseline −985.85; max DD 30.01% vs 15.04%). These are CryptoFetch OHLCV proxy results with funding omitted, not Bybit net PnL.
 - Frozen H-A replay with expanded trade ledger: [run 41670116033](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41670116033), artifact 13247672222. Baseline/H-A financial metrics reproduce the earlier H-A result at published precision; no signal, cost, fold or execution rule changed.
 - Read-only signal-candle and post-entry path reconstruction: [run 41672420459](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41672420459), final schema-validated artifact 13249307987. 2,055 trade rows, 41 cohort rows; source archive SHA manifest matches. No PnL was recomputed.
 - Pre-entry signal-candle features are weak stop-vs-profitable-outcome separators: AUC mostly 0.48–0.55. Do not add body, wick, volume or pre-break compression filters from this sample.

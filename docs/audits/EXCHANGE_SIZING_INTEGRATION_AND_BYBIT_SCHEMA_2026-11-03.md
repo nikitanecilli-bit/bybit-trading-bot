@@ -274,3 +274,16 @@ A cross-repository allowlist scan found that `scripts/archive_bybit_market_histo
 Research CI run [#41544092796](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41544092796), on code commit `2a0e0b958148f1bd69d43e4386c0487166eaa6d6`, shows compilation and every functional test step completed successfully, including the revised market-history host allowlist tests. At the last status check, GitHub was still executing the `Post Check out repository` cleanup step; no functional test remained pending. The subsequent documentation-only commit does not alter tested code.
 
 No request was sent to either retired host.
+
+
+## 20. Confirmed remaining lifecycle and risk-tier blockers
+
+A source-level follow-up after the successful entry-sizing CI confirms three distinct limits:
+
+1. **Partial-close quantity is still fractional, not exchange-quantized.** `OpenPositionState` persists `size_usdt` and `remaining_fraction`, but no first-class contract quantity, TP1 quantity, or remaining contract quantity. `_apply_tp1()` uses the fixed `TP1_FRACTION` and `_close_position()` reconstructs quantity as `size_usdt / entry_price`. Example: with `qtyStep=0.1` and an entry quantity of `0.1`, the modeled 50% TP1 close is `0.05`, which is not a valid quantity step. The engine therefore cannot claim that TP1/final reduce-only legs are exchange-valid. This must be fixed with persisted Decimal-compatible quantity state, quantized TP1/remainder allocation, min-close handling, and dust reconciliation before any contract-accurate replay.
+
+2. **Risk-limit tiers are collected and validated, but not consumed by sizing.** `InstrumentSpec.validate_leverage()` checks the instrument-level leverageFilter only. It does not select a risk tier by position value, enforce the tier-specific `maxLeverage`, or calculate initial/maintenance margin and liquidation. The existing risk-tier snapshot collector validates tier data integrity and mmDeduction recurrence, but no engine path loads those tier snapshots. Instrument-level leverage acceptance is therefore not proof that a given notional is allowed at that leverage.
+
+3. **The H1 runner remains in legacy proxy mode.** `scripts/run_h1_shared_capital_portfolio_validation.py` instantiates `UnifiedQuantEngine` without `instrument_specs_dir`; it does not activate the optional strict entry sizing path. The strict entry integration is currently covered only by synthetic unit fixtures. Existing H1 and E11/E13 results remain notional-proxy research results and are not upgraded by the new tests.
+
+**Execution gate remains BLOCKED.** Do not run or publish market PnL backtests as contract-accurate until official dated instrument snapshots and risk-tier snapshots are available, the H1 runner explicitly enables point-in-time specs, entry and all reduce-only legs use persisted exchange quantities, and margin/liquidation assumptions are account-mode-specific. No actual order was placed.

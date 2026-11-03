@@ -17,7 +17,7 @@ GitHub-hosted runner в США уже дал HTTP 403 от Bybit. Для заг�
 
 В репозитории: Settings → Actions → Runners → New self-hosted runner. Установить runner на постоянно доступном компьютере/VPS в разрешённом регионе и выполнить выданные GitHub команды. Не добавлять API keys: перечисленные market-data endpoints публичные.
 
-**Статус публикации collector workflow (обновлено 2026-11-03):** четыре необходимых collector workflow доступны в default branch `main`: три исходных workflow опубликованы через PR #8 (`a0ceb66d9b2cf818b3a24d723130d1125c8ca382`), а `bybit-linear-universe-history.yml` добавлен отдельным commit `49fb4c42aae2c41f008e5668e79680aaf123a026`. Все они явно checkout-ят `research/market-regime-v1-main`, запускают код из этой ветки и сохраняют архивы обратно туда. H1 validation workflow в `main` пока отсутствует. PR #4 целиком для этого не использовать: он сильно diverged.
+**Статус публикации collector workflow (обновлено 2026-11-03):** четыре необходимых collector workflow доступны в default branch `main`: три исходных workflow опубликованы через PR #8 (`a0ceb66d9b2cf818b3a24d723130d1125c8ca382`), а `bybit-linear-universe-history.yml` добавлен отдельным commit `49fb4c42aae2c41f008e5668e79680aaf123a026`. Все они явно checkout-ят `research/market-regime-v1-main`, запускают код из этой ветки и сохраняют архивы обратно туда. Дополнительно в `main` опубликованы два ручных H1 workflow entry point: top-5 selector и shared-capital validation; оба checkout-ят research branch, а selector коммитит manifest обратно в неё. H1 validation workflow в `main` пока отсутствует. PR #4 целиком для этого не использовать: он сильно diverged.
 
 Если аккаунт зарегистрирован на казахстанском сайте Bybit, задать repository variable BYBIT_API_BASE_URL=https://api.bybit.kz; в любом случае hostname должен соответствовать сайту регистрации аккаунта.
 
@@ -63,6 +63,7 @@ Workflow публикует два артефакта: итоговый `h1_shar
 ## 7. Что требуется до первого запуска
 
 - [x] Опубликовать четыре необходимых collector workflow в `main`: три workflow через PR #8 и `bybit-linear-universe-history.yml` отдельным commit `49fb4c42aae2c41f008e5668e79680aaf123a026`. Они намеренно checkout-ят `research/market-regime-v1-main`, где остаются Python-модули и зависимости; переносить весь PR #4 нельзя.
+- [x] Опубликовать в `main` ручные H1 entry points: `h1-top5-train-selection.yml` (commit `6e4dc5c95e88b6916570f199986ab48f654ec9a8`) и `h1-shared-capital-portfolio-validation.yml` (commit `837c15f1c8767d97670d160a8389231d622ba858`). Они запускаются на `ubuntu-latest`, checkout-ят research branch; selector коммитит manifest в research branch, validation только читает и публикует отчёт.
 - [x] Добавить три collector workflow в default branch. H1 validation workflow остаётся только в research branch.
 - [ ] Отдельно решить и реализовать расписание snapshots после успешного первого ручного сбора; сейчас `schedule`/cron отсутствует.
 - [ ] Проверить, что self-hosted runner зарегистрирован и имеет label `self-hosted`, а egress country не US/CN. Доступных через текущую GitHub-интеграцию сведений о registered runners нет, поэтому этот пункт пока UNVERIFIED.
@@ -107,3 +108,13 @@ Workflow публикует два артефакта: итоговый `h1_shar
 - Узкое исправление: добавлен только этот workflow в `main` (commit `49fb4c42aae2c41f008e5668e79680aaf123a026`). Он использует self-hosted runner, проверяет egress country, checkout-ит research branch, запускает point-in-time universe collector и коммитит snapshot обратно в research branch.
 - Теперь в `main` опубликованы все четыре нужных коллектора: instrument specs, risk tiers, linear universe history и OHLCV/funding/mark archive. H1 selector/validation и Python research modules остаются в research branch.
 - Workflow не запускался: self-hosted runner availability не подтверждена. Это публикация/исправление orchestration, не реальный API download и не PnL.
+
+
+## 12. Публикация H1 workflow entry points в main (2026-11-03)
+
+- GitHub требует, чтобы файл workflow с `workflow_dispatch` существовал в default branch, иначе manual dispatch не регистрируется. H1 selector и H1 shared-capital validation до этого существовали только в research branch, поэтому нельзя было считать их доступными для ручного запуска из Actions UI.
+- В `main` опубликованы два узких entry point:
+  - `.github/workflows/h1-top5-train-selection.yml` — commit `6e4dc5c95e88b6916570f199986ab48f654ec9a8`; запускает train-only selector на `ubuntu-latest`, checkout-ит research branch и коммитит selection manifest/ranking обратно в research branch.
+  - `.github/workflows/h1-shared-capital-portfolio-validation.yml` — commit `837c15f1c8767d97670d160a8389231d622ba858`; запускает strict shared-capital replay на `ubuntu-latest`, checkout-ит research branch и публикует CSV/manifest artifact. Он не отправляет ордера и не обращается к private account API.
+- Эти workflow entry points — manual-only. Для selector нужны уже собранные Bybit H1/funding/mark CSVs, dated instrument/risk snapshots и universe snapshot. Validation дополнительно требует успешный v2 selection manifest.
+- Workflow не dispatch-ились; это публикация оркестрации, не запуск selector, не PnL и не paper trading.

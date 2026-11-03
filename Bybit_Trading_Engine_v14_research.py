@@ -766,6 +766,15 @@ class PlanBStatePersistence:
                     f"Не удалось сохранить резервное состояние: last mark {symbol} должен быть конечным числом > 0"
                 )
             validated_marks[symbol] = float(value)
+        for symbol, position in open_positions.items():
+            signal_ts_ms = position.signal_ts_ms
+            if signal_ts_ms is not None:
+                if (isinstance(signal_ts_ms, bool) or not isinstance(signal_ts_ms, int)
+                        or signal_ts_ms <= 0 or signal_ts_ms > position.entry_ts):
+                    raise ValueError(
+                        f"позиция {symbol}: signal_ts_ms должен быть положительным целым числом "
+                        "не позже entry_ts"
+                    )
         payload = {
             "saved_at_utc": datetime.now(timezone.utc).isoformat(),
             "bot_version": cfg.bot_version,

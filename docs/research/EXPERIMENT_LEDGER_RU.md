@@ -966,3 +966,18 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Each baseline/candidate leg is an independent 10,000-USDT shared-capital portfolio replay with identical execution assumptions; they do not share capital with one another.
 - Research CI [#41728994842](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41728994842) SUCCESS, 55/55 at commit `8ed9a1688d51538e2c31adf68edcfd41a9a7792c`.
 - No market PnL replay. Bybit H1/funding/mark/spec/risk archives are still absent. Changes to replay-critical code invalidate selector provenance, so rerun train-only selection after the final code freeze and before any Bybit validation.
+
+
+## ENG-DATA-017 — Funding schedule snapshots respect symbol lifecycle (2026-11-04)
+
+- Dated instrument snapshots may legitimately omit a contract before its launch or after its delivery. Funding-schedule attachment now allows such out-of-window absence while requiring the symbol to be present in every dated snapshot inside the requested funding interval. Duplicate symbol rows and unknown/invalid intervals remain fail-closed.
+- Added regression tests for absence before/after lifecycle and absence inside the funding interval.
+- Research CI [#41730087544](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41730087544) SUCCESS, 54/54.
+- This aligns funding schedule evidence with per-symbol lifecycle-aware market-history clipping; it does not reconstruct historical listing/delisting state that was never captured.
+
+## ENG-EMA-004 — paired EMA comparison parity and explicit leverage (2026-11-04)
+
+- Paired baseline/candidate manifest now rejects mismatched timeframe, symbol basket, common H1 bar count, fold start/end, starting capital or max concurrent positions. Pairing key remains fold + volume + breakout-ATR + cost multiplier.
+- H1 runner now explicitly assigns `ISOLATED_5X` and `leverage_val=5.0` instead of relying on the BotConfig default; the same constants are written to the validation manifest.
+- CI [#41730087544](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41730087544) SUCCESS, 54/54.
+- No Bybit market PnL replay; all these changes are deterministic integrity hardening only.

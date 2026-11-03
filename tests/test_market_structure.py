@@ -38,11 +38,11 @@ class MarketStructureTests(unittest.TestCase):
         self.assertEqual(trend_direction(rising, fast=50, slow=200, slope=5), "up")
         self.assertEqual(trend_direction(falling, fast=50, slow=200, slope=5), "down")
 
-    def test_ema50_200_requires_alignment_not_only_positive_slope(self):
+    def test_ema50_200_stays_bearish_during_rally_below_slow_ema(self):
         closes = [1000.0] * 220 + [100.0 + i * 0.5 for i in range(220)]
         self.assertEqual(
             trend_direction(make_candles(closes), fast=50, slow=200, slope=5),
-            "neutral",
+            "down",
         )
 
     def test_full_history_ema_retains_older_history_and_is_prefix_causal(self):

@@ -314,6 +314,7 @@ def test_trade_record_retains_tp1_partial_state_and_remaining_quantity():
     )
     pos.tp1_ts_ms = pos.entry_ts + 3_600_000
     pos.stop_price = 103.0
+    pos.breakout_level = 101.0
     e.open_positions["BTCUSDT"] = pos
 
     e._close_position(
@@ -329,6 +330,7 @@ def test_trade_record_retains_tp1_partial_state_and_remaining_quantity():
     assert trade.initial_stop_dist == 5.0
     assert trade.initial_stop_price == 95.0
     assert trade.final_stop_price == 103.0
+    assert trade.breakout_level == 101.0
 
 
 def run_simultaneous_entries(order):

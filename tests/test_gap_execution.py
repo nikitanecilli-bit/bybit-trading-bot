@@ -533,7 +533,7 @@ def test_fill_bar_long_stop_does_not_count_pre_entry_or_later_favorable_wick():
     pos = make_position("long", entry=100.0, stop=95.0)
     e.open_positions["BTCUSDT"] = pos
     captured = {}
-    e._close_position = lambda p, px, reason, ts, mae, mfe: captured.update(
+    e._close_position = lambda p, px, reason, ts, mae, mfe, final_maker=None: captured.update(
         exit_price=px, reason=reason, mae=mae, mfe=mfe
     )
     history = [
@@ -552,7 +552,7 @@ def test_fill_bar_short_stop_does_not_count_pre_entry_or_later_favorable_wick():
     pos = make_position("short", entry=100.0, stop=105.0)
     e.open_positions["BTCUSDT"] = pos
     captured = {}
-    e._close_position = lambda p, px, reason, ts, mae, mfe: captured.update(
+    e._close_position = lambda p, px, reason, ts, mae, mfe, final_maker=None: captured.update(
         exit_price=px, reason=reason, mae=mae, mfe=mfe
     )
     history = [

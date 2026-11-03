@@ -579,7 +579,8 @@ def geometric_monthly_return_pct(net_pnl, starting_capital, start_ts, end_ts,
 def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, end_frac,
                           min_vol, min_breakout_atr, cost_multiplier,
                           instrument_specs_dir, risk_tiers_dir,
-                          funding_dir, mark_price_dir, kline_dir):
+                          funding_dir, mark_price_dir, kline_dir,
+                          ema_trend_labels_by_symbol=None):
     n = len(timestamps)
     start_idx, end_idx = int(n * start_frac), int(n * end_frac)
     start_ts, end_ts = timestamps[start_idx], timestamps[end_idx - 1]

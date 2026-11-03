@@ -102,14 +102,14 @@ Promote only if the frozen H-C result is net profitable after all modeled costs,
 Completed in the research branch as provenance and disabled feature implementation:
 - Baseline and H-A signal evaluators now emit the signal-time Donchian breakout boundary.
 - The boundary is carried through pending orders, OpenPositionState, TradeRecord and the H-A trade/diagnostic ledger.
-- State restoration validates a finite positive boundary while remaining backward-compatible with older backups that do not contain the optional field.
+- State restoration validates a finite positive boundary while remaining backward-compatible with older backups that do not contain the optional field when H-C is disabled. With H-C enabled, an active baseline breakout position or pending signal inside the three-bar window without that boundary is rejected fail-closed.
 - Tests cover long/short signal boundaries, state round-trip, invalid values and legacy backup loading.
 
 The H-C close-based exit event is now implemented behind config key execution_and_exits.enable_post_break_invalidation, default false. It is H1-only and uses the fixed three-bar horizon. Its preregistered scope is the frozen H1 baseline strategy H1-momentum-breakout only. H-A-relative-strength-breakout is a rejected candidate and is explicitly excluded; the implementation and tests preserve that exclusion.
 
-The event runs after intrabar stop/liquidation/TP handling and kill-switch priority. It closes at the completed candle close only when the position remains open and the close has returned inside the stored boundary. TP1 partial state is preserved and only the remaining quantity is closed. Missing signal-time boundary fails closed on pending fill, state restore or active position management.
+The event runs after intrabar stop/liquidation/TP handling and kill-switch priority. It closes at the completed candle close only when the position remains open and the close has returned inside the stored boundary. TP1 partial state is preserved and only the remaining quantity is closed. Missing signal-time boundary fails closed on baseline pending fill, state restore or active position management.
 
-Synthetic CI coverage: Research CI [41675851770](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41675851770) SUCCESS. H-C semantics 7/7 tests passed; state persistence 10/10 passed; the complete research-checks job passed. Covered long/short symmetry, wick-only rejection, first/third-bar window, no trigger after bar 3, stop/TP2 precedence, TP1 partial then retest, no same-bar re-entry, H1-only config and fail-closed state restore.
+Synthetic CI coverage: Research CI [41676357873](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41676357873) SUCCESS. H-C semantics **9/9 tests passed**; full state-persistence suite **67/67 passed**; complete Research engine checks passed. Covered disabled-by-default baseline behavior, fail-closed pending entry, long/short symmetry, first/second/third-bar window, wick-only rejection, no trigger after bar 3, stop/TP2 precedence, TP1 partial then retest, H1-only config, H-A exclusion and no same-bar re-entry.
 
 This is implementation correctness only. The flag remains false by default; no market PnL run has been launched and the feature must not be enabled live.
 

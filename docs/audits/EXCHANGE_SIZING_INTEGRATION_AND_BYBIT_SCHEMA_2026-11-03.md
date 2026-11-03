@@ -343,3 +343,10 @@ Both snapshot workflows now fail fast before calling Bybit when egress is US/CN 
 ## 26. Persist position-level margin requirements
 
 The engine now calls RiskTierHistory.calculate_margin_requirements() on strict entries and persists the selected tier's maxLeverage plus position-level initial_margin_usdt and maintenance_margin_usdt in OpenPositionState. State restoration validates these values as finite non-negative Decimal strings. This makes the tier/entry margin estimate auditable across restart and preserves the configured leverage separately from the tier's max leverage. The estimate is entry-time only: it is not dynamically re-tiered at each mark, does not include estimated closing fees, does not enforce aggregate available margin, and does not produce a liquidation price. Research CI #41619268625 — SUCCESS on 889ae9ebdf3fbd06e81e14bed394612a5be050f6.
+
+
+## 27. H1 market-PnL runner now fails closed without dated Bybit snapshots
+
+The H1 shared-capital validation runner now requires both archived Bybit linear instrument-spec snapshots and risk-tier snapshots before loading data or launching any parameter/fold replay. It passes both directories into UnifiedQuantEngine, enabling strict as-of exchange sizing and risk-tier validation; no legacy notional-proxy fallback is used by this runner. The workflow has a matching preflight step. Added tests cover missing directories, empty snapshot directories, and valid directory configuration. Research CI #41619800964 — SUCCESS on 1e25c1cc00e69dd515e29c4515437c026a654f0a.
+
+No dated snapshots are currently present because the hosted GitHub runner is in a Bybit-blocked US region. Therefore manual H1 market-PnL workflow dispatch will stop at the preflight until official snapshots are collected from a non-US/non-China runner. This is intentional; no market PnL backtest was run.

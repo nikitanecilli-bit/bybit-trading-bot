@@ -847,3 +847,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Расчёт entry-time: IM = position value / configured leverage; MM = position value × MMR − mmDeduction.
 - Research CI #41619268625 — SUCCESS, commit 889ae9ebdf3fbd06e81e14bed394612a5be050f6.
 - Это не динамический mark-to-market margin/liquidation engine; нет account-wide margin solvency или close-fee reserve. Никакие market PnL тесты не запускались.
+
+
+## ENG-EXEC-012 — H1 PnL runner требует dated Bybit snapshots (2026-11-03)
+
+- H1 shared-capital runner больше не запускает PnL replay в legacy notional-proxy режиме.
+- Перед загрузкой данных обязательны обе директории: linear instrument specs и risk-limit tiers; обе передаются в UnifiedQuantEngine strict mode.
+- Preflight проверяет отсутствие/пустые директории; regression suite покрывает fail-closed и корректную конфигурацию.
+- Research CI #41619800964 — SUCCESS, commit 1e25c1cc00e69dd515e29c4515437c026a654f0a.
+- Снимков пока нет из-за US egress GitHub-hosted runner; H1 PnL workflow намеренно остановится до их сбора. Новые market PnL тесты не запускались.

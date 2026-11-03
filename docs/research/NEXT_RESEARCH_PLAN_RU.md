@@ -505,6 +505,7 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - E14 read-only post-break diagnostics completed: 3-bar/6-bar follow-through и retest связаны с последующим stop-loss outcome, но это post-entry association на уже просмотренных fold, не counterfactual PnL и не независимая проверка.
 - H-C close-based post-break invalidation реализована за disabled-by-default H1 flag, ограничена baseline H1-momentum-breakout и покрыта синтетическим CI (9/9 H-C tests; state persistence 67/67). Рыночный PnL не запускался: старые folds запрещены для оценки H-C, нужен untouched period и полноценный execution data gate. Подробности: `docs/research/H_C_POST_BREAK_INVALIDATION_PREREGISTRATION_RU.md`.
 - TradeRecord TP1/remaining-leg provenance перенесён в закрытую запись и проверен full Research CI #41673525597 SUCCESS на commit `69358a1f720e6b91046d2afaf7da8696f5958836`.
+- Delayed multi-bar fill provenance исправлена: исходный signal timestamp теперь проходит через `signal_origin_ts` → `OpenPositionState.signal_ts_ms` → `TradeRecord.signal_ts_ms` → JSON journal; старые backups без поля совместимы. CI [#41684988411 SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41684988411): portfolio accounting 46/46, state persistence 68/68, gap execution 31/31.
 - Старые sizing/liquidation audit notes получили supersession notices; текущий статус сосредоточен в `EXECUTION_INTEGRATION_REAUDIT_2026-11-03.md`.
 
 Текущий блокер:
@@ -514,9 +515,17 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 Следующий порядок:
 1. Не делать H-A threshold sweep и не переиспользовать старые fold для оценки H-C.
 2. Проверить, настроен ли non-US/non-CN self-hosted runner; после его появления выполнить ручные dated instrument/risk-tier captures и Bybit H1/funding/Mark archive с проверкой coverage.
-3. До появления архива продолжить только инженерный аудит: journal serialization/metrics, H1 runner/data manifests, старые audit-note supersession и PR #4 file classification.
-4. Разобрать PR #4 (210 changed files, 1,268 commits ahead / 15 behind current main; +17,657 / −162) по пакетам; не merge/rebase/force-push whole branch. Любая интеграция — отдельная чистая ветка от актуального main с небольшими проверяемыми патчами.
+3. До появления архива продолжить только инженерный аудит: remaining journal metrics (Net R denominator, MAE/MFE, drawdown aggregation), H1 runner/data manifests, старые audit-note supersession и PR #4 file classification. Signal→fill timestamp provenance уже закрыт и regression-tested.
+4. Разобрать PR #4 (211 changed files, 1,326 commits ahead / 18 behind current main; +17,451 / −164) по пакетам; не merge/rebase/force-push whole branch. Любая интеграция — отдельная чистая ветка от актуального main с небольшими проверяемыми патчами.
 5. После закрытия data/account-mode gates — один frozen shared-capital Bybit-native validation. Никаких новых параметрических сеток на proxy данных.
+
+## v15 dashboard safety disclosure — completed in main 2026-11-03
+
+- PR #7 merged: [docs(dashboard): label v15 as unvalidated demo](https://github.com/nikitanecilli-bit/bybit-trading-bot/pull/7), main commit `fc2c16151a6f945a50f6f3b3907bbd8b286bace9`.
+- HTML and its downloadable Markdown source now disclose the planted synthetic edge, independent per-symbol virtual capital, same-sample symbol selection, and synthetic fallback after API failure.
+- Unsupported "pure profit" and 96% fee-savings claims were removed; dashboard remains a demo, not a Python engine result. PDF export remains an unreviewed archived artifact.
+- Dashboard integrity CI and full Research engine checks both passed; see PR #7 for run links.
+
 
 ## Main repository organization — completed 2026-11-03
 

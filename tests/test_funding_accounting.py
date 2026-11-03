@@ -52,11 +52,28 @@ class AccruedFundingTests(unittest.TestCase):
         self.assertEqual(accrued_funding_cost(before_tp1, EVENTS, MARKS, SETTLE_2),
                          Decimal("22.00"))
 
-    def test_margin_funding_preserves_pre_tp1_full_exposure_and_scales_later_events(self):
+    def test_margin_funding_prorates_pre_and_post_tp1_events_to_remaining_position(self):
         pos = position(tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
         self.assertEqual(
             accrued_funding_cost_for_remaining_margin(pos, EVENTS, MARKS, SETTLE_2),
-            Decimal("16.00"),
+            Decimal("11.00"),
+        )
+
+    def test_margin_funding_prorates_pre_tp1_funding_receipts_too(self):
+        pos = position("short", tp1=True, tp1_ts=SETTLE_2, remaining="0.5")
+        receipt = [{"ts": SETTLE_1, "rate": "0.01"}]
+        self.assertEqual(
+            accrued_funding_cost_for_remaining_margin(pos, receipt, MARKS, SETTLE_1),
+            Decimal("-5.00"),
+        )
+
+    def test_margin_funding_uses_exact_remaining_contract_ratio_for_all_history(self):
+        pos = position(tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
+        pos.contract_qty = "1.0"
+        pos.remaining_contract_qty = "0.4"
+        self.assertEqual(
+            accrued_funding_cost_for_remaining_margin(pos, EVENTS, MARKS, SETTLE_2),
+            Decimal("8.80"),
         )
 
     def test_margin_funding_without_tp1_matches_actual_cashflow(self):

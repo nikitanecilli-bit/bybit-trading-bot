@@ -1,6 +1,12 @@
 name: Archive Bybit instrument specifications
 
 on:
+  push:
+    branches:
+      - research/market-regime-v1-main
+    paths:
+      - .github/workflows/bybit-instrument-snapshots.yml
+      - scripts/snapshot_bybit_instruments.py
   schedule:
     - cron: '17 2 3,17 * *'
   workflow_dispatch:
@@ -24,6 +30,30 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Refuse blocked runner egress geography
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          request = urllib.request.Request(
+              "https://ipinfo.io/json",
+              headers={"User-Agent": "bybit-research-network-diagnostic/1.0"},
+          )
+          with urllib.request.urlopen(request, timeout=10) as response:
+              data = json.loads(response.read().decode("utf-8"))
+          country = data.get("country", "unknown")
+          print("Runner egress country:", country)
+          print("Runner egress region:", data.get("region", "unknown"))
+          print("Runner egress organization:", data.get("org", "unknown"))
+          if country in {"US", "CN"}:
+              raise SystemExit(
+                  "Bybit public API blocks US/Mainland China IPs (HTTP 403). "
+                  "Use a self-hosted GitHub Actions runner outside those regions."
+              )
+          if country == "unknown":
+              raise SystemExit("Cannot verify runner egress country; refusing Bybit snapshot request.")
+          PY
       - name: Download dated linear instrument snapshot
         env:
           BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}

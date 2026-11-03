@@ -311,7 +311,12 @@ def validate_funding_manifest(
                             if values != sorted(set(values)):
                                 raise ValueError
                             expected_events = set(values)
-                            if reconstructed_grid is not None and expected_events != reconstructed_grid:
+                            expected_in_required_window = {
+                                ts for ts in expected_events
+                                if int(required_start_ms) <= ts <= int(required_end_ms)
+                            }
+                            if (reconstructed_grid is not None
+                                    and expected_in_required_window != reconstructed_grid):
                                 errors.append("expected_settlement_schedule_not_reconstructed_from_interval")
                         except (TypeError, ValueError):
                             errors.append("invalid_expected_settlement_timestamps")

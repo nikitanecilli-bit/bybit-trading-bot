@@ -281,24 +281,28 @@ def mark_candle_crosses_liquidation(
 
 
 def calculate_isolated_usdt_bankruptcy_price(
-    *, direction: str, entry_price, leverage, tick_size=None
+    *, direction: str, entry_price, leverage, quantity="1", tick_size=None,
+    extra_margin="0", funding_net_cost="0",
 ) -> Decimal:
-    """Calculate isolated USDT bankruptcy price (no extra-margin adjustment).
+    """Calculate isolated USDT bankruptcy price with allocated margin adjustments.
 
-    Bybit documents long bankruptcy price as entry*(1 - 1/leverage) and short
-    as entry*(1 + 1/leverage). When tick_size is supplied, long rounds up and
-    short rounds down to the exchange tick. This helper assumes no extra margin
-    was manually added and does not model fees/funding altering effective IM.
+    Bybit documents the no-adjustment price as entry*(1 +/- 1/leverage).
+    Extra margin shifts bankruptcy farther from entry; funding paid (positive
+    net cost) shifts it toward entry. Amounts must be allocated to this remaining
+    position, not the original position size.
     """
     side = str(direction).strip().lower()
     if side not in {"long", "short"}:
         raise ValueError("direction must be 'long' or 'short'")
     entry = _d(entry_price, "entry_price")
     lev = _d(leverage, "leverage")
-    if entry <= 0 or lev <= 0:
-        raise ValueError("entry_price and leverage must be positive")
-    price = entry * (Decimal("1") - Decimal("1") / lev if side == "long"
-                     else Decimal("1") + Decimal("1") / lev)
+    qty = _d(quantity, "quantity")
+    extra = _d(extra_margin, "extra_margin")
+    funding = _d(funding_net_cost, "funding_net_cost")
+    if entry <= 0 or lev <= 0 or qty <= 0 or extra < 0:
+        raise ValueError("entry_price/leverage/quantity must be positive and extra_margin non-negative")
+    margin_per_unit = entry / lev + extra / qty - funding / qty
+    price = entry - margin_per_unit if side == "long" else entry + margin_per_unit
     if price <= 0:
         raise ValueError("bankruptcy price must be positive")
     if tick_size is not None:

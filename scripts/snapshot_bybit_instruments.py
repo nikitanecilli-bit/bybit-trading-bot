@@ -91,41 +91,51 @@ def _request_page(base_url: str, category: str, cursor: str | None,
     return rows, next_cursor
 
 
+INSTRUMENT_STATUS_FILTERS = {
+    "linear": ("PreLaunch", "Trading", "Settling", "Delivering", "Closed"),
+    "inverse": ("PreLaunch", "Trading", "Settling", "Delivering", "Closed"),
+    "spot": ("Trading",),
+    "option": ("PreLaunch", "Trading", "Delivering", "Closed"),
+}
+
+
 def fetch_all_instruments(
     category: str = "linear",
-    fetch_page: Callable[[str | None], tuple[list[dict[str, Any]], str | None]] | None = None,
+    fetch_page: Callable[[str | None, str], tuple[list[dict[str, Any]], str | None]] | None = None,
 ) -> list[dict[str, Any]]:
-    if category not in {"linear", "inverse", "spot", "option"}:
+    if category not in INSTRUMENT_STATUS_FILTERS:
         raise ValueError(f"unsupported category: {category}")
     if fetch_page is None:
-        fetch_page = lambda cursor: _request_page(DEFAULT_BASE_URL, category, cursor)
+        fetch_page = lambda cursor, status: _request_page(
+            DEFAULT_BASE_URL, category, cursor, status=status
+        )
 
     by_symbol: dict[str, dict[str, Any]] = {}
-    seen_cursors: set[str] = set()
-    cursor: str | None = None
-    page_count = 0
-    while True:
-        page_count += 1
-        if page_count > MAX_PAGES:
-            raise RuntimeError("Bybit instrument pagination exceeded safety limit")
-        rows, next_cursor = fetch_page(cursor)
-        for row in rows:
-            symbol = str(row.get("symbol") or "").strip().upper()
-            if not symbol:
-                raise ValueError("instrument row is missing symbol")
-            if symbol in by_symbol and by_symbol[symbol] != row:
-                raise ValueError(f"conflicting duplicate instrument row: {symbol}")
-            by_symbol[symbol] = row
-        if not next_cursor:
-            break
-        if next_cursor == cursor or next_cursor in seen_cursors:
-            raise RuntimeError("Bybit instrument pagination cursor repeated")
-        seen_cursors.add(next_cursor)
-        cursor = next_cursor
+    for status in INSTRUMENT_STATUS_FILTERS[category]:
+        seen_cursors: set[str] = set()
+        cursor: str | None = None
+        page_count = 0
+        while True:
+            page_count += 1
+            if page_count > MAX_PAGES:
+                raise RuntimeError("Bybit instrument pagination exceeded safety limit")
+            rows, next_cursor = fetch_page(cursor, status)
+            for row in rows:
+                symbol = str(row.get("symbol") or "").strip().upper()
+                if not symbol:
+                    raise ValueError("instrument row is missing symbol")
+                if symbol in by_symbol and by_symbol[symbol] != row:
+                    raise ValueError(f"conflicting duplicate instrument row: {symbol}")
+                by_symbol[symbol] = row
+            if not next_cursor:
+                break
+            if next_cursor == cursor or next_cursor in seen_cursors:
+                raise RuntimeError("Bybit instrument pagination cursor repeated")
+            seen_cursors.add(next_cursor)
+            cursor = next_cursor
     if not by_symbol:
         raise RuntimeError("Bybit returned an empty instrument universe")
     return [by_symbol[symbol] for symbol in sorted(by_symbol)]
-
 
 def build_snapshot(rows: list[dict[str, Any]], category: str,
                    fetched_at: str | None = None) -> dict[str, Any]:
@@ -175,8 +185,10 @@ def main() -> None:
     if args.pause < 0:
         parser.error("--pause cannot be negative")
 
-    def fetch(cursor: str | None):
-        page, next_cursor = _request_page(args.base_url, args.category, cursor)
+    def fetch(cursor: str | None, status: str):
+        page, next_cursor = _request_page(
+            args.base_url, args.category, cursor, status=status
+        )
         if next_cursor and args.pause:
             time.sleep(args.pause)
         return page, next_cursor

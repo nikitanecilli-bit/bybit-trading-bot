@@ -17,15 +17,20 @@ from scripts.snapshot_bybit_instruments import (
 class SnapshotCollectorTests(unittest.TestCase):
     def test_collects_all_pages_and_sorts_symbols(self):
         pages = {
-            None: ([{"symbol": "ETHUSDT"}, {"symbol": "BTCUSDT"}], "cursor-2"),
-            "cursor-2": ([{"symbol": "SOLUSDT"}], None),
+            ("PreLaunch", None): ([{"symbol": "BIOUSDT", "status": "PreLaunch"}], None),
+            ("Trading", None): ([{"symbol": "ETHUSDT", "status": "Trading"},
+                                 {"symbol": "BTCUSDT", "status": "Trading"}], "cursor-2"),
+            ("Trading", "cursor-2"): ([{"symbol": "SOLUSDT", "status": "Trading"}], None),
         }
         seen = []
-        def fetch(cursor):
-            seen.append(cursor)
-            return pages[cursor]
+        def fetch(cursor, status):
+            seen.append((status, cursor))
+            return pages.get((status, cursor), ([], None))
         rows = fetch_all_instruments("linear", fetch)
-        self.assertEqual(seen, [None, "cursor-2"])
+        self.assertEqual(seen, [
+            ("PreLaunch", None), ("Trading", None), ("Trading", "cursor-2"),
+            ("Settling", None), ("Delivering", None), ("Closed", None),
+        ])
         self.assertEqual([row["symbol"] for row in rows],
                          ["BTCUSDT", "ETHUSDT", "SOLUSDT"])
 
@@ -35,28 +40,30 @@ class SnapshotCollectorTests(unittest.TestCase):
             None: ([row], "next"),
             "next": ([dict(row)], None),
         }
-        rows = fetch_all_instruments("linear", lambda cursor: pages[cursor])
+        rows = fetch_all_instruments(
+            "linear", lambda cursor, status: pages[cursor] if status == "Trading" else ([], None)
+        )
         self.assertEqual(rows, [row])
 
     def test_conflicting_duplicate_is_rejected(self):
         pages = {
-            None: ([{"symbol": "BTCUSDT", "status": "Trading"}], "next"),
-            "next": ([{"symbol": "BTCUSDT", "status": "PreLaunch"}], None),
+            ("PreLaunch", None): ([{"symbol": "BTCUSDT", "status": "PreLaunch"}], None),
+            ("Trading", None): ([{"symbol": "BTCUSDT", "status": "Trading"}], None),
         }
         with self.assertRaisesRegex(ValueError, "conflicting duplicate"):
-            fetch_all_instruments("linear", lambda cursor: pages[cursor])
+            fetch_all_instruments("linear", lambda cursor, status: pages.get((status, cursor), ([], None)))
 
     def test_repeated_cursor_is_rejected(self):
-        def fetch(cursor):
-            return ([{"symbol": "BTCUSDT"}], "loop")
+        def fetch(cursor, status):
+            return ([{"symbol": "BTCUSDT", "status": status}], "loop")
         with self.assertRaisesRegex(RuntimeError, "cursor repeated"):
             fetch_all_instruments("linear", fetch)
 
     def test_empty_universe_and_missing_symbol_are_rejected(self):
         with self.assertRaisesRegex(RuntimeError, "empty instrument"):
-            fetch_all_instruments("linear", lambda cursor: ([], None))
+            fetch_all_instruments("linear", lambda cursor, status: ([], None))
         with self.assertRaisesRegex(ValueError, "missing symbol"):
-            fetch_all_instruments("linear", lambda cursor: ([{}], None))
+            fetch_all_instruments("linear", lambda cursor, status: ([{}], None))
 
     def test_strict_retcode_rejects_boolean_false(self):
         with self.assertRaisesRegex(RuntimeError, "non-zero or invalid retCode"):
@@ -80,7 +87,7 @@ class SnapshotCollectorTests(unittest.TestCase):
         try:
             with self.assertRaisesRegex(RuntimeError, "exceeded safety limit"):
                 fetch_all_instruments(
-                    "linear", lambda cursor: ([{"symbol": "BTCUSDT"}], "next")
+                    "linear", lambda cursor, status: ([{"symbol": "BTCUSDT", "status": status}], "next")
                 )
         finally:
             collector.MAX_PAGES = previous

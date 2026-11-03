@@ -83,6 +83,19 @@ class MarketStructureTests(unittest.TestCase):
         self.assertEqual(len(full_labels), len(candles))
 
 
+    def test_non_finite_ema_and_trend_inputs_are_rejected(self):
+        for bad in (float("nan"), float("inf"), float("-inf")):
+            with self.assertRaises(ValueError):
+                ema_series([100.0, bad, 101.0], 3)
+            candles = make_candles([100.0 + i for i in range(210)])
+            candles[-1].close = bad
+            with self.assertRaises(ValueError):
+                trend_direction(candles, fast=50, slow=200, slope=5)
+        candles = make_candles([100.0 + i for i in range(210)])
+        candles[-1].close = 0.0
+        with self.assertRaises(ValueError):
+            trend_direction(candles, fast=50, slow=200, slope=5)
+
     def test_invalid_ema_trend_parameters_rejected(self):
         candles = make_candles([100 + i for i in range(60)])
         with self.assertRaises(ValueError):

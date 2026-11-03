@@ -150,3 +150,6 @@ Regression coverage: long TP1 gap-through vs ordinary intrabar TP1 touch; long a
 **Residual execution limit:** a non-gap OHLC touch is still only a maker proxy. The replay has no L2 order book, queue position, partial fills, cancel/replace latency or adverse-selection model. This correction prevents a known gap-through maker over-credit; it does not prove real maker execution.
 
 This supersedes the earlier simplified note in the fee section that any configured take-profit exit is maker whenever maker_exits is true.
+
+
+**Scope clarification for the current H1 portfolio runner:** scripts/run_h1_shared_capital_portfolio_validation.py explicitly sets maker_entry_and_tp1=True and maker_tp1_and_target=False (both in the engine setup and frozen-config manifest). Thus H1 uses maker entry with taker TP1/TP2 exits; the gap-aware maker-target correction does not alter that H1 execution configuration or its baseline. It protects other engine configurations and any future maker-target ablation from undercharging marketable TP gaps.

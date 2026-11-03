@@ -137,9 +137,31 @@ def validate_funding_manifest(
             continue
         page_intervals = []
         for page in pages:
-            lo, hi = page.get("request_start_ms"), page.get("request_end_ms")
-            if not isinstance(lo, int) or not isinstance(hi, int) or hi < lo:
+            if not isinstance(page, dict):
                 errors.append("invalid_page_metadata")
+                continue
+            if page.get("complete") is not True:
+                # A saturated API page is only a partial response; its window
+                # must be covered by recursive sub-queries or later pages.
+                continue
+            lo, hi = page.get("request_start_ms"), page.get("request_end_ms")
+            rows = page.get("response_rows")
+            if (not isinstance(lo, int) or not isinstance(hi, int) or hi < lo
+                    or not isinstance(rows, int) or rows < 0):
+                errors.append("invalid_page_metadata")
+                continue
+            first_ts, last_ts = page.get("first_ts"), page.get("last_ts")
+            if rows == 0:
+                if first_ts is not None or last_ts is not None:
+                    errors.append("invalid_empty_page_metadata")
+                    continue
+            else:
+                if (not isinstance(first_ts, int) or not isinstance(last_ts, int)
+                        or first_ts > last_ts or first_ts < lo or last_ts > hi):
+                    errors.append("invalid_page_timestamp_bounds")
+                    continue
+            if page.get("out_of_window_rows", 0) != 0:
+                errors.append("page_contains_out_of_window_rows")
                 continue
             page_intervals.append((lo, hi))
         page_intervals.sort()

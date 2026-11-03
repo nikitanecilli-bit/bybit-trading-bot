@@ -218,6 +218,8 @@ def test_hc_real_close_charges_taker_costs_on_tp1_and_remaining_market_exit():
     assert trade.exit_price == bar.close
     assert trade.tp1_hit is True
     assert abs(trade.remaining_fraction_at_exit - (1.0 - engine.TP1_FRACTION)) < 1e-9
+    assert trade.tp1_maker is False
+    assert trade.final_exit_maker is False
     # Entry, TP1 and H-C remaining-leg close are all taker-classified here.
     # The invalidation exit must not receive maker credit.
     assert trade.exchange_fees_usdt > 0

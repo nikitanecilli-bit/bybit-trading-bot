@@ -85,14 +85,14 @@ def test_incremental_download_refuses_to_rebless_modified_existing_csv():
                 {"fundingRateTimestamp": "1000", "fundingRate": "0.001"}
             ]}
 
-        with patch.object(downloader, "api_get", side_effect=first_page), \\
+        with patch.object(downloader, "api_get", side_effect=first_page), \
              patch.object(downloader, "now_ms", return_value=3000):
             csv_path = downloader.download_dataset(
                 object(), "https://api.bybit.com", "funding", "linear",
                 "BTCUSDT", None, "1h", 1000, 1000, root, delay=0,
             )
         csv_path.write_text(
-            "timestamp,datetime,funding_rate\\n999,1970-01-01,0.001\\n",
+            "timestamp,datetime,funding_rate\n999,1970-01-01,0.001\n",
             encoding="utf-8",
         )
         try:

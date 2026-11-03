@@ -31,6 +31,14 @@ class RiskTierHistoryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "exceeds tier 2 maxLeverage"):
                 history.get_tier("BTCUSDT", 1793606400000, "250000", leverage="60")
 
+    def test_get_tiers_returns_full_point_in_time_ladder_without_entry_leverage_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")
+            history = RiskTierHistory.from_directory(tmp)
+            tiers = history.get_tiers("BTCUSDT", 1793606400000, max_age_ms=1)
+            self.assertEqual([item.tier_id for item in tiers], [1, 2])
+            self.assertEqual(tiers[1].max_leverage, Decimal("50"))
+
     def test_calculates_position_level_initial_and_maintenance_margin(self):
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")

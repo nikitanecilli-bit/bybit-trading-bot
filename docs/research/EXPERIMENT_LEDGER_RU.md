@@ -892,3 +892,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Decision: no H-A optimization, no breakeven/stop-widening/session/direction filter and no new PnL on the reused folds. H-C close-based post-break invalidation is now implemented behind a default-OFF research flag, with synthetic semantics/state tests passing; it has NOT been PnL-tested or enabled live. See H_C_POST_BREAK_INVALIDATION_PREREGISTRATION_RU.md. Bybit-native point-in-time data and execution realism remain blockers.
 - Follow-up engineering change: TradeRecord and the H-A runner now retain/export initial stop geometry, TP1 hit/time/realized gross, remaining fraction and final stop. This code change is regression-tested, but artifact 13249307987 predates it; do not claim those TP1 fields exist in E14 output until a later replay.
 - Signal-time Donchian boundary is now emitted by baseline/H-A signal evaluators, persisted through pending/open/closed trade state, validated on restore, and exported by the runner. This is provenance-only and has no effect on execution/PnL; E14 artifact predates it.
+
+
+## ENG-EXEC-015 — согласованность TP1 maker fee между MTM и close для legacy positions (2026-11-03)
+
+- Карточка: [ENG-EXEC-015](experiment_cards/ENG-EXEC-015_LEGACY_TP1_MTM_FEE_FALLBACK_RU.md).
+- Подтверждённый дефект: _close_position() при maker_exits=None использовал fallback order_type == "limit", а _unrealized_pnl_at_marks() трактовал None как taker. Legacy/restored limit position после TP1 поэтому имела разные TP1 fee/slippage в unrealized equity и final close accounting.
+- Test-first CI [#41705641423](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41705641423) FAILED именно на новой регрессии test_legacy_limit_position_mtm_uses_same_tp1_fee_fallback_as_close; mismatch reproduced.
+- Fix: MTM теперь разрешает maker_exits тем же fallback, что и _close_position(). Явные True/False не меняются. Торговые сигналы, risk sizing, stop/target и fee constants не затронуты.
+- Full Research CI [#41705849389](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41705849389) SUCCESS; новая regression и portfolio accounting suite прошли.
+- Влияние на текущий H1 preset: конкретно этот None fallback там не используется, поскольку maker_tp1_and_target=False. Это прежде всего legacy/restored-position accounting consistency defect; никаких market PnL runs не было.
+

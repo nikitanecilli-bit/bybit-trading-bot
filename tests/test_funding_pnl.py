@@ -103,11 +103,12 @@ def test_funding_exactly_at_exit_boundary_is_included():
     assert record.funding_cost_usdt == 10.0
 
 
-def test_funding_before_entry_is_not_charged():
+def test_funding_at_entry_boundary_is_conservatively_charged():
     e, pos = make_engine("long", 0.01)
     e.funding_by_symbol["BTCUSDT"][0]["ts"] = pos.entry_ts
+    e._funding_mark_prices["BTCUSDT"][pos.entry_ts] = 100.0
     record = close(e, pos)
-    assert record.funding_cost_usdt == 0.0
+    assert record.funding_cost_usdt == 10.0
 
 
 def test_missing_mark_proxy_fails_loudly():

@@ -1,6 +1,8 @@
 """Offline tests for official Bybit funding and mark-price history collection."""
 from pathlib import Path
+import hashlib
 import json
+import os
 import tempfile
 import sys
 import unittest
@@ -169,12 +171,19 @@ class BybitMarketHistoryTests(unittest.TestCase):
                 "launchTime": "3600000", "deliveryTime": "0", "status": "Trading",
             }],
         }
+        original_cwd = Path.cwd()
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "universe.json"
-            path.write_text(json.dumps(snapshot), encoding="utf-8")
-            # The loader intentionally requires a repository-relative path.
-            with self.assertRaisesRegex(ValueError, "inside the repository"):
-                load_universe_lifecycle(path)
+            try:
+                os.chdir(tmp)
+                path = Path("universe.json")
+                path.write_text(json.dumps(snapshot), encoding="utf-8")
+                lifecycle, digest, fetched_at = load_universe_lifecycle(path)
+                self.assertEqual(lifecycle["BTCUSDT"]["launch_ms"], 3_600_000)
+                self.assertEqual(lifecycle["BTCUSDT"]["delivery_ms"], 0)
+                self.assertEqual(digest, hashlib.sha256(path.read_bytes()).hexdigest())
+                self.assertEqual(fetched_at, snapshot["fetched_at"])
+            finally:
+                os.chdir(original_cwd)
 
     def test_symbol_path_traversal_and_invalid_characters_rejected(self):
         self.assertEqual(normalize_symbol("btcusdt"), "BTCUSDT")

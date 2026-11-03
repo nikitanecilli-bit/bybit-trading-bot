@@ -83,6 +83,14 @@ class MarketStructureTests(unittest.TestCase):
         self.assertEqual(len(full_labels), len(candles))
 
 
+    def test_trend_labels_reject_duplicate_or_out_of_order_timestamps(self):
+        for timestamps in ([1, 2, 2, 4], [1, 3, 2, 4]):
+            candles = make_candles([100.0, 101.0, 102.0, 103.0])
+            for candle, timestamp in zip(candles, timestamps):
+                candle.ts = timestamp
+            with self.assertRaises(ValueError):
+                trend_direction_series(candles, fast=2, slow=3, slope=1)
+
     def test_non_finite_ema_and_trend_inputs_are_rejected(self):
         for bad in (float("nan"), float("inf"), float("-inf")):
             with self.assertRaises(ValueError):

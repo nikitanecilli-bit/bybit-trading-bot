@@ -75,3 +75,8 @@ The following guardrails have now been added on this research branch:
 ### Stronger schedule-evidence validation
 
 The initial boolean schedule flag was replaced by a required sidecar reference to a separately hashed schedule JSON. The validator now checks the schedule file hash, symbol/category/source identity, coverage boundaries, ordered source-snapshot references and hashes, each referenced raw Bybit instrument snapshot's schema/category/fetched_at/symbol/fundingInterval, and exact equality between expected and observed settlement timestamps inside the scored interval. The H1 gate therefore cannot be satisfied by setting a bare boolean. A schedule-generation process based on complete dated snapshots is still not available for the historical archive, so replay remains blocked.
+
+
+### Dated interval alignment check
+
+The schedule validator also rejects unsupported interval values and requires every expected settlement timestamp to align with the applicable preceding snapshot's recorded interval. Bybit's V5 Funding Rate History documentation explicitly says each symbol can have a different interval and points to Instruments Info for that interval; the H1 gate therefore must not use a global hard-coded cadence. The implementation accepts the documented 1h/2h/4h/8h interval values and uses UTC-aligned settlement boundaries. See the official API documentation: https://bybit-exchange.github.io/docs/v5/market/history-fund-rate and https://bybit-exchange.github.io/docs/v5/market/instrument.

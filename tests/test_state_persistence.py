@@ -18,7 +18,7 @@ def sample_position():
         strategy="state-test", entry_ts=1_790_000_000_000,
         entry_price=100.0, stop_price=95.0, tp1_price=106.0,
         tp2_price=112.0, initial_stop_dist=5.0, size_usdt=1_000.0,
-        risk_usdt=60.0, order_type="market",
+        risk_usdt=60.0, order_type="market", breakout_level=101.0,
     )
 
 
@@ -61,6 +61,7 @@ class StatePersistenceTests(unittest.TestCase):
                     "tp1_price": 1900.0, "tp2_price": 1800.0,
                     "stop_dist": 100.0, "atr": 50.0, "vol_ratio": 1.25,
                     "session": "eu", "order_type": "limit",
+                    "breakout_level": 2010.0,
                 }
             }
             writer = engine.PlanBStatePersistence(str(path), enabled=True)
@@ -79,6 +80,8 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertEqual(positions["BTCUSDT"].risk_limit_value, "500000")
             self.assertEqual(positions["BTCUSDT"].maintenance_margin_rate, "0.01")
             self.assertEqual(positions["BTCUSDT"].maintenance_margin_deduction, "500")
+            self.assertEqual(positions["BTCUSDT"].breakout_level, 101.0)
+            self.assertEqual(restored_pending["ETHUSDT"]["breakout_level"], 2010.0)
             self.assertEqual(restored_risk.realized_equity, 9_500.0)
             self.assertEqual(restored_risk.unrealized_pnl, -125.0)
             self.assertEqual(restored_risk.current_equity, 9_375.0)
@@ -808,6 +811,24 @@ class StatePersistenceTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 engine.PlanBStatePersistence(str(path)).load_state(risk)
             self.assertEqual(risk.to_dict(), before)
+
+    def test_invalid_breakout_level_in_backup_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid-breakout-level.json"
+            cfg = engine.BotConfig()
+            position = sample_position()
+            risk = engine.AdaptiveRiskManager(cfg)
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {"BTCUSDT": position}, {}, 42,
+                last_mark_prices={"BTCUSDT": position.entry_price},
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["open_positions"]["BTCUSDT"]["breakout_level"] = "invalid"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(
+                    engine.AdaptiveRiskManager(cfg)
+                )
 
     def test_invalid_trade_sequence_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -76,3 +76,18 @@ The research-only EMA helper now rejects non-numeric/non-finite EMA inputs, and 
 ### Chronological-input validation — 2026-11-04
 
 The causal trend-series helper now also rejects duplicate and out-of-order candle timestamps. This prevents a caller from silently producing labels from a malformed/non-chronological series. Regression tests cover both duplicate and descending timestamp cases. Research CI [#41727272300](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41727272300) completed **SUCCESS, 53/53 steps** at code commit `f3696125e73df95c663b95df07ef3d0cab3f6c16`.
+
+
+## Opt-in H1 runner integration — 2026-11-04
+
+The architectural integration path is now implemented without changing the baseline:
+- `market_structure.trend_label_index()` builds an exact candle-open timestamp → `up/down/neutral` map from the full chronological H1 series.
+- Default EMA200 seed burn-in is frozen at 1,000 completed H1 candles (5× slow period). Earlier labels are forced to `neutral`; shorter history fails closed.
+- Optional `expected_interval_ms=3,600,000` rejects H1 gaps; duplicate/out-of-order timestamps are also rejected.
+- `lookup_trend_label()` performs exact timestamp lookup only and raises on missing labels; there is no nearest/prior-bar fallback.
+- `build_ema50_200_label_maps()` precomputes per-symbol maps through the scored fold end and requires 1,000 pre-roll bars before the first scored candle.
+- `run_portfolio_variant(..., ema_trend_labels_by_symbol=...)` accepts the precomputed context as an explicit opt-in input. For this long-only H1 runner, only same-bar `up` labels permit a long signal; `down`, `neutral`, or absent context block/fail closed.
+
+Deterministic tests cover exact lookup, full 1,000-bar burn-in, H1 continuity, missing symbol/timestamp, and prefix invariance. Research CI [#41727906187](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41727906187) completed **SUCCESS, 54/54 steps** at commit `8ab840b7a127518411b01fd9828008dd479aef18`.
+
+Important boundary: the current H1 main grid does not pass this optional map, and no EMA-gated market PnL replay has been run. Existing baseline behavior is unchanged. This is integration infrastructure and deterministic validation only; no strategy edge is established.

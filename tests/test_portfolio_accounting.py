@@ -473,6 +473,40 @@ def test_close_trade_reconciles_net_pnl_fees_slippage_and_realized_equity():
     assert "BTCUSDT" not in e.open_positions
 
 
+def test_journal_preserves_sub_micro_price_and_stop_distance_precision():
+    e = make_engine()
+    entry = 0.00000637
+    exit_price = 0.00000641
+    stop_dist = 0.00000037
+    pos = make_position(entry=entry, size=1_000.0)
+    pos.initial_stop_dist = stop_dist
+    pos.stop_price = entry - stop_dist
+    pos.tp1_price = entry + stop_dist * 1.2
+    pos.tp2_price = entry + stop_dist * 2.4
+    pos.breakout_level = entry - 0.00000007
+    e.open_positions["BTCUSDT"] = pos
+
+    e._close_position(
+        pos, exit_price=exit_price, exit_reason="take_profit",
+        exit_ts=pos.entry_ts + 3_600_000, mae_r=0.2, mfe_r=1.5,
+    )
+    trade = e.closed_trades[-1]
+
+    assert trade.entry_price == round(entry, 12)
+    assert trade.exit_price == round(exit_price, 12)
+    assert trade.initial_stop_dist == round(stop_dist, 12)
+    assert trade.initial_stop_price == round(entry - stop_dist, 12)
+    assert trade.tp1_price == round(pos.tp1_price, 12)
+    assert trade.tp2_price == round(pos.tp2_price, 12)
+    assert trade.final_stop_price == round(pos.stop_price, 12)
+    assert trade.breakout_level == round(pos.breakout_level, 12)
+    reconstructed_gross = round(
+        trade.size_usdt * (trade.exit_price - trade.entry_price) / trade.entry_price,
+        2,
+    )
+    assert reconstructed_gross == trade.gross_pnl
+
+
 def test_trade_record_retains_tp1_partial_state_and_remaining_quantity():
     e = make_engine()
     pos = make_position(

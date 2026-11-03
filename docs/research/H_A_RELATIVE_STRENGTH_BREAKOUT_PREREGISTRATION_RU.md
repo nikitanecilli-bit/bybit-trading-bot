@@ -217,3 +217,51 @@ A simple breakeven-at-0.5R or stop widening rule is not justified by these summa
 ### Next diagnostic target
 
 Investigate signal-candle and pre-break structure for stop-loss vs time/trailing winners: body/range relative to ATR, close location, upper/lower wick, volume ratio and trajectory, distance beyond prior Donchian boundary, and pre-break compression. Reconstruct only from bars available at signal close; use the previous H1 candle for next-bar entry and preserve the same shared-capital ledger. This is diagnostic attribution, not evidence of causality or a new profitable strategy.
+
+## 12. Signal-candle and post-break attribution — 2026-11-03
+
+Read-only artifact: workflow [41671977224](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41671977224), artifact ID 13248093501. It contains 2,055 trade rows across baseline and H-A, 41 cohort summaries, and a matching source archive SHA manifest. No PnL was recomputed; no signal or execution rule was changed.
+
+### Pre-entry signal-candle features
+
+Stop-loss vs profitable exit cohorts show weak separation from the signal candle alone. H-A in-sample rank AUC (higher feature value as a stop-loss score):
+
+| Feature | AUC |
+|---|---:|
+| Signal range / ATR | 0.540 |
+| Signal body / ATR | 0.546 |
+| Signal volume / prior 20-bar mean | 0.515 |
+| Directional close location | 0.516 |
+| Breakout close clearance / ATR | 0.524 |
+| Pre-break 6-bar range / 20-bar range | 0.477 |
+| Previous close distance to Donchian boundary | 0.550 |
+
+Fold-level direction and strength are not stable. The small take-profit cohort (18 H-A trades) has visibly larger impulse/volume, but is too small to justify a threshold. Do not introduce a signal-candle size, volume, wick or compression filter from this result.
+
+### Post-entry follow-through and channel retest
+
+For this analysis, the signal bar is the completed H1 candle immediately before the next-bar entry. Post-entry features use only completed H1 bars before exit. The exit candle is excluded for intrabar stop/trailing/TP/kill-switch exits; it is included only for close-based time-stop/end-of-test exits. No OHLC intrabar order is inferred.
+
+H-A results:
+- 3-bar close return in R: stop-loss cohort mean -0.104R (451 eligible trades), profitable exit cohort mean +0.222R (486 eligible trades). Rank AUC for a lower return indicating stop-loss is approximately 0.700.
+- 6-bar close return in R: stop-loss mean -0.118R (353 eligible), profitable cohort mean +0.313R (475 eligible). Rank AUC for a lower return indicating stop-loss is approximately 0.734.
+- Close back inside the prior Donchian boundary at least once within 3 completed bars: 61.6% of eligible stop-loss trades vs 41.6% of profitable exit trades; AUC 0.600.
+- Same retest within 6 completed bars: 73.1% vs 50.5%; AUC 0.613.
+
+The 3-bar retest association is directionally consistent in all folds:
+- Fold 1: retest cohort net -1,206.64 USDT; no-retest cohort +589.12.
+- Fold 2: retest cohort -2,540.07; no-retest +1,102.86.
+- Fold 3: retest cohort -2,917.66; no-retest +1,397.25.
+
+Baseline shows a similar pattern: 3-bar retest cohort net -5,604.54 USDT vs +3,588.59 USDT without retest. This suggests the observation is not unique to the H-A relative-strength rank.
+
+These are eventual realized outcomes conditioned on a future path event, not counterfactual results of exiting at the retest. The eligible cohorts also exclude trades that exit before the requested horizon. This is not proof that an early exit rule would improve PnL.
+
+### Research interpretation
+
+The evidence currently favours post-entry continuation / early invalidation research over a pre-entry candle-shape classifier:
+- Signal-candle shape, volume and pre-break compression have AUC close to 0.5.
+- Directional close return after 3–6 completed H1 bars has materially stronger separation.
+- A close back inside the prior breakout boundary is more common among stop-loss outcomes and has consistent fold-level association.
+
+This is the most promising descriptive pattern found so far, but the folds are already used and are not holdout. Do not select an exact 1/3/6-bar threshold, optimize a retest rule, or claim profitability from this attribution. A future preregistered H-C should define the confirmation/invalidation timing and conservative execution before any new unseen data is tested.

@@ -808,3 +808,13 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Duplicate detail: AAVEUSDT, DOTUSDT, TAOUSDT — 4,321-bar subset полностью совпадает с соответствующими 4,321 timestamps в 8,761-bar archive; ENAUSDT, ONDOUSDT, QNTUSDT — две 8,761-bar копии полностью совпадают.
 - Все шесть SHA-256 из E11 и E13 artifact manifests совпадают с текущими SHA-256 тех же ZIP-файлов. Это подтверждает, что скан проверил именно те архивные байты, на которых были выполнены E11/E13.
 - Вывод: текущая эвристика longest-file selection не привела к выявленному конфликту или потере покрытия в этих конкретных архивах. Это снимает текущий duplicate-archive blocker для E11/E13 inputs, но не заменяет Bybit-native market data и point-in-time universe. Будущие архивы по-прежнему должны проходить такой scan.
+
+
+## ENG-EXEC-008 — dated Bybit risk-tier entry gate (2026-11-03)
+
+- Добавлен `bybit_risk_tiers.py`: as-of загрузка датированных Bybit V5 risk-limit snapshots, выбор первого tier, покрывающего notional, fail-closed на отсутствующем/устаревшем snapshot, отсутствующем symbol, превышении максимального riskLimitValue и tier-specific maxLeverage.
+- `UnifiedQuantEngine` получил необязательный `risk_tiers_dir`. Если он задан, вход отклоняется при отсутствии подходящего исторического tier; выбранные tier ID, risk limit, MMR и MM deduction сохраняются в состоянии позиции.
+- Loader повторно валидирует tier_count, единственный lowest tier, монотонность riskLimit/MMR/IMR/maxLeverage и mmDeduction recurrence. Добавлены тесты на граничный notional, превышение плеча, stale/future snapshots, испорченные lowest-tier и deduction, engine fail-closed и round-trip сохранения tier metadata.
+- Research CI [#41615868813](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41615868813) — **SUCCESS**, commit `b784559f8ca224a893ca6fb074f8376bbeeb6837`; полный deterministic suite завершён, включая cleanup.
+- Важно: это только entry-time tier gate. Bybit пересчитывает tier по position value на Mark Price в реальном времени; движок пока не обновляет tier динамически и не моделирует MM/liquidation/IOC deleveraging. Источники: [официальный risk-limit API](https://bybit-exchange.github.io/docs/v5/market/risk-limit), [maintenance margin](https://www.bybit.com/en/help-center/article/Maintenance-Margin-USDT-Contract), [liquidation rules](https://www.bybit.com/en/help-center/article/UTA-Trading-Rules-Liquidation-Process).
+- Снимки Bybit пока не получены: GitHub Actions получает HTTP 403 от `api.bybit.com`. H1 runner не передаёт `instrument_specs_dir` или `risk_tiers_dir`; результаты E01–E13 не менялись, рыночные backtests не запускались, реальные ордера не размещались.

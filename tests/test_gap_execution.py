@@ -468,6 +468,29 @@ def test_financial_rounding_uses_half_up_at_half_cent():
 
 
 
+def test_pending_entry_cannot_reuse_slot_freed_later_in_same_bar():
+    e = make_engine()
+    e.cfg.max_concurrent_positions = 1
+    e.open_positions["BTCUSDT"] = make_position("long", entry=100.0, stop=95.0)
+    ts = 1_800_000_000_000
+    e.pending["ETHUSDT"] = {
+        "direction": "long", "entry_price": 100.0, "order_type": "market",
+        "strategy": "test", "stop_dist": 2.0, "signal_ts": ts - 15 * 60_000,
+    }
+
+    # Portfolio slots and risk are reserved from the bar-open state.
+    budgets = e._prepare_pending_entry_risk_budgets()
+    assert budgets["ETHUSDT"] == 0.0
+
+    # Even if the existing position is processed/closed first, the pending
+    # entry cannot use a slot that was unavailable at this bar's open.
+    e.open_positions.pop("BTCUSDT")
+    opened = e._try_fill_pending("ETHUSDT", candle(100.0, 101.0, 99.0, 100.5, ts=ts))
+    assert opened is False
+    assert "ETHUSDT" not in e.open_positions
+    assert "ETHUSDT" not in e.pending
+
+
 def test_pending_signal_is_removed_when_risk_gate_rejects_entry():
     e = make_engine()
     e.pending["BTCUSDT"] = pending_signal("market", 100.0)

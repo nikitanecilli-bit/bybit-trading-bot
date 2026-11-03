@@ -405,6 +405,7 @@ class OpenPositionState:
     max_favorable_px: float = 0.0
     max_adverse_px: float = 0.0
     equity_at_entry: float = 0.0
+    leverage: Optional[float] = None
     risk_tier_id: Optional[int] = None
     risk_limit_value: Optional[str] = None
     maintenance_margin_rate: Optional[str] = None
@@ -867,11 +868,11 @@ class PlanBStatePersistence:
                 "entry_price", "stop_price", "tp1_price", "tp2_price",
                 "initial_stop_dist", "size_usdt", "risk_usdt",
                 "realized_tp1_gross_usdt", "remaining_fraction",
-                "max_favorable_px", "max_adverse_px", "equity_at_entry",
+                "max_favorable_px", "max_adverse_px", "equity_at_entry", "leverage",
             }
             positive_position_fields = {
                 "entry_price", "stop_price", "tp1_price", "tp2_price",
-                "initial_stop_dist", "size_usdt", "risk_usdt",
+                "initial_stop_dist", "size_usdt", "risk_usdt", "leverage",
             }
             restored: Dict[str, OpenPositionState] = {}
             for sym, pos_dict in positions_data.items():
@@ -1456,6 +1457,8 @@ class UnifiedQuantEngine:
             pos.symbol, as_of_ts,
             max_age_ms=getattr(self, "max_risk_tier_age_ms", 30 * 24 * 60 * 60 * 1000),
         )
+        if pos.leverage is None or not math.isfinite(float(pos.leverage)) or pos.leverage <= 0:
+            raise RuntimeError(f"{pos.symbol}: missing valid entry leverage; refusing liquidation-aware replay")
         quantity = (
             Decimal(str(pos.remaining_contract_qty)) if pos.exchange_sized
             else Decimal(str(pos.size_usdt)) / Decimal(str(pos.entry_price))
@@ -1474,14 +1477,14 @@ class UnifiedQuantEngine:
         health = evaluate_isolated_margin_health(
             symbol=pos.symbol, direction=pos.direction,
             entry_price=pos.entry_price, mark_price=adverse_mark,
-            quantity=quantity, leverage=self.cfg.leverage_val, tiers=tiers,
+            quantity=quantity, leverage=pos.leverage, tiers=tiers,
             taker_fee_rate=TAKER_FEE, funding_net_cost=funding_cost,
         )
         if not health.liquidation_triggered:
             return None
         bankruptcy = calculate_isolated_usdt_bankruptcy_price(
             direction=pos.direction, entry_price=pos.entry_price,
-            leverage=self.cfg.leverage_val, quantity=quantity,
+            leverage=pos.leverage, quantity=quantity,
             funding_net_cost=funding_cost,
         )
         return float(bankruptcy)
@@ -1912,6 +1915,7 @@ class UnifiedQuantEngine:
             maker_exits=(self.cfg.maker_entry_and_tp1 if self.cfg.maker_tp1_and_target is None else self.cfg.maker_tp1_and_target),
             max_favorable_px=fill, max_adverse_px=fill,
             equity_at_entry=sizing_equity,
+            leverage=float(self.cfg.leverage_val),
             risk_tier_id=risk_margin.tier_id if risk_margin else None,
             risk_limit_value=str(risk_margin.risk_limit_value) if risk_margin else None,
             maintenance_margin_rate=str(risk_margin.maintenance_margin_rate) if risk_margin else None,

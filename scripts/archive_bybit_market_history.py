@@ -422,11 +422,14 @@ def _atomic_csv(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]) -
 
 def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | Path,
                    interval: str = "60", base_url: str = DEFAULT_BASE_URL,
-                   pause: float = 0.1) -> dict[str, Any]:
+                   pause: float = 0.1,
+                   instrument_snapshot_paths: list[str | Path] | None = None) -> dict[str, Any]:
     symbol = normalize_symbol(symbol)
     validate_base_url(base_url)
     if pause < 0:
         raise ValueError("pause cannot be negative")
+    if not instrument_snapshot_paths:
+        raise ValueError("dated instrument snapshots are required for Funding schedule evidence")
     root = Path(output_root)
     funding_path = root / "funding" / f"{symbol.upper()}.csv"
     funding_manifest_path = funding_path.with_suffix(funding_path.suffix + ".audit.json")
@@ -455,6 +458,13 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
         requested_end_ms=end_ms - 1, pages=funding_pages,
         collected_at_ms=int(datetime.now(timezone.utc).timestamp() * 1000),
     )
+    from funding_archive_manifest import attach_funding_settlement_schedule
+    schedule = attach_funding_settlement_schedule(
+        funding_path, funding_manifest_path, symbol=symbol, category="linear",
+        required_start_ms=start_ms, required_end_ms=end_ms - 1,
+        snapshot_paths=instrument_snapshot_paths,
+        snapshot_copy_dir=root / "instrument_snapshots",
+    )
     _atomic_csv(kline_path, ["symbol", "timestamp_ms", "open", "high", "low", "close", "volume", "turnover"], klines)
     _atomic_csv(mark_path, ["symbol", "timestamp_ms", "open", "high", "low", "close"], marks)
     return {
@@ -463,6 +473,11 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
         "funding_file": str(funding_path), "funding_manifest_file": str(funding_manifest_path),
         "funding_file_sha256": funding_manifest["csv_sha256"],
         "funding_manifest_sha256": hashlib.sha256(funding_manifest_path.read_bytes()).hexdigest(),
+        "funding_schedule_file": str(funding_path.parent / f"{symbol}.schedule.json"),
+        "funding_schedule_sha256": hashlib.sha256(
+            (funding_path.parent / f"{symbol}.schedule.json").read_bytes()
+        ).hexdigest(),
+        "funding_schedule_events": len(schedule["expected_settlement_timestamps_ms"]),
         "funding_query_pages": len(funding_pages),
         "funding_complete_query_pages": sum(1 for page in funding_pages if page.get("complete")),
         "trade_kline_file": str(kline_path), "mark_file": str(mark_path),
@@ -477,6 +492,10 @@ def main() -> None:
     parser.add_argument("--universe-snapshot", required=True, help="Repository-relative Bybit linear universe snapshot JSON")
     parser.add_argument("--interval", default="60", choices=sorted(INTERVALS))
     parser.add_argument("--output-root", default="data/archives/bybit")
+    parser.add_argument(
+        "--instrument-snapshot-dir", default="data/instrument_specs/linear",
+        help="Directory of dated Bybit instruments-info snapshots used to evidence Funding interval",
+    )
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     parser.add_argument("--pause", type=float, default=0.1)
     args = parser.parse_args()
@@ -489,6 +508,13 @@ def main() -> None:
         validate_archive_range(args.start_ms, args.end_ms, interval_ms)
     except ValueError as exc:
         parser.error(str(exc))
+    snapshot_dir = Path(args.instrument_snapshot_dir)
+    snapshot_paths = sorted(snapshot_dir.glob("*.json")) if snapshot_dir.is_dir() else []
+    if not snapshot_paths:
+        parser.error(
+            f"no dated Bybit instrument snapshots found in {snapshot_dir}; "
+            "Funding schedule completeness cannot be evidenced"
+        )
     prepared = []
     for symbol in symbols:
         effective_start, effective_end = clip_range_to_lifecycle(
@@ -499,7 +525,7 @@ def main() -> None:
     for symbol, effective_start, effective_end in prepared:
         result = archive_symbol(
             symbol, effective_start, effective_end, args.output_root,
-            args.interval, args.base_url, args.pause,
+            args.interval, args.base_url, args.pause, snapshot_paths,
         )
         result.update({
             "requested_start_ms": args.start_ms,

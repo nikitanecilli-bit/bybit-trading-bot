@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 import os
 import sys
+from pathlib import Path
 from datetime import datetime, timezone
 from collections import defaultdict
 
@@ -30,6 +31,32 @@ COST_MULTIPLIERS = [1.0, 1.5, 2.0]
 BASE_TAKER_FEE = em.TAKER_FEE
 BASE_MAKER_FEE = em.MAKER_FEE
 BASE_TAKER_SLIP = em.TAKER_SLIP
+
+
+def resolve_execution_snapshot_dirs(environ=None):
+    """Require archived point-in-time Bybit instrument and risk-tier snapshots."""
+    env = os.environ if environ is None else environ
+    instrument_dir = Path(env.get(
+        "BYBIT_INSTRUMENT_SPECS_DIR", "data/instrument_specs/linear"
+    ))
+    risk_tier_dir = Path(env.get(
+        "BYBIT_RISK_TIERS_DIR", "data/instrument_specs/risk_limits"
+    ))
+    for label, directory in (
+        ("instrument specs", instrument_dir),
+        ("risk tiers", risk_tier_dir),
+    ):
+        if not directory.is_dir():
+            raise SystemExit(
+                f"Missing Bybit {label} snapshot directory: {directory}. "
+                "Refusing legacy notional-proxy market PnL replay."
+            )
+        if not list(directory.glob("*.json")):
+            raise SystemExit(
+                f"No dated Bybit {label} snapshots in {directory}. "
+                "Refusing legacy notional-proxy market PnL replay."
+            )
+    return str(instrument_dir), str(risk_tier_dir)
 
 
 def aligned_h1_datasets():
@@ -103,7 +130,8 @@ def aligned_h1_datasets():
     return aligned, archives, timestamps
 
 def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, end_frac,
-                          min_vol, min_breakout_atr, cost_multiplier):
+                          min_vol, min_breakout_atr, cost_multiplier,
+                          instrument_specs_dir, risk_tiers_dir):
     # Explicit cost stress: scale fees and taker slippage from engine defaults.
     em.TAKER_FEE = BASE_TAKER_FEE * cost_multiplier
     em.MAKER_FEE = BASE_MAKER_FEE * cost_multiplier
@@ -114,7 +142,11 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
     # Truncate at fold end, while allowing pre-fold candles for indicator warm-up.
     fold_data = {sym: candles[:end_idx] for sym, candles in base_candles.items()}
 
-    engine = em.UnifiedQuantEngine(journal_output_path="/tmp/ignored_h1_portfolio_quality.json")
+    engine = em.UnifiedQuantEngine(
+        journal_output_path="/tmp/ignored_h1_portfolio_quality.json",
+        instrument_specs_dir=instrument_specs_dir,
+        risk_tiers_dir=risk_tiers_dir,
+    )
     cfg = engine.cfg
     cfg.bot_version = f"h1-portfolio-v{min_vol:g}-b{min_breakout_atr:g}-cost{cost_multiplier:g}"
     cfg.timeframe = "1h"
@@ -237,6 +269,8 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
 
 
 def main():
+    instrument_specs_dir, risk_tiers_dir = resolve_execution_snapshot_dirs()
+    print(f"Strict Bybit execution snapshots: specs={instrument_specs_dir}; risk_tiers={risk_tiers_dir}")
     datasets, archives, timestamps = aligned_h1_datasets()
     symbols = sorted(datasets)
     print(f"Aligned H1 portfolio: {len(symbols)} symbols, {len(timestamps)} common bars")
@@ -248,7 +282,8 @@ def main():
                 for cost_multiplier in COST_MULTIPLIERS:
                     result = run_portfolio_variant(
                         datasets, symbols, timestamps, fold, start_frac, end_frac,
-                        min_vol, min_breakout, cost_multiplier
+                        min_vol, min_breakout, cost_multiplier,
+                        instrument_specs_dir, risk_tiers_dir,
                     )
                     rows.append(result)
                     print(f"fold={fold} {result['variant']} trades={result['trades']} "

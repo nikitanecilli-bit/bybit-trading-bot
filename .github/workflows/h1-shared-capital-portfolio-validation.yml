@@ -17,7 +17,20 @@ jobs:
           python-version: "3.12"
       - name: Compile
         run: python -m py_compile Bybit_Trading_Engine_v14_research.py scripts/run_uploaded_dataset_backtests.py scripts/run_h1_shared_capital_portfolio_validation.py
-      - name: Run shared-capital portfolio validation
+      - name: Require official dated Bybit execution snapshots
+        run: |
+          test -n "$(find data/instrument_specs/linear -maxdepth 1 -name '*.json' -print -quit 2>/dev/null)" || {
+            echo "Missing dated Bybit instrument specs; refusing legacy notional-proxy PnL replay."
+            exit 1
+          }
+          test -n "$(find data/instrument_specs/risk_limits -maxdepth 1 -name '*.json' -print -quit 2>/dev/null)" || {
+            echo "Missing dated Bybit risk tiers; refusing legacy notional-proxy PnL replay."
+            exit 1
+          }
+      - name: Run strict shared-capital portfolio validation
+        env:
+          BYBIT_INSTRUMENT_SPECS_DIR: data/instrument_specs/linear
+          BYBIT_RISK_TIERS_DIR: data/instrument_specs/risk_limits
         run: python scripts/run_h1_shared_capital_portfolio_validation.py
       - name: Upload report
         uses: actions/upload-artifact@v4

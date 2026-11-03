@@ -948,5 +948,47 @@ class StatePersistenceTests(unittest.TestCase):
                 engine.PlanBStatePersistence(str(path)).load_state(risk)
 
 
+    def test_hc_enabled_rejects_restored_breakout_position_without_boundary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "hc-missing-position-boundary.json"
+            cfg = engine.BotConfig(timeframe="1h", enable_post_break_invalidation=True)
+            position = sample_position()
+            position.strategy = "H1-momentum-breakout"
+            position.breakout_level = None
+            position.bars_held = 1
+            risk = engine.AdaptiveRiskManager(cfg)
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {"BTCUSDT": position}, {}, 42,
+                last_mark_prices={"BTCUSDT": position.entry_price},
+            )
+            with self.assertRaisesRegex(RuntimeError, "H-C.*breakout_level"):
+                engine.PlanBStatePersistence(str(path)).load_state(
+                    engine.AdaptiveRiskManager(cfg)
+                )
+
+    def test_hc_enabled_rejects_restored_pending_breakout_without_boundary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "hc-missing-pending-boundary.json"
+            cfg = engine.BotConfig(timeframe="1h", enable_post_break_invalidation=True)
+            pending = {
+                "BTCUSDT": {
+                    "symbol": "BTCUSDT", "direction": "long",
+                    "strategy": "H1-momentum-breakout", "signal_ts": 1_790_000_000_000,
+                    "entry_price": 100.0, "stop_price": 95.0,
+                    "tp1_price": 106.0, "tp2_price": 112.0,
+                    "stop_dist": 5.0, "atr": 2.0, "vol_ratio": 2.0,
+                    "session": "eu", "order_type": "market",
+                }
+            }
+            risk = engine.AdaptiveRiskManager(cfg)
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {}, pending, 42, last_mark_prices={},
+            )
+            with self.assertRaisesRegex(RuntimeError, "H-C.*breakout_level"):
+                engine.PlanBStatePersistence(str(path)).load_state(
+                    engine.AdaptiveRiskManager(cfg)
+                )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1018,7 +1018,16 @@ def build_validation_manifest(
             "strategy": "H1-momentum-breakout",
             "validation_mode": design["mode"],
             "ema50_200_gate": {
-                "enabled": bool(design.get("ema50_200_gate_enabled", False)),
+                "comparison_mode": (
+                    "paired_baseline_vs_ema50_200_up"
+                    if bool(design.get("ema50_200_gate_enabled", False))
+                    else "baseline_only"
+                ),
+                "variants": (
+                    ["baseline", "ema50_200_up"]
+                    if bool(design.get("ema50_200_gate_enabled", False))
+                    else ["baseline"]
+                ),
                 "fast_period": 50,
                 "slow_period": 200,
                 "slow_slope_lookback": 5,

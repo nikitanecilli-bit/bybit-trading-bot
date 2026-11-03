@@ -33,7 +33,10 @@ def make_engine(max_chase_pct=1.5):
         def can_open_new_trade(count):
             return True, "OK"
 
-        def calculate_position_size(self, entry_price, stop_price, order_type="market", risk_budget_usdt=None):
+        def calculate_position_size(
+            self, entry_price, stop_price, order_type="market",
+            risk_budget_usdt=None, equity_override=None,
+        ):
             self.order_types.append(order_type)
             return 1000.0, min(10.0, risk_budget_usdt) if risk_budget_usdt is not None else 10.0
 

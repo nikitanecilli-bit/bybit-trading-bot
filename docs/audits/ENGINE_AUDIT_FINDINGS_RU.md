@@ -632,3 +632,6 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 - https://www.bybit.com/en/help-center/article/Initial-Margin-USDT-Contract
 
 **CI status:** test file remains connected to Research CI; current GitHub connector returned no commit status entries, so no claim that GitHub Actions completed successfully. Full Research CI is still unconfirmed.
+
+
+**Покрытие после этапа 2:** `tests/test_mark_price_liquidation.py` теперь содержит 14 unittest-методов. Добавлен regression для TP1: при уменьшении остаточного quantity с 1 до 0.5 BTC без дополнительной маржи и funding, entry-based IM/close-fee и MM должны уменьшаться пропорционально. Workflow trigger теперь явно включает `mark_price_liquidation.py`, а не только `tests/**`.

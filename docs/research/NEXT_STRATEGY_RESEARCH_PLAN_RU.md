@@ -481,3 +481,13 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 - Research CI [#41737866200](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41737866200) completed SUCCESS; portfolio accounting suite **49/49 tests passed**.
 - This closes that specific synthetic accounting-integration test gap only. It does not prove Funding archive completeness or exchange settlement-mark accuracy; the Bybit-native data gate remains CLOSED.
 - No market PnL replay, external data collection, Bybit API, paper trading or live orders.
+
+
+## 2026-11-04 — исправлена атрибуция режима при delayed fill
+
+- `trade_signal_regime()` раньше выводила сигнальную свечу из `entry_ts - timeframe`; это могло неверно группировать delayed-fill trades, хотя TradeRecord уже хранит исходный `signal_ts_ms`.
+- Теперь используется точный `signal_ts_ms`; legacy fallback оставлен только для старых записей без этого поля, некорректное значение fail-closed как `unknown`.
+- Текущие режимные baseline/holdout скрипты работают с market-entry, поэтому исторические отчёты этим изменением не пересчитываются и не переинтерпретируются.
+- Commit `8e73e05f8bc97163d44527001c302d35a8b84a62`; Research CI [#41738201800](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41738201800) SUCCESS.
+- Исправление диагностическое; новых PnL runs не было. Полный data/Funding gate остаётся CLOSED.
+- Подробности: `docs/audits/REGIME_TRADE_ATTRIBUTION_AUDIT_2026-11-04.md`.

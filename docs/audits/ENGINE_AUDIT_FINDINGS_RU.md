@@ -385,3 +385,22 @@ The archive audit found 50 nonempty H1 series, with differing first timestamps (
 - uses a common valid end boundary (or explicit per-position terminal close chronology).
 
 Until that is implemented and tested, H-A may be specified but not run as an all-universe portfolio PnL experiment.
+
+### 2026-11-03 — sparse/dynamic shared-capital replay добавлен и проверен
+
+Чтобы H-A не требовал фиксированной полной timestamp-панели E11/E13, добавлен отдельный режим `run_simulation_pass(..., allow_sparse_data=True)` через `run_sparse_simulation_pass()`.
+
+Режим:
+- проходит по объединению timestamp grids;
+- на каждом timestamp обрабатывает только символы с реальной свечой;
+- требует непрерывную индивидуальную сетку timeframe для каждого символа;
+- допускает разные first timestamps и включает символ в signal discovery только после 26 доступных баров (warm-up);
+- обрезает все выбранные серии к самому раннему общему terminal timestamp;
+- fail-closed останавливает replay, если открытая позиция или pending entry не имеет свечи на требуемом timestamp;
+- использует тот же двухфазный signal discovery и frozen batch-equity sizing, что и исправленный aligned replay.
+
+Добавлен `test_sparse_replay_admits_late_symbols_after_warmup_and_is_order_invariant`: BTC начинает в t0, ETH в t+5h, SOL в t+10h; сигналы появляются только после индивидуального warm-up. Полный sparse replay в прямом и обратном порядке даёт одинаковые выбранные инструменты, ledger, equity path и итоговые метрики.
+
+CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41629995066) — success; portfolio accounting suite 37/37; все 39 CI steps успешны.
+
+**Ограничение:** sparse replay — инфраструктура корректной обработки разной доступности данных, но сам по себе не является доказательством исторического point-in-time состава Bybit. Cross-sectional H-A rank должен на каждом timestamp использовать только инструменты с фактическими барами и полным 72h lookback; будущие listing/coverage сведения не должны влиять на решение в прошлом. Рыночный PnL replay пока не запускался.

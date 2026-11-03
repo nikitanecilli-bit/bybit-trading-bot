@@ -1,0 +1,73 @@
+name: Archive Bybit instrument specifications
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "Use the self-hosted runner outside US/Mainland China"
+        required: true
+        type: choice
+        default: self-hosted
+        options:
+          - self-hosted
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bybit-instrument-snapshots
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/market-regime-v1-main
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Refuse blocked runner egress geography
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          request = urllib.request.Request(
+              "https://ipinfo.io/json",
+              headers={"User-Agent": "bybit-research-network-diagnostic/1.0"},
+          )
+          with urllib.request.urlopen(request, timeout=10) as response:
+              data = json.loads(response.read().decode("utf-8"))
+          country = data.get("country", "unknown")
+          print("Runner egress country:", country)
+          print("Runner egress region:", data.get("region", "unknown"))
+          print("Runner egress organization:", data.get("org", "unknown"))
+          if country in {"US", "CN"}:
+              raise SystemExit(
+                  "Bybit public API blocks US/Mainland China IPs (HTTP 403). "
+                  "Use a self-hosted GitHub Actions runner outside those regions."
+              )
+          if country == "unknown":
+              raise SystemExit("Cannot verify runner egress country; refusing Bybit snapshot request.")
+          PY
+      - name: Download dated linear instrument snapshot
+        env:
+          BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}
+        run: |
+          echo "Using configured official Bybit API base URL: $BYBIT_API_BASE_URL"
+          python scripts/snapshot_bybit_instruments.py --category linear --base-url "$BYBIT_API_BASE_URL"
+      - name: Commit snapshot if changed
+        run: |
+          if [[ -n "$(git status --porcelain data/instrument_specs/linear)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/instrument_specs/linear
+            git commit -m "data: archive Bybit linear instrument specs"
+            git push
+          else
+            echo "Instrument snapshot unchanged; no commit needed."
+          fi

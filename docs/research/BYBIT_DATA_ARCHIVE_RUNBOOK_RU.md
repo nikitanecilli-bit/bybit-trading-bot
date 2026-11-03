@@ -1,0 +1,51 @@
+# Runbook: накопление официальных Bybit execution snapshots и market history
+
+## 1. Ограничение источников
+
+Публичные V5 endpoints instruments-info и risk-limit возвращают текущие параметры, а не исторические версии на произвольный timestamp. Поэтому восстановить точные прошлые qtyStep/minNotional/maxQty/risk tiers задним числом этим API нельзя. История начинается с момента первого успешно сохранённого снимка.
+
+Источники:
+- https://bybit-exchange.github.io/docs/v5/market/instrument
+- https://bybit-exchange.github.io/docs/v5/market/risk-limit
+- https://bybit-exchange.github.io/docs/v5/market/funding/history
+- https://bybit-exchange.github.io/docs/v5/market/mark-price-kline
+- https://bybit-exchange.github.io/docs/v5/market/kline
+
+## 2. Runner
+
+GitHub-hosted runner в США уже дал HTTP 403 от Bybit. Для загрузки данных нужен GitHub self-hosted runner с label self-hosted и исходящим IP вне США и материкового Китая.
+
+В репозитории: Settings → Actions → Runners → New self-hosted runner. Установить runner на постоянно доступном компьютере/VPS в разрешённом регионе и выполнить выданные GitHub команды. Не добавлять API keys: перечисленные market-data endpoints публичные.
+
+Если аккаунт зарегистрирован на казахстанском сайте Bybit, задать repository variable BYBIT_API_BASE_URL=https://api.bybit.kz; в любом случае hostname должен соответствовать сайту регистрации аккаунта.
+
+## 3. Сбор
+
+1. Запустить вручную workflow Archive Bybit instrument specifications с runner=self-hosted. Он сохраняет полную линейную спецификацию и дальше работает по расписанию 3-го и 17-го числа.
+2. Запустить Archive Bybit risk-limit tiers с runner=self-hosted. Он сохраняет risk tiers и дальше работает еженедельно.
+3. Запустить Archive Bybit OHLCV, funding and mark-price history с runner=self-hosted. Указать symbols, start_ms и end_ms (end exclusive, границы H1), interval=60. Результат сохраняется в data/archives/bybit/<start_ms>_<end_ms>_<run_id>/{kline,funding,mark_price}.
+
+## 4. Запуск H1 validation
+
+Workflow H1 Shared-Capital Portfolio Validation принимает три repository-relative каталога:
+- kline_dir — Bybit H1 trade candles;
+- funding_dir — funding settlement CSV;
+- mark_price_dir — mark-price H1 candles.
+
+Для одной полной архивной сессии это каталоги kline, funding и mark_price внутри одного archive root. При нескольких архивных сессиях CSV нужно предварительно объединить по символу без потери/конфликта timestamps; не складывать одноимённые файлы поверх друг друга.
+
+## 5. Обязательное временное покрытие
+
+Каждый scored fold должен иметь:
+- instrument snapshot и risk-tier snapshot не позднее начала fold;
+- возраст первого применимого снимка не более 30 дней;
+- интервалы между снимками не более 30 дней;
+- возраст последнего применимого снимка на конец fold не более 30 дней;
+- funding events и mark-price candles на всех требуемых timestamps;
+- Bybit trade-kline и mark-kline с одинаковой временной сеткой.
+
+Текущий снимок не может подтвердить исторические свечи, предшествующие этому снимку. Не копировать сегодняшние параметры назад во времени и не отключать fail-closed gate ради получения PnL.
+
+## 6. Ограничения после сбора
+
+Даже при полном покрытии данных остаются приближениями: OHLC penetration вместо реальной очереди лимитной заявки, отсутствие исторического bid/ask spread и partial-fill adverse selection, mark-candle open как proxy funding settlement mark, базовые maker/taker fee rates вместо персонального fee tier, отсутствие account-mode-specific liquidation model. Эти ограничения должны быть отражены в отчёте каждого теста.

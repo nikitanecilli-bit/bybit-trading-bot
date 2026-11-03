@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from funding_archive_manifest import validate_funding_manifest
 from scripts.archive_bybit_market_history import (
     FUNDING_WINDOW_MS, fetch_funding_history, fetch_mark_klines, fetch_trade_klines,
     normalize_symbol, parse_funding_rows, parse_mark_rows, parse_trade_rows, validate_base_url,
@@ -126,6 +127,11 @@ class BybitMarketHistoryTests(unittest.TestCase):
             schedule = json.loads(schedule_path.read_text(encoding="utf-8"))
             self.assertEqual(schedule["expected_settlement_timestamps_ms"], [hour])
             self.assertEqual(result["funding_schedule_events"], 1)
+            schedule_report = validate_funding_manifest(
+                funding_path, manifest_path, symbol="BTCUSDT",
+                required_start_ms=hour, required_end_ms=hour * 2 - 1,
+            )
+            self.assertTrue(schedule_report["ok"], schedule_report["errors"])
             with (
                 patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=AssertionError("network must not be called")),
             ):

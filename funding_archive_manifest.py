@@ -155,15 +155,16 @@ def attach_funding_settlement_schedule(
                 if isinstance(row, dict)
                 and str(row.get("symbol", "")).upper() == symbol
             ]
-            interval = int(matches[0]["fundingInterval"]) if len(matches) == 1 else 0
+            if len(matches) > 1:
+                raise ValueError("duplicate symbol in instrument snapshot")
+            interval = int(matches[0]["fundingInterval"]) if matches else None
         except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
             raise ValueError(f"invalid dated instrument snapshot: {source_path}") from exc
         if (source.get("schema_version") != 1
                 or source.get("source") != "Bybit V5 GET /v5/market/instruments-info"
                 or source.get("category") != category
-                or len(matches) != 1
-                or interval not in {60, 120, 240, 480}):
-            raise ValueError(f"snapshot lacks one valid {symbol} fundingInterval: {source_path}")
+                or (interval is not None and interval not in {60, 120, 240, 480})):
+            raise ValueError(f"invalid dated instrument snapshot identity: {source_path}")
         observations.append({
             "source_path": source_path,
             "fetched_at_ms": fetched_at_ms,
@@ -175,8 +176,12 @@ def attach_funding_settlement_schedule(
     times = [item["fetched_at_ms"] for item in observations]
     if len(times) != len(set(times)):
         raise ValueError("dated instrument snapshots must have unique fetched_at timestamps")
-    before = [item for item in observations if item["fetched_at_ms"] <= start_ms]
-    after = [item for item in observations if item["fetched_at_ms"] >= end_ms]
+    matching = [
+        item for item in observations
+        if item["funding_interval_minutes"] is not None
+    ]
+    before = [item for item in matching if item["fetched_at_ms"] <= start_ms]
+    after = [item for item in matching if item["fetched_at_ms"] >= end_ms]
     if not before or not after:
         raise ValueError("dated instrument snapshots must bracket the full Funding interval")
     first = before[-1]
@@ -185,6 +190,8 @@ def attach_funding_settlement_schedule(
         item for item in observations
         if first["fetched_at_ms"] <= item["fetched_at_ms"] <= last["fetched_at_ms"]
     ]
+    if any(item["funding_interval_minutes"] is None for item in selected):
+        raise ValueError(f"{symbol} is absent from a dated instrument snapshot inside the Funding interval")
     intervals = {item["funding_interval_minutes"] for item in selected}
     if len(intervals) != 1:
         raise ValueError(

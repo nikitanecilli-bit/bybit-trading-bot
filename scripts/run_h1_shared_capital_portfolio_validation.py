@@ -68,6 +68,17 @@ def resolve_ema50_200_gate(environ=None):
     raise SystemExit("H1_EMA50_200_GATE must be one of 0/1, false/true, off/on")
 
 
+
+def h1_variant_name(min_vol, min_breakout_atr, cost_multiplier, ema_gate_enabled=False):
+    """Unambiguous output label for baseline versus EMA-gated H1 ablations."""
+    suffix = "_ema50_200_up" if ema_gate_enabled else ""
+    return (
+        f"vol{min_vol:g}_breakATR{min_breakout_atr:g}_cost{cost_multiplier:g}"
+        f"{suffix}"
+    )
+
+
+
 def build_ema50_200_label_maps(base_candles, symbols, end_idx, first_scored_ts):
     """Precompute causal same-bar EMA50/200 labels with a 1,000-H1-bar burn-in."""
     labels_by_symbol = {}

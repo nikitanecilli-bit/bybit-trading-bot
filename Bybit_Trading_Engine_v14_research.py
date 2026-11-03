@@ -1686,11 +1686,17 @@ class UnifiedQuantEngine:
                 sizing_equity = self.risk_mgr.current_equity
             remaining_portfolio_risk = allocated_budget
             equity_override = sizing_equity
-        size_usdt, risk_usdt = self.risk_mgr.calculate_position_size(
-            fill, stop_price, order_type=effective_order_type,
-            risk_budget_usdt=remaining_portfolio_risk,
-            equity_override=equity_override,
-        )
+        if equity_override is None:
+            size_usdt, risk_usdt = self.risk_mgr.calculate_position_size(
+                fill, stop_price, order_type=effective_order_type,
+                risk_budget_usdt=remaining_portfolio_risk,
+            )
+        else:
+            size_usdt, risk_usdt = self.risk_mgr.calculate_position_size(
+                fill, stop_price, order_type=effective_order_type,
+                risk_budget_usdt=remaining_portfolio_risk,
+                equity_override=equity_override,
+            )
         if size_usdt <= 0 or risk_usdt <= 0:
             self._persist()
             return False

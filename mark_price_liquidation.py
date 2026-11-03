@@ -168,9 +168,8 @@ def calculate_mark_price_maintenance_margin(
     ordered = _ordered_tiers(symbol, tiers)
     position_value = mark * qty
     tier = _select_tier(ordered, position_value)
-    if lev > tier.max_leverage:
-        raise ValueError(f"{symbol} leverage exceeds Mark-Price tier maxLeverage")
-
+    # maxLeverage is an entry/increase constraint, not a reason to skip
+    # ongoing MM evaluation after Mark Price moves the position into a higher tier.
     fee_factor = Decimal("1") - Decimal("1") / lev if side == "long" else Decimal("1") + Decimal("1") / lev
     close_fee = qty * entry * fee_factor * fee
     maintenance = position_value * tier.maintenance_margin_rate - tier.mm_deduction + close_fee

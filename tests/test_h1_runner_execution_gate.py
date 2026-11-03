@@ -205,7 +205,7 @@ def test_load_bybit_h1_datasets_rejects_gaps_and_loads_exchange_candles():
         root = Path(tmp)
         path = root / "BTCUSDT.csv"
         rows = ["symbol,timestamp_ms,open,high,low,close,volume,turnover"]
-        for index in range(500):
+        for index in range(501):
             ts = 1_700_000_000_000 + index * 3_600_000
             rows.append(f"BTCUSDT,{ts},100,102,99,101,10,1010")
         path.write_text("\n".join(rows) + "\n", encoding="utf-8")

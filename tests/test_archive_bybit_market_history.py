@@ -100,6 +100,11 @@ class BybitMarketHistoryTests(unittest.TestCase):
             self.assertEqual(manifest["csv_sha256"], result["funding_file_sha256"])
             self.assertEqual(manifest["runs"][0]["pages"][0]["complete"], True)
             self.assertIsNone(manifest["settlement_schedule_evidence"])
+            with (
+                patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=AssertionError("network must not be called")),
+            ):
+                with self.assertRaises(FileExistsError):
+                    archive_symbol("BTCUSDT", hour, hour * 2, tmp, "60", pause=0)
 
     def test_funding_still_fails_if_minimum_window_is_saturated(self):
         def fetch(a, b):

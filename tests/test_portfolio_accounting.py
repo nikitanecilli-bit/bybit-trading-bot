@@ -1023,8 +1023,8 @@ def _run_full_replay_symbol_order(order):
     e.cfg.max_concurrent_positions = 2
     e.cfg.max_risk_trade_pct = 1.0
     e.cfg.max_portfolio_risk_pct = 2.0
-    e.cfg.daily_stop_loss_pct = daily_stop_loss_pct
-    e.cfg.emergency_kill_switch_pct = emergency_kill_switch_pct
+    e.cfg.daily_stop_loss_pct = 1.5
+    e.cfg.emergency_kill_switch_pct = 35.0
     e.cfg.max_chase_limit_pct = 1.5
     e.risk_mgr.cfg = e.cfg
 
@@ -1145,8 +1145,8 @@ def _run_sparse_replay_symbol_order(order, *, emergency_kill_switch_pct=35.0, da
     e.cfg.max_concurrent_positions = 2
     e.cfg.max_risk_trade_pct = 1.0
     e.cfg.max_portfolio_risk_pct = 2.0
-    e.cfg.daily_stop_loss_pct = 1.5
-    e.cfg.emergency_kill_switch_pct = 35.0
+    e.cfg.daily_stop_loss_pct = daily_stop_loss_pct
+    e.cfg.emergency_kill_switch_pct = emergency_kill_switch_pct
     e.cfg.max_chase_limit_pct = 1.5
     e.risk_mgr.cfg = e.cfg
 

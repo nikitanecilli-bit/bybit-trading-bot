@@ -1712,9 +1712,12 @@ class UnifiedQuantEngine:
                        else position_qty * Decimal(str(TP1_FRACTION)))
             tp1_notional = float(tp1_qty * Decimal(str(pos.tp1_price)))
             remaining_exit_notional = float(remaining_qty * Decimal(str(mark)))
-            tp1_cost = (tp1_notional * (MAKER_FEE if pos.maker_exits else TAKER_FEE)) if pos.tp1_hit else 0.0
+            # Match _close_position(): legacy/restored positions may not carry
+            # maker_exits, so resolve the same order-type fallback before MTM.
+            maker_exits = (pos.order_type == "limit") if pos.maker_exits is None else pos.maker_exits
+            tp1_cost = (tp1_notional * (MAKER_FEE if maker_exits else TAKER_FEE)) if pos.tp1_hit else 0.0
             tp1_slip = (tp1_notional * TAKER_SLIP
-                        if pos.tp1_hit and not pos.maker_exits else 0.0)
+                        if pos.tp1_hit and not maker_exits else 0.0)
             exit_cost = remaining_exit_notional * (TAKER_FEE + TAKER_SLIP)
             funding_cost = 0.0
             if getattr(self, "funding_dir", None):

@@ -124,7 +124,7 @@ def test_sparse_replay_uses_union_grid_and_common_terminal_cutoff():
     assert audit["total_trades"] == 0
     assert engine.reset_calls == 1
     assert engine.mark_batches[0] == (
-        base_ts + 25 * 3_600_000, ("AAAUSDT",)
+        base_ts + 25 * 3_600_000, ("AAAUSDT", "BBBUSDT")
     )
     assert engine.mark_batches[-1] == (
         base_ts + 30 * 3_600_000, ("AAAUSDT", "BBBUSDT")

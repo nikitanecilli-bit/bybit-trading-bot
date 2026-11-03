@@ -568,3 +568,6 @@ H1 validation runner дополнен отдельным JSON manifest рядо�
 
 
 **Дополнительное закрытие state persistence gate:** writer теперь отклоняет `signal_ts_ms > entry_ts` до записи backup, симметрично строгому reader. Research CI #41687016004 SUCCESS; state persistence suite 69 tests passed. Это предотвращает создание заведомо невосстанавливаемого Plan B backup.
+
+
+**Plan B writer/reader parity завершена:** serialized candidate теперь проверяется строгим reader до atomic replace. Невалидный position/pending/risk payload не может заменить предыдущий backup; temp удаляется. CI #41689536499 SUCCESS; state persistence suite 73 tests passed. Повреждённые-backup tests отделены от writer tests и мутируют уже валидный envelope после сохранения.

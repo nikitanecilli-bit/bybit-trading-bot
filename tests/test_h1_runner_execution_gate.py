@@ -25,7 +25,8 @@ def _write_funding_manifest(
         requested_start_ms=start_ms, requested_end_ms=end_ms,
         pages=[{
             "request_start_ms": start_ms, "request_end_ms": end_ms,
-            "response_rows": 1, "first_ts": start_ms, "last_ts": start_ms,\n            "complete": True, "saturated": False,
+            "response_rows": 1, "first_ts": start_ms, "last_ts": start_ms,
+            "complete": True, "saturated": False,
         }],
         collected_at_ms=max(end_ms, start_ms) + 1,
     )

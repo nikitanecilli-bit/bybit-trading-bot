@@ -40,6 +40,12 @@ CODE_PATHS = [
     "scripts/run_h_c_reverse_time_robustness.py",
     "scripts/cryptofetch_sparse_loader.py",
     "scripts/audit_cryptofetch_archives.py",
+    "relative_strength_breakout.py",
+    "funding_accounting.py",
+    "mark_price_liquidation.py",
+    "instrument_spec_history.py",
+    "bybit_risk_tiers.py",
+    "exchange_order_sizing.py",
 ]
 
 

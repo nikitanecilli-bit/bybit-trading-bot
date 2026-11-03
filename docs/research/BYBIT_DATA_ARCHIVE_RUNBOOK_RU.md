@@ -32,7 +32,11 @@ Workflow H1 Shared-Capital Portfolio Validation принимает три reposi
 - funding_dir — funding settlement CSV;
 - mark_price_dir — mark-price H1 candles.
 
+Дополнительный необязательный input `symbols` принимает замороженный список через запятую (например, `BTCUSDT,ETHUSDT,SOLUSDT`). Если поле пустое, применяется coverage-based universe selection. Для заранее выбранной группы top-5 + reserve-5 указывать все 10 символов явно, чтобы разные прогоны не выбирали universe заново.
+
 Для одной полной архивной сессии это каталоги kline, funding и mark_price внутри одного archive root. При нескольких архивных сессиях CSV нужно предварительно объединить по символу без потери/конфликта timestamps; не складывать одноимённые файлы поверх друг друга.
+
+Workflow публикует два артефакта: итоговый `h1_shared_capital_portfolio_validation.csv` и `h1_shared_capital_portfolio_validation_manifest.json`. Manifest содержит выбранные символы, общий H1 timestamp grid, точные fold boundaries, параметры стратегии/risk/execution, SHA-256 и размеры входных CSV/JSON, hashes ключевых code/workflow files, Git commit и workflow run metadata, а также hash выходного CSV. Хеши фиксируют точные байты файлов, но сами по себе не удостоверяют удалённое происхождение данных — origin по-прежнему должен подтверждаться collector workflow и путями архивов.
 
 ## 5. Обязательное временное покрытие
 

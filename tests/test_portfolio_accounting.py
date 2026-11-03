@@ -6,6 +6,8 @@ _sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
 import importlib.util
 import sys
 from pathlib import Path
+import json
+import tempfile
 
 ENGINE_PATH = Path(__file__).resolve().parent.parent / "Bybit_Trading_Engine_v14_research.py"
 spec = importlib.util.spec_from_file_location("research_engine_accounting", ENGINE_PATH)
@@ -54,6 +56,44 @@ def make_engine():
     e._persist = lambda: None
     e.tg = type("TelegramSpy", (), {"send_message": staticmethod(lambda *_: None)})()
     return e
+
+
+
+def test_original_signal_timestamp_survives_delayed_fill_and_journal_export():
+    e = make_engine()
+    fill_ts = 1_800_000_000_000
+    original_signal_ts = fill_ts - 2 * 3_600_000
+    e.pending["BTCUSDT"] = {
+        "symbol": "BTCUSDT",
+        "direction": "long",
+        "strategy": "H1-momentum-breakout",
+        # The H1 wrapper adapts this field only as a strict next-bar freshness guard.
+        "signal_ts": fill_ts - 3_600_000,
+        "signal_origin_ts": original_signal_ts,
+        "entry_price": 100.0,
+        "stop_dist": 5.0,
+        "order_type": "market",
+        "breakout_level": 99.0,
+    }
+    candle = engine_mod.Candle(fill_ts, 100.0, 101.0, 99.0, 100.5, 10.0)
+
+    assert e._try_fill_pending("BTCUSDT", candle) is True
+    position = e.open_positions["BTCUSDT"]
+    assert position.entry_ts == fill_ts
+    assert position.signal_ts_ms == original_signal_ts
+
+    e._close_position(
+        position, exit_price=101.0, exit_reason="take_profit",
+        exit_ts=fill_ts + 3_600_000, mae_r=0.0, mfe_r=1.0,
+    )
+    trade = e.closed_trades[-1]
+    assert trade.signal_ts_ms == original_signal_ts
+
+    with tempfile.TemporaryDirectory() as tmp:
+        e.journal_output_path = str(Path(tmp) / "trade-journal.json")
+        e.export_journal_for_dashboard()
+        payload = json.loads(Path(e.journal_output_path).read_text(encoding="utf-8"))
+        assert payload["trades"][0]["signal_ts_ms"] == original_signal_ts
 
 
 def test_final_close_funding_receipt_is_not_credited_on_ambiguous_exit_boundary():

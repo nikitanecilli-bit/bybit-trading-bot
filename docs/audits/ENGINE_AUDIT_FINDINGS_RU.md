@@ -433,3 +433,25 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 - Статический review relative_strength_breakout.py: strength context использует закрытые H1 бары, проверяет as_of timestamp, 24/72-bar close индексы, ATR только по предыдущим барам; breakout Donchian строится по предыдущим 20 барам, а сигнал формируется по закрытию текущего. В текущей реализации очевидного timestamp lookahead не обнаружено; причинность дополнительно покрыта tests/test_relative_strength.py. Это не устраняет survivorship/listing bias источника данных.
 - H-A allocator priority_score действительно использует abs(relative_strength_score); при ограниченных слотах сортировка идёт по силе сигнала, затем по symbol. Ошибочного alphabetical-first allocation в этой версии не обнаружено.
 - Research engine checks run 41634060290 успешен на cf74d8afcd65d4da7e04f80aab8e858a65fb0142; workflow includes H-A causality tests, archive audit, gap execution and portfolio accounting. Текущий HEAD отличается от него только документацией аудита/результатов.
+
+### 2026-11-03 — статический аудит stop/TP1/trailing и risk sizing
+
+Проверены актуальные реализации `_manage_position()`, `_apply_tp1()`, `_close_position()`, `AdaptiveRiskManager.calculate_position_size()`, а также существующие тесты `tests/test_gap_execution.py` и portfolio accounting.
+
+**Подтверждённое поведение:**
+- Stop проверяется раньше TP1/TP2. Если OHLC одной свечи пересекает и stop, и target, модель выбирает stop; это явно консервативная политика неоднозначного внутрисвечного порядка.
+- Gap-stop исполняется по худшему из stop и open: long — `min(stop, open)`, short — `max(stop, open)`. Есть отдельные long/short gap tests.
+- TP1 фиксирует 50% позиции; оставшаяся часть учитывается отдельно. После TP1 stop не может ослабляться: long использует максимум старого stop / break-even-plus / ATR trail, short — минимум.
+- Новый trailing stop не применяется задним числом к диапазону той же свечи, на которой он был рассчитан; тест явно фиксирует это правило.
+- TP2 на одной свече с TP1 моделируется как последовательное исполнение TP1 и остатка на TP2, если partial leg допустим.
+- Комиссии и проскальзывание начисляются по каждой фактически смоделированной ноге: entry, TP1, final exit. Stop/trailing/time/kill-switch final exits считаются taker; maker-класс final exit допускается только для take_profit при включённой maker exit модели.
+- Risk sizing учитывает начальную дистанцию до стопа плюс ожидаемые entry/stop fees и slippage. Это оценка планового риска, а не верхняя граница фактического убытка: gap, funding и фактическое исполнение могут увеличить его.
+
+**Что не является дефектом, но ограничивает достоверность:**
+- OHLC не позволяет узнать, какой экстремум свечи был первым. Stop-first снижает оптимистичное смещение, но не восстанавливает реальную тиковую последовательность.
+- Fill-bar stop тестируется по stop price, без возможности установить внутрисвечной gap/порядок до и после фактического входа.
+- Trailing обновляется на основании экстремума завершившейся свечи и начинает действовать со следующей свечи — это причинно и консервативно, но отличается от тикового trailing.
+- При exchange-sized позиции TP1 может быть отклонён, если после округления по qtyStep/minQty/minNotional обе части не проходят ограничения. В таком случае partial не считается выполненным; позиция остаётся целой, а при TP2 может закрыться целиком. Это допустимый fallback, но в журнале полезно отдельно фиксировать причину пропуска TP1.
+- Плановый risk_usdt не включает возможный gap сверх stop и funding. Поэтому риск в журнале нельзя трактовать как гарантированный максимальный убыток.
+
+**Результат проверки:** в просмотренных stop/TP1/trailing/risk-sizing путях подтверждённого арифметического дефекта не найдено. Тесты покрывают long/short gap stops, stop-vs-TP при конфликте одной свечи, partial TP1, trailing остатка, три execution legs и запрет ретроактивного применения нового trailing stop. Это статический аудит плюс проверка состава уже успешного CI run 41634060290 (commit cf74d8a); новый CI на текущем HEAD не запускался. PnL replay не запускался.

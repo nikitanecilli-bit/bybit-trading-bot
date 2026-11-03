@@ -479,11 +479,11 @@ def test_funding_mark_coverage_rejects_missing_or_unverified_archive_manifest():
         marks.mkdir()
         funding_path = funding / "BTCUSDT.csv"
         funding_path.write_text(
-            "symbol,funding_timestamp_ms,funding_rate\\nBTCUSDT,1000,0.001\\n",
+            "symbol,funding_timestamp_ms,funding_rate\nBTCUSDT,1000,0.001\n",
             encoding="utf-8",
         )
         (marks / "BTCUSDT.csv").write_text(
-            "symbol,timestamp_ms,open\\nBTCUSDT,1000,100\\n",
+            "symbol,timestamp_ms,open\nBTCUSDT,1000,100\n",
             encoding="utf-8",
         )
         _write_funding_manifest(funding_path, 1000, 1000, schedule_verified=False)

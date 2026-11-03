@@ -157,6 +157,35 @@ def test_mtm_defers_tp1_receipt_and_later_credits_only_remaining_quantity():
     assert abs((after_boundary - at_boundary) - 5.0) < 1e-8
 
 
+def test_utc_midnight_daily_baseline_uses_mark_at_boundary():
+    cfg = engine_mod.BotConfig(
+        capital_usdt=10_000.0,
+        daily_stop_loss_pct=5.0,
+        emergency_kill_switch_pct=50.0,
+    )
+    risk = engine_mod.AdaptiveRiskManager(cfg)
+    before_midnight = 1_767_311_400_000  # 2026-01-01 23:00:00 UTC
+    midnight = 1_767_315_000_000         # 2026-01-02 00:00:00 UTC
+
+    risk.mark_to_market(0.0, before_midnight)
+    assert risk.day_start_equity == 10_000.0
+
+    # The 23:00-00:00 bar's adverse mark is already part of the old day.
+    # It must be reflected in the new day's opening baseline, not counted
+    # as a fresh daily loss merely because the mark timestamp crossed midnight.
+    alerts = risk.mark_to_market(-600.0, midnight)
+    assert risk.current_equity == 9_400.0
+    assert risk.day_start_equity == 9_400.0
+    assert alerts["daily_stop_hit"] is False
+    assert risk.daily_stop_triggered is False
+
+    # A further loss after midnight is measured against the refreshed baseline.
+    alerts = risk.mark_to_market(-1_200.0, midnight + 3_600_000)
+    assert risk.current_equity == 8_800.0
+    assert alerts["daily_stop_hit"] is True
+    assert risk.daily_stop_triggered is True
+
+
 def test_mark_to_market_equity_equals_realized_plus_unrealized():
     e = make_engine()
     e.open_positions["BTCUSDT"] = make_position(size=2_000.0)

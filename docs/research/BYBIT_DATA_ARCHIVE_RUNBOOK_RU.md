@@ -120,6 +120,14 @@ Workflow публикует два артефакта: итоговый `h1_shar
 - Workflow не dispatch-ились; это публикация оркестрации, не запуск selector, не PnL и не paper trading.
 
 
+## 14. Пауза на внешние Bybit-зависимости по решению пользователя (2026-11-03)
+
+- До появления кандидата со значительной устойчивой чистой доходностью не регистрировать self-hosted runner, не запускать collector workflow, не скачивать новые Bybit market archives и не подключать private/account API.
+- Опубликованные workflow остаются подготовленной, но неиспользуемой инфраструктурой. Их наличие в `main` не является разрешением или задачей на запуск.
+- Текущий этап ограничен статическим аудитом, исправлением подтверждённых дефектов, deterministic/unit/regression tests и анализом уже имеющихся архивов. Новые рыночные PnL sweeps запрещены до закрытия аудиторских gates и предварительной фиксации следующей гипотезы.
+- Возвращаться к Bybit-native execution validation только после того, как на бумаге получен устойчивый положительный кандидат и конкретная следующая проверка действительно может изменить решение о его пригодности.
+- Не путать публичные market-data endpoints (которые технически не требуют private API key) с разрешением пользователя на их сбор: сбор также отложен.
+
 ## 13. Workflow/code provenance and final selection boundary hardening (2026-11-03)
 
 - Main-branch H1 workflow wrappers explicitly checkout `research/market-regime-v1-main` and record the checked-out SHA as `H1_RESEARCH_CHECKOUT_SHA`. This avoids confusing the main-branch workflow-dispatch commit with the research code commit actually replayed.

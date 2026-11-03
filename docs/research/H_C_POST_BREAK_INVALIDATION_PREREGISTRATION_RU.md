@@ -118,7 +118,7 @@ This is implementation correctness only. The flag remains false by default; no m
 
 The engine now records TP1 and final TP2 liquidity per execution leg. A target limit gapped through at candle open is classified taker; a non-gap intrabar touch remains a maker proxy. H-C close-based invalidation is always taker. Mark-to-market consumes the actual TP1 classification while the remaining open leg is conservatively marked with taker exit cost. The H-A trade ledger exports these fields for future audit.
 
-Synthetic coverage: Research CI [#41720355038](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41720355038) SUCCESS, 52/52; H-C semantics 10/10. No PnL replay. Maker queue, spread and adverse selection remain unmodeled; do not treat OHLC touch as confirmed maker fill.
+Synthetic coverage: Research CI [#41720355038](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41720355038) SUCCESS, 52/52; H-C semantics 10/10. No PnL replay. Maker queue, spread and adverse selection remain unmodeled; do not treat OHLC touch as confirmed maker fill. Follow-up state round-trip for explicit tp1_maker=False passed in [#41720499938](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41720499938), 52/52 steps.
 
 ## 9. Current blockers
 

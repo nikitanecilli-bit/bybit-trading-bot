@@ -339,3 +339,11 @@ Keep the existing runner unchanged as a reproducible long-only variant. After Fu
 - H-C is rejected for this window. No tuning/replay on this year of CryptoFetch data. The full archive is now development-only; no additional PnL sweep may be presented as an independent holdout.
 - The next strategy direction is lower-frequency entry quality: longer H1 Donchian structure plus a causal EMA50/EMA200 trend-regime gate, with a fixed cost-aware execution model. This is a new hypothesis, not a proven edge. First complete static design, code audit and deterministic tests; any future proxy experiment must be separately preregistered and clearly labelled development-only. A real 20% net/month claim still requires funding, mark-price and Bybit execution validation, which remains on hold.
 - No Bybit API connection, external exchange-data download, private account access, paper/live order submission.
+
+
+### 2026-11-04 — EMA50/EMA200 deterministic trend-filter audit
+
+- The research-only full-history EMA helper remains causal and prefix-invariant; the 50/200 direction requires fast/slow alignment, slow-EMA slope and close location, so a countertrend rally below a falling slow EMA remains labelled bearish until the slow trend confirms reversal.
+- Two synthetic tests had encoded contradictory end states: one asserted EMA alignment before its synthetic fast EMA had actually crossed; another expected neutral while fast < slow, slow EMA was falling and close remained below slow EMA. Test data/expectations were corrected; strategy logic was not loosened to satisfy the tests.
+- Research CI [#41726204938](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41726204938) passed 53/53 steps at commit `2f7c590e70da47ab855db31d9f823d8134ac7cd5`.
+- This remains deterministic indicator validation only. The EMA50/200 filter is not integrated into the execution engine and has no PnL evidence. Do not treat it as an accepted strategy improvement or run market PnL until the Funding/Mark and Bybit-native data gates are actually satisfied.

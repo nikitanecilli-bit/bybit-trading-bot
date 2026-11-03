@@ -36,6 +36,8 @@ on:
       - 'scripts/validate_funding_coverage.py'
       - 'tests/**'
       - '.github/workflows/bybit-linear-universe-history.yml'
+      - '.github/workflows/h1-top5-train-selection.yml'
+      - '.github/workflows/h1-shared-capital-portfolio-validation.yml'
       - '.github/workflows/research-checks.yml'
 
 permissions:

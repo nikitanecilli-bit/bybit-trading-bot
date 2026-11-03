@@ -65,6 +65,40 @@ def candle(open_, high, low, close, ts=1_800_000_000_000):
     return engine_mod.Candle(ts=ts, open=open_, high=high, low=low, close=close, volume=10)
 
 
+def test_baseline_long_signal_records_prior_donchian_boundary():
+    cfg = engine_mod.BotConfig(
+        timeframe="1h", active_trading_pool=["BTCUSDT"],
+        max_chase_limit_pct=3.0, min_volume_ratio=1.6,
+    )
+    start = 1_800_000_000_000
+    history = [
+        engine_mod.Candle(start + i * 3_600_000, 100.0, 101.0, 99.0, 100.0, 10.0)
+        for i in range(21)
+    ]
+    signal = engine_mod.Candle(start + 21 * 3_600_000, 100.0, 102.5, 99.5, 102.0, 20.0)
+    result = engine_mod.QuantStrategyCore.evaluate_signal("BTCUSDT", history + [signal], cfg)
+    assert result is not None
+    assert result["direction"] == "long"
+    assert result["breakout_level"] == 101.0
+
+
+def test_baseline_short_signal_records_prior_donchian_boundary():
+    cfg = engine_mod.BotConfig(
+        timeframe="1h", active_trading_pool=["BTCUSDT"],
+        max_chase_limit_pct=3.0, min_volume_ratio=1.6,
+    )
+    start = 1_800_000_000_000
+    history = [
+        engine_mod.Candle(start + i * 3_600_000, 100.0, 101.0, 99.0, 100.0, 10.0)
+        for i in range(21)
+    ]
+    signal = engine_mod.Candle(start + 21 * 3_600_000, 100.0, 100.5, 97.5, 98.0, 20.0)
+    result = engine_mod.QuantStrategyCore.evaluate_signal("BTCUSDT", history + [signal], cfg)
+    assert result is not None
+    assert result["direction"] == "short"
+    assert result["breakout_level"] == 99.0
+
+
 def test_market_long_gap_above_chase_limit_is_cancelled():
     e = make_engine(max_chase_pct=1.5)
     e.pending["BTCUSDT"] = pending_signal("market", 100.0)

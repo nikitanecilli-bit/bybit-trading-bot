@@ -44,7 +44,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Tuple, Any, Callable
 
 from funding_accounting import accrued_funding_cost
 from instrument_spec_history import InstrumentSpecHistory
@@ -1604,7 +1604,9 @@ class UnifiedQuantEngine:
         available_slots = max(0, self.cfg.max_concurrent_positions - len(self.open_positions))
         ranked = sorted(
             pending_symbols,
-            key=lambda sym: (-float(self.pending[sym].get("vol_ratio", 0.0)), sym),
+            key=lambda sym: (-float(
+                self.pending[sym].get("priority_score", self.pending[sym].get("vol_ratio", 0.0))
+            ), sym),
         )
         eligible = ranked[:available_slots]
         portfolio_cap = self.risk_mgr.current_equity * (self.cfg.max_portfolio_risk_pct / 100.0)
@@ -2225,6 +2227,8 @@ def check_alignment(candles: Dict[str, List[Candle]]) -> None:
 def run_sparse_simulation_pass(
     engine: UnifiedQuantEngine, candles: Dict[str, List[Candle]],
     symbols: List[str], data_label: str = "СИНТЕТИКА",
+    signal_evaluator: Optional[Callable] = None,
+    signal_context_provider: Optional[Callable] = None,
 ) -> Dict:
     """Shared-capital replay over a dynamic universe with per-symbol availability.
 
@@ -2299,11 +2303,18 @@ def run_sparse_simulation_pass(
                 signal_candidates.append(sym)
         engine._bar_entry_risk_budgets.clear()
 
+        signal_context = (
+            signal_context_provider(bar_close_ts, histories, engine.cfg)
+            if signal_context_provider is not None else None
+        )
         for sym in signal_candidates:
             can_open, _ = engine.risk_mgr.can_open_new_trade(len(engine.open_positions))
             if not can_open:
                 break
-            sig = QuantStrategyCore.evaluate_signal(sym, histories[sym], engine.cfg)
+            if signal_evaluator is None:
+                sig = QuantStrategyCore.evaluate_signal(sym, histories[sym], engine.cfg)
+            else:
+                sig = signal_evaluator(sym, histories[sym], engine.cfg, signal_context)
             if sig:
                 engine.pending[sym] = sig
                 engine._persist()
@@ -2328,7 +2339,9 @@ def run_sparse_simulation_pass(
 
 def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Candle]],
                         symbols: List[str], data_label: str = "СИНТЕТИКА",
-                        allow_sparse_data: bool = False) -> Dict:
+                        allow_sparse_data: bool = False,
+                        signal_evaluator: Optional[Callable] = None,
+                        signal_context_provider: Optional[Callable] = None) -> Dict:
     # Это именно новый независимый бэктест, не восстановление live-сессии.
     if engine._state_restored:
         raise RuntimeError("Нельзя запускать backtest поверх восстановленного состояния. "
@@ -2342,7 +2355,11 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
     if allow_sparse_data:
         return run_sparse_simulation_pass(
             engine, selected_candles, symbols, data_label=data_label,
+            signal_evaluator=signal_evaluator,
+            signal_context_provider=signal_context_provider,
         )
+    if signal_evaluator is not None or signal_context_provider is not None:
+        raise ValueError("Custom signal callbacks currently require allow_sparse_data=True")
     validate_candle_timeframe(selected_candles, engine.cfg.timeframe)
     check_alignment(selected_candles)
     engine.reset_state_for_new_run()

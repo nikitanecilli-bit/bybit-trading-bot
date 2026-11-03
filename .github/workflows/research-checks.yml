@@ -11,6 +11,7 @@ on:
       - 'bybit_instrument_specs.py'
       - 'instrument_spec_history.py'
       - 'bybit_risk_tiers.py'
+      - 'mark_price_liquidation.py'
       - 'exchange_order_sizing.py'
       - 'bybit_instrument_specs.py'
       - 'instrument_spec_history.py'

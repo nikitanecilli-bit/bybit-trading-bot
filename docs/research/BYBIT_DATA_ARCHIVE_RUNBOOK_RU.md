@@ -89,3 +89,13 @@ Workflow публикует два артефакта: итоговый `h1_shar
 
 
 **Детерминированные collector tests:** Research CI [#41689536499 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41689536499) выполнен на исследовательской ветке; все шаги успешны, включая instrument snapshot collector, risk-limit snapshot collector, market-history archive collector и funding/mark coverage preflight. Это offline/mock tests, не сетевой сбор реальных Bybit данных.
+
+
+## 10. Train-only top-5 selector v2 — одинаковая выборка кандидатов (2026-11-03)
+
+- Аудит выявил методологическую проблему прежнего selector v1: каждый инструмент оценивался на своей доступной части training window. Наличие минимум 3,000 баров и последующая проверка overlap только у выбранной пятёрки не делали expectancy/PF разных кандидатов напрямую сопоставимыми.
+- Selector v2 сначала определяет кандидатов, активных на training cutoff и имеющих минимум 3,000 training bars, затем строит точное пересечение их H1 timestamp ranges. Каждый кандидат replay-ится только на одном и том же общем интервале и с одним и тем же числом баров.
+- Если общее окно меньше 3,000 H1 баров, selector завершается fail-closed и не формирует top-5. Reserve-5 также проверяется на общий overlap.
+- Изменён protocol id на `h1-top5-train-only-v2`; H1 runner принимает только v2 manifest. Старые v1 manifests несовместимы и должны быть пересозданы.
+- Добавлен детерминированный тест общей временной сетки. Research CI [#41702488088](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41702488088) — SUCCESS, 50/50 steps; selector test и runner execution gate прошли.
+- Это исправление сопоставимости train-only ranking, не рыночный результат. Selector пока не запускался: нет Bybit H1/funding/mark архивов и датированных instrument/risk snapshots. PnL не рассчитывался.

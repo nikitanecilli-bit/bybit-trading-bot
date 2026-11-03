@@ -769,6 +769,9 @@ def test_tp1_partial_fill_keeps_equity_consistent_with_remaining_position():
     e._last_mark_prices = {"BTCUSDT": 110.0}
     e._intrabar_risk_marks = {"BTCUSDT": 110.0}
     e._intrabar_risk_marks_ts = ts
+    e._intrabar_mtm_marks = {}
+    e._intrabar_mtm_marks_ts = None
+    e._intrabar_liquidation_exits = {}
     e.closed_trades = []
     e.risk_mgr = engine_mod.AdaptiveRiskManager(cfg)
     e.tg = type("Notifier", (), {"send_message": lambda self, message: None})()

@@ -130,24 +130,6 @@ def test_hc_long_and_short_retest_close_symmetrically():
 
 
 
-def test_hc_rejects_pending_breakout_without_signal_time_boundary():
-    e = _configured_engine()
-    signal_ts = 1_800_000_000_000 - H1_MS
-    e.pending["BTCUSDT"] = {
-        "symbol": "BTCUSDT", "direction": "long",
-        "strategy": "H1-momentum-breakout", "signal_ts": signal_ts,
-        "entry_price": 102.0, "stop_price": 90.0,
-        "tp1_price": 130.0, "tp2_price": 140.0,
-        "stop_dist": 12.0, "atr": 2.0, "vol_ratio": 2.0,
-        "session": "eu", "order_type": "market",
-    }
-    curr = engine.Candle(1_800_000_000_000, 102.0, 103.0, 101.5, 102.5, 10.0)
-    assert engine.UnifiedQuantEngine._try_fill_pending(e, "BTCUSDT", curr) is False
-    assert "BTCUSDT" not in e.open_positions
-    assert "BTCUSDT" not in e.pending
-
-
-
 def test_hc_wick_only_retest_does_not_close():
     e = _configured_engine()
     pos = _position("long")
@@ -242,7 +224,6 @@ if __name__ == "__main__":
         test_hc_disabled_by_default_does_not_change_baseline_exit_path,
         test_hc_pending_without_boundary_is_cancelled_fail_closed,
         test_hc_long_and_short_retest_close_symmetrically,
-        test_hc_rejects_pending_breakout_without_signal_time_boundary,
         test_hc_wick_only_retest_does_not_close,
         test_hc_triggers_on_third_bar_but_not_after_window,
         test_hc_does_not_override_stop_or_tp2_priority,

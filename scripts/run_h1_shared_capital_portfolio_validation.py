@@ -704,6 +704,10 @@ def build_validation_manifest(
     design = validation_design or {
         "mode": "manifest_only_test",
         "folds": FOLDS,
+        "volume_thresholds": list(VOL_THRESHOLDS),
+        "breakout_atr_thresholds": list(BREAKOUT_ATR_THRESHOLDS),
+        "cost_multipliers": list(COST_MULTIPLIERS),
+        "frozen_config": None,
         "selection": None,
     }
     folds = []

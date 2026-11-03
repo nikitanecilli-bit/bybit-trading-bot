@@ -701,7 +701,11 @@ def build_validation_manifest(
     if not timestamps or timestamps != sorted(set(timestamps)):
         raise ValueError("common H1 timestamps must be non-empty, unique and sorted")
 
-    design = validation_design or resolve_validation_design({})
+    design = validation_design or {
+        "mode": "manifest_only_test",
+        "folds": FOLDS,
+        "selection": None,
+    }
     folds = []
     for fold, start_fraction, end_fraction in design["folds"]:
         start_index = int(len(timestamps) * start_fraction)
@@ -782,7 +786,13 @@ def build_validation_manifest(
         if item.strip()
     })
     output_record = _file_manifest_record(output_csv_path)
-    selection = design["selection"]
+    selection = design.get("selection")
+    selection_record = None if selection is None else {
+        "path": _manifest_path(selection["path"]),
+        "sha256": selection["sha256"],
+        "training_cutoff_timestamp_ms": selection["training_cutoff_timestamp_ms"],
+        "generated_at_utc": selection["generated_at_utc"],
+    }
     return {
         "schema_version": 1,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -803,12 +813,7 @@ def build_validation_manifest(
             "allowlist": allowlist,
             "selected_symbols": selected_symbols,
             "selected_symbol_count": len(selected_symbols),
-            "selection_manifest": {
-                "path": _manifest_path(selection["path"]),
-                "sha256": selection["sha256"],
-                "training_cutoff_timestamp_ms": selection["training_cutoff_timestamp_ms"],
-                "generated_at_utc": selection["generated_at_utc"],
-            },
+            "selection_manifest": selection_record,
         },
         "common_h1_grid": {
             "timeframe": "1h",

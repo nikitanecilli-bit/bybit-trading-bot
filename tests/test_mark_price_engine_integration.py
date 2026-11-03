@@ -152,6 +152,9 @@ class MarkPriceEngineIntegrationTests(unittest.TestCase):
         engine.risk_mgr.register_closed_trade_pnl = lambda *_args: {}
         engine._unrealized_pnl_at_marks = lambda *_args: 0.0
         engine._persist = lambda: None
+        engine._last_mark_prices = {"BTCUSDT": 100_980.0}
+        engine.tg = SimpleNamespace(send_message=lambda *_args: None)
+        engine._close_position = em.UnifiedQuantEngine._close_position.__get__(engine)
         engine._close_position(
             pos, exit_price=100_980.0, exit_reason="liquidation",
             exit_ts=pos.entry_ts + 3_600_000, mae_r=1.98, mfe_r=0.0,

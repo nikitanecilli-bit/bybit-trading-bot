@@ -119,3 +119,26 @@ CI run: 41633199418, commit 3ac4bb0c20c48e31e0264df7fe39235cb5c8a658, conclusion
 H-A отклонена как текущий кандидат: не показала положительного net expectancy, не покрыла расходы, а fold 3 показал существенное ухудшение и kill-switch. Не делать parameter tuning или отбора монет по этим же folds — это усилит selection bias. Не переходить к API/runner/live.
 
 Следующий исследовательский шаг — не «подкрутить пороги H-A», а разобраться, почему у baseline/H-A столь большая доля gross edge поглощается costs и почему fold 3 ломает относительную силу: разложить сделки по turnover/holding time, entry/exit fee, adverse excursion, exit reason, long/short и режиму рынка. После этого решить, есть ли основание для отдельной preregistered гипотезы с меньшей частотой сделок. Текущие folds остаются использованными, не holdout. Funding не включён; это не Bybit net PnL.
+
+## 9. Post-run trade-ledger attribution (без нового replay)
+
+Агрегация уже сохранённого trade ledger из artifact run 41633199418:
+
+**Направление H-A**
+- Fold 1: long 156 сделок / -1,588.79 USDT; short 150 / -12.78 USDT. Убыток почти полностью пришёл от long.
+- Fold 2: long 163 / -981.39; short 159 / -1,244.52 USDT. Оба направления отрицательны.
+- Fold 3: long 227 / -409.85; short 178 / -1,897.93 USDT. Основной ущерб пришёл от short.
+- Нет устойчиво лучшего направления: в разных folds меняется сторона, которая создаёт основную просадку.
+
+**Причины закрытия H-A**
+- Fold 1: stop_loss 153 сделки / -5,947.88 USDT; time_stop 104 / +2,283.68; trailing_stop 42 / +1,914.93; take_profit 2 / +172.69.
+- Fold 2: stop_loss 167 / -6,221.34; time_stop 107 / +2,022.83; trailing_stop 41 / +1,762.95; take_profit 3 / +191.99.
+- Fold 3: stop_loss 208 / -8,125.58; time_stop 114 / +1,499.03; trailing_stop 65 / +3,143.12; take_profit 13 / +1,253.01; kill_switch 5 / -77.36.
+- Stop-loss cohort losses materially exceed gains from time/trailing/TP exits in each fold.
+
+**Удержание и оборот**
+- Median holding time: 19–20 H1 bars; p90 and maximum: 32 bars (configured max hold).
+- H-A made 1,033 trades; total modeled fees + slippage = 6,164.79 USDT, about 5.97 USDT/trade on average. Aggregate gross PnL was only +29.53 USDT, about +0.03 USDT/trade. These are portfolio totals divided by trade count, not per-trade normalized expectancy.
+- Ledger reconciliation is exact at reported precision: gross − fees − slippage − funding = net for each fold; funding is 0 because unavailable, not because actual funding would be zero.
+
+**Research implication:** do not simply block long or short globally; the failing side flips by fold. The strongest diagnostic target is the stop-loss cohort versus profitable time/trailing exits, with entry quality and subsequent adverse/favourable excursion. Any next experiment must be a new preregistered hypothesis, not an optimized threshold or direction filter fitted to these already-used folds.

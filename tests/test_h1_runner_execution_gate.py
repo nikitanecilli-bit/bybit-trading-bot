@@ -261,7 +261,7 @@ def test_load_bybit_h1_datasets_rejects_off_hour_timestamp_grid():
         for index in range(501):
             ts = 1_700_000_000_000 + index * 3_600_000
             rows.append(f"BTCUSDT,{ts},100,102,99,101,10,1010")
-        path.write_text("\\n".join(rows) + "\\n", encoding="utf-8")
+        path.write_text("\n".join(rows) + "\n", encoding="utf-8")
         try:
             load_bybit_h1_datasets(root)
         except SystemExit as exc:

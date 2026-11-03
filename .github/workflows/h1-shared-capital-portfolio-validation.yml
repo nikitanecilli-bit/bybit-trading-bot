@@ -91,7 +91,7 @@ jobs:
           if payload.get("selection_status") != "ok" or not isinstance(symbols, list) or len(symbols) != 5 or len(set(symbols)) != 5:
               raise SystemExit("Selection manifest must contain exactly five unique approved primary symbols")
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
-              env.write("H1_SYMBOL_ALLOWLIST=" + ",".join(symbols) + "\\n")
+              env.write("H1_SYMBOL_ALLOWLIST=" + ",".join(symbols) + "\n")
           print("Frozen top-five: " + ",".join(symbols))
           PY
       - name: Run strict shared-capital portfolio validation

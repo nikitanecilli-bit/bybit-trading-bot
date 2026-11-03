@@ -11,11 +11,14 @@ import csv
 import hashlib
 import json
 import os
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
 from scripts.run_h_a_relative_strength_replay import (
     COST_MULTIPLIER,
-    ROOT,
     STARTING_CAPITAL,
     em,
     iso,

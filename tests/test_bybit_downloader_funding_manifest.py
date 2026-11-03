@@ -2,10 +2,29 @@
 import json
 import tempfile
 import sys
+import types
 from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+# The downloader's network transport is deliberately patched in every test.
+# Provide only the requests symbols needed at import time so this offline unit
+# suite does not depend on an optional third-party package or make network calls.
+try:
+    import requests  # noqa: F401
+except ModuleNotFoundError:
+    requests_stub = types.ModuleType("requests")
+    class _ConnectionError(Exception):
+        pass
+    class _Timeout(Exception):
+        pass
+    requests_stub.ConnectionError = _ConnectionError
+    requests_stub.Timeout = _Timeout
+    requests_stub.Session = lambda: (_ for _ in ()).throw(
+        AssertionError("offline tests must not create a network session")
+    )
+    sys.modules["requests"] = requests_stub
 
 import bybit_downloader as downloader
 

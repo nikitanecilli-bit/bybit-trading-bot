@@ -993,3 +993,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Impact: future selector integrity only. No frozen Bybit selection manifest existed; no strategy PnL, Bybit API, download, paper trading or live orders.
 - Remaining limitation: this does not reconstruct historical delisted/temporarily unavailable contracts and does not remove survivorship bias from incomplete historical universe evidence.
 - Decision: selector must be rerun from scratch after final code/data freeze; no earlier manifest may be reused.
+
+
+## HYPOTHESIS INTAKE — MASTERPROMPT_breakout_bot.md (2026-11-04)
+
+- Пользовательская подборка разобрана и классифицирована в `docs/research/hypotheses/MASTERPROMPT_BREAKOUT_HYPOTHESIS_REVIEW_RU.md`.
+- Новые кандидаты в backlog: HYP-BRK-02 (ATR breakout buffer) и HYP-RISK-09 (correlated directional exposure cap); execution retest, MAE/MFE exits, session timing и broad-market context оставлены отдельными отложенными направлениями.
+- Не дублировать: H3 gap gate 2% (E09 не активировался); H4 post-break return-to-channel (пересекается с отклонённым H-C); H8 общий BTC/breadth gate (E12/E13 уже исследовали); H-A relative strength (отклонена).
+- Источник — legacy v6.1 / 15m описание. Текущий рабочий приоритет остаётся H1; старые параметры не перенесены.
+- Документальная регистрация בלבד: нет PnL run, parameter sweep, paper trading, API connection или live orders. Data/accounting gate остаётся закрытым.

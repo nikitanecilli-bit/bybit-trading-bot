@@ -124,6 +124,55 @@ def test_signal_rejects_context_from_future_or_other_bar():
         raise AssertionError("mismatched context timestamp must fail closed")
 
 
+
+
+def test_strength_score_uses_exact_24h_and_72h_close_indices():
+    symbol = "A"
+    rows = []
+    start = 1_800_000_000_000
+    for index in range(73):
+        # Flat prior history makes ATR stable; the last close gives known returns.
+        close = 100.0 if index < 72 else 110.0
+        rows.append(candle(
+            start + index * module.H1_MS, close=close,
+            open_=close, high=close + 1.0, low=close - 1.0,
+        ))
+    symbols = ["A", "B", "C", "D", "E"]
+    histories = {name: rows if name == symbol else history(name) for name in symbols}
+    as_of = rows[-1].ts + module.H1_MS
+    context = module.build_strength_context(as_of, histories)
+    atr = module._atr_from_completed_bars(rows[:-1])
+    expected = (0.5 * (110.0 / 100.0 - 1.0) + 0.5 * (110.0 / 100.0 - 1.0)) / (atr / 110.0)
+    assert abs(context["scores"][symbol] - expected) < 1e-12
+
+
+def test_current_signal_candle_range_does_not_change_strength_atr_denominator():
+    symbols = ["A", "B", "C", "D", "E"]
+    normal = {name: history(name) for name in symbols}
+    expanded = {name: list(rows) for name, rows in normal.items()}
+    original = expanded["A"][-1]
+    expanded["A"][-1] = candle(
+        original.ts, close=original.close, open_=original.open,
+        high=original.close * 3.0, low=original.close * 0.1,
+    )
+    as_of = normal["A"][-1].ts + module.H1_MS
+    base_context = module.build_strength_context(as_of, normal)
+    expanded_context = module.build_strength_context(as_of, expanded)
+    assert base_context["scores"]["A"] == expanded_context["scores"]["A"]
+    assert base_context["ranks"]["A"] == expanded_context["ranks"]["A"]
+
+
+def test_midranks_are_monotonic_and_average_ties():
+    ranks = module._midranks({
+        "low": -2.0, "tie_a": 0.0, "tie_b": 0.0,
+        "high": 2.0, "top": 3.0,
+    })
+    assert ranks["low"] == 0.0
+    assert ranks["tie_a"] == ranks["tie_b"] == 0.375
+    assert ranks["high"] == 0.75
+    assert ranks["top"] == 1.0
+
+
 if __name__ == "__main__":
     tests = [(name, value) for name, value in sorted(globals().items())
              if name.startswith("test_") and callable(value)]

@@ -1,8 +1,11 @@
 """Fail-closed execution snapshot gate for the H1 market PnL runner."""
 from pathlib import Path
 from datetime import datetime, timezone
+import math
 import sys
 import tempfile
+
+import Bybit_Trading_Engine_v14_research as em
 
 repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(repo_root))
@@ -11,8 +14,35 @@ from run_h1_shared_capital_portfolio_validation import (
     resolve_execution_snapshot_dirs, validate_snapshot_history_coverage,
     resolve_funding_dirs, validate_funding_mark_coverage,
     resolve_bybit_kline_dir, load_bybit_h1_datasets,
-    round_limit_quote_to_bybit_tick,
+    round_limit_quote_to_bybit_tick, engine_cost_stress,
 )
+
+
+
+def test_cost_stress_restores_engine_globals_after_success_and_exception():
+    original = (em.TAKER_FEE, em.MAKER_FEE, em.TAKER_SLIP)
+    with engine_cost_stress(2.0):
+        assert em.TAKER_FEE == engine_cost_stress.__globals__["BASE_TAKER_FEE"] * 2.0
+        assert em.MAKER_FEE == engine_cost_stress.__globals__["BASE_MAKER_FEE"] * 2.0
+        assert em.TAKER_SLIP == engine_cost_stress.__globals__["BASE_TAKER_SLIP"] * 2.0
+    assert (em.TAKER_FEE, em.MAKER_FEE, em.TAKER_SLIP) == original
+
+    try:
+        with engine_cost_stress(1.5):
+            raise RuntimeError("synthetic replay failure")
+    except RuntimeError as exc:
+        assert str(exc) == "synthetic replay failure"
+    else:
+        raise AssertionError("synthetic exception should propagate")
+    assert (em.TAKER_FEE, em.MAKER_FEE, em.TAKER_SLIP) == original
+
+    for invalid in (0, -1, float("inf"), float("nan")):
+        try:
+            with engine_cost_stress(invalid):
+                pass
+        except ValueError:
+            continue
+        raise AssertionError(f"invalid multiplier accepted: {invalid!r}")
 
 
 def test_missing_snapshot_directories_reject_legacy_replay():
@@ -271,6 +301,7 @@ def test_delayed_limit_quotes_are_tick_aligned_without_crossing():
 
 if __name__ == "__main__":
     for test in (
+        test_cost_stress_restores_engine_globals_after_success_and_exception,
         test_missing_snapshot_directories_reject_legacy_replay,
         test_empty_snapshot_directory_rejects_legacy_replay,
         test_existing_archives_are_returned,

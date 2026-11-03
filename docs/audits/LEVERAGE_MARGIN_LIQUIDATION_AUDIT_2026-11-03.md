@@ -91,3 +91,35 @@ Official references checked:
 - [Bybit Isolated Liquidation — UTA](https://www.bybit.kz/en-KAZ/help-center/article/Liquidation-Price-Calculation-under-Isolated-Mode-Unified-Trading-Account): UTA isolated long/short formulas and close-fee adjustments.
 
 The collector's sequence checks are now covered by tests; the liquidation calculator itself remains deliberately unimplemented until account mode and dated risk-tier snapshots are known.
+
+
+## 8. Повторная проверка Mark OHLC и margin engine (2026-11-04)
+
+### Что подтверждено кодом
+
+1. scripts/archive_bybit_market_history.py запрашивает Bybit V5 /v5/market/mark-price-kline, парсит timestamp + OHLC, проверяет положительность, OHLC ordering, interval alignment, принадлежность запрошенному окну и отсутствие пропусков на всём диапазоне. Это проверка будущего скачанного архива; реальных полных Bybit архивов в репозитории пока нет.
+2. Engine загружает Mark OHLC отдельно от trade/last OHLC. При включённой liquidation model требует полный Mark OHLC и exact timestamp candle для каждого открытого инструмента. Mark Price используется для MTM/liquidation, Last/Trade Price — для stop trigger/fill.
+3. Risk tier для entry LP фиксируется по entry notional; maintenance margin на текущем Mark выбирает текущую tier. Сравнение dynamic MM health выполняется отдельно от фиксированного LP, поэтому tier upgrade может вызвать shortfall до касания fixed LP.
+4. Расчёты USDT isolated liquidation price, estimated close fee и MM components сопоставлены с актуальной опубликованной Bybit UTA isolated формулой: long/short знаменатель qty × (1 ∓ MMR), MM = mark_notional × MMR − mmDeduction + estimated close fee, close fee = qty × entry × (1 ∓/+ 1/leverage) × taker fee. Existing published-example test for long with extra margin 3,000 USDT returns 36,380.25.
+5. Funding net cost включается в position margin health, учитывает оставшуюся долю позиции после TP1 и откладывает receipt ровно на текущей settlement boundary. Funding archive completeness остаётся отдельным не закрытым gate.
+
+### Что НЕ подтверждено / ограничения модели
+
+- Это single-position isolated UTA approximation, не account-level engine. Cross/Portfolio Margin, shared collateral, активные ордера в account risk, hedged positions, AMR, partial liquidation ladder, insurance-fund execution и exchange-specific rounding не моделируются.
+- Фактический account margin mode и настройки пользователя не известны и не могут быть выведены из конфигурации стратегии. В коде нет приватного account query; leverage_val/ISOLATED_5X — модельное намерение, не доказательство режима биржевого аккаунта.
+- При срабатывании adverse Mark OHLC liquidation path использует экстремум всей свечи и консервативно ставит liquidation раньше same-bar Last stop. OHLC не содержит последовательность тиков, поэтому реальный порядок событий внутри свечи неизвестен; результат — stress approximation, не точная реконструкция.
+- Snapshot fetched_at — время наблюдения, а не effective-from timestamp. RiskTierHistory/InstrumentSpecHistory умеют as-of lookup и max-age, но не могут восстановить точное историческое время изменения risk tier, tick/qty filters, lifecycle или funding interval по редким snapshots.
+- max_risk_tier_age_ms и max_instrument_spec_age_ms default 30 дней — технический stale guard, а не доказательство неизменности параметров в этом интервале.
+- Текущий Bybit API Mark Kline endpoint возвращает OHLC candle timestamps; эти OHLC не дают внутрисвечной временной последовательности. Official API docs describe candle startTime and OHLC; they do not provide tick-by-tick Mark history through this endpoint.
+
+### Итог повторного аудита
+
+- Подтверждённого дефекта формул isolated USDT liquidation/MM в проверенном коде не найдено. Existing tests cover published LP example, directional close fee, dynamic risk-tier transition, funding adjustment and Mark/Last separation.
+- Подтверждённого факта реальной ликвидационной устойчивости нет. Не получены полноценные Bybit Mark, risk-tier и instrument-spec archives, а account mode unknown.
+- Не менял liquidation arithmetic и не расширял account model без authoritative inputs: произвольное предположение о Classic/UTA/Cross было бы опаснее, чем явный blocker.
+- Market PnL replay remains blocked. No PnL, paper, private API or live orders were performed in this audit.
+
+Official references checked 2026-11-04:
+- Bybit UTA isolated liquidation formula: https://www.bybit.kz/en-KAZ/help-center/article/Liquidation-Price-Calculation-under-Isolated-Mode-Unified-Trading-Account
+- Bybit V5 Mark Price Kline: https://bybit-exchange.github.io/docs/v5/market/mark-kline
+- Bybit USDT maintenance margin: https://www.bybit.cloud/help-center/article/Maintenance-Margin-USDT-Contract

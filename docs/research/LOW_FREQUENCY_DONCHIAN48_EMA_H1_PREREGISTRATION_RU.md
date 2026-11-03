@@ -122,3 +122,13 @@ PnL replay запрещён, пока не выполнены все сущес�
 - Train-only Top-5 selector остаётся long-only и ранжирует кандидатов в отдельных односymbolных screening-портфелях; итоговый выбор пяти инструментов не является доказательством оптимальности общего портфеля. Финальный вывод делается только на shared-capital replay.
 - Исторический delisted universe / временная доступность всех контрактов полностью не доказаны; survivorship bias остаётся отдельным ограничением.
 - Никакой market PnL replay, paper trading, Bybit API connection или реальные ордера в рамках этого документа не выполнялись.
+
+
+### Инженерная реализация (2026-11-04)
+
+- Реализовано в research runner: `H1_DONCHIAN48_EMA_ABLATION=1` включает ровно D20 / D48 / D48+EMA; default остаётся D20.
+- Manifest и CSV сохраняют фактические режимы; автоматическая paired-сводка требует все три arms на совпадающих fold/volume/breakout/cost ключах.
+- Workflow: отдельный manual dispatch input `donchian48_ema_ablation`.
+- CI [41734540443](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41734540443) — SUCCESS. Это подтверждает только компиляцию и детерминированные тесты реализации.
+- После изменения runner code hash старый Top-5 selection manifest устаревает и должен быть заново создан из официального набора данных при открытом data gate.
+- Стратегия не запускалась на рыночных данных; прибыльность не оценивалась.

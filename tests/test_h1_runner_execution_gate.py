@@ -41,11 +41,11 @@ def _write_funding_manifest(
             )
             snapshot_path.write_text(json.dumps({
                 "schema_version": 1, "source": "Bybit V5 GET /v5/market/instruments-info", "category": "linear", "fetched_at": fetched_at,
-                "count": 1, "instruments": [{"symbol": funding_path.stem, "fundingInterval": "480"}],
+                "count": 1, "instruments": [{"symbol": funding_path.stem, "fundingInterval": "60"}],
             }), encoding="utf-8")
             source_snapshots.append({
                 "path": snapshot_path.name, "sha256": sha256_file(snapshot_path),
-                "fetched_at_ms": ts, "funding_interval_minutes": 480,
+                "fetched_at_ms": ts, "funding_interval_minutes": 60,
             })
         schedule_path = funding_path.parent / f"{funding_path.stem}.schedule.json"
         schedule = {

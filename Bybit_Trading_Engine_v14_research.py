@@ -48,6 +48,7 @@ from typing import List, Dict, Optional, Tuple, Any
 
 from funding_accounting import accrued_funding_cost
 from instrument_spec_history import InstrumentSpecHistory
+from bybit_risk_tiers import RiskTierHistory
 from exchange_order_sizing import size_to_exchange_constraints
 
 logging.basicConfig(
@@ -394,6 +395,10 @@ class OpenPositionState:
     max_favorable_px: float = 0.0
     max_adverse_px: float = 0.0
     equity_at_entry: float = 0.0
+    risk_tier_id: Optional[int] = None
+    risk_limit_value: Optional[str] = None
+    maintenance_margin_rate: Optional[str] = None
+    maintenance_margin_deduction: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.max_favorable_px <= 0.0:
@@ -899,6 +904,18 @@ class PlanBStatePersistence:
                         raise ValueError(f"позиция {sym}: {field_name} должен быть bool")
                 if "maker_exits" in pos_dict and pos_dict["maker_exits"] is not None and not isinstance(pos_dict["maker_exits"], bool):
                     raise ValueError(f"позиция {sym}: maker_exits должен быть bool или null")
+                if "risk_tier_id" in pos_dict and pos_dict["risk_tier_id"] is not None:
+                    value = pos_dict["risk_tier_id"]
+                    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                        raise ValueError(f"позиция {sym}: risk_tier_id должен быть положительным целым числом")
+                for field_name in ("risk_limit_value", "maintenance_margin_rate", "maintenance_margin_deduction"):
+                    if field_name in pos_dict and pos_dict[field_name] is not None:
+                        try:
+                            value = Decimal(str(pos_dict[field_name]))
+                        except Exception as exc:
+                            raise ValueError(f"позиция {sym}: {field_name} должен быть Decimal-строкой") from exc
+                        if not value.is_finite() or value < 0:
+                            raise ValueError(f"позиция {sym}: {field_name} должен быть конечным числом >= 0")
                 tp1_ts = pos_dict.get("tp1_ts_ms")
                 if tp1_ts is not None:
                     if isinstance(tp1_ts, bool) or not isinstance(tp1_ts, int) or tp1_ts <= 0:
@@ -1195,6 +1212,8 @@ class UnifiedQuantEngine:
         mark_price_dir: Optional[str] = None,
         instrument_specs_dir: Optional[str] = None,
         max_instrument_spec_age_ms: Optional[int] = 30 * 24 * 60 * 60 * 1000,
+        risk_tiers_dir: Optional[str] = None,
+        max_risk_tier_age_ms: Optional[int] = 30 * 24 * 60 * 60 * 1000,
     ):
         self._explicit_config = config_path
         self.funding_dir = funding_dir
@@ -1206,6 +1225,12 @@ class UnifiedQuantEngine:
         if max_instrument_spec_age_ms is not None and max_instrument_spec_age_ms < 0:
             raise ValueError("max_instrument_spec_age_ms cannot be negative")
         self.max_instrument_spec_age_ms = max_instrument_spec_age_ms
+        self.risk_tier_history = (
+            RiskTierHistory.from_directory(risk_tiers_dir) if risk_tiers_dir else None
+        )
+        if max_risk_tier_age_ms is not None and max_risk_tier_age_ms < 0:
+            raise ValueError("max_risk_tier_age_ms cannot be negative")
+        self.max_risk_tier_age_ms = max_risk_tier_age_ms
         if bool(funding_dir) != bool(mark_price_dir):
             raise ValueError("--funding-dir and --mark-price-dir must be provided together")
         self.funding_by_symbol: Dict[str, List[Dict[str, Any]]] = {}
@@ -1616,6 +1641,24 @@ class UnifiedQuantEngine:
             size_usdt = float(exchange_order.notional_usdt)
             risk_usdt = float(exchange_order.risk_usdt)
 
+        risk_tier = None
+        risk_tier_history = getattr(self, "risk_tier_history", None)
+        if risk_tier_history is not None:
+            try:
+                position_value = Decimal(str(size_usdt))
+                risk_tier = risk_tier_history.get_tier(
+                    symbol, curr.ts, position_value,
+                    leverage=Decimal(str(self.cfg.leverage_val)),
+                    max_age_ms=getattr(self, "max_risk_tier_age_ms", 30 * 24 * 60 * 60 * 1000),
+                )
+            except ValueError as exc:
+                logger.warning(
+                    "Reject entry %s: dated Bybit risk tier unavailable or exceeded: %s",
+                    symbol, exc,
+                )
+                self._persist()
+                return False
+
         self.trade_seq += 1
         self.open_positions[symbol] = OpenPositionState(
             trade_id=f"T-{self.trade_seq:04d}", symbol=symbol, direction=direction,
@@ -1626,6 +1669,10 @@ class UnifiedQuantEngine:
             maker_exits=(self.cfg.maker_entry_and_tp1 if self.cfg.maker_tp1_and_target is None else self.cfg.maker_tp1_and_target),
             max_favorable_px=fill, max_adverse_px=fill,
             equity_at_entry=self.risk_mgr.current_equity,
+            risk_tier_id=risk_tier.tier_id if risk_tier else None,
+            risk_limit_value=str(risk_tier.risk_limit_value) if risk_tier else None,
+            maintenance_margin_rate=str(risk_tier.maintenance_margin_rate) if risk_tier else None,
+            maintenance_margin_deduction=str(risk_tier.mm_deduction) if risk_tier else None,
         )
         self._persist()
         return True

@@ -1,0 +1,159 @@
+"""Point-in-time Bybit linear risk-tier selection; no live or account-margin assumptions."""
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
+from typing import Any
+
+
+def _d(value: Any, field: str) -> Decimal:
+    try:
+        result = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError(f"invalid {field}") from exc
+    if not result.is_finite():
+        raise ValueError(f"non-finite {field}")
+    return result
+
+
+def _timestamp_ms(value: str) -> int:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"invalid risk-tier fetched_at: {value!r}") from exc
+    if parsed.tzinfo is None:
+        raise ValueError("risk-tier fetched_at must include timezone")
+    return int(parsed.timestamp() * 1000)
+
+
+@dataclass(frozen=True)
+class RiskTier:
+    symbol: str
+    tier_id: int
+    risk_limit_value: Decimal
+    maintenance_margin_rate: Decimal
+    initial_margin_rate: Decimal
+    max_leverage: Decimal
+    mm_deduction: Decimal
+
+
+@dataclass(frozen=True)
+class RiskTierSnapshot:
+    fetched_at: str
+    fetched_at_ms: int
+    category: str
+    tiers_by_symbol: dict[str, tuple[RiskTier, ...]]
+
+
+class RiskTierHistory:
+    """Loads archived Bybit V5 risk-limit pages and performs as-of tier selection."""
+
+    def __init__(self, snapshots: list[RiskTierSnapshot]):
+        if not snapshots:
+            raise ValueError("no risk-tier snapshots loaded")
+        ordered = sorted(snapshots, key=lambda item: item.fetched_at_ms)
+        stamps = [item.fetched_at_ms for item in ordered]
+        if len(stamps) != len(set(stamps)):
+            raise ValueError("duplicate risk-tier snapshot timestamps")
+        if len({item.category for item in ordered}) != 1:
+            raise ValueError("risk-tier snapshot categories cannot be mixed")
+        self.snapshots = ordered
+        self.category = ordered[0].category
+
+    @classmethod
+    def from_directory(cls, directory: str | Path, category: str = "linear"):
+        root = Path(directory)
+        if not root.is_dir():
+            raise ValueError(f"risk-tier directory does not exist: {root}")
+        snapshots = []
+        for path in sorted(root.glob("*.json")):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ValueError(f"{path}: cannot read risk-tier snapshot") from exc
+            if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+                raise ValueError(f"{path}: unsupported risk-tier schema")
+            if payload.get("category") != category:
+                raise ValueError(f"{path}: expected {category} category")
+            fetched_at = str(payload.get("fetched_at") or "")
+            fetched_at_ms = _timestamp_ms(fetched_at)
+            rows = payload.get("tiers")
+            if not isinstance(rows, list) or not rows:
+                raise ValueError(f"{path}: tiers must be a non-empty list")
+            grouped: dict[str, list[RiskTier]] = {}
+            seen: set[tuple[str, int]] = set()
+            for row in rows:
+                if not isinstance(row, dict):
+                    raise ValueError(f"{path}: tier row must be an object")
+                symbol = str(row.get("symbol") or "").strip().upper()
+                tier_id = row.get("id")
+                if not symbol or isinstance(tier_id, bool) or not isinstance(tier_id, int) or tier_id <= 0:
+                    raise ValueError(f"{path}: invalid symbol or tier id")
+                key = (symbol, tier_id)
+                if key in seen:
+                    raise ValueError(f"{path}: duplicate tier {key}")
+                seen.add(key)
+                risk_limit = _d(row.get("riskLimitValue"), "riskLimitValue")
+                mmr = _d(row.get("maintenanceMargin"), "maintenanceMargin")
+                imr = _d(row.get("initialMargin"), "initialMargin")
+                max_lev = _d(row.get("maxLeverage"), "maxLeverage")
+                deduction = _d(row.get("mmDeduction") or "0", "mmDeduction")
+                if min(risk_limit, mmr, imr, max_lev) <= 0 or deduction < 0:
+                    raise ValueError(f"{path}: risk tier values outside valid range")
+                grouped.setdefault(symbol, []).append(RiskTier(
+                    symbol, tier_id, risk_limit, mmr, imr, max_lev, deduction
+                ))
+            final: dict[str, tuple[RiskTier, ...]] = {}
+            for symbol, tiers in grouped.items():
+                tiers.sort(key=lambda item: item.risk_limit_value)
+                if len({item.risk_limit_value for item in tiers}) != len(tiers):
+                    raise ValueError(f"{path}: duplicate risk limit for {symbol}")
+                if sum(1 for item in tiers if item.tier_id == tiers[0].tier_id) != 1:
+                    raise ValueError(f"{path}: invalid lowest tier for {symbol}")
+                for i, tier in enumerate(tiers):
+                    if i == 0:
+                        continue
+                    prev = tiers[i - 1]
+                    if tier.risk_limit_value <= prev.risk_limit_value:
+                        raise ValueError(f"{path}: risk limits not increasing for {symbol}")
+                    if tier.maintenance_margin_rate < prev.maintenance_margin_rate:
+                        raise ValueError(f"{path}: MMR decreases for {symbol}")
+                    if tier.initial_margin_rate < prev.initial_margin_rate:
+                        raise ValueError(f"{path}: IMR decreases for {symbol}")
+                    if tier.max_leverage > prev.max_leverage:
+                        raise ValueError(f"{path}: max leverage increases for {symbol}")
+                final[symbol] = tuple(tiers)
+            snapshots.append(RiskTierSnapshot(fetched_at, fetched_at_ms, category, final))
+        return cls(snapshots)
+
+    def get_tier(self, symbol: str, as_of_ts: int, position_value: Decimal | str | float,
+                 *, leverage: Decimal | str | float, max_age_ms: int | None = None) -> RiskTier:
+        timestamp = int(as_of_ts)
+        value = _d(position_value, "position_value")
+        lev = _d(leverage, "leverage")
+        if value <= 0 or lev <= 0:
+            raise ValueError("position_value and leverage must be > 0")
+        eligible = [item for item in self.snapshots if item.fetched_at_ms <= timestamp]
+        if not eligible:
+            raise ValueError(f"no {self.category} risk-tier snapshot at or before {timestamp}")
+        selected = eligible[-1]
+        age = timestamp - selected.fetched_at_ms
+        if max_age_ms is not None:
+            if max_age_ms < 0:
+                raise ValueError("max_age_ms cannot be negative")
+            if age > max_age_ms:
+                raise ValueError(f"risk-tier snapshot is stale: age_ms={age}, max_age_ms={max_age_ms}")
+        tiers = selected.tiers_by_symbol.get(symbol.strip().upper())
+        if not tiers:
+            raise ValueError(f"{symbol} absent from dated risk-tier snapshot")
+        tier = next((item for item in tiers if value <= item.risk_limit_value), None)
+        if tier is None:
+            raise ValueError(f"{symbol} position value exceeds highest riskLimitValue")
+        if lev > tier.max_leverage:
+            raise ValueError(
+                f"{symbol} leverage {lev} exceeds tier {tier.tier_id} maxLeverage {tier.max_leverage}"
+            )
+        return tier

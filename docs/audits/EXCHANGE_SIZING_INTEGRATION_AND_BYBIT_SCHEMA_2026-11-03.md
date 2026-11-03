@@ -287,3 +287,14 @@ A source-level follow-up after the successful entry-sizing CI confirms three dis
 3. **The H1 runner remains in legacy proxy mode.** `scripts/run_h1_shared_capital_portfolio_validation.py` instantiates `UnifiedQuantEngine` without `instrument_specs_dir`; it does not activate the optional strict entry sizing path. The strict entry integration is currently covered only by synthetic unit fixtures. Existing H1 and E11/E13 results remain notional-proxy research results and are not upgraded by the new tests.
 
 **Execution gate remains BLOCKED.** Do not run or publish market PnL backtests as contract-accurate until official dated instrument snapshots and risk-tier snapshots are available, the H1 runner explicitly enables point-in-time specs, entry and all reduce-only legs use persisted exchange quantities, and margin/liquidation assumptions are account-mode-specific. No actual order was placed.
+
+
+## 21. Official risk-tier semantics and optional as-of enforcement
+
+The official Bybit V5 `GET /v5/market/risk-limit` response defines per-symbol `riskLimitValue`, `maintenanceMargin`, `initialMargin`, `maxLeverage`, and `mmDeduction`; linear responses are paginated (15 symbols per response). See [Bybit API: Get Risk Limit](https://bybit-exchange.github.io/docs/v5/market/risk-limit).
+
+A new `bybit_risk_tiers.py` reader loads only dated snapshots, selects the first tier whose `riskLimitValue` covers the position notional, and rejects missing/stale symbols, notional above the highest tier, or leverage above that selected tier's `maxLeverage`. The engine can opt into this gate with `risk_tiers_dir`; selected tier ID, limit, MMR and MM deduction are stored with the open position for auditability. Synthetic tests cover tier selection, leverage rejection and persistence fields.
+
+The reader deliberately does **not** yet calculate account margin or liquidation. Bybit's official isolated USDT perpetual liquidation formula depends on tier MMR and MM deduction, position quantity, leverage, extra margin and taker close-fee assumptions. Bybit also states that isolated liquidation is triggered by Mark Price, while cross/UTA liquidation is account-level and depends on account MMR. See [Bybit UTA liquidation rules](https://www.bybit.com/en/help-center/article/UTA-Trading-Rules-Liquidation-Process) and [USDT maintenance margin](https://www.bybit.com/en/help-center/article/Maintenance-Margin-USDT-Contract). Consequently, selecting a tier is not a liquidation simulation. Account mode and margin allocation remain explicit unresolved requirements.
+
+The H1 runner still does not pass either `instrument_specs_dir` or `risk_tiers_dir`; no existing backtest result is upgraded. Live API snapshot retrieval remains blocked by HTTP 403 on the GitHub-hosted runner. No synthetic tier fixture is represented as actual Bybit historical data.

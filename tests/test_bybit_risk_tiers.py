@@ -1,0 +1,69 @@
+"""Deterministic tests for dated Bybit risk-tier lookup and selection."""
+from pathlib import Path
+import json
+import sys
+import tempfile
+import unittest
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from bybit_risk_tiers import RiskTierHistory
+
+
+def payload(fetched_at="2026-11-01T00:00:00Z", tiers=None):
+    return {
+        "schema_version": 1, "category": "linear", "fetched_at": fetched_at,
+        "tiers": tiers or [
+            {"symbol":"BTCUSDT","id":1,"riskLimitValue":"100000","maintenanceMargin":"0.005","initialMargin":"0.01","maxLeverage":"100","mmDeduction":"0"},
+            {"symbol":"BTCUSDT","id":2,"riskLimitValue":"500000","maintenanceMargin":"0.01","initialMargin":"0.02","maxLeverage":"50","mmDeduction":"500"},
+        ],
+    }
+
+
+class RiskTierHistoryTests(unittest.TestCase):
+    def test_selects_first_tier_covering_position_value_and_enforces_max_leverage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")
+            history = RiskTierHistory.from_directory(tmp)
+            tier = history.get_tier("BTCUSDT", 1793606400000, "250000", leverage="40")
+            self.assertEqual(tier.tier_id, 2)
+            self.assertEqual(tier.mm_deduction, 500)
+            with self.assertRaisesRegex(ValueError, "exceeds tier 2 maxLeverage"):
+                history.get_tier("BTCUSDT", 1793606400000, "250000", leverage="60")
+
+    def test_boundary_uses_lower_tier_until_risk_limit_exceeded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")
+            history = RiskTierHistory.from_directory(tmp)
+            self.assertEqual(history.get_tier("BTCUSDT", 1793606400000, "100000", leverage="100").tier_id, 1)
+            self.assertEqual(history.get_tier("BTCUSDT", 1793606400000, "100000.01", leverage="50").tier_id, 2)
+
+    def test_rejects_future_or_stale_snapshots(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")
+            history = RiskTierHistory.from_directory(tmp)
+            with self.assertRaisesRegex(ValueError, "no linear risk-tier snapshot"):
+                history.get_tier("BTCUSDT", 1793500000000, "1000", leverage="10")
+            with self.assertRaisesRegex(ValueError, "stale"):
+                history.get_tier("BTCUSDT", 1793606400000, "1000", leverage="10", max_age_ms=1)
+
+    def test_rejects_missing_symbol_and_position_above_highest_tier(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")
+            history = RiskTierHistory.from_directory(tmp)
+            with self.assertRaisesRegex(ValueError, "absent"):
+                history.get_tier("ETHUSDT", 1793606400000, "1000", leverage="10")
+            with self.assertRaisesRegex(ValueError, "exceeds highest"):
+                history.get_tier("BTCUSDT", 1793606400000, "500001", leverage="10")
+
+    def test_rejects_invalid_tier_structure(self):
+        bad = payload(tiers=[
+            {"symbol":"BTCUSDT","id":1,"riskLimitValue":"100000","maintenanceMargin":"0.01","initialMargin":"0.01","maxLeverage":"100","mmDeduction":"0"},
+            {"symbol":"BTCUSDT","id":2,"riskLimitValue":"500000","maintenanceMargin":"0.005","initialMargin":"0.02","maxLeverage":"50","mmDeduction":"500"},
+        ])
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(bad), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "MMR decreases"):
+                RiskTierHistory.from_directory(tmp)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

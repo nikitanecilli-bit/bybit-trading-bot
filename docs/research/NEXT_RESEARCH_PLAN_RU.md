@@ -497,3 +497,23 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Fixed rates remain assumptions: taker 0.055%, maker 0.020%, taker slippage 0.0225%. VIP/region-specific account fee schedule and maker queue/partial fills not modeled.
 
 - Подготовлена карта интеграции точного qty без изменения кода: `_try_fill_pending` → immutable spec snapshot → exchange-valid qty → OpenPositionState → qtyStep-safe TP1/remaining qty → PnL/fees/funding → TradeRecord → persistence schema migration. Подробности и тест-gate в `EXCHANGE_SIZING_INTEGRATION_AND_BYBIT_SCHEMA_2026-11-03.md` section 16.
+
+## Обновление 2026-11-03 — H-A rejection и execution data gate
+
+Завершено:
+- H-A frozen relative-strength breakout replay выполнен на трёх ранее исследованных fold; обе версии (baseline и H-A) отрицательны после costs во всех fold. H-A хуже baseline на 499.28 USDT суммарно; fold 3 ухудшен на 1,321.93 USDT и max DD вырос на 14.97 п.п. Подробности: `docs/reports/H_A_RELATIVE_STRENGTH_BREAKOUT_RESULTS_2026-11-03_RU.md`.
+- E14 read-only post-break diagnostics completed: 3-bar/6-bar follow-through и retest связаны с последующим stop-loss outcome, но это post-entry association на уже просмотренных fold, не counterfactual PnL и не независимая проверка.
+- H-C close-based post-break invalidation preregistered, но намеренно не реализуется/не запускается на тех же folds: требуется untouched period и полноценный execution data gate.
+- TradeRecord TP1/remaining-leg provenance перенесён в закрытую запись и проверен full Research CI #41673525597 SUCCESS на commit `69358a1f720e6b91046d2afaf7da8696f5958836`.
+- Старые sizing/liquidation audit notes получили supersession notices; текущий статус сосредоточен в `EXECUTION_INTEGRATION_REAUDIT_2026-11-03.md`.
+
+Текущий блокер:
+- В ветке по-прежнему отсутствуют `data/instrument_specs/`, `data/archives/bybit/` и архивы Bybit universe history. В наличии только CryptoFetch archives. Поэтому новый Bybit-native H1 market PnL replay не запускается.
+- Bybit public endpoints блокировали GitHub-hosted egress (HTTP 403 для US/CN). Workflow архивирования готов, но требует настроенного self-hosted runner вне этих регионов. API secrets не нужны для публичных market-data endpoints.
+
+Следующий порядок:
+1. Не делать H-A threshold sweep и не переиспользовать старые fold для оценки H-C.
+2. Проверить, настроен ли non-US/non-CN self-hosted runner; после его появления выполнить ручные dated instrument/risk-tier captures и Bybit H1/funding/Mark archive с проверкой coverage.
+3. До появления архива продолжить только инженерный аудит: journal serialization/metrics, H1 runner/data manifests, старые audit-note supersession и PR #4 file classification.
+4. Разобрать PR #4 (207 changed files, 1,220 commits ahead / 14 behind current main) по пакетам; не merge/rebase/force-push whole branch. Любая интеграция — отдельная чистая ветка от актуального main с небольшими проверяемыми патчами.
+5. После закрытия data/account-mode gates — один frozen shared-capital Bybit-native validation. Никаких новых параметрических сеток на proxy данных.

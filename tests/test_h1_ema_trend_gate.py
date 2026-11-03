@@ -7,9 +7,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from scripts.run_h1_shared_capital_portfolio_validation import (
-    LEVERAGE_MODE, LEVERAGE_VAL, build_ema50_200_label_maps,
-    build_paired_ema_comparison, h1_variant_modes, h1_variant_name,
-    resolve_ema50_200_gate,
+    ACCELERATED_ATR_TRAIL_AFTER_1_5R, ENABLE_POST_BREAK_INVALIDATION,
+    LEVERAGE_MODE, LEVERAGE_VAL, MAX_CHASE_LIMIT_PCT,
+    build_ema50_200_label_maps, build_paired_ema_comparison,
+    h1_variant_modes, h1_variant_name, resolve_ema50_200_gate,
 )
 from market_structure import lookup_trend_label
 
@@ -29,6 +30,14 @@ def make_rows(count):
             volume=100.0,
         ))
     return rows
+
+
+def test_h1_execution_risk_settings_are_explicitly_frozen():
+    assert LEVERAGE_MODE == "ISOLATED_5X"
+    assert LEVERAGE_VAL == 5.0
+    assert MAX_CHASE_LIMIT_PCT == 1.5
+    assert ACCELERATED_ATR_TRAIL_AFTER_1_5R is False
+    assert ENABLE_POST_BREAK_INVALIDATION is False
 
 
 def test_ema50_200_gate_is_explicitly_opt_in_and_rejects_invalid_values():
@@ -194,6 +203,7 @@ def test_ema_gate_rejects_non_contiguous_h1_history():
 
 if __name__ == "__main__":
     tests = [
+        test_h1_execution_risk_settings_are_explicitly_frozen,
         test_ema50_200_gate_is_explicitly_opt_in_and_rejects_invalid_values,
         test_paired_ema_comparison_matches_identical_configs_and_costs,
         test_paired_ema_comparison_rejects_different_baskets_or_windows,

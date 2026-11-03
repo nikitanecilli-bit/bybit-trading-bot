@@ -63,7 +63,7 @@ class AccruedFundingTests(unittest.TestCase):
         pos = position("short", tp1=True, tp1_ts=SETTLE_2, remaining="0.5")
         receipt = [{"ts": SETTLE_1, "rate": "0.01"}]
         self.assertEqual(
-            accrued_funding_cost_for_remaining_margin(pos, receipt, MARKS, SETTLE_1),
+            accrued_funding_cost_for_remaining_margin(pos, receipt, MARKS, SETTLE_2),
             Decimal("-5.00"),
         )
 

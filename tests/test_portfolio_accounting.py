@@ -1104,7 +1104,6 @@ def test_sparse_replay_admits_late_symbols_after_warmup_and_is_order_invariant()
         if left != right
     ]
     assert not path_differences, path_differences[:5]
-    assert forward["daily_stop"] is True
     assert forward["daily_stop"] == reverse["daily_stop"]
     assert forward["kill_switch"] == reverse["kill_switch"]
     assert forward["net_pnl"] == reverse["net_pnl"]

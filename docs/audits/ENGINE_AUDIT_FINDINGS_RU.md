@@ -686,3 +686,21 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 **Границы:** это проверка корректности replay mechanics и event scheduling, а не подтверждение доходности стратегии, реального качества fills или полной cross-margin модели Bybit. Рыночный PnL replay не запускался.
 
 **Состояние `main`:** во время создания нового тестового файла один промежуточный create был отправлен в default branch; файл сразу удалён. Сравнение исходного и текущего `main` подтверждает `0 changed files` (только два компенсирующих commit в истории). Все рабочие изменения тестов и workflow находятся в `research/market-regime-v1-main).
+
+
+### 2026-11-03 — UTC midnight baseline и одновременные protective latches
+
+**Подтверждённый дефект:** `AdaptiveRiskManager.mark_to_market()` вызывал `on_new_timestamp()` до обновления `unrealized_pnl/current_equity`. На первом H1 mark после смены UTC-даты `day_start_equity` фиксировался по equity предыдущего часа. Поэтому изменение equity на баре, закрывшемся ровно в 00:00 UTC, могло ошибочно попасть в дневную просадку нового дня.
+
+**Исправление:** первый mark после старта/восстановления по-прежнему инициализирует дневную базу от стартового/restored equity до применения первого mark — это сохраняет контроль потерь на первом баре. При последующем rollover сначала обновляется mark и `current_equity`, затем `on_new_timestamp()` фиксирует эту equity как baseline нового UTC-дня. `kill_switch_triggered` при смене даты не сбрасывается; сбрасывается только дневной latch.
+
+**Регрессии:**
+- `test_utc_midnight_daily_baseline_uses_mark_at_boundary`: движение equity на границе 00:00 относится к закрывающемуся предыдущему дню; следующий внутридневной убыток уже сравнивается с новой базой.
+- `test_simultaneous_daily_stop_and_kill_switch_latch_independently`: оба лимита могут сработать на одном mark; оба latch сохраняются, kill-switch имеет приоритет в gate новых входов, а UTC rollover снимает только daily latch.
+- Существующая `test_conservative_maker_mtm_can_trip_daily_stop_before_modeled_maker_close` дополнительно защищает поведение первого mark от регрессии.
+
+**Проверка:** Research CI [#41682730056 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41682730056), commit `2e6eb30d0d15fafecd8c20e56d19677c2e3d54b6`. Portfolio accounting suite: **45/45 tests passed**; полный Research workflow завершился успешно.
+
+**Проверка гипотезы о same-bar slot reuse:** предполагаемый order-dependent вход после закрытия позиции в том же баре не подтвердился для обоих shared-capital replay paths. Перед обработкой символов `_prepare_pending_entry_risk_budgets()` резервирует доступные слоты/риск по состоянию портфеля до внутрисвечных закрытий; если слотов на начало бара не было, pending получает нулевой budget и не может воспользоваться слотом, освобождённым позднее в этом же баре. Приоритет одновременных входов уже проверен permutation regression. Не менял эту политику: неиспользованный в текущем баре слот при неисполнении top-ranked limit остаётся консервативным design caveat, а не доказанным PnL-дефектом.
+
+**Границы:** исправление касается UTC дневного risk baseline и latch lifecycle. Оно не меняет entry/exit сигналы и не является рыночным PnL результатом. Bybit cross-margin account-wide liquidation и реальные exchange fills по-прежнему не подтверждены.

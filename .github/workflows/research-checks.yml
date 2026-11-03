@@ -59,6 +59,15 @@ jobs:
           name: cryptofetch-archive-audit
           path: data/audits/cryptofetch_archive_comparison/
           if-no-files-found: warn
+      - name: Prepare H-A dynamic-universe archive manifest (no PnL)
+        run: python scripts/run_h_a_relative_strength_replay.py --output-dir /tmp/h_a_preparation
+      - name: Upload H-A preparation manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: h-a-archive-preparation
+          path: /tmp/h_a_preparation/
+          if-no-files-found: warn
       - name: Test Bybit instrument constraints and Decimal rounding
         run: python tests/test_bybit_instrument_specs.py
       - name: Test dated Bybit instrument snapshot collector

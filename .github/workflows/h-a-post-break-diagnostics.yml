@@ -49,6 +49,23 @@ jobs:
             --results-dir /tmp/h_a_results \
             --archive-dir data/archives/cryptofetch \
             --output-dir /tmp/h_a_post_break_diagnostics
+      - name: Validate diagnostic schema and archive provenance
+        run: |
+          python - <<'PY'
+          import csv, json
+          from pathlib import Path
+          root = Path("/tmp/h_a_post_break_diagnostics")
+          manifest = json.loads((root / "diagnostic_manifest.json").read_text())
+          assert manifest["source_archive_manifest_sha256_match"] is True
+          assert manifest["trade_rows"] > 0
+          with (root / "trade_signal_features.csv").open(newline="") as f:
+              fields = set(next(csv.reader(f)))
+          assert {"post_entry_3bar_close_return_r", "post_entry_retest_inside_3bars"} <= fields
+          with (root / "cohort_summary.csv").open(newline="") as f:
+              fields = set(next(csv.reader(f)))
+          assert "n_post_entry_3bar_close_return_r" in fields
+          print("PASS diagnostic schema, coverage counts and archive provenance")
+          PY
       - name: Upload post-break attribution
         if: always()
         uses: actions/upload-artifact@v4

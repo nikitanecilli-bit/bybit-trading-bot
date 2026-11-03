@@ -39,6 +39,7 @@ def _fixture(direction="long"):
         "entry_price": entry_price,
         "size_usdt": 1_000.0,
         "risk_usdt": 50.0,
+        "initial_stop_dist": 5.0,
     }
     index = {row.ts: i for i, row in enumerate(rows)}
     return rows, index, trade
@@ -49,6 +50,7 @@ def test_long_signal_features_use_previous_closed_bar_and_pre_signal_history():
     features = extract_signal_features(rows, index, trade)
 
     assert features["signal_ts_ms"] == rows[-2].ts
+    assert features["initial_stop_distance_atr"] == 2.5
     assert abs(features["signal_range_atr"] - 1.75) < 1e-9
     assert abs(features["signal_body_atr"] - 1.25) < 1e-9
     assert abs(features["signal_directional_close_location"] - (3.0 / 3.5)) < 1e-9

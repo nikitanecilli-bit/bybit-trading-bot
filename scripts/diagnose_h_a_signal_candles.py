@@ -48,6 +48,7 @@ NUMERIC_FEATURES = (
     "prebreak_tr_mean6_atr",
     "prebreak_volume6_vs20",
     "entry_adverse_gap_atr",
+    "initial_stop_distance_atr",
     "post_entry_completed_bars",
     "post_entry_1bar_close_return_r",
     "post_entry_3bar_close_return_r",
@@ -208,9 +209,14 @@ def extract_signal_features(
     size_usdt = float(trade.get("size_usdt") or 0.0)
     risk_usdt = float(trade.get("risk_usdt") or 0.0)
     entry_price = float(trade["entry_price"])
-    stop_dist = risk_usdt * entry_price / size_usdt if size_usdt > 0 else 0.0
+    recorded_stop_dist = trade.get("initial_stop_dist")
+    stop_dist = (
+        float(recorded_stop_dist) if recorded_stop_dist not in (None, 0, 0.0)
+        else (risk_usdt * entry_price / size_usdt if size_usdt > 0 else 0.0)
+    )
     if stop_dist <= 0 or not math.isfinite(stop_dist):
         raise ValueError(f"{trade.get('symbol')}: invalid initial stop distance")
+    features["initial_stop_distance_atr"] = stop_dist / atr
     features["post_entry_completed_bars"] = len(completed)
 
     for horizon in (1, 3, 6):

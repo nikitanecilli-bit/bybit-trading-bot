@@ -9,6 +9,7 @@ partial fills, and adverse selection are not modelled.
 from __future__ import annotations
 import csv
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -134,7 +135,7 @@ def resolve_funding_dirs(environ=None):
 
 def validate_funding_mark_coverage(
     funding_dir, mark_price_dir, symbols, h1_timestamps, start_ts, end_ts,
-    trade_kline_dir,
+    trade_kline_dir=None,
 ):
     """Require funding events and Bybit mark candles aligned to every scored H1 bar."""
     from scripts.validate_funding_coverage import validate_coverage

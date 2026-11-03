@@ -324,3 +324,10 @@ After Funding archive completeness is proven and the frozen top-5/reserve univer
 Audit found that run_portfolio_variant filters out every signal except long, and select_h1_top5_train_only.py imports that function. Thus both the current H1 shared-capital portfolio replay and its Top-5 train-only selection are long-only. This is narrower than the generic H1 strategy and must be labelled as such. The historical E01 long-only limit result is proxy OHLCV, independent-symbol capital and optimistic fill evidence; it does not justify permanent long-only deployment.
 
 Keep the existing runner unchanged as a reproducible long-only variant. After Funding completeness is proven, add a separate Bybit-native shared-capital directional ablation (long-only / short-only / both) with direction-aware train-only selection or a common predeclared universe, identical costs and risk limits, and final chronological holdout untouched. See docs/audits/H1_DIRECTIONAL_SCOPE_AUDIT_2026-11-03.md. No directional PnL replay was run.
+
+
+## 2026-11-04 — H-C reverse-time proxy protocol frozen
+
+- Audit/engineering gates now cover per-leg TP liquidity, TP1 mark-to-market, H-C event priority, exact taker exit accounting, state persistence, shared-capital equity reconciliation and deterministic symbol-order invariance.
+- One reverse-time CryptoFetch proxy check is preregistered in H-C doc section 6.1: 2025-10-30 00:00 through 2026-04-26 23:00 UTC; fixed 25-symbol archive-available set; same frozen baseline vs baseline+H-C; no H-A, no top-five selection, no tuning; 2x fee/slippage; funding omitted.
+- This is not forward OOS and cannot prove Bybit net PnL or 20% net/month. The workflow will run once on already committed archive bytes only. No Bybit API, external download, account access or orders.

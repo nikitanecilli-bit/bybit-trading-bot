@@ -1937,14 +1937,26 @@ class UnifiedQuantEngine:
 
         exit_price: Optional[float] = None
         exit_reason: Optional[str] = None
+        liquidation_exit = getattr(self, "_intrabar_liquidation_exits", {}).get(symbol)
+        if liquidation_exit is None:
+            liquidation_exit = self._liquidation_exit_price(pos, curr, exit_ts)
+        if liquidation_exit is not None:
+            self._intrabar_liquidation_exits[symbol] = liquidation_exit
 
-        # 1) Стоп (приоритет над целями внутри одной свечи — консервативно).
+        # 1) Liquidation on Mark Price precedes Last Price stops if both are
+        # touched in the same OHLC interval; intrabar event order is unknowable.
         # Если стоп пересечён, OHLC не показывает порядок high/low: не засчитываем
         # благоприятный экстремум этой свечи и ограничиваем MAE фактической модельной
         # ценой стоп-исполнения, а не более глубоким последующим wick.
         stop_hit = (curr.low <= pos.stop_price) if is_long else (curr.high >= pos.stop_price)
         kill_switch_hit = bool(self.risk_mgr.kill_switch_triggered)
-        if kill_switch_hit:
+        if liquidation_exit is not None:
+            exit_price, exit_reason = liquidation_exit, "liquidation"
+            if is_long:
+                pos.max_adverse_px = min(pos.max_adverse_px, exit_price)
+            else:
+                pos.max_adverse_px = max(pos.max_adverse_px, exit_price)
+        elif kill_switch_hit:
             # The portfolio kill-switch may have been triggered by this bar's
             # adverse mark before position management. OHLC cannot establish
             # whether a simultaneous TP touch happened before or after it, so
@@ -1986,7 +1998,7 @@ class UnifiedQuantEngine:
             mfe_r = (pos.entry_price - pos.max_favorable_px) / stop_dist
             mae_r = (pos.max_adverse_px - pos.entry_price) / stop_dist
 
-        if not stop_hit and not fill_bar and not kill_switch_hit:
+        if not stop_hit and not fill_bar and not kill_switch_hit and liquidation_exit is None:
             tp2_hit = (curr.high >= pos.tp2_price) if is_long else (curr.low <= pos.tp2_price)
             if tp2_hit:
                 if not pos.tp1_hit:

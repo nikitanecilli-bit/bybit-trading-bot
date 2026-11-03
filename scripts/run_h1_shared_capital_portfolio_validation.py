@@ -114,6 +114,16 @@ def build_paired_ema_comparison(result_rows, comparison_enabled):
     pairs = []
     for key in sorted(baseline):
         base, candidate = baseline[key], gated[key]
+        paired_invariants = (
+            "timeframe", "symbol_list", "symbols", "common_h1_bars",
+            "test_start_ts", "test_end_ts", "shared_starting_capital",
+            "max_concurrent_positions",
+        )
+        for field in paired_invariants:
+            if field not in base or field not in candidate or base[field] != candidate[field]:
+                raise ValueError(
+                    f"paired EMA portfolios differ in {field!r} for key {key}"
+                )
         pairs.append({
             "fold": key[0],
             "min_volume_ratio": key[1],

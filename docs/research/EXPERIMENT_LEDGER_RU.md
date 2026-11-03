@@ -1004,6 +1004,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Документальная регистрация בלבד: нет PnL run, parameter sweep, paper trading, API connection или live orders. Data/accounting gate остаётся закрытым.
 
 
+## ENG-FUND-004 — reject duplicate Funding CSV timestamps (2026-11-04)
+
+- Подтверждённый дефект: `validate_funding_manifest()` преобразовывал Funding timestamps в set без выявления дублей; дублированная выплата могла пройти сравнение с расписанием.
+- Fix: повторный timestamp добавляет `duplicate_funding_timestamp_in_csv`; regression rehashes CSV/manifest with a duplicate row and verifies fail-closed rejection.
+- CI [41735002481](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41735002481) and [41735022125](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41735022125): both SUCCESS, 55/55 steps.
+- Классификация: accounting/archive validation guardrail; no market PnL experiment.
+- Остаточный blocker: no authoritative historical effective-time series for fundingInterval; sparse point-in-time snapshots cannot exclude interval changes/reversions; settlement Mark remains candle-open proxy.
+
 ## ENG-H1-DONCHIAN-001 — параметризация preregistered Donchian48 arms (2026-11-04)
 
 - Спецификация: `docs/research/LOW_FREQUENCY_DONCHIAN48_EMA_H1_PREREGISTRATION_RU.md`.

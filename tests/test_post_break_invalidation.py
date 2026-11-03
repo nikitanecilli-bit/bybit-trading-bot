@@ -90,6 +90,7 @@ def test_hc_long_and_short_retest_close_symmetrically():
     assert len(long_exit) == 1
     assert long_exit[0][1] == 100.5
     assert long_exit[0][2] == "breakout_retest_invalidation"
+    assert long_exit[0][3] == long_bar.ts + H1_MS
 
     e = _configured_engine()
     short_pos = _position("short")
@@ -98,6 +99,7 @@ def test_hc_long_and_short_retest_close_symmetrically():
     assert len(short_exit) == 1
     assert short_exit[0][1] == 99.5
     assert short_exit[0][2] == "breakout_retest_invalidation"
+    assert short_exit[0][3] == short_bar.ts + H1_MS
 
 
 def test_hc_wick_only_retest_does_not_close():
@@ -115,6 +117,14 @@ def test_hc_triggers_on_third_bar_but_not_after_window():
     captured = _manage(e, pos, bar, fill_bar=False)
     assert len(captured) == 1
     assert captured[0][2] == "breakout_retest_invalidation"
+
+    e = _configured_engine()
+    pos = _position("long")
+    pos.bars_held = 1
+    bar = engine.Candle(pos.entry_ts + H1_MS, 102.0, 103.0, 100.0, 100.5, 10.0)
+    second_bar = _manage(e, pos, bar, fill_bar=False)
+    assert len(second_bar) == 1
+    assert second_bar[0][2] == "breakout_retest_invalidation"
 
     e = _configured_engine()
     pos = _position("long")

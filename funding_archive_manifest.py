@@ -68,8 +68,8 @@ def record_funding_collection(
         "csv_sha256": sha256_file(csv_path),
         "csv_data_rows": csv_data_row_count(csv_path),
         "runs": runs,
-        "settlement_schedule_verified": False,
-        "note": "Query provenance only; a dated authoritative settlement schedule is still required to prove event completeness.",
+        "settlement_schedule_evidence": None,
+        "note": "Query provenance only; a dated authoritative settlement schedule with source snapshot hashes is still required to prove event completeness.",
         "updated_at_utc": datetime.fromtimestamp(collected_at_ms / 1000, tz=timezone.utc).isoformat(),
     }
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -140,9 +140,127 @@ def validate_funding_manifest(
     query_coverage_ok = cursor > int(required_end_ms)
     if not query_coverage_ok:
         errors.append("required_query_interval_not_covered")
-    schedule_verified = payload.get("settlement_schedule_verified") is True
-    if not schedule_verified:
-        errors.append("dated_settlement_schedule_not_verified")
+    schedule_evidence = payload.get("settlement_schedule_evidence")
+    schedule_verified = False
+    expected_events = set()
+    if not isinstance(schedule_evidence, dict):
+        errors.append("dated_settlement_schedule_evidence_missing")
+    else:
+        raw_schedule_path = schedule_evidence.get("path")
+        expected_schedule_hash = schedule_evidence.get("sha256")
+        if not isinstance(raw_schedule_path, str) or not raw_schedule_path:
+            errors.append("invalid_schedule_evidence_path")
+        else:
+            schedule_path = Path(raw_schedule_path)
+            if not schedule_path.is_absolute():
+                schedule_path = manifest_path.parent / schedule_path
+            if not schedule_path.is_file():
+                errors.append("schedule_evidence_file_missing")
+            elif not isinstance(expected_schedule_hash, str) or sha256_file(schedule_path) != expected_schedule_hash:
+                errors.append("schedule_evidence_hash_mismatch")
+            else:
+                try:
+                    schedule = json.loads(schedule_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    schedule = None
+                    errors.append("invalid_schedule_evidence_json")
+                if isinstance(schedule, dict):
+                    if (schedule.get("schema_version") != 1
+                            or schedule.get("source") != "bybit_dated_instrument_snapshots"
+                            or str(schedule.get("symbol", "")).upper() != symbol.upper()
+                            or schedule.get("category") != payload.get("category")):
+                        errors.append("schedule_evidence_identity_mismatch")
+                    try:
+                        schedule_start = int(schedule["coverage_start_ms"])
+                        schedule_end = int(schedule["coverage_end_ms"])
+                    except (KeyError, TypeError, ValueError):
+                        schedule_start, schedule_end = 0, -1
+                        errors.append("invalid_schedule_evidence_coverage")
+                    if schedule_start > int(required_start_ms) or schedule_end < int(required_end_ms):
+                        errors.append("schedule_evidence_does_not_cover_required_interval")
+                    source_snapshots = schedule.get("source_snapshots")
+                    if not isinstance(source_snapshots, list) or not source_snapshots:
+                        errors.append("schedule_source_snapshots_missing")
+                    else:
+                        snapshot_times = []
+                        for snapshot in source_snapshots:
+                            if not isinstance(snapshot, dict):
+                                errors.append("invalid_schedule_source_snapshot")
+                                continue
+                            source_path_raw = snapshot.get("path")
+                            source_hash = snapshot.get("sha256")
+                            try:
+                                fetched_at_ms = int(snapshot["fetched_at_ms"])
+                                interval_minutes = int(snapshot["funding_interval_minutes"])
+                            except (KeyError, TypeError, ValueError):
+                                errors.append("invalid_schedule_source_snapshot_metadata")
+                                continue
+                            source_path = Path(str(source_path_raw or ""))
+                            if not source_path.is_absolute():
+                                source_path = schedule_path.parent / source_path
+                            if (not source_path.is_file() or not isinstance(source_hash, str)
+                                    or sha256_file(source_path) != source_hash):
+                                errors.append("schedule_source_snapshot_hash_mismatch")
+                            if interval_minutes <= 0:
+                                errors.append("invalid_funding_interval_minutes")
+                            snapshot_times.append(fetched_at_ms)
+                        if snapshot_times != sorted(set(snapshot_times)):
+                            errors.append("schedule_source_snapshots_not_strictly_ordered")
+                    raw_expected = schedule.get("expected_settlement_timestamps_ms")
+                    if not isinstance(raw_expected, list):
+                        errors.append("expected_settlement_timestamps_missing")
+                    else:
+                        try:
+                            values = [int(value) for value in raw_expected]
+                            if values != sorted(set(values)):
+                                raise ValueError
+                            expected_events = set(values)
+                        except (TypeError, ValueError):
+                            errors.append("invalid_expected_settlement_timestamps")
+                    if not errors or all(
+                        error not in errors for error in (
+                            "schedule_evidence_identity_mismatch",
+                            "invalid_schedule_evidence_coverage",
+                            "schedule_evidence_does_not_cover_required_interval",
+                            "schedule_source_snapshots_missing",
+                            "invalid_schedule_source_snapshot",
+                            "invalid_schedule_source_snapshot_metadata",
+                            "schedule_source_snapshot_hash_mismatch",
+                            "schedule_source_snapshots_not_strictly_ordered",
+                            "invalid_funding_interval_minutes",
+                            "expected_settlement_timestamps_missing",
+                            "invalid_expected_settlement_timestamps",
+                        )
+                    ):
+                        funding_timestamps = set()
+                        with csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
+                            reader = csv.DictReader(handle)
+                            timestamp_column = (
+                                "funding_timestamp_ms" if reader.fieldnames and "funding_timestamp_ms" in reader.fieldnames
+                                else "timestamp" if reader.fieldnames and "timestamp" in reader.fieldnames
+                                else None
+                            )
+                            if timestamp_column is None:
+                                errors.append("funding_timestamp_column_missing")
+                            else:
+                                for row in reader:
+                                    try:
+                                        funding_timestamps.add(int(row[timestamp_column]))
+                                    except (TypeError, ValueError, KeyError):
+                                        errors.append("invalid_funding_timestamp_in_csv")
+                                        break
+                        expected_in_interval = {
+                            ts for ts in expected_events
+                            if int(required_start_ms) <= ts <= int(required_end_ms)
+                        }
+                        actual_in_interval = {
+                            ts for ts in funding_timestamps
+                            if int(required_start_ms) <= ts <= int(required_end_ms)
+                        }
+                        if expected_in_interval != actual_in_interval:
+                            errors.append("funding_events_do_not_match_dated_schedule")
+                        else:
+                            schedule_verified = True
     return {
         "ok": not errors,
         "status": "ok" if not errors else "incomplete",

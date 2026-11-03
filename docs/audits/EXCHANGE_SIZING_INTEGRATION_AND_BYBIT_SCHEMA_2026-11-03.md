@@ -366,3 +366,23 @@ The H1 runner now validates snapshot time coverage for each scored fold before c
 Six H1 runner gate tests pass, including current-only/historical mismatch, stale start, >30-day gaps and valid continuous coverage. Research CI #41622415461 — SUCCESS on e7164073a2292ed51f01b45d131ff65b3c958612.
 
 Operational implication: snapshots must be accumulated prospectively and periodically. A one-time current capture cannot reconstruct historical Bybit contract limits or historical risk tiers. Until sufficient dated coverage exists for the requested fold, the H1 runner intentionally refuses market PnL replay. This remains separate from Binance-vs-Bybit OHLCV, funding, spread, queue position and mark-price fidelity.
+
+
+## 29. H1 runner now uses official Bybit trade candles, funding and mark prices
+
+The H1 shared-capital runner no longer reads CryptoFetch/Binance ZIP candles. It now requires an explicit BYBIT_KLINE_DIR containing official Bybit V5 H1 trade-kline CSVs and loads those candles directly. The loader rejects malformed OHLCV, duplicate timestamps, and any non-hourly gap/irregular interval; the selected symbols must share a sufficiently large synchronized overlap.
+
+The runner also requires explicit BYBIT_FUNDING_DIR and BYBIT_MARK_PRICE_DIR. Before each scored fold it validates:
+- every selected symbol has funding and mark CSVs;
+- every funding settlement timestamp has a corresponding mark candle;
+- official Bybit trade-kline and mark-kline timestamp grids match;
+- every scored H1 candle has a mark-price candle;
+- each symbol has at least one funding settlement inside the scored fold.
+
+The engine receives funding_dir and mark_price_dir, so accrued funding is included in MTM and final trade PnL. The result's costs field now includes exchange fees, slippage and net funding cost; funding_costs is reported separately. Cost stress multipliers continue to scale trading fees/slippage only, not the historical funding cashflows.
+
+The H1 workflow requires three explicit repository paths: kline_dir, funding_dir, mark_price_dir. The Bybit market-history archive workflow now defaults to a self-hosted runner and allows a manual choice of runner; a preflight rejects US/Mainland China egress. This is needed because the hosted runner was previously confirmed to egress from the US and Bybit returns HTTP 403.
+
+Research CI #41623727845 — SUCCESS on e696af2f78e8ec7724d169899566c3825a9da56e (the tested code/test commit). The subsequent workflow-path/docstring-only changes are recorded separately. No market PnL backtest has been run; there are still no dated exchange snapshots or full Bybit market-history archives in the repo.
+
+Remaining execution limitations: OHLCV is now Bybit-native, but H1 limit fills still use OHLC penetration as a proxy, not order-book queue position; spread and partial-fill adverse selection are not modelled. The funding mark uses the exact-timestamp mark-candle open proxy, not a separately archived exchange settlement mark. Account-specific fee rates and account margin mode are still not configured.

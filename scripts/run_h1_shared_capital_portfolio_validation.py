@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Shared-capital H1 portfolio validation for signal-quality variants.
 
-Uses synchronized Binance OHLCV as a Bybit market-data proxy. Each fold is a
-portfolio simulation with one shared 10,000 USDT account, not 10,000 USDT per
-symbol. Limit fills require OHLC penetration, but queue position, spread,
-partial fills, and adverse selection are not modelled.
+Uses synchronized official Bybit V5 H1 trade OHLCV, funding settlements and
+mark-price candles. Each fold is a portfolio simulation with one shared
+10,000 USDT account, not 10,000 USDT per symbol. Limit fills require OHLC
+penetration, but queue position, spread, partial fills, and adverse selection
+are not modelled.
 """
 from __future__ import annotations
 import csv

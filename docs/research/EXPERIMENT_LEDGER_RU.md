@@ -866,3 +866,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Причина: официальные V5 endpoints instruments-info и risk-limit предоставляют текущие данные и не документируют historical/as-of query параметр; instruments-info указывает на bi-monthly изменение max order quantity fields.
 - 6 gate tests PASS; Research CI #41622415461 SUCCESS, commit e7164073a2292ed51f01b45d131ff65b3c958612.
 - До накопления датированной истории PnL replay остаётся заблокирован. Никакие рыночные PnL тесты не запускались.
+
+
+## ENG-EXEC-014 — H1 net PnL использует Bybit-native candles + funding (2026-11-03)
+
+- Удалён Binance/CryptoFetch ZIP как price source H1 runner. Теперь обязательна директория BYBIT_KLINE_DIR с official Bybit V5 H1 trade klines.
+- Loader проверяет OHLCV, дубликаты и непрерывный интервал 1h; common synchronized overlap проверяется между выбранными инструментами.
+- Runner требует Bybit funding и mark-price CSV для каждого выбранного инструмента; проверяет точное совпадение trade/mark timestamp grids и наличие mark candle для каждой scored H1 свечи и каждого funding settlement.
+- UnifiedQuantEngine получает funding_dir и mark_price_dir; funding учитывается в MTM и final PnL. Поле costs включает fees + slippage + net funding, отдельно выводится funding_costs.
+- H1 workflow требует путей kline_dir, funding_dir, mark_price_dir. Archive workflow для Bybit market history выбирает self-hosted runner по умолчанию и блокирует US/CN egress.
+- Research CI #41623727845 SUCCESS; новые gate-тесты funding/data paths плюс Bybit H1 loader tests прошли на кодовом коммите e696af2f78e8ec7724d169899566c3825a9da56e.
+- Market PnL replay не запускался: нет датированных instrument/risk snapshots и полных Bybit history CSV в репозитории. Не моделируются queue position, spread, partial-fill adverse selection; funding mark использует open свечи mark-price в timestamp settlement.

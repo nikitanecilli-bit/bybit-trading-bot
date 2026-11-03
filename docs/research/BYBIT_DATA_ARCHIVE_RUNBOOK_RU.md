@@ -73,3 +73,6 @@ Workflow публикует два артефакта: итоговый `h1_shar
 - Coverage gate проверяет наличие funding событий, mark candles на каждом funding timestamp и полное совпадение timestamp sets trade/mark H1. Это необходимая проверка целостности, но не проверка корректности самих рыночных цен/ставок и не доказательство exchange fills.
 - Instrument/risk-limit snapshots являются point-in-time наблюдениями; они не восстанавливают исторические параметры до первого сохранённого снимка.
 - Никаких новых PnL запусков не выполнялось: Bybit archive и датированные snapshots пока отсутствуют. Следующий реальный эксперимент не запускать до появления этих данных.
+
+
+**Детерминированные collector tests:** Research CI [#41689536499 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41689536499) выполнен на исследовательской ветке; все шаги успешны, включая instrument snapshot collector, risk-limit snapshot collector, market-history archive collector и funding/mark coverage preflight. Это offline/mock tests, не сетевой сбор реальных Bybit данных.

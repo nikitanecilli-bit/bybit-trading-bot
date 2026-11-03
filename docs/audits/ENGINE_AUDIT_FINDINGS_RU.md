@@ -572,7 +572,7 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 - Decimal-расчёт liquidation price для USDT-linear isolated long/short по опубликованной Bybit формуле.
 - Учитываются entry price, quantity, leverage, extra isolated margin, taker fee rate, MMR и mmDeduction.
 - Проверяется entry notional против dated risk tiers и maxLeverage.
-- Для LP рассчитываются кандидаты по каждому tier; выбирается tier, чей riskLimitValue покрывает notional именно на candidate liquidation price. Это важно, поскольку long при падении цены может перейти в более низкий tier, а short при росте — в более высокий.
+- LP рассчитывается по tier, выбранному на entry notional; не подменяет фиксированную LP динамическим tier на candidate LP. Отдельная функция считает текущую MM по mark notional и соответствующему Mark-Price tier для одной позиции.
 - Неоднозначный/неразрешимый tier selection закрывается ошибкой, а не подстановкой значения.
 
 **Тесты:** `tests/test_mark_price_liquidation.py` покрывает официальный пример Bybit (40,000 entry, 1 BTC, 50x, 0.5% MMR, 3,000 extra margin → 36,380.25 LP), long/short adverse direction, tier switch на liquidation notional, превышение risk limit, maxLeverage и некорректные входы. Тест подключён к Research CI.
@@ -586,3 +586,13 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 Источник формулы и опубликованного контрольного примера: Bybit Help Center, "Trading Rules: Liquidation Process (Unified Trading Account)", https://www.bybit.kz/en-KAZ/help-center/article/UTA-Trading-Rules-Liquidation-Process (USDT perpetual isolated long/short formulas and 40,000/50x/3,000 extra-margin example).
 
 Изменены только новый модуль, его тест и Research CI workflow; торговый движок и торговая логика не менялись. PnL replay, API и новые market data не запускались.
+
+
+**Уточнение по актуальной модели Bybit (официальная статья обновлена 2026-06-18):**
+- Для USDT/USDC isolated IM остаётся привязанной к Entry Price, а MM пересчитывается от Mark Price. Risk-limit tier динамически меняется по Mark Price и совокупной стоимости позиций/ордеров; изменение tier меняет MM и в резком движении может приблизить/вызвать ликвидацию.
+- При этом Bybit указывает, что isolated liquidation price остаётся фиксированной для неизменной позиции. Поэтому LP formula и текущая Mark-Price MM — два разных расчёта, а не один candidate-tier root search.
+- Модуль скорректирован: `calculate_isolated_usdt_liquidation_price()` выбирает tier по entry notional; `calculate_mark_price_maintenance_margin()` отдельно выбирает tier по текущему mark notional и включает estimated close fee (long: entry notional × (1−1/lev) × taker fee; short: entry notional × (1+1/lev) × taker fee).
+- Dynamic-MM helper пока рассматривает только одну позицию. Bybit risk tier учитывает совокупную стоимость позиций и ордеров, поэтому до учёта account/order aggregation результат — position-level approximation, не account-exact liquidation engine.
+- Предыдущая гипотеза о выборе LP tier по candidate liquidation notional была снята до интеграции в движок; тесты теперь проверяют fixed LP entry-tier и отдельно dynamic Mark-Price MM tier.
+
+Официальный источник: Bybit, "The New Margin Calculation: Adjustments and Implications", last updated 2026-06-18, https://www.bybit.com/en/help-center/article/Understanding-the-Adjustment-and-Impact-of-the-New-Margin-Calculation (isolated IM/MM, dynamic Mark-Price risk tiers, fixed liquidation price, lines 160–165, 169–173, 256–265). Bankruptcy price reference: https://www.bybit.com/ru-RU/help-center/article/Bankruptcy-Price-Perpetual-and-Expiry-Contracts.

@@ -91,6 +91,9 @@ def _as_bool(v: Any, default: bool = False) -> bool:
 # =====================================================================
 
 @dataclass
+POST_BREAK_INVALIDATION_BARS = 3  # frozen H-C horizon; not a tunable config parameter
+
+
 class BotConfig:
     bot_version: str = "v6.1"
     maintenance_gate_status: str = "ACTIVE_MONITORING"
@@ -127,6 +130,7 @@ class BotConfig:
     maker_tp1_and_target: Optional[bool] = None
     accelerated_atr_trail_after_1_5r: bool = False
     enable_h2_range_fade: bool = False
+    enable_post_break_invalidation: bool = False
 
     active_trading_pool: List[str] = field(
         default_factory=lambda: ["SOLUSDT", "BTCUSDT", "ETHUSDT", "AVAXUSDT", "DOGEUSDT"]
@@ -182,6 +186,8 @@ class BotConfig:
             errs.append("tp2_r_multiple > 10R: extreme targets require explicit strategy review")
         if self.atr_trail_mult <= 0: errs.append("atr_trail_mult <= 0")
         if self.max_hold_bars < 1: errs.append("max_hold_bars < 1")
+        if self.enable_post_break_invalidation and str(self.timeframe).strip().lower() != "1h":
+            errs.append("enable_post_break_invalidation поддерживается только на H1")
         if any(day not in range(7) for day in self.blocked_weekdays_utc):
             errs.append("blocked_weekdays_utc must contain only integers 0..6 (Monday=0)")
         if any(hour not in range(24) for hour in self.blocked_signal_hours_utc):
@@ -236,7 +242,7 @@ class BotConfig:
         if unknown_strategy:
             raise ValueError(f"unsupported strategy keys (not implemented): {', '.join(unknown_strategy)}")
 
-        allowed_execution = {"maker_entry_and_tp1", "maker_tp1_and_target", "accelerated_atr_trail_after_1_5r"}
+        allowed_execution = {"maker_entry_and_tp1", "maker_tp1_and_target", "accelerated_atr_trail_after_1_5r", "enable_post_break_invalidation"}
         ex_check = data.get("execution_and_exits", {}) or {}
         if not isinstance(ex_check, dict):
             raise ValueError("execution_and_exits must be an object")
@@ -291,6 +297,7 @@ class BotConfig:
         self.maker_entry_and_tp1 = _as_bool(ex.get("maker_entry_and_tp1", False))
         self.maker_tp1_and_target = (_as_bool(ex.get("maker_tp1_and_target", False)) if "maker_tp1_and_target" in ex else None)
         self.accelerated_atr_trail_after_1_5r = _as_bool(ex.get("accelerated_atr_trail_after_1_5r", False))
+        self.enable_post_break_invalidation = _as_bool(ex.get("enable_post_break_invalidation", False))
 
         if isinstance(data.get("active_trading_pool"), list):
             self.active_trading_pool = [str(x) for x in data["active_trading_pool"]]
@@ -1859,6 +1866,15 @@ class UnifiedQuantEngine:
             )
             return False
         sig = self.pending.pop(symbol)
+        strategy_name = str(sig.get("strategy", ""))
+        if (
+            self.cfg.enable_post_break_invalidation
+            and strategy_name in {"H1-momentum-breakout", "H-A-relative-strength-breakout"}
+            and sig.get("breakout_level") is None
+        ):
+            logger.error("H-C: отклонён pending %s — отсутствует signal-time breakout_level", symbol)
+            self._persist()
+            return False
         ok, _ = self.risk_mgr.can_open_new_trade(len(self.open_positions))
         if not ok:
             self._persist()
@@ -2133,6 +2149,23 @@ class UnifiedQuantEngine:
                 self._update_mark_to_market(exit_ts)
             if self.risk_mgr.kill_switch_triggered:
                 exit_price, exit_reason = self._intrabar_risk_marks.get(symbol, curr.close), "kill_switch"
+            elif (
+                self.cfg.enable_post_break_invalidation
+                and pos.strategy in {"H1-momentum-breakout", "H-A-relative-strength-breakout"}
+                and pos.bars_held <= POST_BREAK_INVALIDATION_BARS
+            ):
+                if pos.breakout_level is None:
+                    raise RuntimeError(
+                        f"H-C: open position {symbol} has no persisted signal-time breakout_level"
+                    )
+                retested_inside = (
+                    curr.close <= pos.breakout_level if pos.direction == "long"
+                    else curr.close >= pos.breakout_level
+                )
+                if retested_inside:
+                    exit_price, exit_reason = float(curr.close), "breakout_retest_invalidation"
+                else:
+                    self._persist()
             else:
                 # Persist per-candle position evolution (bars held, MFE/MAE,
                 # trailing stop and TP1 state) so a restart cannot restore an

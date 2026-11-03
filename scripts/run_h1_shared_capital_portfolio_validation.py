@@ -57,6 +57,17 @@ SELECTION_INPUT_KEYS = ("kline", "funding", "mark_price", "instrument_specs", "r
 
 
 
+def resolve_ema50_200_gate(environ=None):
+    """Opt-in only; baseline remains unchanged unless explicitly enabled."""
+    env = os.environ if environ is None else environ
+    raw = str(env.get("H1_EMA50_200_GATE", "0")).strip().lower()
+    if raw in {"", "0", "false", "off", "no"}:
+        return False
+    if raw in {"1", "true", "on", "yes"}:
+        return True
+    raise SystemExit("H1_EMA50_200_GATE must be one of 0/1, false/true, off/on")
+
+
 def build_ema50_200_label_maps(base_candles, symbols, end_idx, first_scored_ts):
     """Precompute causal same-bar EMA50/200 labels with a 1,000-H1-bar burn-in."""
     labels_by_symbol = {}
@@ -604,7 +615,10 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         mark_price_dir=mark_price_dir,
     )
     cfg = engine.cfg
-    cfg.bot_version = f"h1-portfolio-v{min_vol:g}-b{min_breakout_atr:g}-cost{cost_multiplier:g}"
+    cfg.bot_version = (
+        f"h1-portfolio-v{min_vol:g}-b{min_breakout_atr:g}-cost{cost_multiplier:g}"
+        f"{'-ema50_200' if ema_trend_labels_by_symbol is not None else ''}"
+    )
     cfg.timeframe = "1h"
     cfg.active_trading_pool = list(symbols)
     cfg.capital_usdt = STARTING_CAPITAL
@@ -745,7 +759,11 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         "timeframe": "1h",
         "fold": fold,
         **{key: round(value, 4) for key, value in monthly_metrics.items()},
-        "variant": f"vol{min_vol:g}_breakATR{min_breakout_atr:g}_cost{cost_multiplier:g}",
+        "variant": (
+            f"vol{min_vol:g}_breakATR{min_breakout_atr:g}_cost{cost_multiplier:g}"
+            f"_{'ema50_200' if ema_trend_labels_by_symbol is not None else 'baseline'}"
+        ),
+        "ema50_200_gate": ema_trend_labels_by_symbol is not None,
         "cost_multiplier": cost_multiplier,
         "min_volume_ratio": min_vol,
         "min_breakout_atr": min_breakout_atr,
@@ -983,6 +1001,15 @@ def build_validation_manifest(
             "direction": "long_only",
             "strategy": "H1-momentum-breakout",
             "validation_mode": design["mode"],
+            "ema50_200_gate": {
+                "enabled": bool(design.get("ema50_200_gate_enabled", False)),
+                "fast_period": 50,
+                "slow_period": 200,
+                "slow_slope_lookback": 5,
+                "burn_in_bars": 1000,
+                "label_timestamp": "same completed H1 candle open timestamp",
+                "allowed_label_for_long": "up",
+            },
             "frozen_config": design["frozen_config"],
             "volume_thresholds": design["volume_thresholds"],
             "breakout_atr_thresholds": design["breakout_atr_thresholds"],
@@ -1048,6 +1075,8 @@ def main():
     print(f"Aligned H1 portfolio: {len(symbols)} symbols, {len(timestamps)} common bars")
     print(f"Archive sources: {len(set(archives.values()))}; starting capital={STARTING_CAPITAL:.0f} USDT")
     design = resolve_validation_design()
+    ema_gate_enabled = resolve_ema50_200_gate()
+    design["ema50_200_gate_enabled"] = ema_gate_enabled
     first_scored_timestamp = selection_validation_boundary(timestamps)
     validate_selection_cutoff(design["selection"], first_scored_timestamp)
     if set(design["selection"]["symbols"]) != set(symbols):
@@ -1086,9 +1115,17 @@ def main():
     print(f"Train-only selection manifest={design['selection']['path']} sha256={design['selection']['sha256']}")
     print(f"Validation mode={design['mode']}; folds={[item[0] for item in design['folds']]}; "
           f"volume={design['volume_thresholds']}; breakoutATR={design['breakout_atr_thresholds']}; "
-          f"cost stress={design['cost_multipliers']}")
+          f"cost stress={design['cost_multipliers']}; EMA50/200 gate={ema_gate_enabled}")
     rows = []
     for fold, start_frac, end_frac in design["folds"]:
+        fold_start_index = int(len(timestamps) * start_frac)
+        fold_end_index = int(len(timestamps) * end_frac)
+        fold_ema_labels = (
+            build_ema50_200_label_maps(
+                datasets, symbols, fold_end_index, timestamps[fold_start_index],
+            )
+            if ema_gate_enabled else None
+        )
         for min_vol in design["volume_thresholds"]:
             for min_breakout in design["breakout_atr_thresholds"]:
                 for cost_multiplier in design["cost_multipliers"]:
@@ -1097,6 +1134,7 @@ def main():
                         min_vol, min_breakout, cost_multiplier,
                         instrument_specs_dir, risk_tiers_dir,
                         funding_dir, mark_price_dir, kline_dir,
+                        ema_trend_labels_by_symbol=fold_ema_labels,
                     )
                     rows.append(result)
                     print(f"fold={fold} {result['variant']} trades={result['trades']} "

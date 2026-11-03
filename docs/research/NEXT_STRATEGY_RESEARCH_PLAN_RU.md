@@ -394,3 +394,10 @@ The Bybit-native market archive and dated instrument/risk snapshots are still ab
 - The EMA paired ablation now checks identical fold, selected symbols, time window, starting capital and portfolio capacity before publishing baseline-vs-gated deltas. Leverage is explicitly frozen as isolated 5x in the H1 engine configuration and recorded in the research assumptions.
 - Research CI [#41730158593](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41730158593) passed **55/55 steps** at code commit `99a8a05d9c3218d849e38622192bedf2e17b3cd7`, including archive schedule attachment, funding completeness, EMA pairing and deterministic engine tests.
 - No actual Bybit market data were downloaded and no market PnL replay was run. Instrument/risk snapshots and Bybit-native H1/Funding/Mark archives remain absent; HTTP 403 still blocks public snapshot acquisition from the previously tested runners. The market-PnL gate remains CLOSED.
+
+
+### H1 risk configuration freeze — 2026-11-04
+
+A final config-to-manifest consistency check found that `max_chase_limit_pct=1.5` was documented in the H1 frozen assumptions but relied on the engine default rather than being explicitly assigned by the H1 runner. The runner now sets it from a named constant and also explicitly disables accelerated ATR trailing and H-C post-break invalidation, so the paired EMA test cannot silently inherit those engine defaults. The same constants are included in the validation manifest.
+
+Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41730514894) passed **55/55 steps**, including the new frozen-risk-settings regression. This is configuration/provenance hardening only; no market PnL replay was run.

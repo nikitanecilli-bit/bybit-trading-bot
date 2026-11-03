@@ -6,6 +6,7 @@
 - [Аудиты](audits/)
 - [Операционные инструкции](operations/)
 - [Карта репозитория](REPOSITORY_MAP_RU.md)
+- [v15 Dashboard — аудит демо-прототипа](audits/V15_DASHBOARD_DEMO_AUDIT_2026-11-03.md) — synthetic planted edge, pseudo-portfolio и неподтверждённые KPI.
 
 ## Правила чтения результатов
 

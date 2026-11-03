@@ -1,0 +1,35 @@
+name: v15 dashboard artifact integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dashboards/v15/**'
+      - 'tests/test_v15_dashboard_disclosure.py'
+      - '.github/workflows/v15-dashboard-integrity.yml'
+  push:
+    branches: [main, docs/v15-dashboard-demo-disclosure]
+    paths:
+      - 'dashboards/v15/**'
+      - 'tests/test_v15_dashboard_disclosure.py'
+      - '.github/workflows/v15-dashboard-integrity.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Validate v15 demo disclosures and JavaScript
+        run: python tests/test_v15_dashboard_disclosure.py

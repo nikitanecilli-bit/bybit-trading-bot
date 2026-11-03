@@ -1,3 +1,7 @@
+# ⚠️ Архивный демо-прототип — не использовать как доказательство доходности
+
+**Важно:** встроенный HTML ниже — самостоятельная JavaScript-демонстрация, не торговый движок. Offline-режим генерирует свечи с planted edge; Live-режим загружает Bybit OHLCV, но рассчитывает сделки собственной JS-логикой. Символы выбираются на той же выборке, а сделки независимых виртуальных счетов объединяются в псевдопортфель. Нет доказательства shared-capital PnL, независимого holdout или исполнения на Bybit. Ошибка API приводит к синтетическому fallback. Положительные KPI и заявление об экономии комиссий не являются подтверждёнными результатами.
+
 # 📥 Как получить готовый файл `Bybit_Profit_Dashboard_v15.html` на телефон или ПК
 
 Мобильное приложение Gemini выдаёт ошибку `net::ERR_NAME_NOT_RESOLVED`, когда пытается открыть `.html`-карточку во встроенном предпросмотре. Поскольку эта карточка текстовая, **ошибка здесь никогда не возникнет**.
@@ -25,7 +29,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bybit Quant Engine v15.0 — Прибыльный Свинговый Бэктестер и Дашборд</title>
+<title>Bybit v15 Demo Dashboard — НЕВАЛИДИРОВАННЫЙ ПРОТОТИП</title>
 <style>
   :root {
     --bg: #090d16; --card: #111827; --card2: #1f2937; --line: #374151;
@@ -61,7 +65,7 @@
   th, td { padding: 10px 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,.07); white-space: nowrap; }
   th { color: var(--mute); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
   .r { text-align: right; font-variant-numeric: tabular-nums; }
-  .status-box { background: rgba(6,182,212,.08); border: 1px solid rgba(6,182,212,.3); border-radius: 12px; padding: 12px 14px; font-size: 13px; margin-bottom: 14px; white-space: pre-line; }
+  .warning-banner { background: rgba(127,29,29,.28); border: 2px solid #ef4444; color: #fee2e2; border-radius: 12px; padding: 14px 16px; margin: 0 0 14px; font-size: 13px; line-height: 1.55; }\n  .status-box { background: rgba(6,182,212,.08); border: 1px solid rgba(6,182,212,.3); border-radius: 12px; padding: 12px 14px; font-size: 13px; margin-bottom: 14px; white-space: pre-line; }
   .patch-list { display: flex; flex-direction: column; gap: 10px; }
   .patch-item { background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 </style>
@@ -70,59 +74,61 @@
 <div class="wrap">
   <header class="top">
     <div class="title">
-      <h1>⚡ Bybit Profit-First Swing Engine <span class="badge up">v15.0 (Чистый Профит)</span></h1>
-      <p style="font-size:12px;color:var(--mute);margin-top:4px">Автономный бэктестер и центр управления (работает без Python и без интернета + поддерживает живую подгрузку свечей Bybit)</p>
+      <h1>⚡ Bybit v15 Demo Simulator <span class="badge warn">v15.0 • DEMO / НЕ ПРОВЕРЕН</span></h1>
+      <p style="font-size:12px;color:var(--mute);margin-top:4px">Изолированный JavaScript-прототип. Не подключён к Python engine, TradeRecord или официальному H1 replay.</p>
     </div>
     <div class="btns">
       <select id="modeSel" title="Источник данных">
-        <option value="offline" selected>⚡ Автономная матрица Bybit (100% Офлайн)</option>
-        <option value="live">🌐 Живые свечи с api.bybit.com (Онлайн)</option>
+        <option value="offline" selected>⚠️ Синтетические свечи (демо)</option>
+        <option value="live">Bybit API OHLCV (экспериментальный источник)</option>
       </select>
-      <button class="btn-go" id="btnRunBt">🚀 Запустить прибыльный бэктест v15</button>
+      <button class="btn-go" id="btnRunBt">Запустить демо-расчёт (не PnL движка)</button>
       <button class="btn-blue" id="btnExportCfg">📥 Скачать конфиг (.json)</button>
       <button class="btn-dl" id="btnDownloadSelf">💾 Скачать этот дашборд (.html)</button>
     </div>
   </header>
 
-  <div class="status-box" id="statusBox">Готов к работе. Нажмите «🚀 Запустить прибыльный бэктест v15»...</div>
+  <div class="warning-banner" role="alert"><strong>ВНИМАНИЕ: ЭТО НЕ ВАЛИДИРОВАННЫЙ BACKTEST И НЕ ОТЧЁТ ТОРГОВОГО ДВИЖКА.</strong><br>Offline-режим генерирует синтетические свечи с заранее заложенным направленным преимуществом. Live-режим загружает свечи Bybit, но затем использует отдельную JavaScript-логику, не совпадающую с Python engine. Каждый символ торгуется на отдельном виртуальном капитале 10 000 USDT; затем сделки объединяются после отбора символов на той же выборке. Это не shared-capital портфель, не независимый holdout и не доказательство доходности. При ошибке API возможен переход на синтетические данные. Комиссионные и PnL-заявления этого прототипа не подтверждены.</div>
+
+  <div class="status-box" id="statusBox">Готов к работе. Нажмите «Запустить демо-расчёт (не PnL движка)»...</div>
 
   <section class="grid4" id="kpiGrid"></section>
 
   <section class="grid2">
     <div class="card">
-      <h2><span>📈 Кривая капитала (Чистый PnL vs Валовый потенциал)</span><span id="eqBadge" class="badge up">Зелёный коридор</span></h2>
+      <h2><span>📈 Кривая капитала (Чистый PnL vs Валовый потенциал)</span><span id="eqBadge" class="badge warn">DEMO</span></h2>
       <div id="chartBox" style="width:100%;height:260px"></div>
     </div>
     <div class="card">
-      <h2><span>🎯 Аудит План / Факт (6 KPI)</span><span id="planScore" class="badge up">6/6</span></h2>
+      <h2><span>🎯 Демо-пороги (не аудит)</span><span id="planScore" class="badge warn">DEMO</span></h2>
       <div id="planBox"></div>
     </div>
   </section>
 
   <section class="card" style="margin-bottom:16px">
-    <h2><span>📊 Сравнение активов: Старый шумный режим (v14) vs Свинговое ядро (v15.0)</span><span class="badge up">Авто-отсев убыточных монет активен</span></h2>
+    <h2><span>📊 Сравнение активов: Старый шумный режим (v14) vs Свинговое ядро (v15.0)</span><span class="badge warn">Отбор на той же выборке • не OOS</span></h2>
     <div class="tbl-wrap" id="uniTable"></div>
   </section>
 
   <section class="grid2">
     <div class="card">
-      <h2><span>🛠️ Активные защитные фильтры v15.0 (Почему бот теперь в плюсе)</span></h2>
+      <h2><span>🛠️ Активные защитные фильтры v15.0 (Гипотезы прототипа (не подтверждены))</span></h2>
       <div class="patch-list">
         <div class="patch-item">
-          <div><b>1. Свинговая структура 12–24ч (вместо 15m скальпинг-шума)</b><div style="font-size:12px;color:var(--mute)">Сокращает число сделок в 15 раз (с 1100 до ~45 за полгода), экономя $9,500+ на комиссиях биржи.</div></div>
-          <span class="badge up">ВКЛЮЧЕНО</span>
+          <div><b>1. Свинговая структура 12–24ч (вместо 15m скальпинг-шума)</b><div style="font-size:12px;color:var(--mute)">Заявленное сокращение сделок и экономия не подтверждены воспроизводимым shared-capital тестом.</div></div>
+          <span class="badge warn">DEMO</span>
         </div>
         <div class="patch-item">
-          <div><b>2. Лимитный вход Maker (0.020%) на микро-откате 0.18 ATR</b><div style="font-size:12px;color:var(--mute)">Исключает покупку на хаях свечи и снижает комиссию Bybit почти в 3 раза.</div></div>
-          <span class="badge up">ВКЛЮЧЕНО</span>
+          <div><b>2. Лимитный вход Maker (0.020%) на микро-откате 0.18 ATR</b><div style="font-size:12px;color:var(--mute)">OHLC-касание не моделирует очередь, спред и partial fills; maker execution не доказан.</div></div>
+          <span class="badge warn">DEMO</span>
         </div>
         <div class="patch-item">
-          <div><b>3. Структурный стоп ≥ 1.8% + Безубыток на +0.95R + Тейк 4.2R</b><div style="font-size:12px;color:var(--mute)">Не раздувает плечо на микро-стопах; переводит сделку в +0.15R безубытка и тянет тренд.</div></div>
-          <span class="badge up">ВКЛЮЧЕНО</span>
+          <div><b>3. Структурный стоп ≥ 1.8% + Безубыток на +0.95R + Тейк 4.2R</b><div style="font-size:12px;color:var(--mute)">Параметры стопа/BE/TP заданы в отдельной JS-модели; соответствие движку не проверено.</div></div>
+          <span class="badge warn">DEMO</span>
         </div>
         <div class="patch-item">
-          <div><b>4. Блокировка токсичных активов (PEPEUSDT, SUIUSDT, BNBUSDT)</b><div style="font-size:12px;color:var(--mute)">В ядре оставлены только лидеры с подтверждённым трендовым эджем: DOGE, SOL, XRP, ETH.</div></div>
-          <span class="badge up">ВКЛЮЧЕНО</span>
+          <div><b>4. Блокировка токсичных активов (PEPEUSDT, SUIUSDT, BNBUSDT)</b><div style="font-size:12px;color:var(--mute)">Символы отбираются по результатам той же выборки; это создаёт selection bias.</div></div>
+          <span class="badge warn">DEMO</span>
         </div>
       </div>
     </div>
@@ -355,7 +361,7 @@ async function runFullBacktest() {
     if (mode === 'live') {
       try { candles = await fetchBybitLive(sym, 1800); } catch (_) { usedOffline = true; }
     }
-    if (!candles.length) candles = generateCalibratedCandles(sym, 2200);
+    if (!candles.length) { usedOffline = true; candles = generateCalibratedCandles(sym, 2200); }
     const tr = runSwingV15(sym, candles);
     const st = calcStats(tr);
     const keep = st.net > 0 && st.pf >= 1.15;
@@ -366,20 +372,20 @@ async function runFullBacktest() {
   portTrades.sort((a, b) => a.ts - b.ts);
   const pSt = calcStats(portTrades);
 
-  stBox.textContent = `${usedOffline ? '⚡ Режим: 100% Автономная калиброванная матрица Bybit (без сетевых ошибок)' : '🌐 Режим: Живые исторические свечи Bybit API'}\n🏆 ИТОГ ПОРТФЕЛЯ ЛИДЕРОВ v15.0 (${activePool.join(', ')}): Чистая прибыль +$${pSt.net.toLocaleString()} (+${pSt.retPct}%) | Профит-фактор: ${pSt.pf} | Win Rate: ${pSt.wr}% | Комиссии снижены на 96%!`;
+  stBox.textContent = `${usedOffline ? '⚠️ Использована синтетическая демонстрационная генерация (включая fallback после ошибки API).' : '⚠️ Использованы Bybit API candles; расчёт всё равно выполнен отдельной непроверенной JS-моделью.'}\nДемо-результат: ${pSt.n} сделок; Net PnL ${pSt.net.toLocaleString()} USDT; PF ${pSt.pf}. Не является shared-capital результатом и не сравним с Python engine.`
 
   document.getElementById('kpiGrid').innerHTML = `
-    <div class="card"><div class="kpi-lbl">Чистая прибыль (Net PnL)</div><div class="kpi-val up">+$${pSt.net.toLocaleString()}</div><div class="kpi-sub">Доходность: <b>+${pSt.retPct}%</b> (Было в v14: −$9,986)</div></div>
+    <div class="card"><div class="kpi-lbl">Чистая прибыль (Net PnL)</div><div class="kpi-val up">+$${pSt.net.toLocaleString()}</div><div class="kpi-sub">Демо-арифметика; не результат engine/holdout</div></div>
     <div class="card"><div class="kpi-lbl">Профит-Фактор (Net PF)</div><div class="kpi-val up">${pSt.pf}</div><div class="kpi-sub">Валовый PnL: +$${pSt.gross.toLocaleString()} | WinRate: ${pSt.wr}%</div></div>
-    <div class="card"><div class="kpi-lbl">Издержки биржи (Fees + Slip)</div><div class="kpi-val warn">$${pSt.costs.toLocaleString()}</div><div class="kpi-sub">За ${pSt.n} свинговых сделок (Было в v14: $11,712)</div></div>
-    <div class="card"><div class="kpi-lbl">Макс. просадка (Max DD)</div><div class="kpi-val up">${pSt.maxDD}%</div><div class="kpi-sub">Лимит ≤ 10.0% | Ожидание: <b>+${pSt.expR}R</b> / сделка</div></div>
+    <div class="card"><div class="kpi-lbl">Издержки биржи (Fees + Slip)</div><div class="kpi-val warn">$${pSt.costs.toLocaleString()}</div><div class="kpi-sub">Демо-модель; fee tier и fill quality не подтверждены</div></div>
+    <div class="card"><div class="kpi-lbl">Макс. просадка (Max DD)</div><div class="kpi-val up">${pSt.maxDD}%</div><div class="kpi-sub">Демо-показатель; не оценка риска или ожидания</div></div>
   `;
 
   drawSvgChart(pSt.eqCurve, pSt.grossCurve);
 
   const checks = [
-    ['Доходность портфеля', `≥ +15.0%`, `+${pSt.retPct}%`, pSt.retPct >= 15],
-    ['Профит-фактор (КП)', `≥ 1.35`, `${pSt.pf}`, pSt.pf >= 1.35],
+    ['Демо-доходность (не OOS)', `≥ +15.0%`, `+${pSt.retPct}%`, pSt.retPct >= 15],
+    ['Демо PF (не OOS)', `≥ 1.35`, `${pSt.pf}`, pSt.pf >= 1.35],
     ['Win Rate', `≥ 40.0%`, `${pSt.wr}%`, pSt.wr >= 40],
     ['Макс. просадка (Max DD)', `≤ 10.0%`, `${pSt.maxDD}%`, pSt.maxDD <= 10],
     ['Мат. ожидание (Net R)', `≥ +0.15R`, `+${pSt.expR}R`, pSt.expR >= 0.15],

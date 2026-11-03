@@ -66,3 +66,8 @@ Added an explicit unit regression proving that the 50/200 helper remains neutral
 The helper seeds each recursive EMA with the first close in the supplied series. The 206-candle minimum above is only the first mathematically computable directional label; it is **not** proof that EMA200 has converged away from its initial seed. With α=2/201, the seed's remaining weight after 200 updates is approximately 13.53%; after 1,000 updates (five EMA periods) it is approximately 0.00454%.
 
 Therefore, a future full-history precomputation must preserve a substantial pre-roll before the first scored signal. A conservative design candidate is at least 5× the slow period (1,000 H1 bars for EMA200) before scoring, or an explicitly specified SMA-seeded EMA implementation with its own parity tests. The chosen initialization and burn-in must be frozen before any experiment; do not tune it on PnL. The 206-candle test documents the helper's current first-label boundary, not the recommended scoring pre-roll.
+
+
+### Non-finite input hardening — 2026-11-04
+
+The research-only EMA helper now rejects non-numeric/non-finite EMA inputs, and the trend helper rejects non-finite or non-positive close values instead of silently propagating NaN into neutral labels. Regression coverage includes NaN, +Infinity, -Infinity and zero close. Research CI [#41727040877](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41727040877) completed **SUCCESS, 53/53 steps** at code commit `18ea0707790e6830f0f9e40829d00cdf7c7a40fc`.

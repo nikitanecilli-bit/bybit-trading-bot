@@ -765,7 +765,7 @@ def test_stopped_long_mae_uses_stop_fill_and_does_not_count_later_wick_as_mfe():
     pos = make_position(direction="long", entry=100.0, size=1_000.0)
     e.open_positions["BTCUSDT"] = pos
     captured = {}
-    e._close_position = lambda p, px, reason, ts, mae, mfe: captured.update(
+    e._close_position = lambda p, px, reason, ts, mae, mfe, final_maker=None: captured.update(
         exit_price=px, reason=reason, mae=mae, mfe=mfe
     )
     history = [
@@ -783,7 +783,7 @@ def test_stopped_short_mae_uses_stop_fill_and_does_not_count_later_wick_as_mfe()
     pos = make_position(symbol="ETHUSDT", direction="short", entry=100.0, size=1_000.0)
     e.open_positions["ETHUSDT"] = pos
     captured = {}
-    e._close_position = lambda p, px, reason, ts, mae, mfe: captured.update(
+    e._close_position = lambda p, px, reason, ts, mae, mfe, final_maker=None: captured.update(
         exit_price=px, reason=reason, mae=mae, mfe=mfe
     )
     history = [

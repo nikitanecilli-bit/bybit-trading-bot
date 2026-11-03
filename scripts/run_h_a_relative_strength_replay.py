@@ -205,6 +205,15 @@ def run_variant(
             "session": trade.session,
             "order_type": trade.order_type,
             "exit_reason": trade.exit_reason,
+            "initial_stop_dist": trade.initial_stop_dist,
+            "initial_stop_price": trade.initial_stop_price,
+            "tp1_price": trade.tp1_price,
+            "tp2_price": trade.tp2_price,
+            "tp1_hit": trade.tp1_hit,
+            "tp1_ts_ms": trade.tp1_ts_ms,
+            "realized_tp1_gross_usdt": trade.realized_tp1_gross_usdt,
+            "remaining_fraction_at_exit": trade.remaining_fraction_at_exit,
+            "final_stop_price": trade.final_stop_price,
         }
         trades.append(row)
         symbol = by_symbol[trade.token]

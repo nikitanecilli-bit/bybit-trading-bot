@@ -494,6 +494,21 @@ def test_pending_entry_cannot_reuse_slot_freed_later_in_same_bar():
     assert "ETHUSDT" not in e.pending
 
 
+
+def test_pending_original_signal_timestamp_cannot_follow_freshness_guard():
+    e = make_engine()
+    signal = pending_signal("market", 100.0)
+    signal["signal_origin_ts"] = signal["signal_ts"] + 1
+    e.pending["BTCUSDT"] = signal
+
+    opened = e._try_fill_pending(
+        "BTCUSDT", candle(100.0, 101.0, 99.0, 100.5, ts=1_800_000_000_000),
+    )
+    assert opened is False
+    assert "BTCUSDT" not in e.open_positions
+    assert "BTCUSDT" not in e.pending
+
+
 def test_pending_signal_is_removed_when_risk_gate_rejects_entry():
     e = make_engine()
     e.pending["BTCUSDT"] = pending_signal("market", 100.0)
@@ -770,6 +785,7 @@ if __name__ == "__main__":
         test_long_gap_stop_journal_uses_actual_gap_fill_price,
         test_financial_rounding_uses_half_up_at_half_cent,
         test_pending_signal_is_removed_when_risk_gate_rejects_entry,
+        test_pending_original_signal_timestamp_cannot_follow_freshness_guard,
         test_pending_entry_cannot_reuse_slot_freed_later_in_same_bar,
         test_fill_bar_long_stop_does_not_count_pre_entry_or_later_favorable_wick,
         test_fill_bar_short_stop_does_not_count_pre_entry_or_later_favorable_wick,

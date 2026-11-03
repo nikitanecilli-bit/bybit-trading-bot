@@ -350,3 +350,19 @@ The engine now calls RiskTierHistory.calculate_margin_requirements() on strict e
 The H1 shared-capital validation runner now requires both archived Bybit linear instrument-spec snapshots and risk-tier snapshots before loading data or launching any parameter/fold replay. It passes both directories into UnifiedQuantEngine, enabling strict as-of exchange sizing and risk-tier validation; no legacy notional-proxy fallback is used by this runner. The workflow has a matching preflight step. Added tests cover missing directories, empty snapshot directories, and valid directory configuration. Research CI #41619800964 — SUCCESS on 1e25c1cc00e69dd515e29c4515437c026a654f0a.
 
 No dated snapshots are currently present because the hosted GitHub runner is in a Bybit-blocked US region. Therefore manual H1 market-PnL workflow dispatch will stop at the preflight until official snapshots are collected from a non-US/non-China runner. This is intentional; no market PnL backtest was run.
+
+
+## 28. Historical snapshot coverage is now checked per H1 fold
+
+A non-empty snapshot directory is not sufficient. Both Bybit public endpoints expose current instrument/risk-limit data; their documented query parameters contain no historical as-of timestamp. The instruments-info page describes online trading-pair specifications and notes that max limit/market quantity fields are adjusted twice monthly (3rd and 17th, 08:00 UTC+8). The risk-limit endpoint accepts category, symbol and cursor, but no historical time selector. Sources: https://bybit-exchange.github.io/docs/v5/market/instrument and https://bybit-exchange.github.io/docs/v5/market/risk-limit.
+
+The H1 runner now validates snapshot time coverage for each scored fold before constructing the engine:
+- at least one instrument and risk-tier snapshot must exist at or before the fold start;
+- the first eligible snapshot cannot be older than the configured 30-day maximum age;
+- gaps between eligible snapshots cannot exceed 30 days;
+- the latest eligible snapshot cannot be more than 30 days older than fold end;
+- a current-only snapshot is rejected for an older historical fold.
+
+Six H1 runner gate tests pass, including current-only/historical mismatch, stale start, >30-day gaps and valid continuous coverage. Research CI #41622415461 — SUCCESS on e7164073a2292ed51f01b45d131ff65b3c958612.
+
+Operational implication: snapshots must be accumulated prospectively and periodically. A one-time current capture cannot reconstruct historical Bybit contract limits or historical risk tiers. Until sufficient dated coverage exists for the requested fold, the H1 runner intentionally refuses market PnL replay. This remains separate from Binance-vs-Bybit OHLCV, funding, spread, queue position and mark-price fidelity.

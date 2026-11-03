@@ -856,3 +856,13 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Preflight проверяет отсутствие/пустые директории; regression suite покрывает fail-closed и корректную конфигурацию.
 - Research CI #41619800964 — SUCCESS, commit 1e25c1cc00e69dd515e29c4515437c026a654f0a.
 - Снимков пока нет из-за US egress GitHub-hosted runner; H1 PnL workflow намеренно остановится до их сбора. Новые market PnL тесты не запускались.
+
+
+## ENG-EXEC-013 — контроль временного покрытия exchange snapshots (2026-11-03)
+
+- H1 runner проверяет датированные instrument specs и risk tiers отдельно для каждого scored fold.
+- Нужен снимок не позднее начала fold; начальная давность, интервалы между снимками и давность последнего снимка не должны превышать 30 дней.
+- Неподходящий сегодняшний снимок не может быть применён к старой исторической свече.
+- Причина: официальные V5 endpoints instruments-info и risk-limit предоставляют текущие данные и не документируют historical/as-of query параметр; instruments-info указывает на bi-monthly изменение max order quantity fields.
+- 6 gate tests PASS; Research CI #41622415461 SUCCESS, commit e7164073a2292ed51f01b45d131ff65b3c958612.
+- До накопления датированной истории PnL replay остаётся заблокирован. Никакие рыночные PnL тесты не запускались.

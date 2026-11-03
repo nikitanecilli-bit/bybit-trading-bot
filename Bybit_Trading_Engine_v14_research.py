@@ -413,16 +413,6 @@ class OpenPositionState:
     risk_tier_max_leverage: Optional[str] = None
     initial_margin_usdt: Optional[str] = None
     maintenance_margin_usdt: Optional[str] = None
-    # TP1/remaining-leg provenance for exact partial-exit attribution.
-    initial_stop_dist: float = 0.0
-    initial_stop_price: Optional[float] = None
-    tp1_price: Optional[float] = None
-    tp2_price: Optional[float] = None
-    tp1_hit: bool = False
-    tp1_ts_ms: Optional[int] = None
-    realized_tp1_gross_usdt: float = 0.0
-    remaining_fraction_at_exit: float = 1.0
-    final_stop_price: Optional[float] = None
     contract_qty: Optional[str] = None
     tp1_contract_qty: Optional[str] = None
     remaining_contract_qty: Optional[str] = None
@@ -477,6 +467,16 @@ class TradeRecord:
     maintenance_margin_deduction: Optional[str] = None
     initial_margin_usdt: Optional[str] = None
     maintenance_margin_usdt: Optional[str] = None
+    # TP1/remaining-leg provenance for exact partial-exit attribution.
+    initial_stop_dist: float = 0.0
+    initial_stop_price: Optional[float] = None
+    tp1_price: Optional[float] = None
+    tp2_price: Optional[float] = None
+    tp1_hit: bool = False
+    tp1_ts_ms: Optional[int] = None
+    realized_tp1_gross_usdt: float = 0.0
+    remaining_fraction_at_exit: float = 1.0
+    final_stop_price: Optional[float] = None
 
 
 # =====================================================================

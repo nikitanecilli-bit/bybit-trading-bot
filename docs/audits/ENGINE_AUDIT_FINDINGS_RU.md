@@ -404,3 +404,12 @@ Until that is implemented and tested, H-A may be specified but not run as an all
 CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41629995066) — success; portfolio accounting suite 37/37; все 39 CI steps успешны.
 
 **Ограничение:** sparse replay — инфраструктура корректной обработки разной доступности данных, но сам по себе не является доказательством исторического point-in-time состава Bybit. Cross-sectional H-A rank должен на каждом timestamp использовать только инструменты с фактическими барами и полным 72h lookback; будущие listing/coverage сведения не должны влиять на решение в прошлом. Рыночный PnL replay пока не запускался.
+
+### 2026-11-03 — H-A feature tests and archive preparation
+
+- `relative_strength_breakout.py`: pure H1 cross-sectional strength/rank and Donchian breakout evaluator; 24h/72h returns normalized by prior 14 completed bars ATR%; midrank ties; minimum cross-section 5; no future bar access.
+- H-A deterministic suite: 9/9 passed (including exact lookback indexing, ATR exclusion of current signal candle, tie ranks, min breadth and timestamp guards).
+- `scripts/cryptofetch_sparse_loader.py`: uses existing ZIPs, verifies duplicate overlaps and longest-file timestamp coverage, preserves different symbol start dates, and fails closed on conflicts/gaps.
+- `scripts/run_h_a_relative_strength_replay.py`: baseline/H-A shared-capital runner; default prepare-only, PnL requires explicit `--execute`; no exchange API or new data access. Adds timestamped equity snapshots for monthly attribution.
+- CI run `41632126319`: success. Actual prepare-only archive manifest: 50/50 H1 symbols included; six duplicate groups, zero conflicting bars, zero longest-file coverage failures; common terminal candle `2026-10-26T00:00:00Z`. First-history dates: 25 on 2025-10-27, 22 on 2026-04-29, and three later starts in July/September 2026.
+- The three old research folds remain reused, not blind holdout. Funding is absent; any OHLCV-only result is not full Bybit net PnL. No market PnL replay has been run.

@@ -1023,8 +1023,8 @@ def _run_full_replay_symbol_order(order):
     e.cfg.max_concurrent_positions = 2
     e.cfg.max_risk_trade_pct = 1.0
     e.cfg.max_portfolio_risk_pct = 2.0
-    e.cfg.daily_stop_loss_pct = 1.5
-    e.cfg.emergency_kill_switch_pct = 35.0
+    e.cfg.daily_stop_loss_pct = daily_stop_loss_pct
+    e.cfg.emergency_kill_switch_pct = emergency_kill_switch_pct
     e.cfg.max_chase_limit_pct = 1.5
     e.risk_mgr.cfg = e.cfg
 
@@ -1135,7 +1135,7 @@ def test_full_shared_capital_replay_reconciles_ledger_to_final_equity():
     assert abs(result["current_equity"] - result["realized_equity"]) < 0.001
 
 
-def _run_sparse_replay_symbol_order(order):
+def _run_sparse_replay_symbol_order(order, *, emergency_kill_switch_pct=35.0, daily_stop_loss_pct=1.5):
     e = make_engine()
     e._state_restored = False
     e.journal_output_path = "/tmp/ignored_sparse_replay_symbol_order.json"
@@ -1258,6 +1258,30 @@ def test_sparse_replay_admits_late_symbols_after_warmup_and_is_order_invariant()
     assert forward["daily_stop"] == reverse["daily_stop"]
     assert forward["kill_switch"] == reverse["kill_switch"]
     assert forward["bar_snapshots"] == reverse["bar_snapshots"]
+    assert forward["net_pnl"] == reverse["net_pnl"]
+    assert forward["max_dd"] == reverse["max_dd"]
+
+
+def test_sparse_replay_kill_switch_flattens_all_positions_order_invariantly():
+    forward = _run_sparse_replay_symbol_order(
+        ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+        emergency_kill_switch_pct=1.5, daily_stop_loss_pct=99.0,
+    )
+    reverse = _run_sparse_replay_symbol_order(
+        ["SOLUSDT", "ETHUSDT", "BTCUSDT"],
+        emergency_kill_switch_pct=1.5, daily_stop_loss_pct=99.0,
+    )
+
+    assert forward["kill_switch"] is True
+    assert reverse["kill_switch"] is True
+    assert forward["daily_stop"] is False
+    assert reverse["daily_stop"] is False
+    assert len(forward["ledger"]) == len(reverse["ledger"]) == 2
+    assert {row[0] for row in forward["ledger"]} == {"ETHUSDT", "SOLUSDT"}
+    assert {row[0] for row in reverse["ledger"]} == {"ETHUSDT", "SOLUSDT"}
+    assert {row[-1] for row in forward["ledger"]} == {"kill_switch"}
+    assert {row[-1] for row in reverse["ledger"]} == {"kill_switch"}
+    assert forward["ledger"] == reverse["ledger"]
     assert forward["net_pnl"] == reverse["net_pnl"]
     assert forward["max_dd"] == reverse["max_dd"]
 

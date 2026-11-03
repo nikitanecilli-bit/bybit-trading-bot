@@ -285,6 +285,25 @@ def test_tp1_partial_position_mark_includes_realized_leg_and_remaining_leg():
     assert abs(value - (expected_gross - expected_costs)) < 1e-8
 
 
+def test_legacy_limit_position_mtm_uses_same_tp1_fee_fallback_as_close():
+    e = make_engine()
+    # Older/restored limit positions may not persist maker_exits. Final-close
+    # accounting falls back to order_type; MTM must use the same rule.
+    e.open_positions["BTCUSDT"] = make_position(
+        size=1_000.0, remaining=0.5, tp1_hit=True, tp1_gross=10.0,
+        order_type="limit", maker_exits=None,
+    )
+    e._last_mark_prices["BTCUSDT"] = 102.0
+    value = e._unrealized_pnl_at_marks()
+    expected_gross = 10.0 + 1_000.0 * 0.5 * 0.02
+    expected_costs = (
+        1_000.0 * engine_mod.MAKER_FEE
+        + 530.0 * engine_mod.MAKER_FEE
+        + 510.0 * (engine_mod.TAKER_FEE + engine_mod.TAKER_SLIP)
+    )
+    assert abs(value - (expected_gross - expected_costs)) < 1e-8
+
+
 def test_portfolio_risk_budget_caps_new_position_size():
     cfg = engine_mod.BotConfig(
         capital_usdt=10_000.0, max_risk_trade_pct=1.0,

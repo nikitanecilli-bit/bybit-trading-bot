@@ -134,12 +134,13 @@ def accrued_funding_cost_for_remaining_margin(
     as_of_ts: int,
     defer_boundary_receipts: bool = False,
 ) -> Decimal:
-    """Funding cashflow allocated to the currently remaining isolated margin.
+    """Funding cashflows affecting the currently open isolated position.
 
-    Trade PnL continues to use accrued_funding_cost(), which records the actual
-    full-size cashflows. For margin health after TP1, pre-TP1 funding is allocated
-    pro-rata to the remaining quantity because the corresponding portion of
-    position margin was released when quantity was reduced.
+    Historical payments/receipts before TP1 remain charged at the quantity
+    actually exposed when they settled. After TP1, settlements use remaining
+    quantity; at an ambiguous TP1 boundary payments use full quantity and
+    receipts use remaining quantity. This mirrors accrued_funding_cost() but
+    does not include any post-exit cashflows.
     """
     entry_ts = int(position.entry_ts)
     as_of_ts = int(as_of_ts)
@@ -148,6 +149,8 @@ def accrued_funding_cost_for_remaining_margin(
         raise ValueError("valid direction and as_of_ts >= entry_ts are required")
     entry_price = _d(position.entry_price, "entry_price")
     size_usdt = _d(position.size_usdt, "size_usdt")
+    if entry_price <= 0 or size_usdt <= 0:
+        raise ValueError("entry_price and size_usdt must be > 0")
     exact_initial = getattr(position, "contract_qty", None)
     exact_remaining = getattr(position, "remaining_contract_qty", None)
     quantity = _d(exact_initial, "contract_qty") if exact_initial is not None else size_usdt / entry_price
@@ -156,8 +159,13 @@ def accrued_funding_cost_for_remaining_margin(
     if quantity <= 0 or remaining < 0 or remaining > quantity:
         raise ValueError("invalid initial or remaining contract quantity")
     ratio = remaining / quantity
+    tp1_ts = getattr(position, "tp1_ts_ms", None)
+    if bool(getattr(position, "tp1_hit", False)) and tp1_ts is None:
+        raise ValueError("tp1_ts_ms is required when tp1_hit is true")
+    if tp1_ts is not None and int(tp1_ts) < entry_ts:
+        raise ValueError("tp1_ts_ms cannot precede position entry")
+    tp1_ts = int(tp1_ts) if tp1_ts is not None else None
     sign = Decimal("1") if direction == "long" else Decimal("-1")
-    tp1_hit = bool(getattr(position, "tp1_hit", False))
     total = Decimal("0")
     seen: set[int] = set()
     for event in events:
@@ -178,7 +186,12 @@ def accrued_funding_cost_for_remaining_margin(
         if mark <= 0:
             raise ValueError(f"funding mark price must be > 0 at {ts}")
         full_cost = sign * quantity * mark * rate
+        fraction = Decimal("1")
         if defer_boundary_receipts and ts == as_of_ts and full_cost < 0:
-            continue
-        total += full_cost * (ratio if tp1_hit else Decimal("1"))
+            fraction = Decimal("0")
+        elif tp1_ts is not None and ts > tp1_ts:
+            fraction = ratio
+        elif tp1_ts is not None and ts == tp1_ts and full_cost < 0:
+            fraction = ratio
+        total += full_cost * fraction
     return total.quantize(CENT, rounding=ROUND_HALF_UP)

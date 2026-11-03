@@ -15,7 +15,7 @@ def _rows(start_ts, end_ts, *, gap_at=None):
     rows = []
     ts = start_ts - 72 * H1_MS
     while ts <= end_ts:
-        if gap_at is not None and ts >= gap_at:
+        if gap_at is not None and ts == gap_at:
             rows.append(em.Candle(ts + 1, 100, 101, 99, 100, 10))
         else:
             rows.append(em.Candle(ts, 100, 101, 99, 100, 10))

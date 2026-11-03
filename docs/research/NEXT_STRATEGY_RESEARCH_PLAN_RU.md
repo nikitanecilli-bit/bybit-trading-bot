@@ -317,3 +317,10 @@ H1 runner scope check: the shared-capital H1 validator explicitly uses maker ent
 Current H1 shared-capital runner uses a 20 bps entry offset, 5 bps additional penetration, and a 3-H1-bar pending TTL. A normal intrabar OHLC touch is a maker proxy; marketable opening gaps are taker. No queue position, bid/ask, partial fills or price improvement are modelled. The existing h1-limit-fill-stress script is Binance OHLCV proxy with independent capital per symbol, so it cannot validate the current Bybit-native shared-capital model.
 
 After Funding archive completeness is proven and the frozen top-5/reserve universe is fixed, run a Bybit-native shared-capital fill sensitivity (offset 10/20/30 bps × penetration 0/5/10 bps × TTL 1/3/5 H1 bars) with unchanged signals and cost assumptions. Report fill rate, expired signals, maker/taker mix, trade count, costs and net PnL separately. Do not run this as a market PnL experiment before the Funding gate is closed.
+
+
+### Directional-scope blocker in current H1 Top-5 workflow — 2026-11-03
+
+Audit found that run_portfolio_variant filters out every signal except long, and select_h1_top5_train_only.py imports that function. Thus both the current H1 shared-capital portfolio replay and its Top-5 train-only selection are long-only. This is narrower than the generic H1 strategy and must be labelled as such. The historical E01 long-only limit result is proxy OHLCV, independent-symbol capital and optimistic fill evidence; it does not justify permanent long-only deployment.
+
+Keep the existing runner unchanged as a reproducible long-only variant. After Funding completeness is proven, add a separate Bybit-native shared-capital directional ablation (long-only / short-only / both) with direction-aware train-only selection or a common predeclared universe, identical costs and risk limits, and final chronological holdout untouched. See docs/audits/H1_DIRECTIONAL_SCOPE_AUDIT_2026-11-03.md. No directional PnL replay was run.

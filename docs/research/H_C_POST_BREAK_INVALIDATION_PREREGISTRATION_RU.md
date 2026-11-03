@@ -1,6 +1,6 @@
 # H-C — post-break continuation / early invalidation
 
-**Status:** design only; NOT IMPLEMENTED, NOT RUN, NOT APPROVED FOR LIVE.
+**Status:** implemented behind a disabled-by-default research flag; NOT PnL-tested, NOT enabled for live, NOT approved for deployment.
 **Created:** 2026-11-03
 **Parent evidence:** H-A diagnostic artifacts and H_A_RELATIVE_STRENGTH_BREAKOUT_PREREGISTRATION_RU.md, sections 11–12.
 
@@ -59,7 +59,7 @@ After a market entry, evaluate only the first three completed H1 bars, including
 
 No other filters or parameters may change.
 
-## 5. Required implementation and test coverage before any replay
+## 5. Implementation and synthetic regression coverage
 
 1. Store the exact signal-time Donchian boundary in pending signal and open-position state; never recompute it using future candles.
 2. Add an explicit, disabled-by-default configuration switch and an H1-only validation gate.
@@ -104,7 +104,13 @@ Completed in the research branch as provenance-only groundwork:
 - State restoration validates a finite positive boundary while remaining backward-compatible with older backups that do not contain the optional field.
 - Tests cover long/short signal boundaries, state round-trip, invalid values and legacy backup loading.
 
-The H-C close-based exit event itself remains NOT IMPLEMENTED. The new provenance field has no effect on entries, stops, exits or PnL.
+The H-C close-based exit event is now implemented behind config key execution_and_exits.enable_post_break_invalidation, default false. It is H1-only and uses the fixed three-bar horizon. It applies only to H1-momentum-breakout and H-A-relative-strength-breakout.
+
+The event runs after intrabar stop/liquidation/TP handling and kill-switch priority. It closes at the completed candle close only when the position remains open and the close has returned inside the stored boundary. TP1 partial state is preserved and only the remaining quantity is closed. Missing signal-time boundary fails closed on pending fill, state restore or active position management.
+
+Synthetic CI coverage: Research CI [41675851770](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41675851770) SUCCESS. H-C semantics 7/7 tests passed; state persistence 10/10 passed; the complete research-checks job passed. Covered long/short symmetry, wick-only rejection, first/third-bar window, no trigger after bar 3, stop/TP2 precedence, TP1 partial then retest, no same-bar re-entry, H1-only config and fail-closed state restore.
+
+This is implementation correctness only. The flag remains false by default; no market PnL run has been launched and the feature must not be enabled live.
 
 ## 9. Current blockers
 

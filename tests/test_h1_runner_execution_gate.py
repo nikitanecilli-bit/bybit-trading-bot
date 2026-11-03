@@ -4,11 +4,11 @@ from datetime import datetime, timezone
 import sys
 import tempfile
 
-import Bybit_Trading_Engine_v14_research as em
-
 repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(repo_root))
 sys.path.insert(0, str(repo_root / "scripts"))
+
+import Bybit_Trading_Engine_v14_research as em
 from run_h1_shared_capital_portfolio_validation import (
     resolve_execution_snapshot_dirs, validate_snapshot_history_coverage,
     resolve_funding_dirs, validate_funding_mark_coverage,

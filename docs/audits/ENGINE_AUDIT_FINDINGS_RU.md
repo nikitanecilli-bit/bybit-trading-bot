@@ -737,3 +737,12 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 **Проверка:** Research CI [#41687904323 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41687904323); manifest provenance suite **4/4 tests passed**. Рыночный PnL replay не запускался.
 
 **Границы:** hashes фиксируют точные байты, но не являются криптографическим доказательством происхождения файла с Bybit; происхождение подтверждается collector workflow и chain of custody. Runner по-прежнему требует реальные Bybit archives и dated snapshots; текущие файлы CryptoFetch не подходят.
+
+
+### 2026-11-03 — симметрия валидации signal timestamp при сохранении Plan B
+
+**Подтверждённый defect:** `load_state()` уже отклонял backup, если `signal_ts_ms` был не положительным целым числом или находился позже `entry_ts`, но `save_state()` позволял записать такое состояние. В результате сам writer мог успешно создать backup, который reader затем обязан отклонить при восстановлении.
+
+**Исправление:** `save_state()` теперь применяет ту же проверку `signal_ts_ms` до создания временного файла и атомарной замены backup. Добавленная регрессия `test_position_signal_timestamp_cannot_follow_entry_timestamp` подтверждает отказ на этапе сохранения.
+
+**Проверка:** Research CI [#41687016004 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41687016004); fail-closed state persistence suite: **69 tests passed**. В том же run прошли H1 manifest tests.

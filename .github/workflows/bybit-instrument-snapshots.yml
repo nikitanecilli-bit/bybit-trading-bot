@@ -10,6 +10,15 @@ on:
   schedule:
     - cron: '17 2 3,17 * *'
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Use ubuntu-latest (blocked by Bybit US-IP policy) or a self-hosted runner outside US/Mainland China"
+        required: true
+        type: choice
+        default: ubuntu-latest
+        options:
+          - ubuntu-latest
+          - self-hosted
 
 permissions:
   contents: write
@@ -20,7 +29,7 @@ concurrency:
 
 jobs:
   snapshot:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - name: Check out research branch
         uses: actions/checkout@v4

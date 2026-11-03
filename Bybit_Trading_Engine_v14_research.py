@@ -1690,12 +1690,26 @@ class UnifiedQuantEngine:
 
         if symbol in self.pending:
             if self._try_fill_pending(symbol, curr):
-                # The mark above was computed before this position existed. Re-mark
-                # the new position at its conservative adverse fill-bar price so
-                # portfolio daily-stop / kill-switch logic sees its entry-bar risk.
-                self._intrabar_risk_marks[symbol] = self._risk_mark_for_position(
-                    self.open_positions[symbol], curr
+                # The position did not exist during the portfolio pre-mark. Recompute
+                # both Last-Price stop risk and Mark-Price MTM/liquidation for this fill bar.
+                new_pos = self.open_positions[symbol]
+                self._intrabar_risk_marks[symbol] = self._risk_mark_for_position(new_pos, curr)
+                mark_candle = self._mark_candle_for_symbol(
+                    symbol, curr.ts, required=self.liquidation_model_enabled
                 )
+                if mark_candle is None:
+                    self._intrabar_mtm_marks[symbol] = self._intrabar_risk_marks[symbol]
+                else:
+                    liquidation_exit = self._liquidation_exit_price(new_pos, curr, bar_close_ts)
+                    if liquidation_exit is not None:
+                        self._intrabar_liquidation_exits[symbol] = liquidation_exit
+                        self._intrabar_mtm_marks[symbol] = liquidation_exit
+                    else:
+                        stop_crossed = curr.low <= new_pos.stop_price if new_pos.direction == "long" else curr.high >= new_pos.stop_price
+                        self._intrabar_mtm_marks[symbol] = (
+                            self._intrabar_risk_marks[symbol] if stop_crossed else
+                            float(mark_candle.low if new_pos.direction == "long" else mark_candle.high)
+                        )
                 self._update_mark_to_market(bar_close_ts)
                 self._manage_position(symbol, candles_history, fill_bar=True, exit_ts=bar_close_ts)
                 return False

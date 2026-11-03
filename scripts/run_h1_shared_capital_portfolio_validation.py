@@ -122,6 +122,7 @@ def build_paired_ema_comparison(result_rows, comparison_enabled):
     for row in rows:
         key = (
             int(row["fold"]),
+            int(row.get("donchian_period", 20)),
             float(row["min_volume_ratio"]),
             float(row["min_breakout_atr"]),
             float(row["cost_multiplier"]),
@@ -130,11 +131,11 @@ def build_paired_ema_comparison(result_rows, comparison_enabled):
         if key in target:
             raise ValueError(f"duplicate EMA comparison row for key {key}")
         target[key] = row
-    if not baseline or set(baseline) != set(gated):
-        raise ValueError("EMA comparison requires exactly paired baseline and gated rows")
+    if not gated or not set(gated).issubset(baseline):
+        raise ValueError("EMA comparison requires an exactly paired baseline for every gated row")
 
     pairs = []
-    for key in sorted(baseline):
+    for key in sorted(gated):
         base, candidate = baseline[key], gated[key]
         paired_invariants = (
             "timeframe", "symbol_list", "symbols", "common_h1_bars",
@@ -148,9 +149,10 @@ def build_paired_ema_comparison(result_rows, comparison_enabled):
                 )
         pairs.append({
             "fold": key[0],
-            "min_volume_ratio": key[1],
-            "min_breakout_atr": key[2],
-            "cost_multiplier": key[3],
+            "donchian_period": key[1],
+            "min_volume_ratio": key[2],
+            "min_breakout_atr": key[3],
+            "cost_multiplier": key[4],
             "baseline_net_pnl": float(base["net_pnl"]),
             "ema_gated_net_pnl": float(candidate["net_pnl"]),
             "delta_net_pnl_ema_minus_baseline": round(
@@ -173,6 +175,51 @@ def build_paired_ema_comparison(result_rows, comparison_enabled):
         })
     return {"mode": "paired_baseline_vs_ema50_200_up", "pair_count": len(pairs), "pairs": pairs}
 
+
+def build_paired_donchian48_comparison(result_rows, enabled):
+    """Require and compare the three preregistered shared-capital strategy arms."""
+    if not enabled:
+        return {"mode": "disabled", "pair_count": 0, "pairs": []}
+    rows = list(result_rows)
+    indexed = {}
+    for row in rows:
+        mode = (int(row.get("donchian_period", 20)), bool(row.get("ema50_200_gate", False)))
+        key = (
+            int(row["fold"]), float(row["min_volume_ratio"]),
+            float(row["min_breakout_atr"]), float(row["cost_multiplier"]),
+        )
+        slot = indexed.setdefault(key, {})
+        if mode in slot:
+            raise ValueError(f"duplicate Donchian comparison row for {key} mode={mode}")
+        slot[mode] = row
+    required = {(20, False), (48, False), (48, True)}
+    if not indexed or any(set(slot) != required for slot in indexed.values()):
+        raise ValueError("Donchian48 experiment requires exactly paired arms: D20 baseline, D48 baseline, D48+EMA")
+    pairs = []
+    invariants = (
+        "timeframe", "symbol_list", "symbols", "common_h1_bars",
+        "test_start_ts", "test_end_ts", "shared_starting_capital",
+        "max_concurrent_positions",
+    )
+    for key in sorted(indexed):
+        d20, d48, d48ema = (
+            indexed[key][(20, False)], indexed[key][(48, False)], indexed[key][(48, True)]
+        )
+        for field in invariants:
+            if any(row.get(field) != d20.get(field) for row in (d48, d48ema)):
+                raise ValueError(f"Donchian paired portfolios differ in {field!r} for key {key}")
+        pairs.append({
+            "fold": key[0], "min_volume_ratio": key[1],
+            "min_breakout_atr": key[2], "cost_multiplier": key[3],
+            "d20_net_pnl": float(d20["net_pnl"]),
+            "d48_net_pnl": float(d48["net_pnl"]),
+            "d48_ema_net_pnl": float(d48ema["net_pnl"]),
+            "delta_d48_vs_d20_net": round(float(d48["net_pnl"]) - float(d20["net_pnl"]), 6),
+            "delta_d48_ema_vs_d48_net": round(float(d48ema["net_pnl"]) - float(d48["net_pnl"]), 6),
+            "d20_trades": int(d20["trades"]), "d48_trades": int(d48["trades"]),
+            "d48_ema_trades": int(d48ema["trades"]),
+        })
+    return {"mode": "paired_donchian20_vs_donchian48_vs_donchian48_ema", "pair_count": len(pairs), "pairs": pairs}
 
 
 def build_ema50_200_label_maps(base_candles, symbols, end_idx, first_scored_ts):
@@ -1181,6 +1228,9 @@ def build_validation_manifest(
         },
         "paired_ema_comparison": build_paired_ema_comparison(
             result_rows, bool(design.get("ema50_200_gate_enabled", False))
+        ),
+        "paired_donchian48_comparison": build_paired_donchian48_comparison(
+            result_rows, bool(design.get("donchian48_ema_ablation_enabled", False))
         ),
         "result_rows": result_rows,
     }

@@ -44,7 +44,7 @@ def iso(ts_ms: int) -> str:
     return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat()
 
 
-def configure_engine(symbols: list[str], label: str):
+def configure_engine(symbols: list[str], label: str, enable_post_break_invalidation: bool = False):
     engine = em.UnifiedQuantEngine(
         journal_output_path=f"/tmp/{label.replace('/', '_')}_journal.json",
         persist_state=False,
@@ -74,6 +74,7 @@ def configure_engine(symbols: list[str], label: str):
     cfg.maker_entry_and_tp1 = False
     cfg.maker_tp1_and_target = False
     cfg.enable_h2_range_fade = False
+    cfg.enable_post_break_invalidation = enable_post_break_invalidation
     cfg.validate()
     engine.risk_mgr.cfg = cfg
     engine.tg.send_message = lambda *_args, **_kwargs: None
@@ -104,9 +105,13 @@ def monthly_returns(equity_path: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def run_variant(
     data: dict[str, list[em.Candle]], start_ts: int, end_ts: int,
-    label: str, use_h_a: bool,
+    label: str, use_h_a: bool, use_h_c: bool = False,
 ) -> dict[str, Any]:
-    engine = configure_engine(list(data), label)
+    if use_h_a and use_h_c:
+        raise ValueError("H-A and H-C variants are mutually exclusive")
+    engine = configure_engine(
+        list(data), label, enable_post_break_invalidation=use_h_c,
+    )
     equity_path: list[dict[str, Any]] = []
     active_by_close_ts = {
         candle.ts + 3_600_000: sum(
@@ -241,7 +246,9 @@ def run_variant(
         }
 
     result = {
-        "variant": "H-A_relative_strength_breakout" if use_h_a else "baseline_H1_Donchian_volume",
+        "variant": ("H-A_relative_strength_breakout" if use_h_a else
+                       "H-C_post_break_invalidation" if use_h_c else
+                       "baseline_H1_Donchian_volume"),
         "fold_start_utc": iso(start_ts),
         "fold_end_utc": iso(end_ts),
         "symbols_in_fold": len(data),

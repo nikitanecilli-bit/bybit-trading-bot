@@ -15,6 +15,10 @@ on:
         description: Exclusive UTC end timestamp in milliseconds, aligned to H1
         required: true
         type: string
+      universe_snapshot:
+        description: Repository-relative path to a dated data/universe_history/linear/*.json snapshot
+        required: true
+        type: string
       interval:
         description: Mark-price candle interval
         required: true
@@ -79,11 +83,12 @@ jobs:
           SYMBOLS: ${{ inputs.symbols }}
           START_MS: ${{ inputs.start_ms }}
           END_MS: ${{ inputs.end_ms }}
+          UNIVERSE_SNAPSHOT: ${{ inputs.universe_snapshot }}
           INTERVAL: ${{ inputs.interval }}
           BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}
         run: |
           echo "Using configured official Bybit API base URL: $BYBIT_API_BASE_URL"
-          python scripts/archive_bybit_market_history.py --symbols "$SYMBOLS" --start-ms "$START_MS" --end-ms "$END_MS" --interval "$INTERVAL" --base-url "$BYBIT_API_BASE_URL" --output-root "data/archives/bybit/${START_MS}_${END_MS}_${GITHUB_RUN_ID}"
+          python scripts/archive_bybit_market_history.py --symbols "$SYMBOLS" --start-ms "$START_MS" --end-ms "$END_MS" --universe-snapshot "$UNIVERSE_SNAPSHOT" --interval "$INTERVAL" --base-url "$BYBIT_API_BASE_URL" --output-root "data/archives/bybit/${START_MS}_${END_MS}_${GITHUB_RUN_ID}"
       - name: Require exact funding-settlement mark coverage
         env:
           SYMBOLS: ${{ inputs.symbols }}

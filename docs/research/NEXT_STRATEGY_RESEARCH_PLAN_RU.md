@@ -460,3 +460,15 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 - Instrument/risk-tier snapshots are point-in-time observations, not historical effective-time series. No complete Bybit Mark/risk-tier/instrument-spec archives exist yet; public GitHub runner API access has previously returned HTTP 403.
 - Next actionable task is data acquisition/validation infrastructure, not strategy PnL: secure a permitted public Bybit API execution environment or independently archived Bybit-native datasets, then close lifecycle, Mark, risk-tier, instrument-spec and Funding completeness gates. Do not switch to Binance proxies for proof of Bybit execution or liquidation.
 - No PnL run, strategy changes, private API, paper trading or live orders.
+
+
+## 2026-11-04 — Data acquisition source decision
+
+- Official Bybit V5 public endpoints cover H1 trade Kline, Mark Price Kline and Funding history. Bybit docs explicitly restrict US/Mainland China IPs (HTTP 403). Prior GitHub-hosted runner 403 is consistent with this but its precise egress country is not proven from retained logs.
+- Existing archive/snapshot workflows already enforce self-hosted runner outside US/Mainland China and accept official API base URL override. Mainnet hostnames include api.bybit.com and api.bytick.com.
+- Official Bybit Historical Market Data page advertises public OHLCV/trade CSV downloads; current accessible content does not prove Mark/Funding/risk-tier/spec coverage.
+- CryptoHFTData is supplementary only: documented Bybit history begins 2025-06-28; vendor documents missing hours 2025-11-26 through 2025-12-26 and 2026-04-13 through 2026-04-14; pre-Sep-2026 mark/ticker/OI fields are change-only deltas with null unchanged values. It is independent, not official Bybit.
+- Do not weaken strict runner preflight or run PnL on the independent archive alone.
+- Next step is to obtain a permitted self-hosted execution host and fetch a small official BTCUSDT test interval first, then scale to top-5 + reserve-5 and verify hashes, pagination, lifecycle, Funding schedule, Mark candles, risk tiers and instrument specs.
+- Detailed assessment: docs/audits/BYBIT_DATA_ACQUISITION_SOURCE_AUDIT_2026-11-04.md.
+- No private account API, PnL, paper or live orders.

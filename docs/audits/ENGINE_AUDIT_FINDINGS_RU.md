@@ -455,3 +455,36 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 - Плановый risk_usdt не включает возможный gap сверх stop и funding. Поэтому риск в журнале нельзя трактовать как гарантированный максимальный убыток.
 
 **Результат проверки:** в просмотренных stop/TP1/trailing/risk-sizing путях подтверждённого арифметического дефекта не найдено. Тесты покрывают long/short gap stops, stop-vs-TP при конфликте одной свечи, partial TP1, trailing остатка, три execution legs и запрет ретроактивного применения нового trailing stop. Это статический аудит плюс проверка состава уже успешного CI run 41634060290 (commit cf74d8a); новый CI на текущем HEAD не запускался. PnL replay не запускался.
+
+
+### 2026-11-03 — аудит shared portfolio risk, MTM и drawdown
+
+Проверены актуальные реализации `_open_portfolio_risk_usdt()`, `_prepare_pending_entry_risk_budgets()`, `_try_fill_pending()`, `step_candle()`, `_prepare_portfolio_intrabar_marks()`, `_risk_mark_for_position()`, `_unrealized_pnl_at_marks()`, `AdaptiveRiskManager.mark_to_market()` и `_evaluate_drawdown_stops()`; сопоставлены с deterministic tests в `tests/test_portfolio_accounting.py`.
+
+**Подтверждённая логика распределения риска:**
+- Перед обработкой синхронного бара allocator фиксирует текущую MTM equity, число свободных position slots и свободный риск: `equity × max_portfolio_risk_pct − sum(open risk)`.
+- Открытый риск считается как сумма `risk_usdt × remaining_fraction`. После TP1 учитывается только оставшаяся доля позиции; риск не уменьшается дополнительно из-за подтянутого stop. Это консервативная оценка, а не точный mark-to-stop.
+- Pending batch сортируется по `priority_score`, иначе по `vol_ratio`, с symbol как стабильным tie-breaker. Доступный риск равномерно делится между выбранными слотами; все входы batch используют один pre-fill equity snapshot. Перебор symbols при исполнении не может забрать бюджет у следующего сигнала.
+- Если выбранный сигнал не исполнился (например, limit не коснулся цены, chase limit отменил вход или биржевые ограничения отклонили размер), его доля не перераспределяется оставшимся сигналам в этом же баре. Это может недоиспользовать риск-бюджет, но не создаёт превышения лимита.
+- После TP1/закрытия equity пересчитывается как realized equity + unrealized PnL. Закрытая позиция перестаёт входить в open-risk sum; TP1 фиксирует реализованную часть и оставляет MTM только для остатка.
+- Перед последовательной обработкой символов формируются adverse marks для всех уже открытых позиций. При пересечении stop используется моделируемый stop/gap fill; иначе для long/short берётся adverse low/high. Это снижает зависимость portfolio stop/kill-switch от порядка символов.
+- Daily stop считается от equity на начало UTC-дня; emergency kill-switch — от peak equity до текущей MTM equity. Оба контроля обновляются по MTM, а не только по закрытым сделкам.
+
+**Подтверждено существующими regression tests:**
+- Одновременные входы делят общий risk budget одинаково при перестановке symbols.
+- При дефиците слотов выбираются сигналы с большей силой, а не первые symbols в списке.
+- TP1 обновляет и сохраняет MTM equity.
+- TP1 одного инструмента и stop другого на одной свече дают одинаковый результат при обратном порядке обработки.
+- Два одновременных stop-close согласованно обновляют realized/current equity и drawdown.
+- Drawdown для одновременных закрытий не зависит от порядка ledger; разные timestamps обрабатываются по exit chronology.
+- Полный shared-capital replay проверяет инвариантность ledger/equity path/daily stop/kill-switch к перестановке symbols и сверяет сумму net ledger с final realized equity.
+- Sparse replay отдельно проверяет позднее появление инструментов после warm-up и order invariance.
+
+**Ограничение семантики лимита — важно для интерпретации:**
+- `max_portfolio_risk_pct` — это лимит допуска **новых входов**, а не непрерывная гарантия, что сумма планового стоп-риска открытых позиций всегда остаётся ниже этого процента текущей equity. Если equity падает после открытия позиций, их абсолютный `risk_usdt` не масштабируется автоматически вниз; новые входы будут ограничены/запрещены по уменьшившемуся бюджету, но уже открытые позиции остаются до stop/exit/kill-switch.
+- Следовательно, процент open risk относительно текущей equity может временно стать выше заданного cap. Это не ошибка распределения batch, а свойство текущей политики. Kill-switch ограничивает drawdown по MTM equity, но не является точным ограничителем совокупного будущего stop-loss.
+- Плановый риск остаётся оценкой: гэп за stop, mark/last divergence, funding, ликвидация и фактические комиссии/проскальзывание могут увеличить реальный убыток. OHLC adverse marks — консервативная модель, не tick-level replay.
+
+**Итог:** в проверенных путях не найдено подтверждённого дефекта превышения risk budget из-за порядка символов или двойного учёта/потери PnL при TP1 и закрытиях. Существующие тесты покрывают ключевые batch/order/accounting сценарии. Не следует называть portfolio cap гарантированным максимальным убытком или непрерывным процентным ограничителем уже открытых позиций.
+
+**CI evidence:** Research checks run [41634060290](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41634060290), commit `cf74d8afcd65d4da7e04f80aab8e858a65fb0142`, job `tests` — success; шаг `Test portfolio accounting and risk budget` завершён успешно. Сравнение `cf74d8a...d334f6f` показывает только четыре документационных коммита и изменения двух Markdown-файлов; engine и tests не менялись. Поэтому новый CI и тем более PnL replay для этого статического аудита не запускались.

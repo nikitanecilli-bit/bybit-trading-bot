@@ -32,6 +32,8 @@ ENTRY_OFFSET_BPS = 20.0
 ENTRY_PENETRATION_BPS = 5.0
 WAIT_BARS = 3
 STARTING_CAPITAL = 10_000.0
+LEVERAGE_MODE = "ISOLATED_5X"
+LEVERAGE_VAL = 5.0
 MAX_CONCURRENT_POSITIONS = 5
 COST_MULTIPLIERS = [1.0, 1.5, 2.0]
 H1_REPLAY_CODE_PATHS = [
@@ -695,6 +697,8 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
     cfg.timeframe = "1h"
     cfg.active_trading_pool = list(symbols)
     cfg.capital_usdt = STARTING_CAPITAL
+    cfg.leverage_mode = LEVERAGE_MODE
+    cfg.leverage_val = LEVERAGE_VAL
     cfg.max_risk_trade_pct = 1.0
     cfg.max_portfolio_risk_pct = 2.0
     cfg.max_concurrent_positions = MAX_CONCURRENT_POSITIONS
@@ -1100,8 +1104,8 @@ def build_validation_manifest(
             "entry_penetration_bps": ENTRY_PENETRATION_BPS,
             "limit_wait_bars": WAIT_BARS,
             "starting_capital_usdt": STARTING_CAPITAL,
-            "leverage_mode": "ISOLATED_5X",
-            "leverage_val": 5.0,
+            "leverage_mode": LEVERAGE_MODE,
+            "leverage_val": LEVERAGE_VAL,
             "max_concurrent_positions": MAX_CONCURRENT_POSITIONS,
             "max_risk_trade_pct": 1.0,
             "max_portfolio_risk_pct": 2.0,

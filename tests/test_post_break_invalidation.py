@@ -193,6 +193,42 @@ def test_hc_preserves_tp1_partial_then_closes_remaining_leg():
     assert pos.realized_tp1_gross_usdt > 0
 
 
+
+def test_hc_real_close_charges_taker_costs_on_tp1_and_remaining_market_exit():
+    e = _configured_engine()
+    e.closed_trades = []
+    e._unrealized_pnl_at_marks = lambda _ts: 0.0
+    e.risk_mgr.unrealized_pnl = 0.0
+    e.risk_mgr.register_closed_trade_pnl = lambda _net, _ts: {}
+    e.tg = type("TelegramStub", (), {"send_message": lambda *_args, **_kwargs: None})()
+
+    pos = _position("long")
+    pos.tp1_price = 102.5
+    pos.tp2_price = 120.0
+    bar = engine.Candle(pos.entry_ts, 102.0, 103.0, 100.0, 100.5, 10.0)
+    e.open_positions["BTCUSDT"] = pos
+    engine.UnifiedQuantEngine._manage_position(
+        e, "BTCUSDT", _history(bar), fill_bar=False, exit_ts=bar.ts + H1_MS,
+    )
+
+    assert e.open_positions == {}
+    assert len(e.closed_trades) == 1
+    trade = e.closed_trades[0]
+    assert trade.exit_reason == "breakout_retest_invalidation"
+    assert trade.exit_price == bar.close
+    assert trade.tp1_hit is True
+    assert abs(trade.remaining_fraction_at_exit - (1.0 - engine.TP1_FRACTION)) < 1e-9
+    # Entry, TP1 and H-C remaining-leg close are all taker-classified here.
+    # The invalidation exit must not receive maker credit.
+    assert trade.exchange_fees_usdt > 0
+    assert trade.slippage_cost_usdt > 0
+    assert abs(
+        trade.pnl_usdt
+        - (trade.gross_pnl - trade.exchange_fees_usdt
+           - trade.slippage_cost_usdt - trade.funding_cost_usdt)
+    ) < 1e-8
+
+
 def test_hc_applies_only_to_breakout_strategies_and_does_not_reenter_same_bar():
     e = _configured_engine()
     pos = _position("long", strategy="H2-range-fade")
@@ -234,6 +270,7 @@ if __name__ == "__main__":
         test_hc_triggers_on_third_bar_but_not_after_window,
         test_hc_does_not_override_stop_or_tp2_priority,
         test_hc_preserves_tp1_partial_then_closes_remaining_leg,
+        test_hc_real_close_charges_taker_costs_on_tp1_and_remaining_market_exit,
         test_hc_applies_only_to_breakout_strategies_and_does_not_reenter_same_bar,
     ]
     for test in tests:

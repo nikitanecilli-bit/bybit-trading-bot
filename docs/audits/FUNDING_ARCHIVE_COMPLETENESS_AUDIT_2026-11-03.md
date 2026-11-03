@@ -165,4 +165,4 @@ Correction:
 
 This relies on the endpoint's observed descending-page behavior used by the collector's backward pagination. The official endpoint documentation confirms a maximum of 200 records and that an endTime query returns records up to that time, but does not spell out response ordering in the parameter table; the collector therefore records and checks the returned order rather than silently assuming it.
 
-The current test run is [Actions #41718905437](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41718905437), pending at the time of this note.
+Research CI [#41719390878](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41719390878) completed SUCCESS: **52/52 steps**, including Funding archive schedule reconstruction, saturated-page pagination coverage, downloader manifest integrity, H1 funding/Mark preflight, and the existing engine/accounting suite. This run used commit `ebc6721c51cd0c397e35bbae5631dda429a2882f`.

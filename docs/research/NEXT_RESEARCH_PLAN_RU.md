@@ -599,3 +599,23 @@ H1 validation runner дополнен отдельным JSON manifest рядо�
 - Три успешных collector test suites подтверждают локальные/mock сценарии, а не сетевой сбор архива.
 - H1 PnL остаётся заблокированным до фактических Bybit H1 klines, funding/mark series и непрерывных point-in-time instrument/risk snapshots. Никакие PnL результаты не заявляются.
 - Нельзя публиковать 108 результатов как независимые OOS доказательства и нельзя выбирать top-5 монет по одному и тому же отрезку, на котором затем заявляется подтверждение прибыльности.
+
+
+## 2026-11-03 — защита финального H1 holdout
+
+Подтверждён методологический дефект прежнего runner: он выполнял полную сетку 4 volume × 3 breakout-ATR × 3 cost stress на каждом из трёх fold, то есть последний временной fold участвовал в подборе.
+
+Исправлено в исследовательской ветке:
+- H1_VALIDATION_MODE=explore (default): 72 запуска — полная сетка только на fold 1 и 2 (50–80% общей истории). Fold 3 не читается как scoring window.
+- H1_VALIDATION_MODE=confirm: только fold 3 (80–100%) и одна конфигурация из заранее зарегистрированной сетки. Требуются оба frozen inputs: H1_FROZEN_MIN_VOLUME_RATIO и H1_FROZEN_MIN_BREAKOUT_ATR; незарегистрированные значения отклоняются.
+- Для замороженной конфигурации выводятся три заранее заданных cost stress (1.0/1.5/2.0); это сценарии затрат, а не дополнительные параметры стратегии.
+- Manifest теперь фиксирует фактический validation mode, выбранные fold, frozen config и реально применённые сетки.
+- Workflow H1 Shared-Capital Portfolio Validation получил ручной выбор explore/confirm и frozen threshold inputs. Значение по умолчанию — explore.
+- Deterministic tests проверяют запрет scoring fold 3 в explore, единственную frozen-конфигурацию в confirm и отказ на отсутствующих/незарегистрированных параметрах.
+
+Проверка: Research CI #41693438367 — SUCCESS (https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41693438367), test commit e598b59a401d5304c575ed07f81601b1d4444450; compile и все deterministic test steps прошли. Финальный branch head после обновления workflow: 0f82415289d578cd008f742ad65d6d9cce818ebb.
+
+Ограничения:
+- Это устраняет повторный подбор параметров на последнем fold, но не создаёт автоматически корректный top-5 universe. Top-5 должен быть отобран только по train-отрезку и зафиксирован до explore/confirm; список символов затем передаётся через H1_SYMBOL_ALLOWLIST.
+- Нельзя запускать confirm после просмотра fold 3 или менять frozen inputs после получения результата: в таком случае fold 3 становится использованным и следующий подтверждающий holdout должен быть более поздним.
+- Bybit data/execution gate всё ещё закрыт; PnL не запускался. CI подтверждает только код и deterministic tests.

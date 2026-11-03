@@ -1,0 +1,43 @@
+name: H-C reverse-time CryptoFetch proxy (one-shot)
+
+on:
+  push:
+    branches:
+      - research/market-regime-v1-main
+    paths:
+      - 'scripts/run_h_c_reverse_time_robustness.py'
+      - '.github/workflows/h-c-reverse-time-robustness.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: h-c-reverse-time-proxy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  reverse-time-proxy:
+    if: contains(github.event.head_commit.message, '[run-hc-reverse-time]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out frozen research commit
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify frozen H-C reverse-time protocol
+        run: |
+          python -m py_compile scripts/run_h_a_relative_strength_replay.py scripts/run_h_c_reverse_time_robustness.py
+          python scripts/run_h_c_reverse_time_robustness.py --archive-dir data/archives/cryptofetch --output-dir artifacts/h_c_reverse_time
+      - name: Run the single preregistered reverse-time proxy replay
+        run: python scripts/run_h_c_reverse_time_robustness.py --execute --archive-dir data/archives/cryptofetch --output-dir artifacts/h_c_reverse_time
+      - name: Upload frozen replay artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: h-c-reverse-time-cryptofetch-proxy
+          path: artifacts/h_c_reverse_time/
+          if-no-files-found: warn
+          retention-days: 30

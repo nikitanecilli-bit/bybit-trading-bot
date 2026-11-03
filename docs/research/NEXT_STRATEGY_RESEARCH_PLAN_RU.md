@@ -501,3 +501,14 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 - The current Research CI no longer executes historical market backtests/holdouts; it runs deterministic tests, CryptoFetch structural audit and H-A archive preparation marked no PnL.
 - Remaining P1 blockers: maker fill realism, Bybit-native data/Funding schedule completeness, directional scope and account-wide margin model.
 - Detailed status reconciliation: `docs/audits/ENGINE_AUDIT_FINDINGS_RU.md`.
+
+
+## 2026-11-04 — новые пользовательские материалы отсортированы
+
+- Три файла, загруженные в `main` 2026-11-03, скопированы без смыслового редактирования в `docs/research/hypothesis_inputs/`; туда же добавлен исходный backlog `Гипотезы_пользователя_2026-11-03.md` для целостности источников.
+- Расширенная рекомендация `RECOMMENDATIONS_and_top10_mistakes-1.md` отмечена основной методологической версией; короткая версия сохранена как справочник, не как отдельный backlog.
+- Новый H1 master-prompt сопоставлен с действующими гипотезами и экспериментами. Seasonal RVOL и structural level quality — новые кандидаты; retest/maker → HYP-EXEC-06; directional exposure → HYP-RISK-09; session/funding → HYP-TIME-07/data gate; OI/BTC context пересекаются с HYP-CTX-08 и E12/E13.
+- Не повторять E13 compression/BTC context, H-A relative strength, H-C invalidation и прежние no-weekend/session варианты на тех же folds.
+- Добавлен методологический приоритет: event-study screening и явный N_trials accounting. Это подготовка процесса, не разрешение рыночных PnL runs.
+- Подробная классификация: `docs/research/hypotheses/NEW_INPUTS_REVIEW_2026-11-04_RU.md`.
+- `main` не изменялась; стратегия и торговый код не менялись; data/accounting gate остаётся CLOSED.

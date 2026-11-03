@@ -430,7 +430,7 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
 
 def test_engine_fails_closed_when_dated_risk_tier_is_missing_or_leverage_exceeded():
     class RejectingTierHistory:
-        def get_tier(self, symbol, as_of_ts, position_value, *, leverage, max_age_ms):
+        def calculate_margin_requirements(self, symbol, as_of_ts, position_value, *, leverage, max_age_ms):
             raise ValueError("configured leverage exceeds selected tier maxLeverage")
 
     e = make_engine()

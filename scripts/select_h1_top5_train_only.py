@@ -451,7 +451,7 @@ def main():
     print(f"Selection status={manifest['selection_status']}; eligible={manifest['eligible_candidate_count']}; primary={manifest['primary']}; reserve={manifest['reserve']}")
     print(f"Saved immutable selection manifest: {manifest_path}")
     if manifest["selection_status"] != "ok":
-        raise SystemExit("Fewer than five candidates passed the preregistered positive-net eligibility gate")
+        raise SystemExit(f"Train-only selection failed closed: {manifest['selection_status']}")
 
 
 if __name__ == "__main__":

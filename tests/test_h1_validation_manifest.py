@@ -52,11 +52,11 @@ class H1ValidationManifestTests(unittest.TestCase):
             kline_path = kline_dir / "BTCUSDT.csv"
             _write_kline(kline_path, start_ts, 100)
             (funding_dir / "BTCUSDT.csv").write_text(
-                "funding_timestamp_ms,rate\\n1800003600000,0.0001\\n",
+                "funding_timestamp_ms,rate\n1800003600000,0.0001\n",
                 encoding="utf-8",
             )
             (mark_dir / "BTCUSDT.csv").write_text(
-                "timestamp_ms,open,high,low,close\\n1800003600000,100,101,99,100\\n",
+                "timestamp_ms,open,high,low,close\n1800003600000,100,101,99,100\n",
                 encoding="utf-8",
             )
             (specs_dir / "2026-01-01.json").write_text(
@@ -66,7 +66,7 @@ class H1ValidationManifestTests(unittest.TestCase):
                 json.dumps({"fetched_at": "2026-01-01T00:00:00Z"}), encoding="utf-8",
             )
             output_csv = root / "portfolio.csv"
-            output_csv.write_text("fold,symbol_list\\n1,BTCUSDT\\n", encoding="utf-8")
+            output_csv.write_text("fold,symbol_list\n1,BTCUSDT\n", encoding="utf-8")
 
             timestamps = [start_ts + index * 3_600_000 for index in range(100)]
             rows = [{"fold": 1, "symbol_list": "BTCUSDT", "net_pnl": -12.5}]

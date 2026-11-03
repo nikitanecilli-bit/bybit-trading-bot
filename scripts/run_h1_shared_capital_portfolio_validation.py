@@ -50,6 +50,7 @@ H1_REPLAY_CODE_PATHS = [
     "scripts/validate_funding_coverage.py",
     "funding_archive_manifest.py",
     "bybit_downloader.py",
+    "scripts/archive_bybit_market_history.py",
 ]
 SELECTION_INPUT_KEYS = ("kline", "funding", "mark_price", "instrument_specs", "risk_tiers", "universe_snapshot")
 

@@ -118,3 +118,12 @@ Workflow публикует два артефакта: итоговый `h1_shar
   - `.github/workflows/h1-shared-capital-portfolio-validation.yml` — commit `837c15f1c8767d97670d160a8389231d622ba858`; запускает strict shared-capital replay на `ubuntu-latest`, checkout-ит research branch и публикует CSV/manifest artifact. Он не отправляет ордера и не обращается к private account API.
 - Эти workflow entry points — manual-only. Для selector нужны уже собранные Bybit H1/funding/mark CSVs, dated instrument/risk snapshots и universe snapshot. Validation дополнительно требует успешный v2 selection manifest.
 - Workflow не dispatch-ились; это публикация оркестрации, не запуск selector, не PnL и не paper trading.
+
+
+## 13. Workflow/code provenance and final selection boundary hardening (2026-11-03)
+
+- Main-branch H1 workflow wrappers explicitly checkout `research/market-regime-v1-main` and record the checked-out SHA as `H1_RESEARCH_CHECKOUT_SHA`. This avoids confusing the main-branch workflow-dispatch commit with the research code commit actually replayed.
+- The selector manifest records `research_git_commit`, `workflow_definition_commit` and `workflow_definition_ref`. The H1 validation report records `git_commit` as the research checkout SHA and separately records workflow-definition commit/ref.
+- The H1 runner now always checks the selection cutoff against the first 50% validation boundary, including when running `confirm` mode (which scores only fold 3). This prevents a selection cutoff in explore folds 1–2 from passing merely because confirm starts at 80%.
+- Regression tests cover workflow-vs-code commit provenance and the confirm-mode 50% selection boundary. Latest Research CI [#41704302480](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41704302480) — SUCCESS, 50/50 steps.
+- These are provenance/leakage safeguards only; no Bybit archive was downloaded and no PnL was run.

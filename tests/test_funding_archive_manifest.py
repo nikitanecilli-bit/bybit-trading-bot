@@ -196,7 +196,10 @@ class FundingArchiveManifestTests(unittest.TestCase):
             self.csv, self.manifest, symbol="BTCUSDT",
             required_start_ms=3_600_000, required_end_ms=7_200_000,
         )
-        self.assertIn("funding_event_not_aligned_to_dated_interval", report["errors"])
+        self.assertIn(
+            "funding_interval_changed_without_effective_boundary_evidence",
+            report["errors"],
+        )
 
     def test_validator_detects_query_window_gap(self):
         payload = self.record()

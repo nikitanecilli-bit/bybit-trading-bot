@@ -115,7 +115,8 @@ def parse_funding_rows(rows: Any, symbol: str) -> list[dict[str, Any]]:
 
 def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
                           fetch_page: Callable[[int, int], list[dict[str, Any]]] | None = None,
-                          base_url: str = DEFAULT_BASE_URL, pause: float = 0.1
+                          base_url: str = DEFAULT_BASE_URL, pause: float = 0.1,
+                          audit_pages: list[dict[str, Any]] | None = None
                           ) -> list[dict[str, Any]]:
     symbol = normalize_symbol(symbol)
     if start_ms <= 0 or end_ms <= start_ms or pause < 0:
@@ -130,7 +131,19 @@ def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
 
     def fetch_window(window_start: int, window_end: int) -> None:
         page = parse_funding_rows(fetch_page(window_start, window_end - 1), symbol)
-        if len(page) >= FUNDING_LIMIT:
+        saturated = len(page) >= FUNDING_LIMIT
+        if audit_pages is not None:
+            page_timestamps = [row["funding_timestamp_ms"] for row in page]
+            audit_pages.append({
+                "request_start_ms": int(window_start),
+                "request_end_ms": int(window_end - 1),
+                "response_rows": len(page),
+                "first_ts": min(page_timestamps) if page_timestamps else None,
+                "last_ts": max(page_timestamps) if page_timestamps else None,
+                "complete": not saturated,
+                "saturated": saturated,
+            })
+        if saturated:
             if window_end - window_start <= 1:
                 raise RuntimeError("funding page remains saturated at minimum window width")
             midpoint = window_start + (window_end - window_start) // 2
@@ -407,7 +420,11 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
     validate_base_url(base_url)
     if pause < 0:
         raise ValueError("pause cannot be negative")
-    funding = fetch_funding_history(symbol, start_ms, end_ms, base_url=base_url, pause=pause)
+    funding_pages: list[dict[str, Any]] = []
+    funding = fetch_funding_history(
+        symbol, start_ms, end_ms, base_url=base_url, pause=pause,
+        audit_pages=funding_pages,
+    )
     klines = fetch_trade_klines(symbol, start_ms, end_ms, interval, base_url=base_url, pause=pause)
     marks = fetch_mark_klines(symbol, start_ms, end_ms, interval, base_url=base_url, pause=pause)
     root = Path(output_root)
@@ -415,12 +432,25 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
     kline_path = root / "kline" / f"{symbol.upper()}.csv"
     mark_path = root / "mark_price" / f"{symbol.upper()}.csv"
     _atomic_csv(funding_path, ["symbol", "funding_timestamp_ms", "funding_rate"], funding)
+    from funding_archive_manifest import record_funding_collection
+    funding_manifest_path = funding_path.with_suffix(funding_path.suffix + ".audit.json")
+    funding_manifest = record_funding_collection(
+        funding_path, funding_manifest_path, symbol=symbol, category="linear",
+        api_base=base_url, requested_start_ms=start_ms,
+        requested_end_ms=end_ms - 1, pages=funding_pages,
+        collected_at_ms=int(datetime.now(timezone.utc).timestamp() * 1000),
+    )
     _atomic_csv(kline_path, ["symbol", "timestamp_ms", "open", "high", "low", "close", "volume", "turnover"], klines)
     _atomic_csv(mark_path, ["symbol", "timestamp_ms", "open", "high", "low", "close"], marks)
     return {
         "symbol": symbol.upper(), "funding_events": len(funding), "trade_candles": len(klines), "mark_candles": len(marks),
         "start_ms": start_ms, "end_exclusive_ms": end_ms,
-        "funding_file": str(funding_path), "trade_kline_file": str(kline_path), "mark_file": str(mark_path),
+        "funding_file": str(funding_path), "funding_manifest_file": str(funding_manifest_path),
+        "funding_file_sha256": funding_manifest["csv_sha256"],
+        "funding_manifest_sha256": hashlib.sha256(funding_manifest_path.read_bytes()).hexdigest(),
+        "funding_query_pages": len(funding_pages),
+        "funding_complete_query_pages": sum(1 for page in funding_pages if page.get("complete")),
+        "trade_kline_file": str(kline_path), "mark_file": str(mark_path),
     }
 
 

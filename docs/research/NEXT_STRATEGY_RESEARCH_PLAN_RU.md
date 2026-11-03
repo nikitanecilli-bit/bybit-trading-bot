@@ -290,3 +290,10 @@ This is a confirmed validator limitation, not evidence that a current archive is
 The manifest validator now independently reconstructs the expected UTC Funding grid from dated instrument snapshots when all snapshots across the scored interval report one stable fundingInterval; the supplied expected-timestamp list must match that grid. A CSV and schedule that omit the same settlement now fail. If snapshots show different intervals, validation fails closed because fetch time does not prove the exact effective time of a change.
 
 Residual: equal snapshots cannot rule out an interval change and reversion between observations. Live instrument snapshot capture remains blocked by HTTP 403 and the collector is manual. Treat the grid check as a consistency check conditional on observed interval stability, not as proof of complete historical metadata. H1 PnL remains blocked until this residual is addressed with authoritative historical effective-time evidence or independently verifiable continuous observations. Official Bybit terms define 1h/2h/4h/8h UTC settlement grids; do not substitute a fixed 8h rule.
+
+
+### Funding archive pagination coverage — 2026-11-03
+
+The Funding collector now records descending/unique timestamp-order evidence for each response page. The manifest validator accounts for the upper segment of a saturated 200-row page from its oldest returned event to the requested end, and requires complete earlier query windows to join it without gaps. A 201-settlement regression fixture covers one saturated page plus one complete tail page; a lone saturated page with an uncovered lower segment still fails. This resolves a false-negative that would have rejected normal multi-page histories.
+
+The endpoint docs specify the 200-record limit and endTime behavior but do not explicitly state response ordering; the collector verifies the actual returned ordering and refuses to attest saturated pages if the order is not descending or timestamps are not unique. This is query-window provenance, not a substitute for the independently reconstructed Funding settlement grid.

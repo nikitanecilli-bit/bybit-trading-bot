@@ -1,0 +1,85 @@
+name: H1 Top-5 Train-Only Selection
+
+on:
+  workflow_dispatch:
+    inputs:
+      kline_dir:
+        description: "Repository path to official Bybit H1 trade-kline CSVs"
+        required: true
+        type: string
+      funding_dir:
+        description: "Repository path to Bybit funding CSVs"
+        required: true
+        type: string
+      mark_price_dir:
+        description: "Repository path to Bybit mark-price H1 CSVs"
+        required: true
+        type: string
+      universe_snapshot:
+        description: "Repository path to a Bybit linear lifecycle snapshot JSON"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: h1-top5-selection-research
+  cancel-in-progress: false
+
+jobs:
+  select:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/market-regime-v1-main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Require official Bybit archive inputs
+        env:
+          KLINE_DIR: ${{ inputs.kline_dir }}
+          FUNDING_DIR: ${{ inputs.funding_dir }}
+          MARK_DIR: ${{ inputs.mark_price_dir }}
+          UNIVERSE_FILE: ${{ inputs.universe_snapshot }}
+        run: |
+          for path in "$KLINE_DIR" "$FUNDING_DIR" "$MARK_DIR"; do
+            test -d "$path" || { echo "Missing archive directory: $path"; exit 1; }
+          done
+          test -f "$UNIVERSE_FILE" || { echo "Missing Bybit lifecycle snapshot: $UNIVERSE_FILE"; exit 1; }
+      - name: Compile train-only selector
+        run: python -m py_compile scripts/select_h1_top5_train_only.py scripts/run_h1_shared_capital_portfolio_validation.py
+      - name: Run fixed-cost training-period symbol selection
+        env:
+          BYBIT_KLINE_DIR: ${{ inputs.kline_dir }}
+          BYBIT_FUNDING_DIR: ${{ inputs.funding_dir }}
+          BYBIT_MARK_PRICE_DIR: ${{ inputs.mark_price_dir }}
+          BYBIT_UNIVERSE_SNAPSHOT_FILE: ${{ inputs.universe_snapshot }}
+          BYBIT_INSTRUMENT_SPECS_DIR: data/instrument_specs/linear
+          BYBIT_RISK_TIERS_DIR: data/instrument_specs/risk_limits
+        run: |
+          rm -rf data/research/h1_top5_selection
+          mkdir -p data/research/h1_top5_selection
+          python scripts/select_h1_top5_train_only.py --output-dir data/research/h1_top5_selection
+      - name: Commit frozen selection manifest to the research branch
+        if: always()
+        run: |
+          if [ -f data/research/h1_top5_selection/h1_top5_selection_manifest.json ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A data/research/h1_top5_selection/
+            if ! git diff --cached --quiet; then
+              git commit -m "research(h1): archive train-only top-five selection"
+              git push origin HEAD:refs/heads/research/market-regime-v1-main
+            fi
+          fi
+      - name: Upload frozen selection manifest and ranking
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: h1-top5-train-only-selection
+          path: data/research/h1_top5_selection/
+          if-no-files-found: warn

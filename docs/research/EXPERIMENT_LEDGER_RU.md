@@ -1024,3 +1024,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - **Классификация:** инженерная реализация + unit/CI verification; не market experiment, не PnL evidence.
 - Изменённый runner hash означает, что ранее созданный Top-5 selection manifest нельзя повторно использовать: его code provenance должен быть заново сформирован на официальных данных после открытия data gate.
 - Никакого PnL replay, параметрического поиска, новых загрузок, API, paper trading или live orders не выполнялось.
+
+
+## ENG-MARK-005 — Mark OHLC / isolated liquidation re-audit (2026-11-04)
+
+- Re-audited Mark archive collector, engine integration, isolated USDT liquidation/MM calculator, risk-tier history and instrument-spec as-of history.
+- Mark collector validates OHLC positivity/order, aligned timestamps, requested chunk membership and exact interval coverage; engine requires exact-timestamp full Mark OHLC for every open position when liquidation model is enabled.
+- Formula cross-check against current Bybit UTA isolated USDT documentation found no confirmed arithmetic defect in the tested liquidation/MM components. Existing tests include published 36,380.25 USDT long LP example, directional close fee, dynamic MM tier changes, funding adjustment, TP1 remaining quantity and Mark/Last separation.
+- Confirmed limitations: single-position isolated approximation only; no cross/portfolio/shared collateral, active-order aggregation, AMR, partial liquidation ladder or exact intrabar ordering. OHLC stress assumes conservative liquidation precedence within a bar.
+- Dated snapshots are observations, not effective-from history. No complete Bybit Mark/risk-tier/instrument-spec archive exists in repository; max-age defaults of 30 days are stale guards, not proof of parameter stability.
+- Official references: Bybit UTA isolated liquidation formula; V5 Mark Price Kline; USDT maintenance margin documentation (links in LEVERAGE_MARGIN_LIQUIDATION_AUDIT_2026-11-03.md).
+- Classification: code/formula re-audit; no market PnL test, no strategy change.
+- Decision: no ungrounded formula changes. Data/account-mode gate remains CLOSED; no PnL, private API, paper or live execution.

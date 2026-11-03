@@ -3,24 +3,51 @@ from __future__ import annotations
 """Research-only causal market-structure filters. No production signal changes."""
 
 
-def ema(values, period):
-    if not values or period < 1:
-        return 0.0
+def ema_series(values, period):
+    """Full-history recursive EMA values; input must be chronological and closed."""
+    if isinstance(period, bool) or not isinstance(period, int) or period < 1:
+        raise ValueError("EMA period must be a positive integer")
+    if not values:
+        return []
     alpha = 2.0 / (period + 1.0)
-    value = float(values[0])
+    current = float(values[0])
+    output = [current]
     for item in values[1:]:
-        value += alpha * (float(item) - value)
-    return value
+        current += alpha * (float(item) - current)
+        output.append(current)
+    return output
+
+
+def ema(values, period):
+    """Return the final value of the full-history recursive EMA."""
+    values = list(values)
+    if not values:
+        return 0.0
+    return ema_series(values, period)[-1]
 
 
 def trend_direction(candles, fast=10, slow=30, slope=5):
-    """Classify up/down/neutral using closed candles only."""
+    """Classify up/down/neutral using full-history EMAs of closed candles only.
+
+    Unlike a rolling-window EMA approximation, the EMA state is carried from the
+    beginning of the supplied chronological history. Trend direction requires
+    fast/slow alignment, slow-EMA slope, and close relative to the slow EMA.
+    """
+    if (
+        isinstance(fast, bool) or not isinstance(fast, int) or fast < 1
+        or isinstance(slow, bool) or not isinstance(slow, int) or slow < 2
+        or isinstance(slope, bool) or not isinstance(slope, int) or slope < 1
+        or fast >= slow
+    ):
+        raise ValueError("require 1 <= fast < slow and slope >= 1")
     closes = [float(c.close) for c in candles]
     if len(closes) < slow + slope + 1:
         return "neutral"
-    fast_ema = ema(closes[-fast:], fast)
-    slow_ema = ema(closes[-slow:], slow)
-    prior_slow = ema(closes[-(slow + slope):-slope], slow)
+    fast_values = ema_series(closes, fast)
+    slow_values = ema_series(closes, slow)
+    fast_ema = fast_values[-1]
+    slow_ema = slow_values[-1]
+    prior_slow = slow_values[-slope - 1]
     if fast_ema > slow_ema and slow_ema > prior_slow and closes[-1] > slow_ema:
         return "up"
     if fast_ema < slow_ema and slow_ema < prior_slow and closes[-1] < slow_ema:

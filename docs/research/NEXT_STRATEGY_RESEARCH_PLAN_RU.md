@@ -244,3 +244,6 @@ Static audit found a P1 preflight blind spot documented in `docs/audits/FUNDING_
 Implemented query-provenance sidecars in `bybit_downloader.py` / `funding_archive_manifest.py`. H1 selector and portfolio validation now bind sidecar hashes; the H1 runner fails closed if the sidecar is missing, altered, does not cover the scored fold, or lacks dated settlement-schedule verification. Regression tests cover collector pagination metadata, incremental runs, hash tampering and query-window gaps.
 
 Do not manually set `settlement_schedule_verified=true`. The collector leaves it false by design. Remaining work is to derive a dated schedule from authoritative Bybit instrument-history evidence (including interval changes), prove expected settlement timestamps for each scored period, and only then allow a manifest to carry verifiable schedule evidence. Until then no H1 market PnL replay.
+
+
+The schedule gate was strengthened after implementation: H1 now requires a separately hashed schedule-evidence file and checks its identity, interval coverage, raw Bybit instrument snapshot hashes/metadata, and exact expected-vs-observed funding timestamps in the scored fold. A boolean override is not accepted. A trustworthy schedule builder and sufficient dated historical snapshots remain outstanding; no market PnL replay until those exist.

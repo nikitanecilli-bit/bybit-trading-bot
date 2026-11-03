@@ -54,3 +54,8 @@ Research CI [#41726204938](https://github.com/nikitanecilli-bit/bybit-trading-bo
 - Do not run market PnL until the Funding/Mark completeness and Bybit-native archive gates are actually satisfied.
 - Do not change the engine's `CALC_WINDOW` or default signal behavior for this audit.
 - No live API, new archive collection, real orders, or strategy execution changes were made.
+
+
+### Warm-up boundary regression — 2026-11-04
+
+Added an explicit unit regression proving that the 50/200 helper remains neutral at 205 candles and emits the first directional label at 206 candles for the configured 5-bar slow-EMA slope. Research CI [#41726808976](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41726808976) completed **SUCCESS, 53/53 steps** at commit `8876ee399118837b35a3fcfdf58d2e117ec9fb72`. This locks the warm-up contract and makes the 200-bar engine-window mismatch executable rather than documentation-only.

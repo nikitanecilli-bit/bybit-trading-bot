@@ -1720,9 +1720,10 @@ class UnifiedQuantEngine:
             # Match _close_position(): legacy/restored positions may not carry
             # maker_exits, so resolve the same order-type fallback before MTM.
             maker_exits = (pos.order_type == "limit") if pos.maker_exits is None else pos.maker_exits
-            tp1_cost = (tp1_notional * (MAKER_FEE if maker_exits else TAKER_FEE)) if pos.tp1_hit else 0.0
+            tp1_maker = maker_exits if pos.tp1_maker is None else pos.tp1_maker
+            tp1_cost = (tp1_notional * (MAKER_FEE if tp1_maker else TAKER_FEE)) if pos.tp1_hit else 0.0
             tp1_slip = (tp1_notional * TAKER_SLIP
-                        if pos.tp1_hit and not maker_exits else 0.0)
+                        if pos.tp1_hit and not tp1_maker else 0.0)
             exit_cost = remaining_exit_notional * (TAKER_FEE + TAKER_SLIP)
             funding_cost = 0.0
             if getattr(self, "funding_dir", None):
@@ -2287,7 +2288,8 @@ class UnifiedQuantEngine:
                 0.0 if maker else notional * TAKER_SLIP)
 
     def _close_position(self, pos: OpenPositionState, exit_price: float, exit_reason: str,
-                        exit_ts: int, mae_r: float, mfe_r: float) -> None:
+                        exit_ts: int, mae_r: float, mfe_r: float,
+                        final_exit_maker: Optional[bool] = None) -> None:
         sign = 1.0 if pos.direction == "long" else -1.0
         if pos.exchange_sized:
             remaining_qty = Decimal(str(pos.remaining_contract_qty))
@@ -2329,13 +2331,18 @@ class UnifiedQuantEngine:
         f, s = self._leg_cost(entry_notional, entry_maker)
         fees += f; slip += s
         maker_exits = (pos.order_type == "limit") if pos.maker_exits is None else pos.maker_exits
+        tp1_maker = maker_exits if pos.tp1_maker is None else pos.tp1_maker
         if pos.tp1_hit:
             tp1_qty = (Decimal(str(pos.tp1_contract_qty)) if pos.exchange_sized
                        else position_qty * Decimal(str(TP1_FRACTION)))
             tp1_notional = float(tp1_qty * Decimal(str(pos.tp1_price)))
-            f, s = self._leg_cost(tp1_notional, maker_exits)
+            f, s = self._leg_cost(tp1_notional, tp1_maker)
             fees += f; slip += s
-        final_maker = maker_exits and exit_reason == "take_profit"
+        final_maker = (
+            maker_exits and exit_reason == "take_profit"
+            if final_exit_maker is None
+            else bool(final_exit_maker) and exit_reason == "take_profit"
+        )
         final_notional = float(remaining_qty * Decimal(str(exit_price)))
         if exit_reason == "liquidation":
             # Bybit documents no liquidation fee for perpetual/futures; takeover
@@ -2393,6 +2400,8 @@ class UnifiedQuantEngine:
             remaining_fraction_at_exit=round(pos.remaining_fraction, 8),
             final_stop_price=round(pos.stop_price, 12),
             breakout_level=round(pos.breakout_level, 12) if pos.breakout_level is not None else None,
+            tp1_maker=tp1_maker if pos.tp1_hit else None,
+            final_exit_maker=final_maker,
         )
         self.closed_trades.append(record)
         del self.open_positions[pos.symbol]

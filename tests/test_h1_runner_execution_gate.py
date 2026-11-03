@@ -11,6 +11,26 @@ sys.path.insert(0, str(repo_root))
 sys.path.insert(0, str(repo_root / "scripts"))
 
 import Bybit_Trading_Engine_v14_research as em
+from funding_archive_manifest import record_funding_collection
+
+
+def _write_funding_manifest(funding_path, start_ms, end_ms, schedule_verified=True):
+    manifest_path = funding_path.with_suffix(funding_path.suffix + ".audit.json")
+    payload = record_funding_collection(
+        funding_path, manifest_path, symbol=funding_path.stem,
+        category="linear", api_base="https://api.bybit.com",
+        requested_start_ms=start_ms, requested_end_ms=end_ms,
+        pages=[{
+            "request_start_ms": start_ms, "request_end_ms": end_ms,
+            "response_rows": 1, "first_ts": start_ms, "last_ts": start_ms,
+        }],
+        collected_at_ms=max(end_ms, start_ms) + 1,
+    )
+    payload["settlement_schedule_verified"] = schedule_verified
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    return manifest_path
+
+
 from run_h1_shared_capital_portfolio_validation import (
     resolve_execution_snapshot_dirs, validate_snapshot_history_coverage,
     resolve_funding_dirs, validate_funding_mark_coverage,
@@ -415,6 +435,7 @@ def test_funding_mark_coverage_requires_every_symbol_and_h1_mark_bar():
             "symbol,timestamp_ms,open\nBTCUSDT,1000,100\n",
             encoding="utf-8",
         )
+        _write_funding_manifest(funding / "BTCUSDT.csv", 1000, 3601000)
         try:
             validate_funding_mark_coverage(
                 funding, marks, ["BTCUSDT"], [1000, 3601000], 1000, 3601000
@@ -438,6 +459,7 @@ def test_funding_mark_coverage_rejects_no_settlement_in_fold():
             "symbol,timestamp_ms,open\nBTCUSDT,1000,100\n",
             encoding="utf-8",
         )
+        _write_funding_manifest(funding / "BTCUSDT.csv", 2000, 2000)
         try:
             validate_funding_mark_coverage(
                 funding, marks, ["BTCUSDT"], [2000], 2000, 2000
@@ -448,6 +470,31 @@ def test_funding_mark_coverage_rejects_no_settlement_in_fold():
             raise AssertionError("no settlement in fold must fail")
 
 
+
+
+def test_funding_mark_coverage_rejects_missing_or_unverified_archive_manifest():
+    with tempfile.TemporaryDirectory() as tmp:
+        funding, marks = Path(tmp) / "funding", Path(tmp) / "marks"
+        funding.mkdir()
+        marks.mkdir()
+        funding_path = funding / "BTCUSDT.csv"
+        funding_path.write_text(
+            "symbol,funding_timestamp_ms,funding_rate\\nBTCUSDT,1000,0.001\\n",
+            encoding="utf-8",
+        )
+        (marks / "BTCUSDT.csv").write_text(
+            "symbol,timestamp_ms,open\\nBTCUSDT,1000,100\\n",
+            encoding="utf-8",
+        )
+        _write_funding_manifest(funding_path, 1000, 1000, schedule_verified=False)
+        try:
+            validate_funding_mark_coverage(
+                funding, marks, ["BTCUSDT"], [1000], 1000, 1000
+            )
+        except SystemExit as exc:
+            assert "dated_settlement_schedule_not_verified" in str(exc)
+        else:
+            raise AssertionError("unverified funding schedule must block H1 replay")
 
 
 def test_bybit_kline_dir_is_mandatory():
@@ -569,6 +616,7 @@ if __name__ == "__main__":
         test_funding_dirs_are_mandatory_and_non_empty,
         test_funding_mark_coverage_requires_every_symbol_and_h1_mark_bar,
         test_funding_mark_coverage_rejects_no_settlement_in_fold,
+        test_funding_mark_coverage_rejects_missing_or_unverified_archive_manifest,
         test_bybit_kline_dir_is_mandatory,
         test_load_bybit_h1_datasets_rejects_gaps_and_loads_exchange_candles,
         test_load_bybit_h1_datasets_rejects_off_hour_timestamp_grid,

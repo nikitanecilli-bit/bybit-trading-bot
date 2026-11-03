@@ -276,3 +276,10 @@ CI run [#41715596303](https://github.com/nikitanecilli-bit/bybit-trading-bot/act
 The funding ledger no longer silently excludes a settlement whose timestamp equals the modeled entry candle open. Bybit documents that fills within five seconds before/after settlement may or may not be included. With no exchange fill timestamp, the simulator now charges a possible payment and excludes a possible receipt at that exact boundary; events strictly before entry remain excluded. This is a conservative boundary convention, not a reconstruction of actual exchange event order.
 
 Research CI [#41716240400](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41716240400) passed 50/50 steps. The isolated margin funding treatment remains account-level approximate: net Funding is applied directly to position margin without modeling whether available balance covers it. Depending on funding sign and wallet balance this can overstate or understate liquidation risk. Do not interpret it as uniformly conservative or full UTA fidelity.
+
+
+### Open Funding schedule proof gap — 2026-11-03
+
+The current Funding manifest validator checks CSV timestamps against a supplied `expected_settlement_timestamps_ms` list and verifies each listed event aligns with the most recent preceding dated instrument snapshot. It does not independently derive the complete expected event list or prove the effective timestamp of an interval change. A CSV and expected list that omit the same event can therefore be internally consistent. Snapshot `fetched_at` is observation time, not interval-effective-time evidence.
+
+This is a confirmed validator limitation, not evidence that a current archive is damaged. Keep H1 market PnL blocked until an authoritative, independently auditable historical Funding-interval schedule is available. Do not treat a green manifest check alone as proof of settlement completeness; do not hardcode an 8h cadence.

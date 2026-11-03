@@ -63,7 +63,7 @@ def test_mtm_respects_configured_1h_close_boundary():
 def test_open_position_management_receives_bar_close_timestamp_across_utc_midnight():
     e, _ = bare_engine("15m")
     calls = []
-    e.open_positions["BTCUSDT"] = object()
+    e.open_positions["BTCUSDT"] = type("Position", (), {"direction": "long", "stop_price": 90.0})()
     e._manage_position = lambda symbol, history, fill_bar, exit_ts: calls.append(exit_ts)
     ts_open = int(engine_mod.datetime(2026, 1, 1, 23, 45, tzinfo=engine_mod.timezone.utc).timestamp() * 1000)
     candle = engine_mod.Candle(ts=ts_open, open=100, high=101, low=99, close=100.5, volume=10)

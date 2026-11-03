@@ -164,7 +164,7 @@ def test_simultaneous_daily_stop_and_kill_switch_latch_independently():
         emergency_kill_switch_pct=5.0,
     )
     risk = engine_mod.AdaptiveRiskManager(cfg)
-    first_ts = 1_767_308_400_000  # 2026-01-01 23:00:00 UTC
+    first_ts = 1_767_304_800_000  # 2026-01-01 22:00:00 UTC
     midnight = 1_767_312_000_000  # 2026-01-02 00:00:00 UTC
     risk.mark_to_market(0.0, first_ts)
 

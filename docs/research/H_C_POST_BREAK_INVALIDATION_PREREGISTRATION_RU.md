@@ -141,3 +141,16 @@ Synthetic coverage: Research CI [#41720355038](https://github.com/nikitanecilli-
 - Existing H-A folds are development data only.
 
 **No market PnL run has been launched for H-C.**
+
+
+### 9.1. Reverse-time runner manifest correction — 2026-11-03
+
+A code review of the one-shot reverse-time proxy runner found two manifest defects before execution: Python booleans had been written as lowercase JSON literals (which would raise NameError when building the payload), and the H-C setting was recorded under a misleading enable_post_break_invalidation_bars field rather than separating the actual enable flag from the frozen three-bar horizon.
+
+The runner now builds two explicit configs:
+- baseline: enable_post_break_invalidation=False;
+- H-C candidate: enable_post_break_invalidation=True, post_break_invalidation_bars=POST_BREAK_INVALIDATION_BARS (3).
+
+Maker flags are valid Python bools and remain False in both configs. A regression test verifies both config dictionaries and the fixed horizon. Research CI [#41721944597](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41721944597) completed SUCCESS, 53/53 steps.
+
+This is manifest/configuration correctness only. The one-shot reverse-time CryptoFetch proxy workflow was not triggered; no proxy PnL replay, Bybit API access, Funding data collection or live orders were performed.

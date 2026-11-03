@@ -109,3 +109,46 @@ E01–E13, E11 и E13 shared-capital цифры, а также другие ис
 Теперь следующий шаг — не запуск PnL немедленно, а аудит реализации H-A feature pipeline: causal 24h/72h relative strength, ATR normalization, cross-sectional ranks только среди активных символов с достаточной историей, без будущей информации; затем independent unit tests и preregistration. После этого — corrected-engine frozen baseline, и лишь затем один H-A replay.
 
 H-A теперь preregistered до любых рыночных PnL прогонов: `H_A_RELATIVE_STRENGTH_BREAKOUT_PREREGISTRATION_RU.md`. Зафиксированы 24h/72h returns normalized by ATR%, midrank, top/bottom quintiles, Donchian(20), min breadth 5, market next-open, `|score|` priority, отсутствие дополнительных фильтров и ограничения funding/universe. Не менять правила после просмотра результата.
+
+## 8. Фактический статус H-A и следующий диагностический шаг — 2026-11-03
+
+Этот раздел supersedes прежние формулировки разделов 6–7 о том, что H-A ещё не запускалась.
+
+### Результат H-A
+
+- Preregistered replay завершён в CI run [41633199418](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41633199418); правила не подбирались по результатам.
+- Universe по fold: 47 / 49 / 50 символов; состав менялся по мере появления доступной истории. Общая последняя свеча архива — 2026-10-26 00:00 UTC.
+- Baseline: 1,022 сделки; gross +587.02 USDT; fees 4,416.37; slippage 1,806.63; net -5,635.98 USDT.
+- H-A: 1,033 сделки; gross +29.53 USDT; fees 4,375.03; slippage 1,789.76; net -6,135.26 USDT.
+- H-A хуже baseline на 499.28 USDT. H-A отрицательна по net PnL во всех трёх folds; PF ниже 1 и expectancy отрицательна во всех folds. Fold 3 активировал 30% emergency kill-switch.
+- H-A отклонена как кандидат. Не оптимизировать ранги/пороги, не отбирать инструменты и не отключать глобально long/short на этих же folds.
+- Это CryptoFetch/Binance-style OHLCV proxy с удвоенной моделью taker fee/slippage; funding не включён, Bybit point-in-time universe не подтверждён, folds ранее исследовались и не являются holdout.
+
+Подробный frozen результат и attribution находятся в `H_A_RELATIVE_STRENGTH_BREAKOUT_PREREGISTRATION_RU.md`.
+
+### Что известно о причинах убытка
+
+- В каждом fold основную отрицательную сумму создаёт stop-loss cohort; time-stop и trailing-stop cohorts положительны, но не компенсируют стопы.
+- Убыточное направление меняется между folds: нельзя обосновать постоянный long-only или short-only режим.
+- Median holding time H-A — 19–20 H1 bars; максимальная длительность ограничена 32 bars.
+- Старый artifact содержит gross/fees/slippage/net, направление и exit reason, но не содержит MAE/MFE, risk_usdt, session и order_type. Поэтому полноценная attribution по excursion и фактическому типу исполнения из старого artifact невозможна.
+
+### Диагностическая задача
+
+Текущий runner уже экспортирует MAE_R, MFE_R, risk_usdt, gross_R, session и order_type. Нужен один диагностический повтор тех же заранее зафиксированных folds — без изменения сигналов, параметров, universe, стоимости или правил исполнения — только чтобы проверить новые поля и построить stop-loss / winner attribution. Это не новый поиск стратегии и не независимый OOS.
+
+На момент записи такой повтор не подтверждён: изменение workflow для unbuffered logging закоммичено в `3f762a4`, но соответствующий H-A Actions run не появился. Инструментальное подключение позволяет читать Actions, но не отправлять workflow_dispatch. Не считать диагностический replay выполненным и не делать выводов по отсутствующим MAE/MFE.
+
+### Техническое состояние
+
+- Portfolio kill-switch regression commit `917f74f` прошёл Research CI [41669101893](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41669101893); новый gap-execution тест 28/28 PASS. В `test_time_model.py` также уже есть более сильный полный сценарий `test_full_step_candle_kill_switch_flattens_portfolio_and_blocks_reentry`.
+- Коммит `3f762a4` меняет только запуск H-A runner на `python -u` для потокового вывода; торговая логика и правила эксперимента не менялись.
+- `main` не изменялась. Ни Bybit API, ни новые архивы, ни live orders не использовались.
+
+### Следующее решение
+
+1. Не запускать parameter sweeps и не пытаться «исправить» H-A подбором порогов.
+2. Получить диагностический ledger с excursion/entry execution fields на том же frozen replay; если workflow dispatch недоступен, оставить этот пункт явно заблокированным.
+3. Параллельно завершить статический аудит причин stop-loss: сигнал → цена следующего открытия → gap/chase → stop distance → adverse/favourable excursion → exit reason → per-leg costs. MAE после стопа трактовать как execution-bounded, не как полный внутрисвечной диапазон.
+4. Только после диагностики сформулировать отдельную preregistered гипотезу с меньшим turnover. H-B mean reversion и H-C continuation quality остаются отдельными кандидатами; не смешивать их.
+5. Не использовать эти folds как holdout и не переходить к API/self-hosted runner/live до появления обоснованного кандидата.

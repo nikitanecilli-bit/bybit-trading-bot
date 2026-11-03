@@ -131,9 +131,15 @@ class H1ValidationManifestTests(unittest.TestCase):
             root = Path(tmp)
             kline_dir = root / "kline"
             kline_dir.mkdir()
-            (kline_dir / "OTHERUSDT.csv").write_text("timestamp_ms\\n1\\n", encoding="utf-8")
+            with (kline_dir / "OTHERUSDT.csv").open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(["timestamp_ms"])
+                writer.writerow([1])
             outside = root / "BTCUSDT.csv"
-            outside.write_text("timestamp_ms\\n1800000000000\\n", encoding="utf-8")
+            with outside.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(["timestamp_ms"])
+                writer.writerow([1_800_000_000_000])
             timestamps = [1_800_000_000_000 + i * 3_600_000 for i in range(100)]
             with self.assertRaisesRegex(ValueError, "outside the manifested kline directory"):
                 build_validation_manifest(

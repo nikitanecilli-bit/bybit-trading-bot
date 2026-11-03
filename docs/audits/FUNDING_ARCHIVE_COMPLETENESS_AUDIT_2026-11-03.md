@@ -56,3 +56,17 @@ Bybit funding intervals are instrument-dependent and may change. A fixed 8-hour 
 - Do not alter funding arithmetic or assume a fixed 8-hour schedule as part of this audit.
 - No strategy parameters, execution rules, or historical results were changed.
 - No Bybit API, new archive collection, self-hosted runner, or live order was used.
+
+
+## Implementation progress — 2026-11-03
+
+The following guardrails have now been added on this research branch:
+
+- `funding_archive_manifest.py` writes an atomic sidecar manifest with the API endpoint/base, category/symbol, requested time window, page request windows, response row counts, returned timestamp bounds, collection time, CSV SHA-256 and row count. Multiple incremental collection runs are preserved.
+- `bybit_downloader.py` records each Funding pagination page and writes/updates the sidecar after collection.
+- `validate_funding_manifest()` verifies CSV hash/row count and that recorded page query windows cover the scored interval.
+- `validate_funding_mark_coverage()` now refuses H1 replay unless a matching sidecar exists, its query coverage spans the scored fold, and dated settlement schedule evidence is explicitly marked verified.
+- The funding sidecar is included in both train-only selector input provenance and final H1 validation input manifests. The helper and collector are included in replay code provenance.
+- Offline regression tests cover pagination metadata, incremental manifest preservation, hash tampering, query-window gaps, and fail-closed runner behavior.
+
+**Important remaining limitation:** the collector deliberately writes `settlement_schedule_verified: false`. Query logs and a CSV hash prove what was requested/received and whether the CSV changed; they do not independently prove that Bybit returned every settlement event. No code path should set this flag to true until a dated, source-backed funding interval schedule is reconstructed and validated over the scored period. Thus this implementation improves provenance and blocks unverified archives, but it does not yet close the schedule-completeness requirement. Market PnL replay remains prohibited.

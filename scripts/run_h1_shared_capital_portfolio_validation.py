@@ -35,15 +35,69 @@ MAX_CONCURRENT_POSITIONS = 5
 COST_MULTIPLIERS = [1.0, 1.5, 2.0]
 
 
-def resolve_validation_design(environ=None):
-    """Separate exploratory grid from the one-shot final holdout evaluation.
+def load_frozen_selection_manifest(environ=None):
+    """Load and validate the train-only top-five manifest required by every mode."""
+    env = os.environ if environ is None else environ
+    raw_path = str(env.get("H1_SELECTION_MANIFEST", "")).strip()
+    if not raw_path:
+        raise SystemExit("H1_SELECTION_MANIFEST is required; run the train-only top-five selector first")
+    path = Path(raw_path)
+    if not path.is_file():
+        raise SystemExit(f"H1 selection manifest does not exist: {path}")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Invalid H1 selection manifest: {exc}") from exc
+    if payload.get("schema_version") != 1 or payload.get("selection_protocol") != "h1-top5-train-only-v1":
+        raise SystemExit("Unsupported H1 selection manifest schema/protocol")
+    if payload.get("selection_status") != "ok":
+        raise SystemExit("H1 selection manifest has no valid top-five set; refusing validation")
+    primary = payload.get("primary")
+    if not isinstance(primary, list) or len(primary) != 5:
+        raise SystemExit("H1 selection manifest must contain exactly five primary symbols")
+    symbols = [str(item).strip().upper() for item in primary]
+    if any(not item for item in symbols) or len(set(symbols)) != 5:
+        raise SystemExit("H1 selection manifest primary symbols must be unique and non-empty")
+    allowlist = [
+        item.strip().upper()
+        for item in str(env.get("H1_SYMBOL_ALLOWLIST", "")).split(",")
+        if item.strip()
+    ]
+    if len(allowlist) != 5 or set(allowlist) != set(symbols):
+        raise SystemExit("H1_SYMBOL_ALLOWLIST must exactly match the five symbols in the selection manifest")
+    try:
+        cutoff = int(payload["training_window"]["cutoff_timestamp_ms"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise SystemExit("H1 selection manifest lacks a valid training cutoff timestamp") from exc
+    if cutoff <= 0:
+        raise SystemExit("H1 selection training cutoff must be positive")
+    return {
+        "path": str(path),
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "symbols": sorted(symbols),
+        "training_cutoff_timestamp_ms": cutoff,
+        "generated_at_utc": payload.get("generated_at_utc"),
+    }
 
-    Explore mode may compare the predeclared grid only on folds 1-2.
-    Confirm mode runs fold 3 for exactly one frozen grid configuration.
-    Cost multipliers remain stress scenarios, not selectable strategy parameters.
-    """
+
+def validate_selection_cutoff(selection, first_scored_timestamp_ms):
+    """Prove the selector's last training candle precedes every validation fold."""
+    cutoff = int(selection["training_cutoff_timestamp_ms"])
+    first_scored = int(first_scored_timestamp_ms)
+    if cutoff >= first_scored:
+        raise SystemExit(
+            f"H1 selection leakage: training cutoff {cutoff} is not before "
+            f"first validation timestamp {first_scored}"
+        )
+
+
+def resolve_validation_design(environ=None):
+    """Separate train-only universe selection, exploratory folds and final confirmation."""
     env = os.environ if environ is None else environ
     mode = str(env.get("H1_VALIDATION_MODE", "explore")).strip().lower()
+    if mode not in {"explore", "confirm"}:
+        raise SystemExit("H1_VALIDATION_MODE must be 'explore' or 'confirm'")
+    selection = load_frozen_selection_manifest(env)
     if mode == "explore":
         return {
             "mode": mode,
@@ -52,18 +106,8 @@ def resolve_validation_design(environ=None):
             "breakout_atr_thresholds": list(BREAKOUT_ATR_THRESHOLDS),
             "cost_multipliers": list(COST_MULTIPLIERS),
             "frozen_config": None,
+            "selection": selection,
         }
-    if mode != "confirm":
-        raise SystemExit("H1_VALIDATION_MODE must be 'explore' or 'confirm'")
-    frozen_symbols = [
-        item.strip().upper()
-        for item in str(env.get("H1_SYMBOL_ALLOWLIST", "")).split(",")
-        if item.strip()
-    ]
-    if len(frozen_symbols) != 5 or len(set(frozen_symbols)) != 5:
-        raise SystemExit(
-            "confirm mode requires exactly five unique preselected symbols in H1_SYMBOL_ALLOWLIST"
-        )
     try:
         volume = float(env["H1_FROZEN_MIN_VOLUME_RATIO"])
         breakout = float(env["H1_FROZEN_MIN_BREAKOUT_ATR"])
@@ -85,8 +129,10 @@ def resolve_validation_design(environ=None):
         "frozen_config": {
             "min_volume_ratio": volume,
             "min_breakout_atr": breakout,
-            "symbols": frozen_symbols,
+            "symbols": selection["symbols"],
+            "selection_manifest_sha256": selection["sha256"],
         },
+        "selection": selection,
     }
 
 
@@ -711,6 +757,7 @@ def build_validation_manifest(
     code_paths = [
         "Bybit_Trading_Engine_v14_research.py",
         "scripts/run_h1_shared_capital_portfolio_validation.py",
+        "scripts/select_h1_top5_train_only.py",
         ".github/workflows/h1-shared-capital-portfolio-validation.yml",
         "multibar_limit_wait.py",
         "funding_accounting.py",
@@ -735,6 +782,7 @@ def build_validation_manifest(
         if item.strip()
     })
     output_record = _file_manifest_record(output_csv_path)
+    selection = design["selection"]
     return {
         "schema_version": 1,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -751,10 +799,16 @@ def build_validation_manifest(
             "Hashes identify exact files but do not independently attest remote origin."
         ),
         "universe": {
-            "selection_mode": "explicit_allowlist" if allowlist else "coverage_filtered",
+            "selection_mode": "frozen_train_only_top5",
             "allowlist": allowlist,
             "selected_symbols": selected_symbols,
             "selected_symbol_count": len(selected_symbols),
+            "selection_manifest": {
+                "path": _manifest_path(selection["path"]),
+                "sha256": selection["sha256"],
+                "training_cutoff_timestamp_ms": selection["training_cutoff_timestamp_ms"],
+                "generated_at_utc": selection["generated_at_utc"],
+            },
         },
         "common_h1_grid": {
             "timeframe": "1h",
@@ -824,6 +878,11 @@ def main():
     print(f"Aligned H1 portfolio: {len(symbols)} symbols, {len(timestamps)} common bars")
     print(f"Archive sources: {len(set(archives.values()))}; starting capital={STARTING_CAPITAL:.0f} USDT")
     design = resolve_validation_design()
+    first_scored_timestamp = timestamps[int(len(timestamps) * design["folds"][0][1])]
+    validate_selection_cutoff(design["selection"], first_scored_timestamp)
+    if set(design["selection"]["symbols"]) != set(symbols):
+        raise SystemExit("Aligned Bybit universe does not exactly match frozen top-five selection manifest")
+    print(f"Train-only selection manifest={design['selection']['path']} sha256={design['selection']['sha256']}")
     print(f"Validation mode={design['mode']}; folds={[item[0] for item in design['folds']]}; "
           f"volume={design['volume_thresholds']}; breakoutATR={design['breakout_atr_thresholds']}; "
           f"cost stress={design['cost_multipliers']}")

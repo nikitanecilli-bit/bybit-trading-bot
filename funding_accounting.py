@@ -125,3 +125,60 @@ def accrued_funding_cost(
         total += sign * quantity * mark * fraction * rate
 
     return total.quantize(CENT, rounding=ROUND_HALF_UP)
+
+
+def accrued_funding_cost_for_remaining_margin(
+    position: Any,
+    events: Iterable[Mapping[str, Any]],
+    mark_prices: Mapping[int, Any],
+    as_of_ts: int,
+    defer_boundary_receipts: bool = False,
+) -> Decimal:
+    """Funding cashflow allocated to the currently remaining isolated margin.
+
+    Trade PnL continues to use accrued_funding_cost(), which records the actual
+    full-size cashflows. For margin health after TP1, pre-TP1 funding is allocated
+    pro-rata to the remaining quantity because the corresponding portion of
+    position margin was released when quantity was reduced.
+    """
+    entry_ts = int(position.entry_ts)
+    as_of_ts = int(as_of_ts)
+    direction = str(position.direction).lower()
+    if direction not in {"long", "short"} or as_of_ts < entry_ts:
+        raise ValueError("valid direction and as_of_ts >= entry_ts are required")
+    entry_price = _d(position.entry_price, "entry_price")
+    size_usdt = _d(position.size_usdt, "size_usdt")
+    exact_initial = getattr(position, "contract_qty", None)
+    exact_remaining = getattr(position, "remaining_contract_qty", None)
+    quantity = _d(exact_initial, "contract_qty") if exact_initial is not None else size_usdt / entry_price
+    remaining_fraction = _d(position.remaining_fraction, "remaining_fraction")
+    remaining = _d(exact_remaining, "remaining_contract_qty") if exact_remaining is not None else quantity * remaining_fraction
+    if quantity <= 0 or remaining < 0 or remaining > quantity:
+        raise ValueError("invalid initial or remaining contract quantity")
+    ratio = remaining / quantity
+    sign = Decimal("1") if direction == "long" else Decimal("-1")
+    tp1_hit = bool(getattr(position, "tp1_hit", False))
+    total = Decimal("0")
+    seen: set[int] = set()
+    for event in events:
+        try:
+            ts = int(event["ts"])
+            rate = _d(event["rate"], "funding rate")
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"invalid funding event: {event!r}") from exc
+        if ts in seen:
+            raise ValueError(f"duplicate funding settlement timestamp: {ts}")
+        seen.add(ts)
+        if not (entry_ts < ts <= as_of_ts):
+            continue
+        mark_raw = mark_prices.get(ts)
+        if mark_raw is None:
+            raise RuntimeError(f"Missing exact candle-boundary mark proxy for funding timestamp {ts}")
+        mark = _d(mark_raw, "funding mark price")
+        if mark <= 0:
+            raise ValueError(f"funding mark price must be > 0 at {ts}")
+        full_cost = sign * quantity * mark * rate
+        if defer_boundary_receipts and ts == as_of_ts and full_cost < 0:
+            continue
+        total += full_cost * (ratio if tp1_hit else Decimal("1"))
+    return total.quantize(CENT, rounding=ROUND_HALF_UP)

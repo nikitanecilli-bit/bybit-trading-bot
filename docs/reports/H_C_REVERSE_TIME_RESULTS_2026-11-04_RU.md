@@ -12,7 +12,7 @@
 - GitHub Actions run: [#41722545731](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41722545731), SUCCESS.
 - Artifact: h-c-reverse-time-cryptofetch-proxy, ID 13272957989.
 - Research commit: a5e7e1799f472db4cc00824dfcc774b40058165e.
-- Research CI / deterministic gates before execution: [#41722380421](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41722380421), SUCCESS, 53/53.
+- Research CI / deterministic gates before execution: [#41722380421](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41722380421), SUCCESS, 53/53. The exact execution commit also passed Research CI [#41722545755](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41722545755), SUCCESS, 53/53.
 - The earlier workflow attempt [#41722181706](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41722181706) failed on a script import before archive loading or PnL execution. The path fix passed CI before the completed replay. The failed bootstrap did not consume the preregistered PnL run.
 - Input archive integrity summary: 50 valid H1 symbols in archive, 6 duplicate symbol/timeframe groups, zero conflicting overlap bars, zero longest-archive-not-superset pairs. The frozen early-window universe below is a 25-symbol subset.
 - Code SHA-256 inventory is embedded in the artifact manifest.

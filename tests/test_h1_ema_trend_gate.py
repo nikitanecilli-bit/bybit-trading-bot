@@ -53,6 +53,28 @@ def test_ema50_200_gate_is_explicitly_opt_in_and_rejects_invalid_values():
 
 
 
+def test_ema_gate_is_explicit_opt_in_and_variant_output_is_unambiguous():
+    assert resolve_ema50_200_gate({}) is False
+    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "0"}) is False
+    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "false"}) is False
+    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "1"}) is True
+    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "true"}) is True
+    try:
+        resolve_ema50_200_gate({"H1_EMA50_200_GATE": "maybe"})
+    except SystemExit:
+        pass
+    else:
+        raise AssertionError("invalid EMA gate setting must fail closed")
+
+    baseline = h1_variant_name(1.6, 0.1, 2.0, False)
+    gated = h1_variant_name(1.6, 0.1, 2.0, True)
+    assert baseline == "vol1.6_breakATR0.1_cost2"
+    assert gated == "vol1.6_breakATR0.1_cost2_ema50_200_up"
+    assert baseline != gated
+    assert h1_variant_modes(False) == (False,)
+    assert h1_variant_modes(True) == (False, True)
+
+
 def test_ema_gate_precomputes_full_history_and_uses_exact_scored_timestamp():
     rows = make_rows(1_100)
     first_scored_ts = rows[1_000].ts

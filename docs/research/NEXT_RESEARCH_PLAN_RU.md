@@ -622,3 +622,19 @@ H1 validation runner дополнен отдельным JSON manifest рядо�
 
 
 Дополнение к защите holdout (после CI #41693921708): confirm mode теперь дополнительно требует ровно пять уникальных заранее выбранных символов в H1_SYMBOL_ALLOWLIST. Автоматический coverage-filtered universe в confirm запрещён. Frozen symbol list сохраняется в manifest. Это не выполняет отбор top-5 за нас: top-5 сначала нужно определить на train-периоде, затем неизменно передать в explore и confirm. Research CI #41693921708 завершился SUCCESS; все 49 job steps успешны. Финальный workflow-only commit `4482bc95fea19d025ccb9c2456a26bbc1c62cfdf` содержит эти изменения в активной ветке.
+
+
+## 2026-11-03 — train-only top-5 selection protocol
+
+Добавлен отдельный Bybit-native selector `scripts/select_h1_top5_train_only.py` и manual workflow `H1 Top-5 Train-Only Selection`.
+
+Правила зафиксированы до получения данных:
+- Universe берётся из официального Bybit linear lifecycle snapshot; допускаются только USDT-settled LinearPerpetual, активные по launch/delivery bounds на cutoff. Отсутствующие в snapshot инструменты исключаются и отражаются в manifest.
+- Training cutoff — 50% span самой длинной H1 истории, с embargo в один H1 бар до validation. Используются только свечи не позже cutoff.
+- На каждом кандидате выполняется один фиксированный long-only H1 replay: volume ratio 1.6, breakout clearance 0.10 ATR, 2x cost stress, существующие engine execution/risk settings. Никакого sweep и старого per-symbol PnL ranking.
+- Требуется не менее 3,000 training H1 bars и 30 закрытых сделок; eligibility только при net PnL > 0, PF > 1 и expectancy R > 0.
+- Ранжирование: expectancy R ↓, PF ↓, drawdown ↑, trades ↓, symbol ↑. Берутся top-5 primary и следующие 5 reserve. Если меньше пяти eligible либо у primary нет минимум 3,000 общих training bars — selector fail-closed, слабые монеты не подставляются.
+- Manifest содержит cutoff, source hashes, code hashes, lifecycle snapshot, все кандидатные метрики/исключения, primary/reserve и правило ранжирования.
+- Explore и confirm теперь оба требуют committed selection manifest и ровно тот же allowlist. Runner проверяет hash manifest, совпадение списка, отсутствие пересечения training cutoff с первым scored fold; итоговый validation manifest сохраняет provenance отбора.
+
+Ограничения: Bybit lifecycle snapshot содержит launch/delivery bounds, но не гарантирует полный исторический retention delisted contracts и не отражает временные приостановки торгов. Поэтому universe completeness остаётся ограниченной, пока не накоплена/проверена историческая серия snapshots и официальные listing/delisting notices. Selector требует Bybit H1, funding, mark, dated specs/risk tiers; он не может быть исполнен на имеющихся CryptoFetch ZIP. Старый shortlist RAY/PUMP/TAO/AAVE/CAKE и reserve DASH/HBAR/ENA/GMX/ONDO не переиспользуется.

@@ -10,6 +10,7 @@ from scripts.run_h1_shared_capital_portfolio_validation import (
     ACCELERATED_ATR_TRAIL_AFTER_1_5R, ENABLE_POST_BREAK_INVALIDATION,
     LEVERAGE_MODE, LEVERAGE_VAL, MAX_CHASE_LIMIT_PCT,
     build_ema50_200_label_maps, build_paired_ema_comparison,
+    build_paired_donchian48_comparison, resolve_donchian_variant_modes,
     h1_variant_modes, h1_variant_name, resolve_ema50_200_gate,
 )
 from market_structure import lookup_trend_label
@@ -201,6 +202,53 @@ def test_ema_gate_rejects_non_contiguous_h1_history():
         raise AssertionError("H1 gaps must not be interpreted as consecutive EMA bars")
 
 
+
+
+def test_donchian48_ablation_is_opt_in_and_freezes_exact_three_arms():
+    assert resolve_donchian_variant_modes({}) == ((20, False),)
+    assert resolve_donchian_variant_modes({"H1_EMA50_200_GATE": "1"}) == ((20, False), (20, True))
+    assert resolve_donchian_variant_modes({"H1_DONCHIAN48_EMA_ABLATION": "1"}) == (
+        (20, False), (48, False), (48, True)
+    )
+    try:
+        resolve_donchian_variant_modes({
+            "H1_DONCHIAN48_EMA_ABLATION": "1",
+            "H1_EMA50_200_GATE": "1",
+        })
+    except SystemExit as exc:
+        assert "cannot be combined" in str(exc)
+    else:
+        raise AssertionError("overlapping EMA experiment flags must fail closed")
+    assert h1_variant_name(1.6, 0.1, 2.0, False, 20) == "vol1.6_breakATR0.1_cost2"
+    assert h1_variant_name(1.6, 0.1, 2.0, False, 48) == "vol1.6_breakATR0.1_cost2_donchian48"
+
+
+def test_paired_donchian48_comparison_requires_three_exact_arms():
+    base = {
+        "fold": 1, "min_volume_ratio": 1.6, "min_breakout_atr": 0.1,
+        "cost_multiplier": 2.0, "timeframe": "1h",
+        "symbol_list": "BTCUSDT;ETHUSDT", "symbols": 2,
+        "common_h1_bars": 4000, "test_start_ts": 1_000_000,
+        "test_end_ts": 2_000_000, "shared_starting_capital": 10_000.0,
+        "max_concurrent_positions": 5, "net_pnl": -100.0,
+        "trades": 40, "ema50_200_gate": False, "donchian_period": 20,
+    }
+    rows = []
+    for period, ema, net in ((20, False, -100.0), (48, False, -60.0), (48, True, -30.0)):
+        row = dict(base, donchian_period=period, ema50_200_gate=ema, net_pnl=net)
+        rows.append(row)
+    result = build_paired_donchian48_comparison(rows, enabled=True)
+    assert result["pair_count"] == 1
+    assert result["pairs"][0]["delta_d48_vs_d20_net"] == 40.0
+    assert result["pairs"][0]["delta_d48_ema_vs_d48_net"] == 30.0
+    try:
+        build_paired_donchian48_comparison(rows[:2], enabled=True)
+    except ValueError as exc:
+        assert "exactly paired arms" in str(exc)
+    else:
+        raise AssertionError("missing Donchian arm must fail closed")
+
+
 if __name__ == "__main__":
     tests = [
         test_h1_execution_risk_settings_are_explicitly_frozen,
@@ -212,6 +260,8 @@ if __name__ == "__main__":
         test_ema_gate_fails_closed_without_1000_pre_roll_bars,
         test_ema_gate_fails_closed_for_missing_symbol_or_history,
         test_ema_gate_rejects_non_contiguous_h1_history,
+        test_donchian48_ablation_is_opt_in_and_freezes_exact_three_arms,
+        test_paired_donchian48_comparison_requires_three_exact_arms,
     ]
     for test in tests:
         test()

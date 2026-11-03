@@ -30,6 +30,26 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Diagnose runner egress geography (no credentials)
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          try:
+              request = urllib.request.Request(
+                  "https://ipinfo.io/json",
+                  headers={"User-Agent": "bybit-research-network-diagnostic/1.0"},
+              )
+              with urllib.request.urlopen(request, timeout=10) as response:
+                  data = json.loads(response.read().decode("utf-8"))
+              print("Runner egress country:", data.get("country", "unknown"))
+              print("Runner egress region:", data.get("region", "unknown"))
+              print("Runner egress organization:", data.get("org", "unknown"))
+          except Exception as exc:
+              print("Runner egress geolocation unavailable:", type(exc).__name__)
+          PY
       - name: Download dated linear risk-limit tiers
         env:
           BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}

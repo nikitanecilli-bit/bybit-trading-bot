@@ -48,6 +48,20 @@ NUMERIC_FEATURES = (
     "prebreak_tr_mean6_atr",
     "prebreak_volume6_vs20",
     "entry_adverse_gap_atr",
+    "post_entry_completed_bars",
+    "post_entry_1bar_close_return_r",
+    "post_entry_3bar_close_return_r",
+    "post_entry_6bar_close_return_r",
+    "post_entry_1bar_close_return_atr",
+    "post_entry_3bar_close_return_atr",
+    "post_entry_6bar_close_return_atr",
+    "post_entry_first3_max_favorable_r",
+    "post_entry_first3_max_adverse_r",
+    "post_entry_first3_mean_true_range_atr",
+    "post_entry_first3_mean_volume_vs_signal",
+    "post_entry_retest_inside_1bar",
+    "post_entry_retest_inside_3bars",
+    "post_entry_retest_inside_6bars",
 )
 
 
@@ -176,6 +190,71 @@ def extract_signal_features(
         "prebreak_volume6_vs20": _safe_div(mean_vol6, mean_vol20),
         "entry_adverse_gap_atr": adverse_entry_gap,
     }
+
+    # Post-entry diagnostics are strictly bounded by the trade's exit time.
+    # For intrabar exits, the exit candle is excluded because its close occurs
+    # after the modeled fill; time-stop/end-of-test exits occur at bar close.
+    exit_ts = _parse_utc_ms(str(trade["exit_date"]))
+    close_exit = str(trade.get("exit_reason")) in {"time_stop", "end_of_test"}
+    completed = []
+    for candle in rows[entry_index:]:
+        candle_close_ts = candle.ts + H1_MS
+        if candle_close_ts > exit_ts:
+            break
+        if not close_exit and candle_close_ts >= exit_ts:
+            continue
+        completed.append(candle)
+
+    size_usdt = float(trade.get("size_usdt") or 0.0)
+    risk_usdt = float(trade.get("risk_usdt") or 0.0)
+    entry_price = float(trade["entry_price"])
+    stop_dist = risk_usdt * entry_price / size_usdt if size_usdt > 0 else 0.0
+    if stop_dist <= 0 or not math.isfinite(stop_dist):
+        raise ValueError(f"{trade.get('symbol')}: invalid initial stop distance")
+    features["post_entry_completed_bars"] = len(completed)
+
+    for horizon in (1, 3, 6):
+        if len(completed) >= horizon:
+            close_price = float(completed[horizon - 1].close)
+            close_return = sign * (close_price - entry_price)
+            features[f"post_entry_{horizon}bar_close_return_r"] = close_return / stop_dist
+            features[f"post_entry_{horizon}bar_close_return_atr"] = close_return / atr
+            features[f"post_entry_retest_inside_{'1bar' if horizon == 1 else str(horizon) + 'bars'}"] = int(
+                any(
+                    (float(row.close) <= prior_high) if direction == "long"
+                    else (float(row.close) >= prior_low)
+                    for row in completed[:horizon]
+                )
+            )
+        else:
+            features[f"post_entry_{horizon}bar_close_return_r"] = None
+            features[f"post_entry_{horizon}bar_close_return_atr"] = None
+            features[f"post_entry_retest_inside_{'1bar' if horizon == 1 else str(horizon) + 'bars'}"] = None
+
+    if len(completed) >= 3:
+        first3 = completed[:3]
+        if direction == "long":
+            favorable = max(float(row.high) - entry_price for row in first3) / stop_dist
+            adverse = max(entry_price - float(row.low) for row in first3) / stop_dist
+        else:
+            favorable = max(entry_price - float(row.low) for row in first3) / stop_dist
+            adverse = max(float(row.high) - entry_price for row in first3) / stop_dist
+        post_tr = _true_ranges([signal, *first3])
+        features["post_entry_first3_max_favorable_r"] = favorable
+        features["post_entry_first3_max_adverse_r"] = adverse
+        features["post_entry_first3_mean_true_range_atr"] = (
+            statistics.fmean(post_tr) / atr if post_tr else None
+        )
+        features["post_entry_first3_mean_volume_vs_signal"] = (
+            statistics.fmean(float(row.volume) for row in first3) / float(signal.volume)
+            if float(signal.volume) > 0 else None
+        )
+    else:
+        features["post_entry_first3_max_favorable_r"] = None
+        features["post_entry_first3_max_adverse_r"] = None
+        features["post_entry_first3_mean_true_range_atr"] = None
+        features["post_entry_first3_mean_volume_vs_signal"] = None
+
     return features
 
 

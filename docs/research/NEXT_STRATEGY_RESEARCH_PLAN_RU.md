@@ -401,3 +401,13 @@ The Bybit-native market archive and dated instrument/risk snapshots are still ab
 A final config-to-manifest consistency check found that `max_chase_limit_pct=1.5` was documented in the H1 frozen assumptions but relied on the engine default rather than being explicitly assigned by the H1 runner. The runner now sets it from a named constant and also explicitly disables accelerated ATR trailing and H-C post-break invalidation, so the paired EMA test cannot silently inherit those engine defaults. The same constants are included in the validation manifest.
 
 Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41730514894) passed **55/55 steps**, including the new frozen-risk-settings regression. This is configuration/provenance hardening only; no market PnL replay was run.
+
+
+## 2026-11-04 — исправлена утечка validation в train-only Top-5 selector
+
+- Подтверждён дефект: общий cutoff от самого длинного H1 архива мог включать вторую половину истории короткого символа, а затем такой символ мог повлиять на ранжирование кандидатов.
+- Добавлена индивидуальная проверка границы первой validation-части каждого символа до ранжирования. Пересечение исключается с причиной `candidate_training_overlaps_own_validation`; границы записываются в manifest.
+- Регрессия воспроизводит пример 10,000-bar reference против 4,000-bar candidate: прежний общий cutoff индекс 4,998 пересекал собственную validation-границу кандидата на индексе 2,000.
+- CI [#41732028220](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41732028220) SUCCESS, 54/54 steps.
+- Это исправление целостности отбора, не рыночный результат. Bybit Top-5 manifest ещё не создавался; PnL replay не запускался. Survivorship bias и отсутствие исторического delisted-universe остаются отдельными ограничениями.
+- Полный аудит: `docs/audits/H1_TOP5_TRAIN_SPLIT_LEAKAGE_AUDIT_2026-11-04.md`.

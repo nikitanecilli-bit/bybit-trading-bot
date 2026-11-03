@@ -15,6 +15,10 @@ on:
         description: "Repository path to official Bybit H1 trade-kline CSVs (one <SYMBOL>.csv per symbol)"
         required: true
         type: string
+      symbols:
+        description: "Optional comma-separated frozen Bybit universe (e.g. BTCUSDT,ETHUSDT); blank uses coverage filtering"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -68,6 +72,8 @@ jobs:
           BYBIT_FUNDING_DIR: ${{ inputs.funding_dir }}
           BYBIT_MARK_PRICE_DIR: ${{ inputs.mark_price_dir }}
           BYBIT_KLINE_DIR: ${{ inputs.kline_dir }}
+          H1_SYMBOL_ALLOWLIST: ${{ inputs.symbols }}
+          BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}
         run: python scripts/run_h1_shared_capital_portfolio_validation.py
       - name: Upload report
         uses: actions/upload-artifact@v4
@@ -75,6 +81,7 @@ jobs:
           name: h1-shared-capital-portfolio-validation
           path: |
             h1_shared_capital_portfolio_validation.csv
+            h1_shared_capital_portfolio_validation_manifest.json
             h1_fold2_trade_diagnostics.csv
             h1_fold2_risk_events.csv
             h1_fold2_risk_block_counts.csv

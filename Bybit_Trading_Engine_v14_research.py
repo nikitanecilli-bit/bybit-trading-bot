@@ -404,7 +404,6 @@ class OpenPositionState:
     risk_usdt: float
     order_type: str
     maker_exits: Optional[bool] = None
-    tp1_maker: Optional[bool] = None  # actual TP1 liquidity classification after gap handling
     breakout_level: Optional[float] = None  # signal-time Donchian boundary
     signal_ts_ms: Optional[int] = None  # original signal close; may precede delayed limit fill
     tp1_hit: bool = False
@@ -430,6 +429,8 @@ class OpenPositionState:
     min_order_qty: Optional[str] = None
     min_notional_value: Optional[str] = None
     exchange_sized: bool = False
+    # Appended to preserve the positional constructor order of older position fields.
+    tp1_maker: Optional[bool] = None
 
     def __post_init__(self) -> None:
         if self.max_favorable_px <= 0.0:

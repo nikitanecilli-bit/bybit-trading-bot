@@ -624,6 +624,64 @@ def test_new_short_fill_bar_adverse_mark_triggers_portfolio_kill_switch():
     assert "BTCUSDT" in e.open_positions
 
 
+def test_portfolio_kill_switch_flattens_all_positions_and_blocks_pending_entries():
+    e = make_engine()
+    long_pos = make_position("long", entry=100.0, stop=90.0)
+    short_pos = make_position("short", entry=100.0, stop=110.0)
+    short_pos.symbol = "ETHUSDT"
+    e.open_positions = {"BTCUSDT": long_pos, "ETHUSDT": short_pos}
+    e._intrabar_mtm_marks = {"BTCUSDT": 90.0, "ETHUSDT": 110.0}
+    e._intrabar_risk_marks = {"BTCUSDT": 90.0, "ETHUSDT": 110.0}
+    e._intrabar_risk_marks_ts = 1_800_000_900_000
+    e._intrabar_mtm_marks_ts = 1_800_000_900_000
+    e._liquidation_exit_price = lambda *_args, **_kwargs: None
+    e.tg = type("Notifier", (), {"send_message": lambda self, _message: None})()
+
+    def trigger_kill_switch(unrealized_pnl_usdt, ts_ms):
+        hit = unrealized_pnl_usdt <= -50.0
+        if hit:
+            e.risk_mgr.kill_switch_triggered = True
+        return {"kill_switch_hit": hit, "daily_stop_hit": False}
+
+    e.risk_mgr.mark_to_market = trigger_kill_switch
+    close_ts = 1_800_000_900_000
+    e._update_mark_to_market(close_ts)
+    assert e.risk_mgr.kill_switch_triggered is True
+
+    closed = []
+    def capture_close(pos, price, reason, exit_ts, mae_r, mfe_r):
+        closed.append((pos.symbol, price, reason, exit_ts))
+        e.open_positions.pop(pos.symbol)
+
+    e._close_position = capture_close
+    start = 1_800_000_000_000 - 15 * 900_000
+    history = [
+        candle(100.0, 101.0, 99.0, 100.0, ts=start + i * 900_000)
+        for i in range(15)
+    ]
+    current = candle(100.0, 101.0, 99.0, 100.0, ts=1_800_000_000_000)
+    history.append(current)
+    for symbol in ("BTCUSDT", "ETHUSDT"):
+        engine_mod.UnifiedQuantEngine._manage_position(
+            e, symbol, history, False, close_ts,
+        )
+
+    assert sorted(closed) == sorted([
+        ("BTCUSDT", 90.0, "kill_switch", close_ts),
+        ("ETHUSDT", 110.0, "kill_switch", close_ts),
+    ])
+    assert e.open_positions == {}
+
+    e.pending["XRPUSDT"] = pending_signal()
+    e.risk_mgr.can_open_new_trade = lambda _count: (False, "KILL_SWITCH")
+    opened = e._try_fill_pending(
+        "XRPUSDT", candle(100.0, 101.0, 99.0, 100.0, ts=1_800_000_000_000),
+    )
+    assert opened is False
+    assert "XRPUSDT" not in e.open_positions
+    assert "XRPUSDT" not in e.pending
+
+
 if __name__ == "__main__":
     tests = [
         test_market_long_gap_above_chase_limit_is_cancelled,
@@ -653,6 +711,7 @@ if __name__ == "__main__":
         test_new_trailing_stop_is_not_applied_retroactively_to_same_candle,
         test_new_long_fill_bar_adverse_mark_triggers_portfolio_kill_switch,
         test_new_short_fill_bar_adverse_mark_triggers_portfolio_kill_switch,
+        test_portfolio_kill_switch_flattens_all_positions_and_blocks_pending_entries,
     ]
     for test in tests:
         test()

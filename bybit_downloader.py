@@ -183,6 +183,10 @@ def collect(session, base_url, spec, base_params, start_ms, end_ms, delay, audit
                 "response_rows": len(parsed),
                 "first_ts": min(page_timestamps) if page_timestamps else None,
                 "last_ts": max(page_timestamps) if page_timestamps else None,
+                "response_order_descending": all(
+                    left >= right for left, right in zip(page_timestamps, page_timestamps[1:])
+                ),
+                "response_timestamps_unique": len(set(page_timestamps)) == len(page_timestamps),
                 "complete": len(parsed) < spec["limit"],
                 "saturated": len(parsed) >= spec["limit"],
                 "out_of_window_rows": sum(

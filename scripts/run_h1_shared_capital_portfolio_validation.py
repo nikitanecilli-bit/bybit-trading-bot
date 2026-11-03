@@ -22,6 +22,7 @@ from contextlib import contextmanager
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import Bybit_Trading_Engine_v14_research as em
+from market_structure import trend_label_index, lookup_trend_label
 from multibar_limit_wait import evaluate_limit_wait, prepare_signal_for_next_bar_fill
 
 FOLDS = [(1, 0.50, 0.65), (2, 0.65, 0.80), (3, 0.80, 1.00)]
@@ -53,6 +54,37 @@ H1_REPLAY_CODE_PATHS = [
     "scripts/archive_bybit_market_history.py",
 ]
 SELECTION_INPUT_KEYS = ("kline", "funding", "mark_price", "instrument_specs", "risk_tiers", "universe_snapshot")
+
+
+
+def build_ema50_200_label_maps(base_candles, symbols, end_idx, first_scored_ts):
+    """Precompute causal same-bar EMA50/200 labels with a 1,000-H1-bar burn-in."""
+    labels_by_symbol = {}
+    for symbol in sorted(symbols):
+        if symbol not in base_candles:
+            raise SystemExit(f"EMA trend context missing symbol {symbol}")
+        rows = list(base_candles[symbol][:end_idx])
+        timestamps = [int(candle.ts) for candle in rows]
+        try:
+            first_scored_index = timestamps.index(int(first_scored_ts))
+        except ValueError as exc:
+            raise SystemExit(
+                f"EMA trend context lacks exact first scored timestamp for {symbol}"
+            ) from exc
+        if first_scored_index < 1000:
+            raise SystemExit(
+                f"EMA50/200 requires 1,000 completed H1 pre-roll bars before scoring: "
+                f"{symbol} has {first_scored_index}"
+            )
+        labels_by_symbol[symbol] = trend_label_index(
+            rows, fast=50, slow=200, slope=5, burn_in_bars=1000,
+            expected_interval_ms=3_600_000,
+        )
+        # Exact first scored bar must be present; "neutral" is a valid regime,
+        # but a missing timestamp is a hard provenance failure.
+        lookup_trend_label(labels_by_symbol[symbol], int(first_scored_ts))
+    return labels_by_symbol
+
 
 
 def validate_selection_provenance(selection, current_input_files, current_code_files):
@@ -595,6 +627,11 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
     engine.risk_mgr.cfg = cfg
     engine.tg.send_message = lambda *_args, **_kwargs: None
 
+    if ema_trend_labels_by_symbol is not None:
+        missing_label_maps = sorted(set(symbols).difference(ema_trend_labels_by_symbol))
+        if missing_label_maps:
+            raise ValueError(f"EMA trend context missing symbol maps: {missing_label_maps}")
+
     core = em.QuantStrategyCore
     original_eval = core.evaluate_signal
 
@@ -602,7 +639,16 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         if not bars or not (start_ts <= bars[-1].ts <= end_ts):
             return None
         sig = original_eval(sym, bars, conf)
-        if sig is None or str(sig.get("direction", "")).lower() != "long":
+        if sig is None:
+            return None
+        if ema_trend_labels_by_symbol is not None:
+            label_map = ema_trend_labels_by_symbol.get(sym)
+            if not isinstance(label_map, dict):
+                raise RuntimeError(f"EMA trend context for {sym} is unavailable")
+            label = lookup_trend_label(label_map, int(bars[-1].ts))
+            if label != "up":
+                return None
+        if str(sig.get("direction", "")).lower() != "long":
             return None
         if float(sig.get("vol_ratio", 0.0)) < min_vol:
             return None

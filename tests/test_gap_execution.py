@@ -57,6 +57,7 @@ def pending_signal(order_type="market", ref=100.0, direction="long"):
     return {
         "direction": direction, "entry_price": ref, "order_type": order_type,
         "strategy": "test", "stop_dist": 2.0,
+        "breakout_level": ref - 1.0 if direction == "long" else ref + 1.0,
         "signal_ts": 1_800_000_000_000 - 15 * 60_000,
     }
 
@@ -116,6 +117,7 @@ def test_market_long_gap_within_limit_fills_at_next_open():
     pos = e.open_positions["BTCUSDT"]
     assert pos.entry_price == 101.0
     assert pos.stop_price == 99.0
+    assert pos.breakout_level == 99.0
 
 
 def test_limit_buy_gapped_below_limit_fills_at_open_not_worse_limit():

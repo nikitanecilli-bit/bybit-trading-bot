@@ -166,3 +166,12 @@ Correction:
 This relies on the endpoint's observed descending-page behavior used by the collector's backward pagination. The official endpoint documentation confirms a maximum of 200 records and that an endTime query returns records up to that time, but does not spell out response ordering in the parameter table; the collector therefore records and checks the returned order rather than silently assuming it.
 
 Research CI [#41719390878](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41719390878) completed SUCCESS: **52/52 steps**, including Funding archive schedule reconstruction, saturated-page pagination coverage, downloader manifest integrity, H1 funding/Mark preflight, and the existing engine/accounting suite. This run used commit `ebc6721c51cd0c397e35bbae5631dda429a2882f`.
+
+
+### Follow-up verification — 2026-11-04
+
+The reconstructed-grid regressions are now part of the active Research CI workflow rather than merely existing as unexecuted test files. The workflow also executes the active downloader-manifest regressions and H1 runner fail-closed fixtures.
+
+Research CI [#41726204938](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41726204938) completed **SUCCESS, 53/53 steps**, at commit `2f7c590e70da47ab855db31d9f823d8134ac7cd5`. Funding-specific passing steps include cumulative Funding accounting, realized Funding PnL, Mark-to-market Funding risk, Funding/Mark preflight, Funding archive provenance and schedule completeness, and downloader manifest integrity.
+
+This verifies the new code paths against synthetic/offline fixtures. It does **not** remove the residual trust boundary described above: the currently available snapshots cannot rule out an interval change and reversion between observations, and no actual Bybit funding/Mark archive with historical schedule evidence exists. The market-PnL gate remains CLOSED.

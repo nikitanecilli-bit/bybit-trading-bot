@@ -5,7 +5,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.select_h1_top5_train_only import rank_candidates, common_training_bar_count, common_training_window
+from scripts.select_h1_top5_train_only import rank_candidates, common_training_bar_count, common_training_window, first_validation_timestamp
 
 
 def _row(symbol, trades, net, pf, exp, dd):
@@ -77,6 +77,7 @@ def test_common_training_window_uses_exact_shared_h1_intersection():
         "bar_count": 5,
     }
     assert common_training_window({})["bar_count"] == 0
+    assert first_validation_timestamp(histories) == 5 * 3_600_000
 
 
 def test_insufficient_positive_candidates_are_not_promoted():

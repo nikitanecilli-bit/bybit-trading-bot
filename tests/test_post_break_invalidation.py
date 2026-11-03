@@ -199,6 +199,12 @@ def test_hc_applies_only_to_breakout_strategies_and_does_not_reenter_same_bar():
     bar = engine.Candle(pos.entry_ts, 102.0, 103.0, 100.0, 100.5, 10.0)
     assert _manage(e, pos, bar, fill_bar=True) == []
 
+    # H-A is a rejected, separate candidate; H-C is preregistered only for
+    # the frozen H1 baseline and must not silently manage H-A positions.
+    e = _configured_engine()
+    pos = _position("long", strategy="H-A-relative-strength-breakout")
+    assert _manage(e, pos, bar, fill_bar=True) == []
+
     # Existing-position processing always returns before signal discovery.
     e = _configured_engine()
     pos = _position("long")

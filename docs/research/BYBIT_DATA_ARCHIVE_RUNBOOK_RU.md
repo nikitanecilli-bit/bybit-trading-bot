@@ -135,3 +135,12 @@ Workflow публикует два артефакта: итоговый `h1_shar
 - The H1 runner now always checks the selection cutoff against the first 50% validation boundary, including when running `confirm` mode (which scores only fold 3). This prevents a selection cutoff in explore folds 1–2 from passing merely because confirm starts at 80%.
 - Regression tests cover workflow-vs-code commit provenance and the confirm-mode 50% selection boundary. Latest Research CI [#41704302480](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41704302480) — SUCCESS, 50/50 steps.
 - These are provenance/leakage safeguards only; no Bybit archive was downloaded and no PnL was run.
+
+
+## 13. Funding collection provenance gate (2026-11-03)
+
+The active `scripts/archive_bybit_market_history.py` collector writes a per-symbol sidecar beside each funding CSV: `SYMBOL.csv.audit.json`. It records every Bybit V5 Funding History query window, page row counts/bounds, whether a page was saturated, CSV row count and SHA-256. Saturated 200-row responses are marked incomplete and recursively subdivided; only complete leaf query windows count toward coverage. The archive-level `archive_manifest.json` also records the active collector script hash and sidecar references.
+
+Do not edit a Funding CSV after collection. Incremental use of the legacy downloader verifies the previous hash before appending and refuses to re-attest modified bytes.
+
+**This is query/data provenance, not yet proof of settlement completeness.** The H1 runner additionally requires a separately hashed schedule-evidence JSON, based on dated raw Bybit instrument snapshots for that symbol. The current archive workflow's single universe snapshot is point-in-time only; it must not be stretched across an arbitrary historical period. Until the schedule evidence covers the scored fold and expected settlement timestamps match the Funding CSV, the H1 runner will fail closed and no market PnL replay should be started.

@@ -39,6 +39,8 @@
 - [Карта репозитория](docs/REPOSITORY_MAP_RU.md)
 - [Исторические отчёты](docs/reports/)
 - [Аудиты](docs/audits/)
+- [Исходные гипотезы пользователя](docs/research/hypothesis_inputs/Гипотезы_пользователя_2026-11-03.md)
+- [Аудит Quant Lab и очередь гипотез](docs/research/QUANT_LAB_ASSETS_AND_HYPOTHESIS_QUEUE_2026-11-03_RU.md)
 
 ## Быстрый старт
 

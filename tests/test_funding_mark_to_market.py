@@ -119,6 +119,24 @@ def test_explicit_taker_tp1_override_is_preserved_in_mtm():
     assert abs(value - 48.98625) < 1e-9
 
 
+
+def test_actual_taker_tp1_fill_overrides_configured_maker_in_mtm():
+    engine = make_engine(False)
+    pos = engine.open_positions["BTCUSDT"]
+    pos.order_type = "limit"
+    pos.maker_exits = True
+    pos.tp1_maker = False  # gap-through fill was marketable and classified taker
+    pos.tp1_hit = True
+    pos.tp1_ts_ms = 1_500
+    pos.remaining_fraction = 0.5
+    pos.realized_tp1_gross_usdt = 50.0
+    value = engine_mod.UnifiedQuantEngine._unrealized_pnl_at_marks(engine, 2_000)
+    # Entry maker fee 0.20 + actual TP1 taker fee/slippage 0.42625
+    # + remaining taker close fee/slippage 0.3875.
+    assert abs(value - 48.98625) < 1e-9
+
+
+
 def test_tp1_application_records_conservative_candle_close_boundary():
     pos = engine_mod.OpenPositionState(
         trade_id="tp1-ts", symbol="BTCUSDT", direction="long",

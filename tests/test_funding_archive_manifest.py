@@ -256,8 +256,8 @@ class FundingArchiveManifestTests(unittest.TestCase):
         end_ms = 200 * 3_600_000
         timestamps = list(range(start_ms, end_ms + 1, 3_600_000))
         self.csv.write_text(
-            "timestamp,datetime,funding_rate\\n"
-            + "".join(f"{ts},1970-01-01,0.001\\n" for ts in timestamps),
+            "timestamp,datetime,funding_rate\n"
+            + "".join(f"{ts},1970-01-01,0.001\n" for ts in timestamps),
             encoding="utf-8",
         )
         payload = record_funding_collection(

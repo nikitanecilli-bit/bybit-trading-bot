@@ -158,3 +158,29 @@ This is a scope limitation, not a newly discovered defect in the portfolio engin
 Также добавлены отдельные проверки same-bar slot reservation, simultaneous daily-stop/kill-switch latches и funding-adjusted bankruptcy reconciliation. Ни один из этих тестов не запускает рыночный PnL replay.
 
 **Текущий вывод:** confirmed profit-inflating accounting defect в проверенном lifecycle не найден. Исправленные UTC/journal defects закрыты регрессиями. Консервативная taker-MTM vs maker-TP asymmetry остаётся намеренной и протестированной. Liquidation остаётся isolated position-level approximation; account-wide cross-margin/UTA не моделируется. Bybit-native archive отсутствует, поэтому PnL validity/exchange execution остаются data-gated.
+
+
+## Funding allocation to the remaining position after TP1 — 2026-11-03
+
+A focused review of the liquidation funding path found a partial-close allocation defect in `accrued_funding_cost_for_remaining_margin()`:
+
+- Before this correction, every Funding settlement before TP1 was charged in full to the remaining isolated position margin.
+- After TP1, settlements were scaled to remaining quantity.
+- This did not allocate the accumulated funding cashflows between the closed and still-open portions of a partially closed position.
+
+Bybit's official Closed P&L explanation says that on partial close, accumulated opening fees and funding fees are prorated according to the percentage of the position closed. The remaining open leg must therefore retain only its proportional share of historical funding, not 100% of pre-TP1 funding.
+
+**Correction:** when TP1 has actually occurred as of the margin timestamp, the helper now allocates every historical funding cashflow (before, at, and after TP1) to the exact remaining-contract ratio. Legacy positions use their remaining fraction. Before the TP1 timestamp, the full original exposure remains. The current-boundary receipt deferral is preserved for adverse intrabar risk checks. `accrued_funding_cost()` still returns the full lifecycle funding amount for final closed-trade PnL; only the remaining-margin allocation changed.
+
+Regression coverage:
+- pre-TP1 and post-TP1 payments prorated to the remaining quantity;
+- pre-TP1 funding receipts prorated too;
+- exact remaining contract quantity takes precedence over legacy fraction;
+- an as-of timestamp before TP1 does not prematurely prorate;
+- engine liquidation integration receives the remaining share of historical Funding.
+
+Research CI run [#41715596303](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41715596303): the cumulative Funding accounting test, realized Funding accounting test, and Mark OHLC liquidation engine integration test all report SUCCESS; all 50 configured workflow steps reported success at last inspection. GitHub still reported the overall run/job as `in_progress` despite the final `Complete job` step succeeding, so terminal run conclusion remains unconfirmed at this note's creation.
+
+**Remaining limitation:** the isolated margin calculator still subtracts all net funding allocated to the open leg from its position margin. Bybit documents that Funding is first deducted from available balance and only falls back to position initial margin when available balance is insufficient. Since the current model has no account-wide available-balance ledger, this is a conservative stress assumption, not exact account-level funding/margin behavior. It can overstate liquidation risk; it should not be described as a fully exchange-accurate margin path.
+
+No strategy PnL replay was run. No strategy parameters, closed-trade funding accounting, or live execution behavior were changed.

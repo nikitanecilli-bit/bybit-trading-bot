@@ -33,8 +33,10 @@ def accrued_funding_cost(
 ) -> Decimal:
     """Return cumulative funding paid/received in [entry_ts, as_of_ts].
 
-    Funding settlement at entry timestamp is excluded; settlement at the
-    as-of timestamp is included. mark_prices contains timestamp-aligned
+    Settlement at the entry timestamp is treated conservatively: a possible
+    payment is charged, while a possible receipt is excluded because Bybit does
+    not guarantee inclusion for executions within five seconds of settlement.
+    The as-of timestamp is included. mark_prices contains timestamp-aligned
     mark-candle open proxies. At an ambiguous final-close boundary, payments
     use full initial quantity and receipts use zero quantity. At an ambiguous
     TP1-only boundary, payments use full quantity and receipts use the

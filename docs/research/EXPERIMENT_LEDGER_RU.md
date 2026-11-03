@@ -937,3 +937,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Reporting/engineering only: no market PnL replay, no Bybit download, no API connection, no orders.
 
 - Follow-up persistence regression: explicit tp1_maker=False survives Plan-B save/restore without collapsing to the maker_exits=True fallback. Research CI [#41720499938](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41720499938) SUCCESS, 52/52 steps. No market PnL replay.
+
+
+## ENG-HC-RT-001 — H-C reverse-time CryptoFetch proxy (2026-11-04)
+
+- Frozen run [#41722545731](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41722545731), artifact 13272957989, protocol H-C-RT-CRYPTOFETCH-2026-11-04-v1, research commit a5e7e1799f472db4cc00824dfcc774b40058165e.
+- Window 2025-10-30 00:00 through 2026-04-26 23:00 UTC, fixed 25-symbol archive-available universe, 72 H1 warmup bars, same baseline versus baseline+H-C, 2x fees/taker slippage, market execution, funding/mark omitted.
+- Baseline: 313 trades, gross -1,098.10, fees 1,151.42, slippage 470.95, proxy net before funding -2,720.47, PF 0.63, expectancy -0.213R, max DD 30.06%.
+- H-C: 610 trades, gross +404.08, fees 2,330.71, slippage 953.49, proxy net before funding -2,880.12, PF 0.72, expectancy -0.120R, max DD 30.18%.
+- H-C gross improved +1,502.18, but fees+slippage increased +1,661.83; trade count rose 94.9%; proxy net worsened -159.65. 296 invalidation exits averaged -0.399R and totalled -4,535.90 net. Stop-loss count fell 180→138; both variants hit the 30% kill switch.
+- Decision: reject H-C for this proxy window; no tuning or rerun. CryptoFetch is not Bybit-native, not forward OOS, survivor-biased and excludes funding/mark. Full detail in docs/reports/H_C_REVERSE_TIME_RESULTS_2026-11-04_RU.md.
+- Bootstrap failure [#41722181706] occurred before import/archive/PnL; path fix passed [#41722380421] 53/53 before the first complete run.

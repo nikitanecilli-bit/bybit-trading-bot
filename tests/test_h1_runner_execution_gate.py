@@ -101,6 +101,7 @@ def _selection_env(tmpdir):
         "selection_protocol": "h1-top5-train-only-v2",
         "selection_status": "ok",
         "generated_at_utc": "2026-11-03T00:00:00Z",
+        "strategy_config": {"direction": "long_only"},
         "training_window": {"cutoff_timestamp_ms": 1000},
         "input_files": {key: [] for key in ("kline", "funding", "mark_price", "instrument_specs", "risk_tiers", "universe_snapshot")},
         "code_files": [],
@@ -151,6 +152,21 @@ def test_selection_manifest_and_allowlist_must_match_exactly():
             assert "exactly match" in str(exc)
         else:
             raise AssertionError("mismatched frozen allowlist must fail")
+
+
+def test_selection_manifest_direction_must_match_long_only_runner():
+    with tempfile.TemporaryDirectory() as tmp:
+        env = _selection_env(tmp)
+        path = Path(env["H1_SELECTION_MANIFEST"])
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["strategy_config"]["direction"] = "both"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        try:
+            load_frozen_selection_manifest(env)
+        except SystemExit as exc:
+            assert "long_only" in str(exc)
+        else:
+            raise AssertionError("direction-mismatched selection manifest must fail")
 
 
 def test_selection_manifest_must_be_valid_and_successful():
@@ -661,6 +677,7 @@ if __name__ == "__main__":
         test_explore_mode_uses_only_frozen_train_selected_top_five,
         test_confirm_mode_requires_one_frozen_predeclared_config_and_selection_manifest,
         test_selection_manifest_and_allowlist_must_match_exactly,
+        test_selection_manifest_direction_must_match_long_only_runner,
         test_selection_manifest_must_be_valid_and_successful,
         test_selection_provenance_rejects_changed_data_and_code,
         test_selection_provenance_rejects_changed_universe_snapshot,

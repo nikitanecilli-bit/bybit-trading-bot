@@ -31,7 +31,7 @@ on:
       - 'tests/test_snapshot_bybit_risk_limits.py'
       - 'scripts/bybit_private_api_check.py'
       - '.github/workflows/bybit-private-api-check.yml'
-      - 'scripts/run_h1_shared_capital_portfolio_validation.py'
+      - 'scripts/run_h1_shared_capital_portfolio_validation.py tests/test_h1_ema_trend_gate.py'
       - 'scripts/select_h1_top5_train_only.py'
       - 'scripts/run_h_a_relative_strength_replay.py'
       - 'scripts/run_h_c_reverse_time_robustness.py'
@@ -146,6 +146,8 @@ jobs:
         run: python tests/test_h1_runner_execution_gate.py
       - name: Test H1 validation manifest provenance
         run: python tests/test_h1_validation_manifest.py
+      - name: Test causal EMA50/200 H1 trend gate integration
+        run: python tests/test_h1_ema_trend_gate.py
       - name: Test portfolio accounting and risk budget
         run: python tests/test_portfolio_accounting.py
       - name: Test fail-closed state persistence

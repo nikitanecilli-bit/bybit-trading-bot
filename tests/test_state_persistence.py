@@ -126,6 +126,37 @@ class StatePersistenceTests(unittest.TestCase):
                 )
 
 
+    def test_save_rejects_future_position_entry_timestamp(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "future-entry-save.json"
+            cfg = engine.BotConfig()
+            risk = engine.AdaptiveRiskManager(cfg)
+            position = sample_position()
+            position.entry_ts = 1_800_000_000_000
+            with self.assertRaisesRegex(ValueError, "entry_ts"):
+                engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                    cfg, risk, {"BTCUSDT": position}, {}, 42,
+                    last_mark_prices={"BTCUSDT": position.entry_price},
+                )
+            self.assertFalse(path.exists())
+
+    def test_save_rejects_future_tp1_timestamp(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "future-tp1-save.json"
+            cfg = engine.BotConfig()
+            risk = engine.AdaptiveRiskManager(cfg)
+            position = sample_position()
+            position.tp1_hit = True
+            position.remaining_fraction = 0.5
+            position.realized_tp1_gross_usdt = 10.0
+            position.tp1_ts_ms = 1_800_000_000_000
+            with self.assertRaisesRegex(ValueError, "tp1_ts_ms"):
+                engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                    cfg, risk, {"BTCUSDT": position}, {}, 42,
+                    last_mark_prices={"BTCUSDT": position.entry_price},
+                )
+            self.assertFalse(path.exists())
+
     def test_restored_engine_uses_persisted_mark_before_first_new_candle(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "marked-state.json"

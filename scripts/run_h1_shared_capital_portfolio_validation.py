@@ -74,13 +74,32 @@ def resolve_ema50_200_gate(environ=None):
 
 
 
-def h1_variant_name(min_vol, min_breakout_atr, cost_multiplier, ema_gate_enabled=False):
-    """Unambiguous output label for baseline versus EMA-gated H1 ablations."""
+def h1_variant_name(min_vol, min_breakout_atr, cost_multiplier, ema_gate_enabled=False,
+                    donchian_period=20):
+    """Unambiguous output label for frozen H1 strategy ablations."""
     suffix = "_ema50_200_up" if ema_gate_enabled else ""
+    channel = "" if int(donchian_period) == 20 else f"_donchian{int(donchian_period)}"
     return (
         f"vol{min_vol:g}_breakATR{min_breakout_atr:g}_cost{cost_multiplier:g}"
-        f"{suffix}"
+        f"{channel}{suffix}"
     )
+
+
+def resolve_donchian_variant_modes(environ=None):
+    """Opt in to the preregistered three-arm Donchian20/48/EMA experiment."""
+    env = os.environ if environ is None else environ
+    raw = str(env.get("H1_DONCHIAN48_EMA_ABLATION", "0")).strip().lower()
+    if raw in {"", "0", "false", "off", "no"}:
+        ema = resolve_ema50_200_gate(env)
+        return tuple((20, enabled) for enabled in h1_variant_modes(ema))
+    if raw not in {"1", "true", "on", "yes"}:
+        raise SystemExit("H1_DONCHIAN48_EMA_ABLATION must be one of 0/1, false/true, off/on")
+    if resolve_ema50_200_gate(env):
+        raise SystemExit(
+            "H1_DONCHIAN48_EMA_ABLATION cannot be combined with H1_EMA50_200_GATE; "
+            "the preregistered three-arm design controls its own EMA modes"
+        )
+    return ((20, False), (48, False), (48, True))
 
 
 def h1_variant_modes(ema_comparison_enabled):
@@ -679,7 +698,7 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
                           min_vol, min_breakout_atr, cost_multiplier,
                           instrument_specs_dir, risk_tiers_dir,
                           funding_dir, mark_price_dir, kline_dir,
-                          ema_trend_labels_by_symbol=None):
+                          ema_trend_labels_by_symbol=None, donchian_period=20):
     n = len(timestamps)
     start_idx, end_idx = int(n * start_frac), int(n * end_frac)
     start_ts, end_ts = timestamps[start_idx], timestamps[end_idx - 1]
@@ -704,7 +723,7 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
     )
     cfg = engine.cfg
     cfg.bot_version = (
-        f"h1-portfolio-v{min_vol:g}-b{min_breakout_atr:g}-cost{cost_multiplier:g}"
+        f"h1-portfolio-d{int(donchian_period)}-v{min_vol:g}-b{min_breakout_atr:g}-cost{cost_multiplier:g}"
         f"{'-ema50_200' if ema_trend_labels_by_symbol is not None else ''}"
     )
     cfg.timeframe = "1h"
@@ -720,7 +739,7 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
     cfg.enable_post_break_invalidation = ENABLE_POST_BREAK_INVALIDATION
     cfg.daily_stop_loss_pct = 5.0
     cfg.emergency_kill_switch_pct = 30.0
-    cfg.donchian_period = 20
+    cfg.donchian_period = int(donchian_period)
     cfg.atr_period = 14
     cfg.min_volume_ratio = min_vol
     cfg.stop_atr_mult = 2.5
@@ -855,7 +874,9 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         "variant": h1_variant_name(
             min_vol, min_breakout_atr, cost_multiplier,
             ema_gate_enabled=ema_trend_labels_by_symbol is not None,
+            donchian_period=donchian_period,
         ),
+        "donchian_period": int(donchian_period),
         "ema50_200_gate": ema_trend_labels_by_symbol is not None,
         "cost_multiplier": cost_multiplier,
         "min_volume_ratio": min_vol,
@@ -1130,7 +1151,9 @@ def build_validation_manifest(
             "max_chase_limit_pct": MAX_CHASE_LIMIT_PCT,
             "accelerated_atr_trail_after_1_5r": ACCELERATED_ATR_TRAIL_AFTER_1_5R,
             "enable_post_break_invalidation": ENABLE_POST_BREAK_INVALIDATION,
-            "donchian_period": 20,
+            "donchian_period_modes": design.get(
+                "donchian_variant_modes", [{"donchian_period": 20, "ema50_200_gate": False}]
+            ),
             "atr_period": 14,
             "stop_atr_mult": 2.5,
             "tp1_r_multiple": 2.0,
@@ -1182,8 +1205,16 @@ def main():
     print(f"Aligned H1 portfolio: {len(symbols)} symbols, {len(timestamps)} common bars")
     print(f"Archive sources: {len(set(archives.values()))}; starting capital={STARTING_CAPITAL:.0f} USDT")
     design = resolve_validation_design()
-    ema_gate_enabled = resolve_ema50_200_gate()
+    strategy_modes = resolve_donchian_variant_modes()
+    ema_gate_enabled = any(use_ema for _, use_ema in strategy_modes)
     design["ema50_200_gate_enabled"] = ema_gate_enabled
+    design["donchian48_ema_ablation_enabled"] = (
+        strategy_modes == ((20, False), (48, False), (48, True))
+    )
+    design["donchian_variant_modes"] = [
+        {"donchian_period": period, "ema50_200_gate": use_ema}
+        for period, use_ema in strategy_modes
+    ]
     first_scored_timestamp = selection_validation_boundary(timestamps)
     validate_selection_cutoff(design["selection"], first_scored_timestamp)
     if set(design["selection"]["symbols"]) != set(symbols):
@@ -1222,7 +1253,7 @@ def main():
     print(f"Train-only selection manifest={design['selection']['path']} sha256={design['selection']['sha256']}")
     print(f"Validation mode={design['mode']}; folds={[item[0] for item in design['folds']]}; "
           f"volume={design['volume_thresholds']}; breakoutATR={design['breakout_atr_thresholds']}; "
-          f"cost stress={design['cost_multipliers']}; EMA50/200 gate={ema_gate_enabled}")
+          f"cost stress={design['cost_multipliers']}; strategy modes={design['donchian_variant_modes']}")
     rows = []
     for fold, start_frac, end_frac in design["folds"]:
         fold_start_index = int(len(timestamps) * start_frac)
@@ -1236,7 +1267,7 @@ def main():
         for min_vol in design["volume_thresholds"]:
             for min_breakout in design["breakout_atr_thresholds"]:
                 for cost_multiplier in design["cost_multipliers"]:
-                    for use_ema_gate in h1_variant_modes(ema_gate_enabled):
+                    for donchian_period, use_ema_gate in strategy_modes:
                         result = run_portfolio_variant(
                             datasets, symbols, timestamps, fold, start_frac, end_frac,
                             min_vol, min_breakout, cost_multiplier,
@@ -1245,6 +1276,7 @@ def main():
                             ema_trend_labels_by_symbol=(
                                 fold_ema_labels if use_ema_gate else None
                             ),
+                            donchian_period=donchian_period,
                         )
                         rows.append(result)
                         print(f"fold={fold} {result['variant']} trades={result['trades']} "

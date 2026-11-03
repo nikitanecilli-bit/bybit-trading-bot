@@ -215,6 +215,7 @@ def validate_funding_manifest(
                                     ]
                                     source_interval = int(matches[0]["fundingInterval"]) if len(matches) == 1 else 0
                                     if (source_payload.get("schema_version") != 1
+                                            or source_payload.get("source") != "Bybit V5 GET /v5/market/instruments-info"
                                             or source_payload.get("category") != payload.get("category")
                                             or source_fetched_at.tzinfo is None
                                             or source_fetched_ms != fetched_at_ms

@@ -511,7 +511,10 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
     print(f"Saved {path}; {len(rows)} portfolio-fold-cost runs. Cost multipliers={COST_MULTIPLIERS}.")
-    print("CAVEAT: Binance OHLCV proxy; modelled costs; limit penetration is not a real queue/fill model.")
+    print("CAVEAT: Bybit-native H1 trade OHLCV; OHLC limit penetration is not a real queue/fill model.")
+    print("CAVEAT: Funding uses timestamp-aligned Mark-candle open as a settlement-price proxy; fees/slippage are fixed model assumptions.")
+    print("CAVEAT: No historical bid/ask, L2 queue priority, partial-fill adverse selection, or account-specific fee tier is modelled.")
+    print("CAVEAT: Isolated liquidation is a position-level model; confirm the actual Bybit account mode (UTA vs Classic) before interpreting liquidation results.")
 
 
 if __name__ == "__main__":

@@ -638,3 +638,16 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 
 
 **Фактический CI результат после исправления импорта:** GitHub Actions run `41639323448`, commit `5aa2497d37f84ea0e1a43568d27d3eea3a4f282e`, завершился `success`. `tests/test_mark_price_liquidation.py`: 14/14 unittest passed; весь Research engine checks workflow завершился успешно. Первый запуск `41639134909` падал только на `ModuleNotFoundError: bybit_risk_tiers` из-за отсутствия repository root в `sys.path`; добавлен явный root path, после чего повторный полный workflow зелёный.
+
+
+### 2026-11-03 — изоляция cost-stress между H1 portfolio replay
+
+**Подтверждённый дефект состояния исследовательского runner:** `run_portfolio_variant()` менял module-level `TAKER_FEE`, `MAKER_FEE` и `TAKER_SLIP` на значения stress multiplier и оставлял их изменёнными после возврата. При повторном запуске другого исследования в том же Python-процессе движок мог унаследовать последний множитель и незаметно применить чужую модель издержек.
+
+**Исправление:** добавлен контекстный менеджер `engine_cost_stress()`. Он проверяет конечный положительный множитель, сохраняет фактические исходные globals, применяет stress только на время `run_simulation_pass()` и восстанавливает исходные значения в `finally`, включая путь с исключением. Расчёт конкретного завершённого replay не меняется.
+
+**Регрессии:** `test_cost_stress_restores_engine_globals_after_success_and_exception` проверяет множитель 2.0, восстановление после штатного выхода, восстановление после выброшенного исключения и отказ на нулевом/отрицательном/NaN/Inf множителях.
+
+**Проверка:** Research CI [#41678553516 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41678553516), включая H1 runner execution-gate test и новую регрессию. Run выполнен на commit `a63d75965e710b12e6beaab22ac522c27644d7a3`; текущий head `cb31282a6e5e563048d71d1b7eee62e3f352a45d` отличается только пустым commit (compare: 0 changed files). Промежуточные CI попытки на неполных промежуточных commits падали в тестовом контуре; финальный workflow прошёл полностью.
+
+**Границы:** это исправление изоляции исследовательского процесса. Ни рыночный PnL, ни качество сигналов, ни реалистичность maker fills этим не подтверждаются. Новый market replay не запускался.

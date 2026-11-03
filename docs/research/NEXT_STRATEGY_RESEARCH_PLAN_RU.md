@@ -250,3 +250,10 @@ The schedule gate was strengthened after implementation: H1 now requires a separ
 
 
 Incremental Funding archive updates also verify the existing CSV hash and row count against the previous sidecar before downloading/appending. Any drift fails closed; a later download cannot silently bless a modified historical archive.
+
+
+### Active Bybit archive collector provenance — 2026-11-03
+
+The production research workflow uses `scripts/archive_bybit_market_history.py`, not the legacy `bybit_downloader.py`. The active collector now records Funding pagination pages (including saturated/incomplete 200-row pages and recursively complete child windows), writes per-symbol `SYMBOL.csv.audit.json` sidecars, and includes its own SHA-256 in the archive-level manifest. H1 replay code provenance includes this active collector. CI [#41712680254](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41712680254) passed 50/50 steps, including the active archive collector integration test.
+
+No actual Bybit archives or dated historical funding schedule evidence are present in the repository. Do not run H1 market PnL until both are available and the schedule-evidence gate passes.

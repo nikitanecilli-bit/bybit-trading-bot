@@ -50,3 +50,8 @@ Do not run this experiment until the Funding archive completeness gate, Mark cov
 - No Bybit API or live orders used.
 - No new market PnL replay run.
 - The issue is documented as a research-scope blocker for interpreting the current H1 Top-5 workflow.
+
+
+## Provenance clarification
+
+The long-only scope is explicitly recorded in both artifacts: the selector writes strategy_config.direction = long_only, and the portfolio runner writes strategy_and_execution.direction = long_only. This is not a missing-manifest-field defect. The blocker is that the selected strategy scope is narrower than a generic/two-sided H1 claim and conflicts with the research plan's instruction not to make permanent directional restrictions from proxy evidence.

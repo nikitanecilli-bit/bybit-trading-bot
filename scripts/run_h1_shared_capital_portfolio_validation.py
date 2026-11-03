@@ -217,8 +217,12 @@ def load_bybit_h1_datasets(directory):
                     )
                 except (TypeError, ValueError, KeyError, OverflowError) as exc:
                     raise SystemExit(f"{path}:{line_no}: invalid Bybit H1 candle: {exc}") from exc
+                if ts <= 0 or ts % 3_600_000 != 0:
+                    raise SystemExit(
+                        f"{path}:{line_no}: Bybit H1 timestamp is not aligned to a UTC hour"
+                    )
                 values = (op, hi, low, close, volume, turnover)
-                if (ts <= 0 or not all(math.isfinite(value) for value in values)
+                if (not all(math.isfinite(value) for value in values)
                         or min(op, hi, low, close) <= 0 or volume < 0 or turnover < 0
                         or hi < max(op, low, close) or low > min(op, hi, close)):
                     raise SystemExit(f"{path}:{line_no}: invalid Bybit H1 OHLCV values")

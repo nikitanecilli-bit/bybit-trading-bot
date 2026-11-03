@@ -9,12 +9,13 @@ from bybit_risk_tiers import RiskTierHistory
 
 
 def payload(fetched_at="2026-11-01T00:00:00Z", tiers=None):
+    rows = tiers or [
+        {"symbol":"BTCUSDT","id":1,"riskLimitValue":"100000","maintenanceMargin":"0.005","initialMargin":"0.01","maxLeverage":"100","mmDeduction":"0","isLowestRisk":1},
+        {"symbol":"BTCUSDT","id":2,"riskLimitValue":"500000","maintenanceMargin":"0.01","initialMargin":"0.02","maxLeverage":"50","mmDeduction":"500","isLowestRisk":0},
+    ]
     return {
         "schema_version": 1, "category": "linear", "fetched_at": fetched_at,
-        "tiers": tiers or [
-            {"symbol":"BTCUSDT","id":1,"riskLimitValue":"100000","maintenanceMargin":"0.005","initialMargin":"0.01","maxLeverage":"100","mmDeduction":"0","isLowestRisk":1},
-            {"symbol":"BTCUSDT","id":2,"riskLimitValue":"500000","maintenanceMargin":"0.01","initialMargin":"0.02","maxLeverage":"50","mmDeduction":"500","isLowestRisk":0},
-        ],
+        "tier_count": len(rows), "tiers": rows,
     }
 
 
@@ -72,8 +73,8 @@ class RiskTierHistoryTests(unittest.TestCase):
 
     def test_rejects_invalid_tier_structure(self):
         bad = payload(tiers=[
-            {"symbol":"BTCUSDT","id":1,"riskLimitValue":"100000","maintenanceMargin":"0.01","initialMargin":"0.01","maxLeverage":"100","mmDeduction":"0"},
-            {"symbol":"BTCUSDT","id":2,"riskLimitValue":"500000","maintenanceMargin":"0.005","initialMargin":"0.02","maxLeverage":"50","mmDeduction":"500"},
+            {"symbol":"BTCUSDT","id":1,"riskLimitValue":"100000","maintenanceMargin":"0.01","initialMargin":"0.01","maxLeverage":"100","mmDeduction":"0","isLowestRisk":1},
+            {"symbol":"BTCUSDT","id":2,"riskLimitValue":"500000","maintenanceMargin":"0.005","initialMargin":"0.02","maxLeverage":"50","mmDeduction":"500","isLowestRisk":0},
         ])
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "risk.json").write_text(json.dumps(bad), encoding="utf-8")

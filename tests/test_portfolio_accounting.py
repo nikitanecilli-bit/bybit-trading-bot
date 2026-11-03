@@ -261,6 +261,38 @@ def test_stop_risk_uses_exit_notional_at_stop_price():
     assert short_risk <= 100.0
 
 
+def test_open_maker_take_profit_mtm_remains_conservative_vs_final_maker_close():
+    e = make_engine()
+    pos = make_position(size=1_000.0, order_type="limit", maker_exits=True)
+    e.open_positions["BTCUSDT"] = pos
+    e._last_mark_prices["BTCUSDT"] = 110.0
+    exit_ts = 1_800_003_600_000
+
+    # Open-position MTM deliberately stress-prices the remaining exit as taker.
+    mtm = e._unrealized_pnl_at_marks(exit_ts)
+    expected_mtm = (
+        100.0
+        - 1_000.0 * engine_mod.MAKER_FEE
+        - 1_100.0 * (engine_mod.TAKER_FEE + engine_mod.TAKER_SLIP)
+    )
+    assert abs(mtm - expected_mtm) < 1e-9
+
+    # A modeled TP close may use maker fee and no taker slippage.
+    e._close_position(
+        pos, exit_price=110.0, exit_reason="take_profit",
+        exit_ts=exit_ts, mae_r=0.0, mfe_r=2.0,
+    )
+    trade = e.closed_trades[-1]
+    expected_closed_net = (
+        100.0 - 1_000.0 * engine_mod.MAKER_FEE - 1_100.0 * engine_mod.MAKER_FEE
+    )
+    assert trade.pnl_usdt == round(expected_closed_net, 2)
+    expected_conservative_gap = 1_100.0 * (
+        engine_mod.TAKER_FEE + engine_mod.TAKER_SLIP - engine_mod.MAKER_FEE
+    )
+    assert abs((trade.pnl_usdt - mtm) - expected_conservative_gap) < 0.01
+
+
 def test_close_trade_reconciles_net_pnl_fees_slippage_and_realized_equity():
     e = make_engine()
     pos = make_position(size=1_000.0, order_type="market", maker_exits=False)

@@ -180,6 +180,7 @@ def evaluate_relative_strength_breakout(
         "tp2_price": tp2,
         "stop_dist": stop_dist,
         "atr": atr,
+        "breakout_level": upper if direction == "long" else lower,
         "vol_ratio": 1.0,
         "priority_score": abs(score),
         "relative_strength_score": score,

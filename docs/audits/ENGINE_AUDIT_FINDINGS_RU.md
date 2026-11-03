@@ -367,3 +367,21 @@ CI [41628558820](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 **Дополнительный дефект тестового harness (confirmed and fixed):** блок `if __name__ == "__main__"` стоял до четырёх последних exchange-sizing тестов. Поскольку CI вызывает файл напрямую через `python tests/test_portfolio_accounting.py`, эти четыре теста объявлялись уже после выполнения test runner и пропускались. Блок перемещён в конец файла; теперь все 36 тестов исполняются.
 
 Это закрывает full-replay symbol-order audit gate на проверенном synthetic fixture. Это не доказывает прибыльность и не является рыночным PnL тестом. Рыночный replay не запускался.
+
+### 2026-11-03 — H1 cross-sectional universe availability audit
+
+**Confirmed engine constraint:** current `run_simulation_pass()` calls `check_alignment()`, which requires every symbol array to contain exactly the same timestamps and length. It cannot directly replay late-starting/shorter histories as a dynamic universe.
+
+**Confirmed research-runner limitation:** E11/E13 `synchronized_data()` first filters symbols by minimum bar count in every future fold, then intersects all selected timestamp sets to create one fixed synchronized panel. The `covers` decision uses bars from all folds, including periods later than the signal timestamp. This is a complete-case research cohort, not a causal point-in-time universe. It excludes symbols that list later and can induce survivorship/availability selection.
+
+The archive audit found 50 nonempty H1 series, with differing first timestamps (e.g. GRAM/AERO begin in July 2026 and HYPE in September 2026); the files are gap-free internally but do not form one common universe from the beginning of the full year.
+
+**Decision for H-A:** do not reuse E11/E13's fixed-cohort construction as if it represented all available instruments. Before H-A PnL, implement and test a sparse/dynamic shared-capital replay that:
+- iterates the union of timestamps while only processing symbols with an actual candle at that timestamp;
+- enforces per-symbol warm-up (at least the 72h feature lookback) before admitting a symbol to cross-sectional ranks;
+- fails closed if an open position or pending order lacks its required next candle;
+- calculates relative strength against only the symbols genuinely available at that timestamp;
+- keeps signal discovery and batch entry sizing order-invariant;
+- uses a common valid end boundary (or explicit per-position terminal close chronology).
+
+Until that is implemented and tested, H-A may be specified but not run as an all-universe portfolio PnL experiment.

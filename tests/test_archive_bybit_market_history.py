@@ -6,6 +6,7 @@ import os
 import tempfile
 import sys
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -85,12 +86,33 @@ class BybitMarketHistoryTests(unittest.TestCase):
                 "symbol": "BTCUSDT", "timestamp_ms": hour,
                 "open": "100", "high": "102", "low": "99", "close": "101",
             }
+            snapshot_dir = Path(tmp) / "source_snapshots"
+            snapshot_dir.mkdir()
+            snapshot_paths = []
+            for stamp in (hour - 1, hour * 2):
+                snapshot_path = snapshot_dir / f"{stamp}.json"
+                fetched_at = datetime.fromtimestamp(
+                    stamp / 1000, tz=timezone.utc
+                ).isoformat().replace("+00:00", "Z")
+                snapshot_path.write_text(json.dumps({
+                    "schema_version": 1,
+                    "source": "Bybit V5 GET /v5/market/instruments-info",
+                    "category": "linear",
+                    "fetched_at": fetched_at,
+                    "count": 1,
+                    "instruments": [{"symbol": "BTCUSDT", "fundingInterval": "60"}],
+                }), encoding="utf-8")
+                snapshot_paths.append(snapshot_path)
+
             with (
                 patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=fake_funding),
                 patch("scripts.archive_bybit_market_history.fetch_trade_klines", return_value=[candle]),
                 patch("scripts.archive_bybit_market_history.fetch_mark_klines", return_value=[mark]),
             ):
-                result = archive_symbol("BTCUSDT", hour, hour * 2, tmp, "60", pause=0)
+                result = archive_symbol(
+                    "BTCUSDT", hour, hour * 2, tmp, "60", pause=0,
+                    instrument_snapshot_paths=snapshot_paths,
+                )
 
             funding_path = Path(result["funding_file"])
             manifest_path = Path(result["funding_manifest_file"])
@@ -99,12 +121,19 @@ class BybitMarketHistoryTests(unittest.TestCase):
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(manifest["csv_sha256"], result["funding_file_sha256"])
             self.assertEqual(manifest["runs"][0]["pages"][0]["complete"], True)
-            self.assertIsNone(manifest["settlement_schedule_evidence"])
+            self.assertIsNotNone(manifest["settlement_schedule_evidence"])
+            schedule_path = Path(result["funding_schedule_file"])
+            schedule = json.loads(schedule_path.read_text(encoding="utf-8"))
+            self.assertEqual(schedule["expected_settlement_timestamps_ms"], [hour])
+            self.assertEqual(result["funding_schedule_events"], 1)
             with (
                 patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=AssertionError("network must not be called")),
             ):
                 with self.assertRaises(FileExistsError):
-                    archive_symbol("BTCUSDT", hour, hour * 2, tmp, "60", pause=0)
+                    archive_symbol(
+                        "BTCUSDT", hour, hour * 2, tmp, "60", pause=0,
+                        instrument_snapshot_paths=snapshot_paths,
+                    )
 
     def test_funding_still_fails_if_minimum_window_is_saturated(self):
         def fetch(a, b):

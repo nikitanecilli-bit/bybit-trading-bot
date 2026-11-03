@@ -142,6 +142,25 @@ class MarkPriceEngineIntegrationTests(unittest.TestCase):
         assert engine.closed_call[1] == 100_980.0
         assert engine.closed_call[2] == "liquidation"
 
+    def test_liquidation_close_does_not_charge_ordinary_exit_fee_or_slippage(self):
+        engine = make_engine()
+        pos = make_position()
+        engine.cfg.bot_version = "test"
+        engine.open_positions = {"BTCUSDT": pos}
+        engine.closed_trades = []
+        engine.risk_mgr.unrealized_pnl = 0.0
+        engine.risk_mgr.register_closed_trade_pnl = lambda *_args: {}
+        engine._unrealized_pnl_at_marks = lambda *_args: 0.0
+        engine._persist = lambda: None
+        engine._close_position(
+            pos, exit_price=100_980.0, exit_reason="liquidation",
+            exit_ts=pos.entry_ts + 3_600_000, mae_r=1.98, mfe_r=0.0,
+        )
+        trade = engine.closed_trades[-1]
+        assert trade.exchange_fees_usdt == 54.45
+        assert trade.slippage_cost_usdt == 22.28
+        assert trade.exit_reason == "liquidation"
+
     def test_mark_price_mtm_is_separate_from_last_price_stop_mark(self):
         engine = make_engine()
         pos = make_position(direction="long", entry=100.0, stop=90.0, size=1_000.0)

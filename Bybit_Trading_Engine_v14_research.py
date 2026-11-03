@@ -1040,6 +1040,15 @@ class PlanBStatePersistence:
                     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                         raise ValueError(f"позиция {sym}: bars_held должен быть неотрицательным целым числом")
                 pos = OpenPositionState(**pos_dict)
+                if (
+                    getattr(risk_mgr.cfg, "enable_post_break_invalidation", False)
+                    and pos.strategy in {"H1-momentum-breakout", "H-A-relative-strength-breakout"}
+                    and pos.bars_held <= POST_BREAK_INVALIDATION_BARS
+                    and pos.breakout_level is None
+                ):
+                    raise ValueError(
+                        f"позиция {sym}: H-C включён, но отсутствует signal-time breakout_level"
+                    )
                 if pos.symbol != sym:
                     raise ValueError(f"ключ позиции {sym!r} не совпадает с pos.symbol {pos.symbol!r}")
                 restored[sym] = pos
@@ -1094,6 +1103,14 @@ class PlanBStatePersistence:
                     raise ValueError(f"pending signal {sym}: order_type должен быть market/limit")
                 if not isinstance(signal["strategy"], str) or not signal["strategy"]:
                     raise ValueError(f"pending signal {sym}: strategy должен быть непустой строкой")
+                if (
+                    getattr(risk_mgr.cfg, "enable_post_break_invalidation", False)
+                    and signal["strategy"] in {"H1-momentum-breakout", "H-A-relative-strength-breakout"}
+                    and signal.get("breakout_level") is None
+                ):
+                    raise ValueError(
+                        f"pending signal {sym}: H-C включён, но отсутствует signal-time breakout_level"
+                    )
                 for field_name in ("entry_price", "stop_dist"):
                     value = signal[field_name]
                     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:

@@ -183,7 +183,7 @@ H-A теперь preregistered до любых рыночных PnL прогон
 
 ## 10. Post-break continuation is the next research target — 2026-11-03
 
-The artifact-only attribution is complete: workflow [41671977224](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41671977224), artifact ID 13248093501. It reconstructs the prior signal bar and only completed post-entry bars before the modeled exit. Archive SHA provenance matches the original H-A replay.
+The final schema-validated artifact-only attribution is complete: workflow [41672420459](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41672420459), artifact ID 13249307987. It reconstructs the prior signal bar and only completed post-entry bars before the modeled exit. Archive SHA provenance matches the original H-A replay.
 
 ### What did not work
 
@@ -209,3 +209,15 @@ The next candidate should be a post-entry continuation / early invalidation hypo
 - Require a truly unseen time period or new point-in-time archive before judging it as a candidate. Existing three folds are development data only.
 
 The descriptive results justify writing a preregistration; they do not justify running a threshold sweep or claiming an edge.
+
+## 11. H-C preregistration created — 2026-11-03
+
+Created H_C_POST_BREAK_INVALIDATION_PREREGISTRATION_RU.md. This is a frozen design only:
+- It defines a close-based invalidation when an H1 candle closes back inside the prior 20-bar Donchian boundary during the first three completed bars after entry.
+- It preserves existing intrabar stop/TP/liquidation priority, TP1 partial realization and remaining quantity, and uses market close costs.
+- It requires exact signal-time breakout-level persistence and deterministic long/short, TP1, event-order and no-lookahead tests before implementation.
+- It is NOT implemented, NOT run and NOT approved for live.
+
+No new market PnL run is authorized by this preregistration. The current CryptoFetch/Binance-style archives are not Bybit-native and lack historical point-in-time Bybit universe, dated instrument specs/risk tiers and verified full funding/mark coverage. The user had previously deferred Bybit API connection until strategy research is ready; do not bypass that constraint.
+
+Next safe work: finish static review of position lifecycle and trade-journal provenance needed for TP1-aware close accounting, then wait for valid unseen data. Do not run H-C on the already-used folds or tune the 3-bar window.

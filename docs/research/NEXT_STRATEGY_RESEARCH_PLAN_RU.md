@@ -420,7 +420,7 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 - Единственный primary candidate: H1 Donchian(48) + causal EMA50/EMA200-up.
 - Парные контроли: frozen Donchian(20) без EMA и Donchian(48) без EMA. Все варианты должны использовать одинаковые universe, shared capital, риск, исполнение и costs.
 - Donchian(96), micro-pullback, stop min 1.8%, breakeven +0.95R и TP 4.2R не смешивать в этот тест; это отдельные гипотезы/абляции.
-- Текущий runner фиксирует Donchian=20; для будущего теста нужен отдельный явный параметр и manifest provenance, baseline default менять нельзя.
+- В исследовательском runner подготовлен opt-in трёхрукавный режим Donchian20 / Donchian48 / Donchian48+EMA50/200 с явным периодом в результатах и manifest; обычный режим и default движка остаются Donchian20. CI детерминированных тестов успешен. Перед реальным запуском требуется заново сформировать train-only selection manifest, поскольку hash runner изменился.
 - Все CryptoFetch folds уже использованы и не являются OOS. Никакого нового PnL replay до закрытия funding completeness и остальных data/accounting gates.
 - Это дизайн/пререгистрация, не PnL evidence и не доказательство edge.
 
@@ -439,3 +439,13 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 - H8 BTC/broad context пересекается с E12/E13; E13 оставалась net-negative, поэтому прежние folds не использовать повторно.
 - H-A relative strength уже отклонена; не возвращать оптимизацией.
 - Никаких новых market PnL runs на использованных CryptoFetch folds. Текущий Bybit-native/Funding/Mark/accounting gate остаётся закрытым.
+
+
+## 2026-11-04 — инженерная подготовка Donchian48 завершена
+
+- `scripts/run_h1_shared_capital_portfolio_validation.py` получил opt-in `H1_DONCHIAN48_EMA_ABLATION=1`: строго три paired shared-capital варианта — D20 baseline, D48 baseline, D48+EMA50/200-up.
+- CSV включает фактический `donchian_period`; manifest фиксирует варианты и парное сравнение. Сравнение fail-closed при пропуске одной из трёх ног или несовпадении портфельных инвариантов.
+- Workflow dispatch получил отдельный переключатель; обычный Donchian20 и отдельная legacy EMA20 абляция сохранены.
+- CI: [41734540443](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41734540443), SUCCESS. Проверены компиляция и детерминированные тесты; market PnL не запускался.
+- Изменение runner hash инвалидирует старый train-only selection provenance; новый selector manifest потребуется только после прохождения разрешённого data gate.
+- Bybit/Funding/Mark/accounting gate остаётся закрытым. Никаких новых архивов, PnL runs, API подключений, paper или live orders.

@@ -373,6 +373,40 @@ class StatePersistenceTests(unittest.TestCase):
     def test_negative_position_size_is_rejected(self):
         self._assert_invalid_position_payload(lambda position: position.update({"size_usdt": -100.0}))
 
+    def test_exchange_sized_contract_quantities_round_trip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "exchange-sized-state.json"
+            position = sample_position()
+            position.exchange_sized = True
+            position.contract_qty = "1.0"
+            position.tp1_contract_qty = "0.5"
+            position.remaining_contract_qty = "0.5"
+            position.qty_step = "0.1"
+            position.min_order_qty = "0.1"
+            position.min_notional_value = "5"
+            position.tp1_hit = True
+            position.remaining_fraction = 0.5
+            position.realized_tp1_gross_usdt = 30.0
+            position.tp1_ts_ms = 1_790_000_003_600
+            writer = engine.PlanBStatePersistence(str(path), enabled=True)
+            writer.save_state(engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
+                              {"BTCUSDT": position}, {}, 42,
+                              last_mark_prices={"BTCUSDT": position.entry_price})
+            restored, _, _ = engine.PlanBStatePersistence(str(path)).load_state(
+                engine.AdaptiveRiskManager(engine.BotConfig())
+            )
+            self.assertEqual(restored["BTCUSDT"], position)
+
+    def test_exchange_sized_state_rejects_fractional_contract_quantity(self):
+        def mutate(position):
+            position.update({
+                "exchange_sized": True, "contract_qty": "1.0",
+                "tp1_contract_qty": None, "remaining_contract_qty": "0.55",
+                "qty_step": "0.1", "min_order_qty": "0.1",
+                "min_notional_value": "5",
+            })
+        self._assert_invalid_position_payload(mutate)
+
     def test_valid_tp1_partial_position_round_trips(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "tp1-state.json"

@@ -37,7 +37,7 @@ import json
 import logging
 import math
 import os
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, ROUND_FLOOR
 import re
 import time
 import urllib.parse
@@ -399,6 +399,13 @@ class OpenPositionState:
     risk_limit_value: Optional[str] = None
     maintenance_margin_rate: Optional[str] = None
     maintenance_margin_deduction: Optional[str] = None
+    contract_qty: Optional[str] = None
+    tp1_contract_qty: Optional[str] = None
+    remaining_contract_qty: Optional[str] = None
+    qty_step: Optional[str] = None
+    min_order_qty: Optional[str] = None
+    min_notional_value: Optional[str] = None
+    exchange_sized: bool = False
 
     def __post_init__(self) -> None:
         if self.max_favorable_px <= 0.0:
@@ -892,6 +899,10 @@ class PlanBStatePersistence:
                 tp1_hit = pos_dict.get("tp1_hit", False)
                 realized_tp1 = pos_dict.get("realized_tp1_gross_usdt", 0.0)
                 expected_remaining = 1.0 - TP1_FRACTION if tp1_hit else 1.0
+                if pos_dict.get("exchange_sized", False):
+                    expected_remaining = float(
+                        parsed_qty["remaining_contract_qty"] / parsed_qty["contract_qty"]
+                    )
                 if not math.isclose(fraction, expected_remaining, rel_tol=0.0, abs_tol=1e-9):
                     raise ValueError(f"позиция {sym}: tp1_hit и remaining_fraction противоречат друг другу")
                 if not tp1_hit and not math.isclose(realized_tp1, 0.0, rel_tol=0.0, abs_tol=1e-9):
@@ -916,6 +927,40 @@ class PlanBStatePersistence:
                             raise ValueError(f"позиция {sym}: {field_name} должен быть Decimal-строкой") from exc
                         if not value.is_finite() or value < 0:
                             raise ValueError(f"позиция {sym}: {field_name} должен быть конечным числом >= 0")
+                if "exchange_sized" in pos_dict and not isinstance(pos_dict["exchange_sized"], bool):
+                    raise ValueError(f"позиция {sym}: exchange_sized должен быть bool")
+                qty_fields = ("contract_qty", "tp1_contract_qty", "remaining_contract_qty",
+                              "qty_step", "min_order_qty", "min_notional_value")
+                parsed_qty = {}
+                for field_name in qty_fields:
+                    raw = pos_dict.get(field_name)
+                    if raw is not None:
+                        if not isinstance(raw, str) or not raw:
+                            raise ValueError(f"позиция {sym}: {field_name} должен быть Decimal-строкой")
+                        try:
+                            value = Decimal(raw)
+                        except InvalidOperation as exc:
+                            raise ValueError(f"позиция {sym}: {field_name} некорректен") from exc
+                        if not value.is_finite() or value <= 0:
+                            raise ValueError(f"позиция {sym}: {field_name} должен быть конечным числом > 0")
+                        parsed_qty[field_name] = value
+                if pos_dict.get("exchange_sized", False):
+                    required_qty = ("contract_qty", "remaining_contract_qty", "qty_step",
+                                    "min_order_qty", "min_notional_value")
+                    missing_qty = [name for name in required_qty if name not in parsed_qty]
+                    if missing_qty:
+                        raise ValueError(f"позиция {sym}: exchange_sized требует quantity/spec поля: {missing_qty}")
+                    initial_qty = parsed_qty["contract_qty"]
+                    remaining_qty = parsed_qty["remaining_contract_qty"]
+                    step = parsed_qty["qty_step"]
+                    if initial_qty % step != 0 or remaining_qty % step != 0:
+                        raise ValueError(f"позиция {sym}: contract quantities не выровнены по qtyStep")
+                    tp1_qty = parsed_qty.get("tp1_contract_qty", Decimal("0"))
+                    if tp1_hit:
+                        if tp1_qty <= 0 or tp1_qty + remaining_qty != initial_qty:
+                            raise ValueError(f"позиция {sym}: TP1/remaining contract quantities не сходятся")
+                    elif tp1_qty != 0 or remaining_qty != initial_qty:
+                        raise ValueError(f"позиция {sym}: до TP1 весь contract_qty должен оставаться открытым")
                 tp1_ts = pos_dict.get("tp1_ts_ms")
                 if tp1_ts is not None:
                     if isinstance(tp1_ts, bool) or not isinstance(tp1_ts, int) or tp1_ts <= 0:
@@ -1374,13 +1419,19 @@ class UnifiedQuantEngine:
         for sym, pos in self.open_positions.items():
             mark = self._intrabar_risk_marks.get(sym, self._last_mark_prices.get(sym, pos.entry_price))
             sign = 1.0 if pos.direction == "long" else -1.0
-            remaining_gross = pos.size_usdt * pos.remaining_fraction * sign * (mark - pos.entry_price) / pos.entry_price
+            position_qty = (Decimal(str(pos.contract_qty)) if pos.exchange_sized
+                            else Decimal(str(pos.size_usdt)) / Decimal(str(pos.entry_price)))
+            remaining_qty = (Decimal(str(pos.remaining_contract_qty)) if pos.exchange_sized
+                             else position_qty * Decimal(str(pos.remaining_fraction)))
+            remaining_gross = float(remaining_qty) * sign * (mark - pos.entry_price)
             gross = pos.realized_tp1_gross_usdt + remaining_gross
-            entry_cost = pos.size_usdt * (MAKER_FEE if pos.order_type == "limit" else TAKER_FEE)
-            entry_slip = 0.0 if pos.order_type == "limit" else pos.size_usdt * TAKER_SLIP
-            position_qty = pos.size_usdt / pos.entry_price
-            tp1_notional = position_qty * pos.tp1_price * TP1_FRACTION
-            remaining_exit_notional = position_qty * mark * pos.remaining_fraction
+            entry_notional = float(position_qty * Decimal(str(pos.entry_price)))
+            entry_cost = entry_notional * (MAKER_FEE if pos.order_type == "limit" else TAKER_FEE)
+            entry_slip = 0.0 if pos.order_type == "limit" else entry_notional * TAKER_SLIP
+            tp1_qty = (Decimal(str(pos.tp1_contract_qty)) if pos.exchange_sized and pos.tp1_contract_qty
+                       else position_qty * Decimal(str(TP1_FRACTION)))
+            tp1_notional = float(tp1_qty * Decimal(str(pos.tp1_price)))
+            remaining_exit_notional = float(remaining_qty * Decimal(str(mark)))
             tp1_cost = (tp1_notional * (MAKER_FEE if pos.maker_exits else TAKER_FEE)) if pos.tp1_hit else 0.0
             tp1_slip = (tp1_notional * TAKER_SLIP
                         if pos.tp1_hit and not pos.maker_exits else 0.0)
@@ -1641,6 +1692,8 @@ class UnifiedQuantEngine:
             size_usdt = float(exchange_order.notional_usdt)
             risk_usdt = float(exchange_order.risk_usdt)
 
+        exchange_order = None
+        instrument_spec = None
         risk_tier = None
         risk_tier_history = getattr(self, "risk_tier_history", None)
         if risk_tier_history is not None:
@@ -1673,17 +1726,42 @@ class UnifiedQuantEngine:
             risk_limit_value=str(risk_tier.risk_limit_value) if risk_tier else None,
             maintenance_margin_rate=str(risk_tier.maintenance_margin_rate) if risk_tier else None,
             maintenance_margin_deduction=str(risk_tier.mm_deduction) if risk_tier else None,
+            contract_qty=str(exchange_order.qty) if exchange_order else None,
+            remaining_contract_qty=str(exchange_order.qty) if exchange_order else None,
+            qty_step=str(instrument_spec.qty_step) if instrument_spec else None,
+            min_order_qty=str(instrument_spec.min_order_qty) if instrument_spec else None,
+            min_notional_value=str(instrument_spec.min_notional_value) if instrument_spec else None,
+            exchange_sized=exchange_order is not None,
         )
         self._persist()
         return True
 
     @staticmethod
-    def _apply_tp1(pos: OpenPositionState, tp1_ts_ms: Optional[int] = None) -> None:
+    def _apply_tp1(pos: OpenPositionState, tp1_ts_ms: Optional[int] = None) -> bool:
         tp1_move = abs(pos.tp1_price - pos.entry_price) / pos.entry_price
-        pos.realized_tp1_gross_usdt = round(pos.size_usdt * TP1_FRACTION * tp1_move, 4)
-        pos.remaining_fraction = 1.0 - TP1_FRACTION
+        if pos.exchange_sized:
+            initial_qty = Decimal(str(pos.contract_qty))
+            step = Decimal(str(pos.qty_step))
+            tp1_qty = (initial_qty * Decimal(str(TP1_FRACTION)) / step).to_integral_value(
+                rounding=ROUND_FLOOR
+            ) * step
+            remaining_qty = initial_qty - tp1_qty
+            min_qty = Decimal(str(pos.min_order_qty))
+            min_notional = Decimal(str(pos.min_notional_value))
+            if (tp1_qty < min_qty or remaining_qty < min_qty
+                    or tp1_qty * Decimal(str(pos.tp1_price)) < min_notional
+                    or remaining_qty * Decimal(str(min(pos.stop_price, pos.entry_price))) < min_notional):
+                return False
+            pos.tp1_contract_qty = str(tp1_qty)
+            pos.remaining_contract_qty = str(remaining_qty)
+            pos.realized_tp1_gross_usdt = round(float(tp1_qty) * abs(pos.tp1_price - pos.entry_price), 4)
+            pos.remaining_fraction = float(remaining_qty / initial_qty)
+        else:
+            pos.realized_tp1_gross_usdt = round(pos.size_usdt * TP1_FRACTION * tp1_move, 4)
+            pos.remaining_fraction = 1.0 - TP1_FRACTION
         pos.tp1_hit = True
         pos.tp1_ts_ms = tp1_ts_ms
+        return True
 
     def _manage_position(self, symbol: str, hist: List[Candle], fill_bar: bool, exit_ts: int) -> None:
         pos = self.open_positions[symbol]
@@ -1798,8 +1876,24 @@ class UnifiedQuantEngine:
     def _close_position(self, pos: OpenPositionState, exit_price: float, exit_reason: str,
                         exit_ts: int, mae_r: float, mfe_r: float) -> None:
         sign = 1.0 if pos.direction == "long" else -1.0
-        rem_chg = sign * (exit_price - pos.entry_price) / pos.entry_price
-        rem_gross = pos.size_usdt * pos.remaining_fraction * rem_chg
+        if pos.exchange_sized:
+            remaining_qty = Decimal(str(pos.remaining_contract_qty))
+            step = Decimal(str(pos.qty_step))
+            min_qty = Decimal(str(pos.min_order_qty))
+            min_notional = Decimal(str(pos.min_notional_value))
+            if remaining_qty <= 0 or remaining_qty % step != 0:
+                raise RuntimeError(f"{pos.symbol}: final reduce quantity is not positive/aligned to qtyStep")
+            if remaining_qty < min_qty or remaining_qty * Decimal(str(exit_price)) < min_notional:
+                raise RuntimeError(
+                    f"{pos.symbol}: final reduce quantity violates archived minOrderQty/minNotionalValue; "
+                    "cannot claim exchange-valid close"
+                )
+            rem_gross = float(remaining_qty) * sign * (exit_price - pos.entry_price)
+        else:
+            remaining_qty = (Decimal(str(pos.size_usdt)) / Decimal(str(pos.entry_price))
+                             * Decimal(str(pos.remaining_fraction)))
+            rem_chg = sign * (exit_price - pos.entry_price) / pos.entry_price
+            rem_gross = pos.size_usdt * pos.remaining_fraction * rem_chg
         gross_pnl = _money_round(pos.realized_tp1_gross_usdt + rem_gross)
         funding_cost = 0.0
         if getattr(self, "funding_dir", None):
@@ -1815,16 +1909,20 @@ class UnifiedQuantEngine:
         # затем округляем итог в денежном формате (half-up), а не каждую ногу отдельно.
         entry_maker = pos.order_type == "limit"
         fees = slip = 0.0
-        position_qty = pos.size_usdt / pos.entry_price
-        f, s = self._leg_cost(pos.size_usdt, entry_maker)                      # вход: qty * entry
+        position_qty = (Decimal(str(pos.contract_qty)) if pos.exchange_sized
+                        else Decimal(str(pos.size_usdt)) / Decimal(str(pos.entry_price)))
+        entry_notional = float(position_qty * Decimal(str(pos.entry_price)))
+        f, s = self._leg_cost(entry_notional, entry_maker)
         fees += f; slip += s
         maker_exits = (pos.order_type == "limit") if pos.maker_exits is None else pos.maker_exits
-        if pos.tp1_hit:                                                        # TP1: qty * TP1 price
-            tp1_notional = position_qty * pos.tp1_price * TP1_FRACTION
+        if pos.tp1_hit:
+            tp1_qty = (Decimal(str(pos.tp1_contract_qty)) if pos.exchange_sized
+                       else position_qty * Decimal(str(TP1_FRACTION)))
+            tp1_notional = float(tp1_qty * Decimal(str(pos.tp1_price)))
             f, s = self._leg_cost(tp1_notional, maker_exits)
             fees += f; slip += s
-        final_maker = maker_exits and exit_reason == "take_profit"             # финальная нога
-        final_notional = position_qty * exit_price * pos.remaining_fraction
+        final_maker = maker_exits and exit_reason == "take_profit"
+        final_notional = float(remaining_qty * Decimal(str(exit_price)))
         f, s = self._leg_cost(final_notional, final_maker)
         fees += f; slip += s
         fees, slip = _money_round(fees), _money_round(slip)

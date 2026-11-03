@@ -70,7 +70,16 @@ def accrued_funding_cost(
             raise ValueError("closed_ts_ms cannot precede position entry")
 
     sign = Decimal("1") if direction == "long" else Decimal("-1")
-    quantity = size_usdt / entry_price
+    exact_initial = getattr(position, "contract_qty", None)
+    exact_remaining = getattr(position, "remaining_contract_qty", None)
+    quantity = _d(exact_initial, "contract_qty") if exact_initial is not None else size_usdt / entry_price
+    remaining_quantity = (
+        _d(exact_remaining, "remaining_contract_qty")
+        if exact_remaining is not None else quantity * remaining_fraction
+    )
+    if quantity <= 0 or remaining_quantity < 0 or remaining_quantity > quantity:
+        raise ValueError("contract quantities must satisfy 0 <= remaining <= initial")
+    remaining_ratio = remaining_quantity / quantity
     total = Decimal("0")
     seen: set[int] = set()
 
@@ -107,7 +116,7 @@ def accrued_funding_cost(
             # the receipt is included at the next mark (ts < as_of_ts).
             fraction = Decimal("0")
         elif tp1_ts is not None and ts > tp1_ts:
-            fraction = remaining_fraction
+            fraction = remaining_ratio
         elif tp1_ts is not None and ts == tp1_ts:
             # TP1 and funding share a candle-close boundary, but position remains
             # open: use full size for payments and remaining size for receipts.

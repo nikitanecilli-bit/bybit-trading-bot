@@ -819,3 +819,60 @@ if __name__ == "__main__":
         print("PASS", name)
     print(f"{len(tests)}/{len(tests)} tests passed")
 
+
+
+
+def _exchange_sized_position(qty="1.0"):
+    pos = make_position(size=100.0)
+    pos.exchange_sized = True
+    pos.contract_qty = qty
+    pos.remaining_contract_qty = qty
+    pos.qty_step = "0.1"
+    pos.min_order_qty = "0.1"
+    pos.min_notional_value = "5"
+    return pos
+
+
+def test_exchange_sized_tp1_uses_step_aligned_qty_and_exact_remaining_contracts():
+    pos = _exchange_sized_position()
+    assert engine_mod.UnifiedQuantEngine._apply_tp1(pos, 1_800_003_600_000)
+    assert pos.tp1_contract_qty == "0.5"
+    assert pos.remaining_contract_qty == "0.5"
+    assert pos.contract_qty == "1.0"
+    assert pos.remaining_fraction == 0.5
+    assert pos.realized_tp1_gross_usdt == 3.0
+    assert pos.tp1_hit
+
+
+def test_exchange_sized_tp1_is_skipped_when_split_violates_exchange_minimums():
+    pos = _exchange_sized_position(qty="0.1")
+    assert not engine_mod.UnifiedQuantEngine._apply_tp1(pos, 1_800_003_600_000)
+    assert not pos.tp1_hit
+    assert pos.tp1_contract_qty is None
+    assert pos.remaining_contract_qty == "0.1"
+    assert pos.remaining_fraction == 1.0
+
+
+def test_exchange_sized_final_close_uses_exact_remaining_contract_qty_for_pnl():
+    e = make_engine()
+    pos = _exchange_sized_position()
+    assert engine_mod.UnifiedQuantEngine._apply_tp1(pos, 1_800_003_600_000)
+    e.open_positions["BTCUSDT"] = pos
+    e._last_mark_prices["BTCUSDT"] = 112.0
+    e._close_position(pos, 112.0, "take_profit", 1_800_007_200_000, 0.0, 2.4)
+    assert e.closed_trades[-1].gross_pnl == 9.0
+    assert "BTCUSDT" not in e.open_positions
+
+
+def test_exchange_sized_close_rejects_unquantized_final_leg():
+    e = make_engine()
+    pos = _exchange_sized_position()
+    pos.remaining_contract_qty = "0.05"
+    e.open_positions["BTCUSDT"] = pos
+    e._last_mark_prices["BTCUSDT"] = 100.0
+    try:
+        e._close_position(pos, 100.0, "stop_loss", 1_800_003_600_000, 0.0, 0.0)
+    except RuntimeError as exc:
+        assert "qtyStep" in str(exc)
+    else:
+        raise AssertionError("strict close must reject non-quantized remaining qty")

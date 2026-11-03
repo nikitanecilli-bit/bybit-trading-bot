@@ -96,7 +96,17 @@ Always report, by fold and symbol:
 
 Promote only if the frozen H-C result is net profitable after all modeled costs, improves net PnL versus baseline on the untouched validation period, and does not obtain its result from one symbol or one fold. If it fails, reject; do not tune the 3-bar window or boundary definition on the same holdout.
 
-## 8. Current blockers
+## 8. Current implementation status
+
+Completed in the research branch as provenance-only groundwork:
+- Baseline and H-A signal evaluators now emit the signal-time Donchian breakout boundary.
+- The boundary is carried through pending orders, OpenPositionState, TradeRecord and the H-A trade/diagnostic ledger.
+- State restoration validates a finite positive boundary while remaining backward-compatible with older backups that do not contain the optional field.
+- Tests cover long/short signal boundaries, state round-trip, invalid values and legacy backup loading.
+
+The H-C close-based exit event itself remains NOT IMPLEMENTED. The new provenance field has no effect on entries, stops, exits or PnL.
+
+## 9. Current blockers
 
 - Bybit-native historical market and point-in-time universe archives are not yet complete/verified in the repository.
 - The current H-A artifacts predate the latest trade-journal extension and therefore still lack TP1 partial-state fields. The research branch now retains initial stop geometry, TP1 hit/time/realized gross, remaining fraction and final stop in TradeRecord, and the H-A runner exports them on future runs. H-C must still be implemented inside the engine lifecycle so event priority and partial quantities are exact; do not infer counterfactual PnL from old final trade rows.

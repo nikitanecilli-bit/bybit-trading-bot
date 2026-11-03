@@ -89,6 +89,36 @@ def test_without_funding_the_same_position_does_not_hit_tight_daily_stop():
     assert engine.risk_mgr.daily_stop_triggered is False
 
 
+def test_legacy_limit_position_uses_maker_tp1_fee_fallback_in_mtm():
+    engine = make_engine(False)
+    pos = engine.open_positions["BTCUSDT"]
+    pos.order_type = "limit"
+    pos.maker_exits = None  # legacy/restored state predating explicit maker_exits
+    pos.tp1_hit = True
+    pos.tp1_ts_ms = 1_500
+    pos.remaining_fraction = 0.5
+    pos.realized_tp1_gross_usdt = 50.0
+    value = engine_mod.UnifiedQuantEngine._unrealized_pnl_at_marks(engine, 2_000)
+    # Entry maker fee 0.20 + TP1 maker fee 0.11 + remaining taker close
+    # fee/slippage 0.3875. A falsey-None fallback would overcharge TP1.
+    assert abs(value - 49.3025) < 1e-9
+
+
+def test_explicit_taker_tp1_override_is_preserved_in_mtm():
+    engine = make_engine(False)
+    pos = engine.open_positions["BTCUSDT"]
+    pos.order_type = "limit"
+    pos.maker_exits = False
+    pos.tp1_hit = True
+    pos.tp1_ts_ms = 1_500
+    pos.remaining_fraction = 0.5
+    pos.realized_tp1_gross_usdt = 50.0
+    value = engine_mod.UnifiedQuantEngine._unrealized_pnl_at_marks(engine, 2_000)
+    # Entry maker fee 0.20 + TP1 taker fee/slippage 0.42625
+    # + remaining taker fee/slippage 0.3875.
+    assert abs(value - 48.98625) < 1e-9
+
+
 def test_tp1_application_records_conservative_candle_close_boundary():
     pos = engine_mod.OpenPositionState(
         trade_id="tp1-ts", symbol="BTCUSDT", direction="long",

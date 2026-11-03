@@ -898,13 +898,6 @@ class PlanBStatePersistence:
                     raise ValueError(f"позиция {sym}: short targets должны удовлетворять entry > TP1 > TP2")
                 tp1_hit = pos_dict.get("tp1_hit", False)
                 realized_tp1 = pos_dict.get("realized_tp1_gross_usdt", 0.0)
-                expected_remaining = 1.0 - TP1_FRACTION if tp1_hit else 1.0
-                if pos_dict.get("exchange_sized", False):
-                    expected_remaining = float(
-                        parsed_qty["remaining_contract_qty"] / parsed_qty["contract_qty"]
-                    )
-                if not math.isclose(fraction, expected_remaining, rel_tol=0.0, abs_tol=1e-9):
-                    raise ValueError(f"позиция {sym}: tp1_hit и remaining_fraction противоречат друг другу")
                 if not tp1_hit and not math.isclose(realized_tp1, 0.0, rel_tol=0.0, abs_tol=1e-9):
                     raise ValueError(f"позиция {sym}: realized TP1 PnL задан при tp1_hit=false")
                 for field_name in ("max_favorable_px", "max_adverse_px"):
@@ -961,6 +954,13 @@ class PlanBStatePersistence:
                             raise ValueError(f"позиция {sym}: TP1/remaining contract quantities не сходятся")
                     elif tp1_qty != 0 or remaining_qty != initial_qty:
                         raise ValueError(f"позиция {sym}: до TP1 весь contract_qty должен оставаться открытым")
+                expected_remaining = 1.0 - TP1_FRACTION if tp1_hit else 1.0
+                if pos_dict.get("exchange_sized", False):
+                    expected_remaining = float(
+                        parsed_qty["remaining_contract_qty"] / parsed_qty["contract_qty"]
+                    )
+                if not math.isclose(fraction, expected_remaining, rel_tol=0.0, abs_tol=1e-9):
+                    raise ValueError(f"позиция {sym}: tp1_hit и remaining_fraction противоречат друг другу")
                 tp1_ts = pos_dict.get("tp1_ts_ms")
                 if tp1_ts is not None:
                     if isinstance(tp1_ts, bool) or not isinstance(tp1_ts, int) or tp1_ts <= 0:

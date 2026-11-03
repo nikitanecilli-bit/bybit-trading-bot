@@ -825,7 +825,7 @@ class PlanBStatePersistence:
         # Validate the exact serialized candidate with the same strict reader
         # before replacing the last known-good recovery point.
         try:
-            PlanBStatePersistence(tmp_path, enabled=False).load_state(
+            PlanBStatePersistence(tmp_path, enabled=True).load_state(
                 AdaptiveRiskManager(cfg), log_restore=False,
             )
         except RuntimeError as e:

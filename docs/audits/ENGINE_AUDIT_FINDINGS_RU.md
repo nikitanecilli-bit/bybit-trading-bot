@@ -746,3 +746,14 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 **Исправление:** `save_state()` теперь применяет ту же проверку `signal_ts_ms` до создания временного файла и атомарной замены backup. Добавленная регрессия `test_position_signal_timestamp_cannot_follow_entry_timestamp` подтверждает отказ на этапе сохранения.
 
 **Проверка:** Research CI [#41687016004 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41687016004); fail-closed state persistence suite: **69 tests passed**. В том же run прошли H1 manifest tests.
+
+
+### 2026-11-03 — симметрия writer/reader для Plan B backup
+
+**Подтверждённый defect:** save path проверял JSON finite values и отдельные timestamp invariants, но мог записать structurally invalid position/pending/risk payload, который strict `load_state()` затем отклонял. Это создавало backup, который сам writer считал успешным, но который не мог быть восстановлен после перезапуска.
+
+**Исправление:** после записи и fsync временного файла, но до `os.replace()` writer прогоняет именно сериализованный candidate через тот же strict reader с отдельным `AdaptiveRiskManager` и без success-log. Если reader отклоняет payload, temp удаляется, существующий last-known-good backup остаётся неизменным, а save завершается ошибкой. Отдельные быстрые timestamp checks остаются для ясных сообщений. Тесты проверяют отказ на invalid position и invalid pending, сохранность предыдущего backup и удаление temp; тесты восстановления повреждённого payload теперь создают corruption после валидного save, не обходя новую гарантию writer.
+
+**Проверка:** Research CI [#41689536499 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41689536499); state persistence suite **73 tests passed**, полный Research workflow завершился успешно.
+
+**Эффект:** не меняет торговые сигналы или PnL; усиливает recovery-point integrity и предотвращает атомарную замену валидного backup на payload, который не пройдёт restore.

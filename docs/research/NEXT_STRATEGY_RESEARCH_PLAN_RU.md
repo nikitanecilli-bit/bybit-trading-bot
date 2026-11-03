@@ -372,3 +372,8 @@ The earlier note saying the EMA labels were not passed into the main H1 grid is 
 Correction: default mode remains baseline-only. With `H1_EMA50_200_GATE=1`, every fold/volume/breakout/cost configuration now runs **both** baseline and EMA50/200-up-gated variants, each with the same frozen five-symbol basket, fold boundaries, shared starting capital, engine settings and cost multiplier. They are independent portfolio replays, not simultaneous capital-sharing portfolios. Output labels are deterministic and distinct (`...` vs `..._ema50_200_up`).
 
 This is comparison plumbing only, not evidence of improved expectancy. It does not relax the Bybit data gates. No market PnL replay was run. Research CI must pass before treating the paired runner as ready.
+
+
+Paired comparison wiring was verified in Research CI [#41728994842](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41728994842): **55/55 steps SUCCESS**, including the EMA trend gate, paired-row matching and fail-closed missing-pair tests. The dedicated workflow exposes `ema50_200_comparison=off|paired`; `paired` produces baseline and gated rows in one immutable result manifest. Research branch head: `8ed9a1688d51538e2c31adf68edcfd41a9a7792c`.
+
+The Bybit-native market archive and dated instrument/risk snapshots are still absent from the repository, so the H1 runner remains data-gated. Do not launch a market replay or infer strategy performance from synthetic tests.

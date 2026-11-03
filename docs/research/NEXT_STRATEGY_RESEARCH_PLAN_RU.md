@@ -212,12 +212,14 @@ The descriptive results justify writing a preregistration; they do not justify r
 
 ## 11. H-C preregistration created — 2026-11-03
 
-Created H_C_POST_BREAK_INVALIDATION_PREREGISTRATION_RU.md. This is a frozen design only:
-- It defines a close-based invalidation when an H1 candle closes back inside the prior 20-bar Donchian boundary during the first three completed bars after entry.
-- It preserves existing intrabar stop/TP/liquidation priority, TP1 partial realization and remaining quantity, and uses market close costs.
-- It requires exact signal-time breakout-level persistence and deterministic long/short, TP1, event-order and no-lookahead tests before implementation.
-- It is implemented in the research branch behind execution_and_exits.enable_post_break_invalidation=false by default; it is NOT PnL-tested, NOT enabled for live and NOT approved for deployment. Synthetic CI semantics passed 7/7; state persistence passed 10/10 in Research CI [41675851770](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41675851770).
+Created H_C_POST_BREAK_INVALIDATION_PREREGISTRATION_RU.md and implemented the frozen event in the research engine:
+- It closes only when a completed H1 candle closes back inside the signal-time prior 20-bar Donchian boundary during the first three completed bars after entry.
+- Scope is the frozen H1 baseline strategy H1-momentum-breakout only; H-A is a rejected candidate and is excluded.
+- Existing intrabar liquidation/kill-switch/stop/TP priority is preserved; TP1 partial realization and remaining quantity flow through the normal close accounting, with market-close costs.
+- The exact signal-time breakout level is persisted through pending orders, open positions, state restore and TradeRecord.
+- The feature is behind execution_and_exits.enable_post_break_invalidation=false by default. Synthetic regression and state-restore tests pass in Research CI; see the H-C preregistration for the exact latest run and coverage.
+- Status: implemented and mechanically tested; NOT PnL-tested, NOT enabled for live and NOT approved for deployment.
 
-No new market PnL run is authorized by this preregistration. The current CryptoFetch/Binance-style archives are not Bybit-native and lack historical point-in-time Bybit universe, dated instrument specs/risk tiers and verified full funding/mark coverage. The user had previously deferred Bybit API connection until strategy research is ready; do not bypass that constraint. TradeRecord now retains TP1 hit/time/realized gross, remaining fraction and stop geometry, and the H-A runner exports those fields on future runs; existing H-A artifacts predate this extension. Signal-time Donchian breakout_level is now also carried through pending orders, open-position state, TradeRecord and future H-A artifacts; legacy state backups remain loadable. This is provenance-only: H-C exit logic is still disabled/not implemented.
+No new market PnL run is authorized by this preregistration. The current CryptoFetch/Binance-style archives are not Bybit-native and lack historical point-in-time Bybit universe, dated instrument specs/risk tiers and verified full funding/mark coverage. The user had previously deferred Bybit API connection until strategy research is ready; do not bypass that constraint. TradeRecord now retains TP1 hit/time/realized gross, remaining fraction, stop geometry and breakout level; existing H-A artifacts predate these journal extensions. Legacy state backups remain loadable when H-C is disabled.
 
-Next safe work: finish static review of position lifecycle and trade-journal provenance needed for TP1-aware close accounting, then wait for valid unseen data. Do not run H-C on the already-used folds or tune the 3-bar window.
+Next safe work: finish static review of position lifecycle, TP1-aware PnL/cost reconciliation, and sparse/shared-capital event ordering; add deterministic tests only for confirmed gaps. Do not run H-C on the already-used folds or tune the three-bar window.

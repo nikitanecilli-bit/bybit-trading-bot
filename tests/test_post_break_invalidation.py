@@ -28,6 +28,7 @@ def _configured_engine():
     e.cfg.timeframe = "1h"
     e.cfg.enable_post_break_invalidation = True
     e._update_mark_to_market = lambda _ts: None
+    e.risk_mgr.on_new_timestamp = lambda _ts: None
     return e
 
 
@@ -164,8 +165,18 @@ def test_hc_applies_only_to_breakout_strategies_and_does_not_reenter_same_bar():
     e = _configured_engine()
     pos = _position("long")
     e.open_positions["BTCUSDT"] = pos
-    e._close_position = lambda *_args: None
+    closed = []
+
+    def close_and_remove(position, *args):
+        closed.append(args)
+        e.open_positions.pop(position.symbol, None)
+
+    e._close_position = close_and_remove
     e.step_candle("BTCUSDT", _history(bar), evaluate_new_signal=True)
+    assert len(closed) == 1
+    assert closed[0][1] == bar.close
+    assert closed[0][2] == "breakout_retest_invalidation"
+    assert "BTCUSDT" not in e.open_positions
     assert e.pending == {}
 
 

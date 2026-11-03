@@ -6,6 +6,7 @@ from bybit_risk_tiers import RiskTier
 from mark_price_liquidation import (
     calculate_isolated_usdt_liquidation_price,
     calculate_mark_price_maintenance_margin,
+    calculate_isolated_usdt_bankruptcy_price,
     mark_candle_crosses_liquidation,
 )
 
@@ -96,6 +97,32 @@ class IsolatedLiquidationTests(unittest.TestCase):
         self.assertEqual(short.estimated_close_fee, Decimal("24.20"))
         self.assertEqual(long.maintenance_margin, Decimal("214.80"))
         self.assertEqual(short.maintenance_margin, Decimal("229.20"))
+
+    def test_isolated_bankruptcy_price_and_directional_tick_rounding(self):
+        self.assertEqual(
+            calculate_isolated_usdt_bankruptcy_price(
+                direction="long", entry_price="40000", leverage="50"
+            ),
+            Decimal("39200"),
+        )
+        self.assertEqual(
+            calculate_isolated_usdt_bankruptcy_price(
+                direction="short", entry_price="40000", leverage="50"
+            ),
+            Decimal("40800"),
+        )
+        self.assertEqual(
+            calculate_isolated_usdt_bankruptcy_price(
+                direction="long", entry_price="40000.03", leverage="50", tick_size="0.1"
+            ),
+            Decimal("39200.1"),
+        )
+        self.assertEqual(
+            calculate_isolated_usdt_bankruptcy_price(
+                direction="short", entry_price="40000.03", leverage="50", tick_size="0.1"
+            ),
+            Decimal("40800.0"),
+        )
 
     def test_mark_candle_detects_long_and_short_liquidation_crossings(self):
         self.assertTrue(mark_candle_crosses_liquidation(

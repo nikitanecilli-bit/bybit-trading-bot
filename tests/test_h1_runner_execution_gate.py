@@ -56,7 +56,7 @@ def _write_funding_manifest(
             }), encoding="utf-8")
             source_snapshots.append({
                 "path": snapshot_path.name, "sha256": sha256_file(snapshot_path),
-                "fetched_at_ms": ts, "funding_interval_minutes": 60,
+                "fetched_at_ms": ts, "funding_interval_minutes": funding_interval_minutes,
             })
         schedule_path = funding_path.parent / f"{funding_path.stem}.schedule.json"
         schedule = {

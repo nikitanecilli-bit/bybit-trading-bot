@@ -638,3 +638,6 @@ H1 validation runner дополнен отдельным JSON manifest рядо�
 - Explore и confirm теперь оба требуют committed selection manifest и ровно тот же allowlist. Runner проверяет hash manifest, совпадение списка, отсутствие пересечения training cutoff с первым scored fold; итоговый validation manifest сохраняет provenance отбора.
 
 Ограничения: Bybit lifecycle snapshot содержит launch/delivery bounds, но не гарантирует полный исторический retention delisted contracts и не отражает временные приостановки торгов. Поэтому universe completeness остаётся ограниченной, пока не накоплена/проверена историческая серия snapshots и официальные listing/delisting notices. Selector требует Bybit H1, funding, mark, dated specs/risk tiers; он не может быть исполнен на имеющихся CryptoFetch ZIP. Старый shortlist RAY/PUMP/TAO/AAVE/CAKE и reserve DASH/HBAR/ENA/GMX/ONDO не переиспользуется.
+
+
+Проверка реализации train-only selector: Research CI run [41695778287](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41695778287) — SUCCESS, все 50 job steps прошли, включая compile, selector ranking tests, H1 execution-gate tests и manifest provenance tests. Предыдущие CI попытки выявили ошибки в тестовых fixtures/manifest defaults; они исправлены до успешного запуска. Этот CI не запускал рыночный PnL: Bybit архивы в репозитории по-прежнему отсутствуют.

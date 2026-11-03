@@ -228,7 +228,7 @@ def attach_funding_settlement_schedule(
     schedule_path.parent.mkdir(parents=True, exist_ok=True)
     schedule_tmp = schedule_path.with_suffix(schedule_path.suffix + ".tmp")
     schedule_tmp.write_text(
-        json.dumps(schedule, ensure_ascii=False, indent=2) + "\\n",
+        json.dumps(schedule, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     os.replace(schedule_tmp, schedule_path)
@@ -243,7 +243,7 @@ def attach_funding_settlement_schedule(
     )
     manifest_tmp = manifest_path.with_suffix(manifest_path.suffix + ".tmp")
     manifest_tmp.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\\n",
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     os.replace(manifest_tmp, manifest_path)

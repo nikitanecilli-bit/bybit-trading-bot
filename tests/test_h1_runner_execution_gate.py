@@ -270,6 +270,24 @@ def test_load_bybit_h1_datasets_rejects_off_hour_timestamp_grid():
             raise AssertionError("off-hour timestamps must fail H1 archive validation")
 
 
+def test_load_bybit_h1_datasets_rejects_symbol_filename_mismatch():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        path = root / "BTCUSDT.csv"
+        rows = ["symbol,timestamp_ms,open,high,low,close,volume,turnover"]
+        for index in range(501):
+            ts = 1_699_999_200_000 + index * 3_600_000
+            row_symbol = "ETHUSDT" if index == 0 else "BTCUSDT"
+            rows.append(f"{row_symbol},{ts},100,102,99,101,10,1010")
+        path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+        try:
+            load_bybit_h1_datasets(root)
+        except SystemExit as exc:
+            assert "does not match filename symbol BTCUSDT" in str(exc)
+        else:
+            raise AssertionError("mismatched CSV symbol must fail archive validation")
+
+
 
 def test_delayed_limit_quotes_are_tick_aligned_without_crossing():
     from bybit_instrument_specs import InstrumentSpec
@@ -314,6 +332,7 @@ if __name__ == "__main__":
         test_bybit_kline_dir_is_mandatory,
         test_load_bybit_h1_datasets_rejects_gaps_and_loads_exchange_candles,
         test_load_bybit_h1_datasets_rejects_off_hour_timestamp_grid,
+        test_load_bybit_h1_datasets_rejects_symbol_filename_mismatch,
         test_delayed_limit_quotes_are_tick_aligned_without_crossing,
     ):
         test()

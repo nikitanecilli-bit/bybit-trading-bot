@@ -172,6 +172,25 @@ class FundingArchiveManifestTests(unittest.TestCase):
         )
         self.assertIn("query_window_not_fully_covered", report["errors"])
 
+    def test_validator_does_not_count_saturated_parent_page_as_complete_coverage(self):
+        payload = self.record()
+        self.attach_schedule(payload, [3_600_000, 7_200_000])
+        payload["runs"][0]["pages"] = [{
+            "request_start_ms": 3_600_000,
+            "request_end_ms": 7_200_000,
+            "response_rows": 200,
+            "first_ts": 3_600_000,
+            "last_ts": 7_200_000,
+            "complete": False,
+            "saturated": True,
+        }]
+        self.manifest.write_text(json.dumps(payload), encoding="utf-8")
+        report = validate_funding_manifest(
+            self.csv, self.manifest, symbol="BTCUSDT",
+            required_start_ms=3_600_000, required_end_ms=7_200_000,
+        )
+        self.assertIn("query_window_not_fully_covered", report["errors"])
+
     def test_validator_rejects_settlement_off_dated_funding_interval_grid(self):
         payload = self.record()
         self.attach_schedule(payload, [3_600_000, 7_200_000])

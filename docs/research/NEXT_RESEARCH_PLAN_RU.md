@@ -641,3 +641,6 @@ H1 validation runner дополнен отдельным JSON manifest рядо�
 
 
 Проверка реализации train-only selector: Research CI run [41695778287](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41695778287) — SUCCESS, все 50 job steps прошли, включая compile, selector ranking tests, H1 execution-gate tests и manifest provenance tests. Предыдущие CI попытки выявили ошибки в тестовых fixtures/manifest defaults; они исправлены до успешного запуска. Этот CI не запускал рыночный PnL: Bybit архивы в репозитории по-прежнему отсутствуют.
+
+
+Упрощён handoff между workflow: H1 selector теперь автоматически сохраняет manifest и ranking в `data/research/h1_top5_selection/` и коммитит их в выбранную research-ветку; артефакт также прикрепляется к workflow run. Validation workflow читает primary list непосредственно из manifest и сам формирует allowlist — ручное повторное копирование тикеров исключено. Если selector не найдёт пять кандидатов, он сохранит fail-closed manifest со статусом ошибки, который validation runner не примет.

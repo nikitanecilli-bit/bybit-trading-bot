@@ -34,7 +34,7 @@ def _fixture(direction="long"):
         "symbol": "BTCUSDT",
         "direction": direction,
         "entry_date": entry_date,
-        "exit_date": datetime.fromtimestamp(entry_ts + H1_MS, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "exit_date": datetime.fromtimestamp((entry_ts + H1_MS) / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "exit_reason": "stop_loss",
         "entry_price": entry_price,
         "size_usdt": 1_000.0,
@@ -96,7 +96,7 @@ def test_post_entry_followthrough_is_causal_and_exit_bar_is_excluded():
     index = {row.ts: i for i, row in enumerate(rows)}
 
     # A time-stop occurs at the sixth completed bar close, so all six bars count.
-    trade["exit_date"] = datetime.fromtimestamp(entry_ts + 6 * H1_MS, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    trade["exit_date"] = datetime.fromtimestamp((entry_ts + 6 * H1_MS) / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     trade["exit_reason"] = "time_stop"
     features = extract_signal_features(rows, index, trade)
     assert features["post_entry_completed_bars"] == 6

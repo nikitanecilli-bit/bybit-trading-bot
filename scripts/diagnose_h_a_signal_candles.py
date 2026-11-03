@@ -274,6 +274,7 @@ def _summarize_group(rows: list[dict[str, Any]], fold: str, variant: str, reason
     }
     for field in NUMERIC_FEATURES:
         values = [float(row[field]) for row in rows if row.get(field) is not None]
+        result[f"n_{field}"] = len(values)
         result[f"avg_{field}"] = round(statistics.fmean(values), 6) if values else None
         result[f"median_{field}"] = round(statistics.median(values), 6) if values else None
     return result

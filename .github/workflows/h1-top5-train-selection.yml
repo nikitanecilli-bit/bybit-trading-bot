@@ -24,7 +24,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: h1-top5-selection-${{ github.ref }}
+  group: h1-top5-selection-research
   cancel-in-progress: false
 
 jobs:

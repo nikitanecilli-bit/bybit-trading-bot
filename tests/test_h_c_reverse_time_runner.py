@@ -93,6 +93,18 @@ def test_hc_runner_enables_only_the_preregistered_h1_exit():
     assert candidate.risk_mgr.cfg is candidate.cfg
 
 
+
+def test_runner_cli_imports_from_repository_root_when_executed_as_script():
+    import subprocess
+    import sys
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "run_h_c_reverse_time_robustness.py"), "--help"],
+        cwd=ROOT, capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--execute" in result.stdout
+
+
 def test_h_a_and_h_c_variants_cannot_be_combined():
     try:
         run_variant({}, 1, 2, "invalid-combined", use_h_a=True, use_h_c=True)
@@ -110,6 +122,7 @@ if __name__ == "__main__":
         test_prepare_fold_rejects_insufficient_warmup_and_non_contiguous_history,
         test_hc_runner_enables_only_the_preregistered_h1_exit,
         test_h_a_and_h_c_variants_cannot_be_combined,
+        test_runner_cli_imports_from_repository_root_when_executed_as_script,
     ]
     for test in tests:
         test()

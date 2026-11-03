@@ -157,6 +157,31 @@ def test_mtm_defers_tp1_receipt_and_later_credits_only_remaining_quantity():
     assert abs((after_boundary - at_boundary) - 5.0) < 1e-8
 
 
+def test_simultaneous_daily_stop_and_kill_switch_latch_independently():
+    cfg = engine_mod.BotConfig(
+        capital_usdt=10_000.0,
+        daily_stop_loss_pct=5.0,
+        emergency_kill_switch_pct=5.0,
+    )
+    risk = engine_mod.AdaptiveRiskManager(cfg)
+    first_ts = 1_767_308_400_000  # 2026-01-01 23:00:00 UTC
+    midnight = 1_767_312_000_000  # 2026-01-02 00:00:00 UTC
+    risk.mark_to_market(0.0, first_ts)
+
+    alerts = risk.mark_to_market(-600.0, first_ts + 3_600_000)
+    assert alerts == {"daily_stop_hit": True, "kill_switch_hit": True}
+    assert risk.daily_stop_triggered is True
+    assert risk.kill_switch_triggered is True
+    assert risk.can_open_new_trade(0) == (False, "KILL_SWITCH_ACTIVE")
+
+    # UTC rollover clears only the daily latch; the emergency kill-switch
+    # remains latched and continues to block entries.
+    risk.mark_to_market(-600.0, midnight)
+    assert risk.daily_stop_triggered is False
+    assert risk.kill_switch_triggered is True
+    assert risk.can_open_new_trade(0) == (False, "KILL_SWITCH_ACTIVE")
+
+
 def test_utc_midnight_daily_baseline_uses_mark_at_boundary():
     cfg = engine_mod.BotConfig(
         capital_usdt=10_000.0,

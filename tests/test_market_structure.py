@@ -5,7 +5,7 @@ _sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
 import unittest
 from types import SimpleNamespace
 
-from market_structure import breakout_quality, ema_series, trend_direction, trend_direction_series
+from market_structure import (breakout_quality, ema_series, trend_direction,\n                              trend_direction_series, trend_label_index,\n                              lookup_trend_label)
 
 
 def make_candles(closes, volumes=None, ranges=None):
@@ -90,6 +90,58 @@ class MarketStructureTests(unittest.TestCase):
                 candle.ts = timestamp
             with self.assertRaises(ValueError):
                 trend_direction_series(candles, fast=2, slow=3, slope=1)
+
+
+    def test_ema_trend_label_index_uses_exact_timestamp_and_1000_bar_burnin(self):
+        h1_ms = 3_600_000
+        candles = make_candles([100.0 + i * 0.5 for i in range(1001)])
+        for i, candle in enumerate(candles):
+            candle.ts = (i + 1) * h1_ms
+        labels = trend_label_index(
+            candles, fast=50, slow=200, slope=5,
+            expected_interval_ms=h1_ms,
+        )
+        self.assertEqual(len(labels), len(candles))
+        self.assertEqual(lookup_trend_label(labels, candles[999].ts), "neutral")
+        self.assertEqual(lookup_trend_label(labels, candles[1000].ts), "up")
+        with self.assertRaises(KeyError):
+            lookup_trend_label(labels, candles[1000].ts + h1_ms)
+
+    def test_ema_trend_label_index_is_prefix_invariant_after_burnin(self):
+        h1_ms = 3_600_000
+        closes = [100.0 + i * 0.2 for i in range(1100)]
+        full = make_candles(closes)
+        prefix = make_candles(closes[:1050])
+        for rows in (full, prefix):
+            for i, candle in enumerate(rows):
+                candle.ts = (i + 1) * h1_ms
+        full_labels = trend_label_index(full, expected_interval_ms=h1_ms)
+        prefix_labels = trend_label_index(prefix, expected_interval_ms=h1_ms)
+        for candle in prefix[1000:]:
+            self.assertEqual(
+                lookup_trend_label(prefix_labels, candle.ts),
+                lookup_trend_label(full_labels, candle.ts),
+            )
+
+    def test_ema_trend_label_index_fails_closed_on_short_or_gapped_history(self):
+        h1_ms = 3_600_000
+        short = make_candles([100.0 + i for i in range(1000)])
+        for i, candle in enumerate(short):
+            candle.ts = (i + 1) * h1_ms
+        with self.assertRaises(ValueError):
+            trend_label_index(short)
+        with self.assertRaises(ValueError):
+            trend_label_index(
+                make_candles([100.0 + i for i in range(1001)]),
+                burn_in_bars=999,
+            )
+
+        gapped = make_candles([100.0 + i for i in range(1002)])
+        for i, candle in enumerate(gapped):
+            candle.ts = (i + 1) * h1_ms + (h1_ms if i >= 1001 else 0)
+        with self.assertRaises(ValueError):
+            trend_label_index(gapped, expected_interval_ms=h1_ms)
+
 
     def test_non_finite_ema_and_trend_inputs_are_rejected(self):
         for bad in (float("nan"), float("inf"), float("-inf")):

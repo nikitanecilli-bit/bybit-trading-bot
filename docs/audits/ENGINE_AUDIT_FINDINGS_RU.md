@@ -726,3 +726,14 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 **Проверка:** Research CI [#41685190246 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41685190246); portfolio accounting suite **47/47 tests passed**, полный workflow завершился успешно.
 
 **Границы:** исправление влияет только на precision новых journal records, не на sizing/fills/PnL. Исторические записи, уже сохранённые с 6/8 знаками, автоматически восстановить невозможно; для их реконструкции нужны исходные fills/данные или повторный replay. 12 decimal places — сериализационная точность float-модели, не замена Decimal/tick-size-native price pipeline.
+
+
+### 2026-11-03 — H1 runner provenance manifest
+
+**Подтверждённый reporting gap:** H1 shared-capital runner сохранял итоговый CSV с числом инструментов, но без полного symbol list и hashes точных входных архивов/snapshots. По одному CSV нельзя было независимо установить, какие именно файлы и code revision дали результат.
+
+**Исправление:** runner теперь формирует `h1_shared_capital_portfolio_validation_manifest.json` рядом с CSV. Manifest включает выбранные символы и режим отбора, общий H1 grid, точные fold timestamps, конфигурацию стратегии/risk/execution, SHA-256 и размеры всех входных kline/funding/mark/spec/risk files, hashes ключевых engine/runner/workflow dependencies, Git/workflow metadata, result rows и hash CSV. Выбранный kline source обязан входить в manifestируемую kline directory. H1 workflow получил optional comma-separated `symbols` input для замороженного universe и загружает только реально создаваемые runner-ом CSV+JSON outputs; прежние три несуществующих diagnostic paths удалены из artifact upload.
+
+**Проверка:** Research CI [#41687904323 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41687904323); manifest provenance suite **4/4 tests passed**. Рыночный PnL replay не запускался.
+
+**Границы:** hashes фиксируют точные байты, но не являются криптографическим доказательством происхождения файла с Bybit; происхождение подтверждается collector workflow и chain of custody. Runner по-прежнему требует реальные Bybit archives и dated snapshots; текущие файлы CryptoFetch не подходят.

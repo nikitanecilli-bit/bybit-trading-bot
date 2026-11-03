@@ -22,7 +22,7 @@ def test_rank_uses_only_positive_net_candidates_and_deterministic_tiebreaks():
         _row("BBBUSDT", 40, 80, 1.5, 0.12, 8),
         _row("CCCUSDT", 80, -10, 2.0, 0.30, 4),
         _row("DDDUSDT", 29, 200, 2.0, 0.40, 2),
-        _row("EEEUSDT", 60, 120, 1.1, 0.08, 15),
+        _row("EEEUSDT", 60, 120, 1.0, 0.08, 15),
         _row("FFFUSDT", 60, 120, 1.6, -0.01, 5),
     ]
     evaluated, eligible = rank_candidates(rows)

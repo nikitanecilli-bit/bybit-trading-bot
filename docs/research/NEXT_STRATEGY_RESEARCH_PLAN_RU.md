@@ -310,3 +310,10 @@ Research CI [#41720537099](https://github.com/nikitanecilli-bit/bybit-trading-bo
 
 
 H1 runner scope check: the shared-capital H1 validator explicitly uses maker entry and taker TP1/TP2 exits (maker_entry_and_tp1=True, maker_tp1_and_target=False). The new gap-aware maker-target logic therefore does not change the frozen H1 baseline; it hardens the generic engine and future maker-exit experiments.
+
+
+### Bybit-native H1 limit-fill sensitivity — queued behind Funding gate
+
+Current H1 shared-capital runner uses a 20 bps entry offset, 5 bps additional penetration, and a 3-H1-bar pending TTL. A normal intrabar OHLC touch is a maker proxy; marketable opening gaps are taker. No queue position, bid/ask, partial fills or price improvement are modelled. The existing h1-limit-fill-stress script is Binance OHLCV proxy with independent capital per symbol, so it cannot validate the current Bybit-native shared-capital model.
+
+After Funding archive completeness is proven and the frozen top-5/reserve universe is fixed, run a Bybit-native shared-capital fill sensitivity (offset 10/20/30 bps × penetration 0/5/10 bps × TTL 1/3/5 H1 bars) with unchanged signals and cost assumptions. Report fill rate, expired signals, maker/taker mix, trade count, costs and net PnL separately. Do not run this as a market PnL experiment before the Funding gate is closed.

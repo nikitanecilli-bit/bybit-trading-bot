@@ -715,3 +715,14 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 **Проверка:** Research CI [#41684012791 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41684012791); isolated liquidation suite: **16/16 tests passed**, полный Research workflow завершился успешно.
 
 **Ограничения:** модель остаётся position-level isolated approximation. Не моделируются account-wide cross-margin collateral, aggregation позиций/ордеров по risk tier, partial-liquidation ladder, AMR, фактические exchange settlement timestamps/rounding и подтверждённая реальная settlement mark. Поэтому тест закрывает математическую внутреннюю согласованность funding-adjusted bankruptcy, но не доказывает точность live liquidation PnL.
+
+
+### 2026-11-03 — точность цен в TradeRecord
+
+**Подтверждённый дефект журнала:** `_close_position()` сохранял `entry_price`/`exit_price` с округлением до 6 знаков, а `initial_stop_dist`, stop/TP/breakout levels — до 8. Для субмикроценовых инструментов (например, цена порядка `0.00000637`) обе цены могли записаться одинаковыми после округления, хотя PnL рассчитывался по исходным float. Журнал становился непригоден для независимого восстановления price-change PnL и исходной стоп-дистанции. Это не меняло сам рассчитанный PnL, но искажало provenance и последующий trade-level анализ.
+
+**Исправление:** price и absolute price-distance fields в `TradeRecord` теперь сохраняются с 12 знаками после запятой; денежные поля и R/MAE/MFE rounding не менялись. Добавлен `test_journal_preserves_sub_micro_price_and_stop_distance_precision`: проверяет восстановление gross PnL из сохранённых entry/exit и сохранение исходного stop distance/уровней.
+
+**Проверка:** Research CI [#41685190246 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41685190246); portfolio accounting suite **47/47 tests passed**, полный workflow завершился успешно.
+
+**Границы:** исправление влияет только на precision новых journal records, не на sizing/fills/PnL. Исторические записи, уже сохранённые с 6/8 знаками, автоматически восстановить невозможно; для их реконструкции нужны исходные fills/данные или повторный replay. 12 decimal places — сериализационная точность float-модели, не замена Decimal/tick-size-native price pipeline.

@@ -202,3 +202,23 @@ Regression tests cover payment vs receipt, both funding helpers, strict pre-entr
 The execution model now mirrors its existing entry-gap treatment for take-profit limit legs. A TP1/TP2 limit crossed by the candle open is classified as taker rather than maker; ordinary intrabar target touches retain the configured maker proxy. TP1 classification is persisted and used identically in MTM and closed PnL; final TP2 liquidity is recorded in TradeRecord. The model keeps the target limit price on a gap (no price-improvement credit), so this correction affects fees/slippage, not gross fill price.
 
 Research CI [#41720537099](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41720537099) passed 52/52 steps. Non-gap maker fills remain optimistic without L2/queue/partial-fill evidence. No market PnL replay was run.
+
+
+## End-to-end synthetic lifecycle: TP1 + Funding + MTM + final close — 2026-11-04
+
+Added `test_full_replay_reconciles_tp1_funding_mtm_and_final_close` to `tests/test_portfolio_accounting.py`.
+
+The deterministic H1 fixture executes one complete engine replay:
+- market entry on the next candle after a signal;
+- TP1 on the following candle and a 50% remaining position;
+- Funding payment before TP1 at full quantity;
+- Funding payment exactly at the TP1 close boundary, conservatively charged at full quantity;
+- Funding payment after TP1, charged only to the remaining half;
+- post-TP1 trailing-stop exit;
+- reconciliation of trade net PnL against gross PnL, fees, slippage and Funding, plus realized/current equity.
+
+Research CI [#41737866200](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41737866200) completed **SUCCESS**. The portfolio accounting suite passed **49/49 tests**, including the new end-to-end lifecycle regression.
+
+**What this closes:** a deterministic integration gap between partial TP1, cumulative Funding, MTM and final-close accounting in the local engine model.
+
+**What this does not close:** Funding archive completeness, exact exchange settlement Mark, Bybit-native historical data, real maker fills, or account-wide margin behavior. This is a synthetic correctness test, not market PnL evidence. No Bybit API, market PnL replay, paper trading or live orders were used.

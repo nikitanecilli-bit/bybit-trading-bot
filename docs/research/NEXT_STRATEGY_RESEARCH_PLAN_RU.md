@@ -472,3 +472,12 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 - Next step is to obtain a permitted self-hosted execution host and fetch a small official BTCUSDT test interval first, then scale to top-5 + reserve-5 and verify hashes, pagination, lifecycle, Funding schedule, Mark candles, risk tiers and instrument specs.
 - Detailed assessment: docs/audits/BYBIT_DATA_ACQUISITION_SOURCE_AUDIT_2026-11-04.md.
 - No private account API, PnL, paper or live orders.
+
+
+## 2026-11-04 — end-to-end TP1/Funding accounting regression
+
+- Added a synthetic full-lifecycle regression for entry → TP1 partial close → Funding before/at/after the TP1 boundary → trailing-stop close.
+- The test reconciles gross PnL, fees, slippage, Funding, trade net PnL and final realized/current equity in one replay; Funding is charged at full size before and exactly at the TP1 boundary, then at the remaining half afterward.
+- Research CI [#41737866200](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41737866200) completed SUCCESS; portfolio accounting suite **49/49 tests passed**.
+- This closes that specific synthetic accounting-integration test gap only. It does not prove Funding archive completeness or exchange settlement-mark accuracy; the Bybit-native data gate remains CLOSED.
+- No market PnL replay, external data collection, Bybit API, paper trading or live orders.

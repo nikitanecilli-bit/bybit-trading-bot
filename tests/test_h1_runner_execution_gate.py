@@ -5,6 +5,7 @@ import sys
 import os
 import tempfile
 import json
+import csv
 
 repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(repo_root))
@@ -16,16 +17,25 @@ from funding_archive_manifest import record_funding_collection, sha256_file
 
 def _write_funding_manifest(
     funding_path, start_ms, end_ms, *,
-    schedule_start_ms=None, expected_events=None, include_schedule=True,
+    schedule_start_ms=None, expected_events=None, funding_interval_minutes=60,
+    include_schedule=True,
 ):
     manifest_path = funding_path.with_suffix(funding_path.suffix + ".audit.json")
+    with funding_path.open("r", encoding="utf-8-sig", newline="") as handle:
+        funding_rows = list(csv.DictReader(handle))
+    funding_timestamps = [
+        int(row.get("funding_timestamp_ms", row.get("timestamp")))
+        for row in funding_rows
+    ]
     payload = record_funding_collection(
         funding_path, manifest_path, symbol=funding_path.stem,
         category="linear", api_base="https://api.bybit.com",
         requested_start_ms=start_ms, requested_end_ms=end_ms,
         pages=[{
             "request_start_ms": start_ms, "request_end_ms": end_ms,
-            "response_rows": 1, "first_ts": start_ms, "last_ts": start_ms,
+            "response_rows": len(funding_timestamps),
+            "first_ts": min(funding_timestamps) if funding_timestamps else None,
+            "last_ts": max(funding_timestamps) if funding_timestamps else None,
             "complete": True, "saturated": False,
         }],
         collected_at_ms=max(end_ms, start_ms) + 1,
@@ -42,7 +52,7 @@ def _write_funding_manifest(
             )
             snapshot_path.write_text(json.dumps({
                 "schema_version": 1, "source": "Bybit V5 GET /v5/market/instruments-info", "category": "linear", "fetched_at": fetched_at,
-                "count": 1, "instruments": [{"symbol": funding_path.stem, "fundingInterval": "60"}],
+                "count": 1, "instruments": [{"symbol": funding_path.stem, "fundingInterval": str(funding_interval_minutes)}],
             }), encoding="utf-8")
             source_snapshots.append({
                 "path": snapshot_path.name, "sha256": sha256_file(snapshot_path),

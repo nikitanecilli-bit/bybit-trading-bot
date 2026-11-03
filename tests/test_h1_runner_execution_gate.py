@@ -31,7 +31,7 @@ def _selection_env(tmpdir):
         "selection_status": "ok",
         "generated_at_utc": "2026-11-03T00:00:00Z",
         "training_window": {"cutoff_timestamp_ms": 1000},
-        "input_files": {key: [] for key in ("kline", "funding", "mark_price", "instrument_specs", "risk_tiers")},
+        "input_files": {key: [] for key in ("kline", "funding", "mark_price", "instrument_specs", "risk_tiers", "universe_snapshot")},
         "code_files": [],
         "primary": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT"],
     }), encoding="utf-8")

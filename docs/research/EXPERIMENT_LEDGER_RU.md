@@ -923,3 +923,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - All three fully covered calendar months inside the separate folds were negative for both variants: May baseline -17.75% / H-A -12.38%; July -11.40% / -12.04%; September -7.90% / -14.16%.
 - Partial boundary months are separately labelled and must not be stitched into one continuous equity curve because each fold resets capital to 10,000 USDT. Fold 3's partial August was +1.07% / +1.62%, not +20%.
 - Conclusion: no evidence of the required 20% net monthly return; H-A remains rejected. Funding is omitted and CryptoFetch is not Bybit-native. Source artifact: h-a-preregistered-ohlcv-results, artifact ID 13247672222, workflow run 41670116033.
+
+
+## ENG-EXEC-016 — per-leg maker/taker classification for TP1 and TP2 (2026-11-04)
+
+- Confirmed execution-accounting defect: maker-exit configuration previously classified TP1/TP2 as maker even when the candle opened through the resting limit target, i.e. the order was marketable at the open. This understated taker fees and slippage for gap-through target fills in maker-enabled variants.
+- Engine now records actual TP1 liquidity as optional OpenPositionState.tp1_maker, and TradeRecord records tp1_maker plus final_exit_maker. If a long target is gapped through above the sell limit at candle open, or a short target below the buy limit, the fill is classified taker. Non-gap intrabar target touches retain the existing maker proxy; queue position, spread and adverse selection remain unmodeled.
+- TP2 final-leg maker classification is passed explicitly into close accounting. All non-target exits, including H-C breakout invalidation, remain taker. Mark-to-market uses the recorded TP1 classification; the remaining unrealized close stays taker as a conservative MTM assumption.
+- Gap-through execution price remains the target price rather than crediting a better open fill; this is conservative for gross PnL while the liquidity classification correctly increases costs.
+- H-A trade-ledger export now includes both liquidity fields. A synthetic H-C integration test verifies TP1 partial plus remaining-leg market close costs and exact net reconciliation. State persistence round-trip for explicit tp1_maker=False is added separately.
+- Research CI [#41720355038](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41720355038) SUCCESS, 52/52 steps; H-C semantics 10/10; gap execution suite and MTM suite passed.
+- Historical E08/E09 maker/limit results must be treated as provisional until replayed with this corrected accounting. The frozen H-A run used market exits (maker flags disabled), so this specific gap-liquidity fix does not explain or improve its negative result.
+- Reporting/engineering only: no market PnL replay, no Bybit download, no API connection, no orders.

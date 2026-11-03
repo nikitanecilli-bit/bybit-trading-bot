@@ -627,9 +627,12 @@ class AdaptiveRiskManager:
 
     def mark_to_market(self, unrealized_pnl_usdt: float, ts_ms: int) -> Dict[str, bool]:
         """Обновляет equity с учётом плавающего PnL и проверяет лимиты риска."""
-        self.on_new_timestamp(ts_ms)
+        # Refresh the mark first: when ts_ms crosses 00:00 UTC, the new day's
+        # opening equity must include the mark at that exact boundary, not the
+        # previous bar's stale equity. Then roll the daily baseline and evaluate.
         self.unrealized_pnl = float(unrealized_pnl_usdt)
         self.current_equity = round(self.realized_equity + self.unrealized_pnl, 4)
+        self.on_new_timestamp(ts_ms)
         return self._evaluate_drawdown_stops()
 
     def _evaluate_drawdown_stops(self) -> Dict[str, bool]:

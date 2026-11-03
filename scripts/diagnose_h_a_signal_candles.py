@@ -355,6 +355,7 @@ def run_diagnostics(results_dir: Path, archive_dir: Path, output_dir: Path) -> d
                     "realized_tp1_gross_usdt": trade.get("realized_tp1_gross_usdt"),
                     "remaining_fraction_at_exit": trade.get("remaining_fraction_at_exit"),
                     "final_stop_price": trade.get("final_stop_price"),
+                    "breakout_level": trade.get("breakout_level"),
                     **features,
                 }
                 enriched.append(row)

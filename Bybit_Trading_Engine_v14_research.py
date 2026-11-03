@@ -413,6 +413,16 @@ class OpenPositionState:
     risk_tier_max_leverage: Optional[str] = None
     initial_margin_usdt: Optional[str] = None
     maintenance_margin_usdt: Optional[str] = None
+    # TP1/remaining-leg provenance for exact partial-exit attribution.
+    initial_stop_dist: float = 0.0
+    initial_stop_price: Optional[float] = None
+    tp1_price: Optional[float] = None
+    tp2_price: Optional[float] = None
+    tp1_hit: bool = False
+    tp1_ts_ms: Optional[int] = None
+    realized_tp1_gross_usdt: float = 0.0
+    remaining_fraction_at_exit: float = 1.0
+    final_stop_price: Optional[float] = None
     contract_qty: Optional[str] = None
     tp1_contract_qty: Optional[str] = None
     remaining_contract_qty: Optional[str] = None
@@ -2218,6 +2228,18 @@ class UnifiedQuantEngine:
             maintenance_margin_deduction=pos.maintenance_margin_deduction,
             initial_margin_usdt=pos.initial_margin_usdt,
             maintenance_margin_usdt=pos.maintenance_margin_usdt,
+            initial_stop_dist=round(pos.initial_stop_dist, 8),
+            initial_stop_price=round(
+                pos.entry_price - pos.initial_stop_dist if pos.direction == "long"
+                else pos.entry_price + pos.initial_stop_dist, 8,
+            ),
+            tp1_price=round(pos.tp1_price, 8),
+            tp2_price=round(pos.tp2_price, 8),
+            tp1_hit=bool(pos.tp1_hit),
+            tp1_ts_ms=pos.tp1_ts_ms,
+            realized_tp1_gross_usdt=round(pos.realized_tp1_gross_usdt, 8),
+            remaining_fraction_at_exit=round(pos.remaining_fraction, 8),
+            final_stop_price=round(pos.stop_price, 8),
         )
         self.closed_trades.append(record)
         del self.open_positions[pos.symbol]

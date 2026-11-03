@@ -377,3 +377,11 @@ This is comparison plumbing only, not evidence of improved expectancy. It does n
 Paired comparison wiring was verified in Research CI [#41728994842](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41728994842): **55/55 steps SUCCESS**, including the EMA trend gate, paired-row matching and fail-closed missing-pair tests. The dedicated workflow exposes `ema50_200_comparison=off|paired`; `paired` produces baseline and gated rows in one immutable result manifest. Research branch head: `8ed9a1688d51538e2c31adf68edcfd41a9a7792c`.
 
 The Bybit-native market archive and dated instrument/risk snapshots are still absent from the repository, so the H1 runner remains data-gated. Do not launch a market replay or infer strategy performance from synthetic tests.
+
+
+## 2026-11-04 — final EMA/lifecycle integrity hardening
+
+- The paired EMA manifest now fails closed if baseline and candidate differ in timeframe, selected symbols, common H1 bar count, fold boundaries, starting capital or max concurrent positions. The H1 runner explicitly sets 5x isolated leverage in config and manifest.
+- Funding schedule snapshots may omit a symbol outside its lifecycle window, but any dated snapshot inside the requested funding interval must contain it. Regression tests cover both cases.
+- Research CI [#41730087544](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41730087544) SUCCESS, 54/54.
+- No Bybit market PnL, no private API, no external downloads, no orders. The Bybit-native archive remains the only data blocker for the preregistered paired comparison.

@@ -90,3 +90,32 @@
 Следствие: fold 3 физически заканчивается `2026-10-26T00:00:00Z`, а не requested `2026-10-27T00:00:00Z`; runner обязан показывать фактическую границу. Поздние символы допускаются в cross-section только после своего фактического старта и 72h warm-up. Архивный manifest с SHA-256 сохранён в artifact `h-a-archive-preparation` run 41632126319.
 
 Это подтверждает пригодность существующих файлов для динамического OHLCV replay, но не доказывает Bybit listing history, не устраняет survivorship bias в исходном наборе символов и не добавляет funding/mark-price.
+
+## 8. Фактический результат preregistered replay — 2026-11-03
+
+CI run: 41633199418, commit 3ac4bb0c20c48e31e0264df7fe39235cb5c8a658, conclusion success. Артефакт: h-a-preregistered-ohlcv-results (fold_summary.csv, results.json, archive_manifest.json).
+
+| Fold | Variant | Trades | Net USDT | PF | Expectancy R | Max DD |
+|---|---|---:|---:|---:|---:|---:|
+| 1 | Baseline | 320 | -2,278.63 | 0.66 | -0.193 | 24.01% |
+| 1 | H-A | 306 | -1,601.57 | 0.74 | -0.140 | 17.79% |
+| 2 | Baseline | 306 | -2,371.50 | 0.62 | -0.199 | 24.59% |
+| 2 | H-A | 322 | -2,225.91 | 0.66 | -0.194 | 23.26% |
+| 3 | Baseline | 396 | -985.85 | 0.88 | -0.034 | 15.04% |
+| 3 | H-A | 405 | -2,307.78 | 0.74 | -0.136 | 30.01% |
+
+По трём независимым reset-folds:
+- Baseline: 1,022 trades; gross +587.02; fees 4,416.37; slippage 1,806.63; net -5,635.98 USDT.
+- H-A: 1,033 trades; gross +29.53; fees 4,375.03; slippage 1,789.76; net -6,135.26 USDT.
+- H-A хуже baseline на 499.28 USDT суммарно; это сумма трёх независимых прогонов с reset капитала, не единая непрерывная equity curve.
+- H-A лучше baseline в fold 1 на 677.06 USDT и в fold 2 на 145.59 USDT, но хуже в fold 3 на 1,321.93 USDT. Преимущество не переносится между периодами.
+- H-A net отрицателен во всех folds; PF ниже 1, expectancy отрицательна во всех folds. В fold 3 активировался 30% emergency kill-switch.
+- H-A gross суммарно лишь +29.53 USDT до 6,164.79 USDT modeled fees+slippage. Baseline gross +587.02 до 6,223.00 USDT costs.
+- Monthly path H-A: fold 1 May -12.38%, June -3.51%; fold 2 July -12.04%, August -11.03%; fold 3 September -14.16%, October -11.82%. Августовская частичная прибыль в начале fold 3 не удержалась.
+- В H-A были отдельные символы с положительным net в нескольких folds (например ETC, ICP, ZEC), но их результаты малы относительно портфельного убытка и это post-hoc attribution на уже использованных периодах. Нельзя превращать их в shortlist без нового независимого хронологического теста.
+
+### Вывод и решение
+
+H-A отклонена как текущий кандидат: не показала положительного net expectancy, не покрыла расходы, а fold 3 показал существенное ухудшение и kill-switch. Не делать parameter tuning или отбора монет по этим же folds — это усилит selection bias. Не переходить к API/runner/live.
+
+Следующий исследовательский шаг — не «подкрутить пороги H-A», а разобраться, почему у baseline/H-A столь большая доля gross edge поглощается costs и почему fold 3 ломает относительную силу: разложить сделки по turnover/holding time, entry/exit fee, adverse excursion, exit reason, long/short и режиму рынка. После этого решить, есть ли основание для отдельной preregistered гипотезы с меньшей частотой сделок. Текущие folds остаются использованными, не holdout. Funding не включён; это не Bybit net PnL.

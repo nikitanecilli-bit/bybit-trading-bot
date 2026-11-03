@@ -106,3 +106,16 @@ The first implementation touched the legacy root-level `bybit_downloader.py`. Re
 - An integration regression test calls `archive_symbol()` with mocked market responses and verifies the sidecar is produced.
 
 The sidecar still intentionally has no settlement schedule evidence. The archive workflow receives one point-in-time universe snapshot; it cannot be treated as a historical funding-interval schedule for an arbitrary multi-month archive. H1 market PnL remains blocked until dated schedule evidence spans the scored interval.
+
+
+### Final active-collector guardrails and CI
+
+Additional protections:
+- Active collector output roots are immutable: if a Funding CSV, its audit sidecar, trade-kline CSV, or mark-price CSV already exists for the symbol, the collector refuses to overwrite the output root. This prevents a rerun from silently replacing prior evidence.
+- Duplicate Funding timestamps returned by Bybit are rejected, even if the duplicate rows are identical.
+- The manifest validator counts only pages explicitly marked complete; a saturated 200-row parent response cannot attest its full request window. Recursive complete child windows must cover the entire requested interval.
+- The active collector now adds its own script SHA-256 to the archive-level manifest, and H1 replay code provenance hashes this active collector.
+
+Research CI [#41713006331](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41713006331) completed successfully: 50 workflow steps, zero failures. This includes the active archive collector integration test, duplicate-timestamp regression, saturated-page coverage tests, funding manifest checks, H1 execution/provenance gates, portfolio accounting, and sparse shared-capital replay.
+
+The gate is still intentionally not green for real H1 PnL: no actual Bybit archive sidecars or dated funding schedule evidence exist in the repository.

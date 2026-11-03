@@ -15,7 +15,7 @@
 - Pagination has a 1,000-page safety cap and still rejects repeated cursors.
 - HTTP/URL failures are reported without printing response bodies.
 
-The instrument snapshot workflow no longer runs on every code push. It remains manual and has a weekly scheduled retry, avoiding a network-dependent red job on each code change.
+The instrument snapshot workflow no longer runs on every code push. It is manual-dispatch only, avoiding a network-dependent red job on each code change. No scheduled retry is currently configured in .github/workflows/bybit-instrument-snapshots.yml.
 
 ## Tests and CI
 

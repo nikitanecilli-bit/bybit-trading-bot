@@ -52,9 +52,12 @@ def trend_direction_series(candles, fast=10, slow=30, slope=5):
     """
     _validate_trend_periods(fast, slow, slope)
     try:
+        timestamps = [int(c.ts) for c in candles]
         closes = [float(c.close) for c in candles]
     except (AttributeError, TypeError, ValueError, OverflowError) as exc:
-        raise ValueError("trend candles must expose numeric close values") from exc
+        raise ValueError("trend candles must expose timestamp and numeric close values") from exc
+    if any(right <= left for left, right in zip(timestamps, timestamps[1:])):
+        raise ValueError("trend candle timestamps must be strictly increasing")
     if any(not math.isfinite(close) or close <= 0 for close in closes):
         raise ValueError("trend candle closes must be finite and > 0")
     if not closes:

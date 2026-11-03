@@ -168,3 +168,52 @@ Artifact h-a-preregistered-ohlcv-results повторно скачан и про
 - MAE/MFE attribution H-A — не выполнена; данных в сохранённом artifact нет.
 - Dynamic universe breadth — измерен из сохранённого artifact; 50 symbols не были активны одновременно на всём горизонте.
 - Никакой новый PnL replay не запускался.
+
+## 11. Диагностический повтор с расширенным trade ledger — 2026-11-03
+
+CI run [41670116033](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41670116033), commit `3f762a4bf9fa3f53a61ff0912e2deaf411ead4b8`, conclusion SUCCESS. Artifact: `h-a-preregistered-ohlcv-results`, artifact ID 13247672222.
+
+Цель повторного запуска — не повторный поиск edge, а проверка расширенных диагностических полей `mae_r`, `mfe_r`, `risk_usdt`, `risk_pct`, `gross_r_multiple`, `session`, `order_type`. Сигналы, параметры, cost multiplier, folds и universe не менялись. Финансовые метрики всех шести variant/fold комбинаций совпали с предыдущим artifact на опубликованной точности. Следовательно, расширение ledger не изменило исполнение или PnL.
+
+Поля trade ledger проверены отдельным deterministic regression в Research CI [41670688299](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41670688299), commit `952cb7cdceea91622bb560be4d462eba29d9d681`; полный workflow SUCCESS.
+
+### Stop-loss cohort
+
+По H-A суммарно:
+- 1,033 сделки; 528 stop-loss (51.1%).
+- Stop-loss net PnL: -20,294.80 USDT, в среднем -38.44 USDT на сделку.
+- Средний MFE stop-loss cohort: 0.447R; median 0.31R.
+- 37.7% stop-loss trades имели MFE не ниже 0.5R; 13.8% — не ниже 1R; 3.2% — не ниже 1.5R.
+- Средняя длительность stop-loss trades: около 11.6 H1 bars.
+- Fold stability: средний MFE stop-loss cohort = 0.463R / 0.430R / 0.448R в folds 1/2/3; доля MFE >=0.5R = 38.6% / 38.3% / 36.5%.
+
+Сравнение с frozen baseline:
+- Baseline: 523 stop-loss из 1,022 сделок (51.2%); stop-loss net -20,112.73 USDT; average stop-loss MFE 0.449R.
+- H-A практически не изменила частоту stop-loss или их MFE profile. Relative-strength rank не улучшил качество этой когорты в измеряемом смысле.
+
+### Другие exit cohorts H-A
+
+| Exit reason | Trades | Net PnL total | Avg net/trade | Avg MFE |
+|---|---:|---:|---:|---:|
+| Stop-loss | 528 | -20,294.80 | -38.44 | 0.447R |
+| Time-stop | 325 | +5,805.54 | +17.86 | 1.509R |
+| Trailing-stop | 148 | +6,821.00 | +46.09 | 2.779R |
+| Take-profit | 18 | +1,617.69 | +89.87 | 5.687R |
+| Kill-switch | 5 | -77.36 | -15.47 | 0.780R |
+| End-of-test | 9 | -7.33 | -0.81 | 0.949R |
+
+Stop-loss MAE averages exactly 1R by construction: `_manage_position()` caps the adverse extreme at the modeled stop fill and excludes the ambiguous post-stop wick. MFE on stop bars is also conservative because the favorable extreme on the stop candle is not counted when OHLC cannot establish intrabar order. These values are execution-bounded, not full path extrema.
+
+### Session and direction stability
+
+Session net attribution changes by fold; no UTC session is consistently profitable. The long/short loss contribution also changes by fold, consistent with the earlier ledger analysis. Do not add a global session, long-only or short-only gate based on this artifact.
+
+### Interpretation
+
+The relative-strength hypothesis did not reduce stop-loss frequency (51.2% baseline vs 51.1% H-A), nor improve the stop-loss MFE profile (0.449R vs 0.447R). H-A's aggregate gross PnL fell by 557.49 USDT while modeled fees+slippage fell by only 58.21 USDT; net therefore deteriorated by 499.28 USDT.
+
+A simple breakeven-at-0.5R or stop widening rule is not justified by these summaries. MFE/MAE do not preserve the sequence of intrabar price touches; changing a stop can also cut time-stop/trailing winners. Any stop-management hypothesis needs a separately preregistered path-aware replay, and must not be tuned on these already-used folds.
+
+### Next diagnostic target
+
+Investigate signal-candle and pre-break structure for stop-loss vs time/trailing winners: body/range relative to ATR, close location, upper/lower wick, volume ratio and trajectory, distance beyond prior Donchian boundary, and pre-break compression. Reconstruct only from bars available at signal close; use the previous H1 candle for next-bar entry and preserve the same shared-capital ledger. This is diagnostic attribution, not evidence of causality or a new profitable strategy.

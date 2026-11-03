@@ -818,6 +818,9 @@ def test_finalize_open_positions_uses_bar_close_timestamp_across_utc_midnight():
     e._last_mark_prices = {}
     e._intrabar_risk_marks = {}
     e._intrabar_risk_marks_ts = None
+    e._intrabar_mtm_marks = {}
+    e._intrabar_mtm_marks_ts = None
+    e._intrabar_liquidation_exits = {}
     e.closed_trades = []
     e.risk_mgr = engine_mod.AdaptiveRiskManager(cfg)
     e.tg = type("Notifier", (), {"send_message": lambda self, message: None})()

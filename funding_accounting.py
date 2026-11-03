@@ -92,7 +92,7 @@ def accrued_funding_cost(
         if ts in seen:
             raise ValueError(f"duplicate funding settlement timestamp: {ts}")
         seen.add(ts)
-        if not (entry_ts < ts <= as_of_ts):
+        if not (entry_ts <= ts <= as_of_ts):
             continue
         mark_raw = mark_prices.get(ts)
         if mark_raw is None:
@@ -104,7 +104,11 @@ def accrued_funding_cost(
             raise ValueError(f"funding mark price must be > 0 at {ts}")
         fraction = Decimal("1")
         full_position_cost = sign * quantity * mark * rate
-        if closed_ts_ms is not None and ts == closed_ts_ms:
+        if ts == entry_ts and full_position_cost < 0:
+            # Entry and funding settlement boundary ordering is unknown.
+            # Charge a possible payment, but never assume a receipt.
+            fraction = Decimal("0")
+        elif closed_ts_ms is not None and ts == closed_ts_ms:
             # A full exit and settlement share an OHLC candle-close boundary.
             # With unknown event order, charge a payment on full size but never
             # credit a receipt on a position that may already have been closed.
@@ -179,7 +183,7 @@ def accrued_funding_cost_for_remaining_margin(
         if ts in seen:
             raise ValueError(f"duplicate funding settlement timestamp: {ts}")
         seen.add(ts)
-        if not (entry_ts < ts <= as_of_ts):
+        if not (entry_ts <= ts <= as_of_ts):
             continue
         mark_raw = mark_prices.get(ts)
         if mark_raw is None:
@@ -193,6 +197,9 @@ def accrued_funding_cost_for_remaining_margin(
         # This includes settlements that happened before the TP1 timestamp.
         tp1_effective_as_of = tp1_ts is not None and tp1_ts <= as_of_ts
         fraction = ratio if tp1_effective_as_of else Decimal("1")
+        if ts == entry_ts and full_cost < 0:
+            # Do not book a potentially unavailable receipt at the entry instant.
+            fraction = Decimal("0")
         if defer_boundary_receipts and ts == as_of_ts and full_cost < 0:
             # The current-boundary receipt is deferred until the next mark,
             # because MTM is evaluated before same-candle exit resolution.

@@ -131,3 +131,22 @@ The updated Funding accounting, realized Funding, and Mark OHLC liquidation inte
 ### Exact entry/Funding timestamp boundary
 
 The funding ledger now includes a Funding settlement whose timestamp exactly matches the modeled entry candle open using a conservative event-order rule: charge a possible payment, do not assume a possible receipt. Settlements strictly before entry remain excluded. This reflects Bybit's documented uncertainty for orders opened/closed within five seconds of settlement; the simulator does not have exchange fill timestamps precise enough to determine actual inclusion. CI [#41716240400](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41716240400) passed 50/50 steps, including realized Funding PnL and cumulative Funding accounting tests.
+
+
+### Marketable TP limit gaps — 2026-11-03
+
+A fee-classification asymmetry was confirmed in the execution model. Entry limit orders that are marketable at the next candle open are correctly reclassified as taker, but TP1/TP2 limit targets were previously charged at the configured maker rate even when the candle opened through the target. A resting sell limit for a long (or buy limit for a short) becomes marketable when the open is beyond its limit; the maker assumption was therefore optimistic on gap-through target legs.
+
+**Correction:**
+- TP1 liquidity classification is now stored per position as tp1_maker.
+- A TP1 limit target opened through at the start of the candle is classified as taker and incurs taker fee plus modeled slippage; an ordinary intrabar touch retains the configured maker proxy.
+- Final TP2 exit classification is calculated separately for the actual close bar and recorded as final_exit_maker.
+- Mark-to-market and final closed-trade accounting use the same TP1 per-leg classification.
+- The actual TP1 liquidity flag survives state persistence and is retained in TradeRecord.
+- Gap fills remain priced at the target level rather than granting opening-price improvement. This is deliberately conservative on price; the fix changes liquidity/fee classification only.
+
+Regression coverage: long TP1 gap-through vs ordinary intrabar TP1 touch; long and short TP2 gap-through; independent fee/slippage math for the TP1 and final legs; state restore of an actual taker TP1 classification. Research CI [#41720537099](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41720537099) completed SUCCESS: **52/52 steps**.
+
+**Residual execution limit:** a non-gap OHLC touch is still only a maker proxy. The replay has no L2 order book, queue position, partial fills, cancel/replace latency or adverse-selection model. This correction prevents a known gap-through maker over-credit; it does not prove real maker execution.
+
+This supersedes the earlier simplified note in the fee section that any configured take-profit exit is maker whenever maker_exits is true.

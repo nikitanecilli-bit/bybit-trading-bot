@@ -941,6 +941,14 @@ class PlanBStatePersistence:
                     raise ValueError(f"позиция {sym}: entry_ts должен быть положительным целым числом")
                 if entry_ts > saved_at_ms:
                     raise ValueError(f"позиция {sym}: entry_ts не может быть позже saved_at_utc")
+                signal_ts_ms = pos_dict.get("signal_ts_ms")
+                if signal_ts_ms is not None:
+                    if (isinstance(signal_ts_ms, bool) or not isinstance(signal_ts_ms, int)
+                            or signal_ts_ms <= 0 or signal_ts_ms > entry_ts):
+                        raise ValueError(
+                            f"позиция {sym}: signal_ts_ms должен быть положительным целым числом "
+                            "не позже entry_ts"
+                        )
                 for field_name in numeric_position_fields.intersection(pos_dict):
                     value = pos_dict[field_name]
                     # Leverage was added after legacy Plan B backups already existed.
@@ -1894,7 +1902,7 @@ class UnifiedQuantEngine:
         sig = self.pending.pop(symbol)
         signal_origin_ts = sig.get("signal_origin_ts", signal_ts)
         if (isinstance(signal_origin_ts, bool) or not isinstance(signal_origin_ts, int)
-                or signal_origin_ts <= 0):
+                or signal_origin_ts <= 0 or signal_origin_ts > signal_ts):
             logger.error("Reject pending %s: invalid original signal timestamp %r", symbol, signal_origin_ts)
             self._persist()
             return False

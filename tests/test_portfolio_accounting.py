@@ -354,6 +354,10 @@ def test_engine_applies_dated_bybit_qty_step_and_minimums_when_spec_history_enab
     position = e.open_positions["BTCUSDT"]
     quantity = position.size_usdt / position.entry_price
     assert abs(quantity / 0.1 - round(quantity / 0.1)) < 1e-8
+    assert position.exchange_sized
+    assert position.contract_qty is not None
+    assert position.remaining_contract_qty == position.contract_qty
+    assert position.qty_step == "0.1"
     assert position.size_usdt >= 5.0
     assert position.risk_usdt <= 100.0
 

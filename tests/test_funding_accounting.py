@@ -52,6 +52,28 @@ class AccruedFundingTests(unittest.TestCase):
         self.assertEqual(accrued_funding_cost(before_tp1, EVENTS, MARKS, SETTLE_2),
                          Decimal("22.00"))
 
+    def test_exact_contract_remaining_quantity_overrides_legacy_fraction_after_tp1(self):
+        pos = position(tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
+        pos.contract_qty = "1.0"
+        pos.remaining_contract_qty = "0.4"
+        # The persisted contract quantity is authoritative even if the
+        # legacy display fraction is rounded or stale.
+        self.assertEqual(
+            accrued_funding_cost(pos, [EVENTS[1]], MARKS, SETTLE_2),
+            Decimal("0.48"),
+        )
+
+    def test_exact_contract_remaining_quantity_applies_at_tp1_receipt_boundary(self):
+        pos = position(tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
+        pos.contract_qty = "1.0"
+        pos.remaining_contract_qty = "0.4"
+        self.assertEqual(
+            accrued_funding_cost(
+                pos, [{"ts": SETTLE_1, "rate": "-0.01"}], MARKS, SETTLE_1
+            ),
+            Decimal("-0.40"),
+        )
+
     def test_missing_exact_mark_fails_closed(self):
         with self.assertRaisesRegex(RuntimeError, "Missing exact"):
             accrued_funding_cost(position(), EVENTS, {SETTLE_1: 100}, SETTLE_2)

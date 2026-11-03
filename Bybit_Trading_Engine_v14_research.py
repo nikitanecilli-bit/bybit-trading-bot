@@ -1662,6 +1662,8 @@ class UnifiedQuantEngine:
             self._persist()
             return False
 
+        exchange_order = None
+        instrument_spec = None
         # Optional strict execution path. When a dated Bybit snapshot directory
         # is supplied, missing/stale symbols, leverage mismatches and exchange
         # lot constraints reject the entry; there is deliberately no proxy fallback.
@@ -1692,8 +1694,6 @@ class UnifiedQuantEngine:
             size_usdt = float(exchange_order.notional_usdt)
             risk_usdt = float(exchange_order.risk_usdt)
 
-        exchange_order = None
-        instrument_spec = None
         risk_tier = None
         risk_tier_history = getattr(self, "risk_tier_history", None)
         if risk_tier_history is not None:

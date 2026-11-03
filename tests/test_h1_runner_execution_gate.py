@@ -477,16 +477,16 @@ def test_funding_mark_coverage_requires_every_symbol_and_h1_mark_bar():
         funding.mkdir()
         marks.mkdir()
         (funding / "BTCUSDT.csv").write_text(
-            "symbol,funding_timestamp_ms,funding_rate\\n"
-            "BTCUSDT,28800000,0.001\\n"
-            "BTCUSDT,57600000,0.001\\n",
+            "symbol,funding_timestamp_ms,funding_rate\n"
+            "BTCUSDT,28800000,0.001\n"
+            "BTCUSDT,57600000,0.001\n",
             encoding="utf-8",
         )
         (marks / "BTCUSDT.csv").write_text(
-            "symbol,timestamp_ms,open\\n"
-            "BTCUSDT,28800000,100\\n"
-            "BTCUSDT,32400000,100\\n"
-            "BTCUSDT,57600000,100\\n",
+            "symbol,timestamp_ms,open\n"
+            "BTCUSDT,28800000,100\n"
+            "BTCUSDT,32400000,100\n"
+            "BTCUSDT,57600000,100\n",
             encoding="utf-8",
         )
         _write_funding_manifest(
@@ -510,15 +510,15 @@ def test_funding_mark_coverage_rejects_no_settlement_in_fold():
         funding.mkdir()
         marks.mkdir()
         (funding / "BTCUSDT.csv").write_text(
-            "symbol,funding_timestamp_ms,funding_rate\\n"
-            "BTCUSDT,28800000,0.001\\n"
-            "BTCUSDT,57600000,0.001\\n",
+            "symbol,funding_timestamp_ms,funding_rate\n"
+            "BTCUSDT,28800000,0.001\n"
+            "BTCUSDT,57600000,0.001\n",
             encoding="utf-8",
         )
         (marks / "BTCUSDT.csv").write_text(
-            "symbol,timestamp_ms,open\\n"
-            "BTCUSDT,28800000,100\\n"
-            "BTCUSDT,57600000,100\\n",
+            "symbol,timestamp_ms,open\n"
+            "BTCUSDT,28800000,100\n"
+            "BTCUSDT,57600000,100\n",
             encoding="utf-8",
         )
         _write_funding_manifest(

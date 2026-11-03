@@ -151,6 +151,30 @@ class RiskTierHistory:
             snapshots.append(RiskTierSnapshot(fetched_at, fetched_at_ms, category, final))
         return cls(snapshots)
 
+    def get_tiers(self, symbol: str, as_of_ts: int, *, max_age_ms: int | None = None) -> tuple[RiskTier, ...]:
+        """Return the symbol's complete point-in-time tier ladder.
+
+        Unlike get_tier(), this does not apply a leverage constraint: existing
+        positions must continue to be evaluated for maintenance-margin shortfall
+        if Mark Price moves them into a tier whose maxLeverage is below their
+        historical entry leverage.
+        """
+        timestamp = int(as_of_ts)
+        eligible = [item for item in self.snapshots if item.fetched_at_ms <= timestamp]
+        if not eligible:
+            raise ValueError(f"no {self.category} risk-tier snapshot at or before {timestamp}")
+        selected = eligible[-1]
+        age = timestamp - selected.fetched_at_ms
+        if max_age_ms is not None:
+            if max_age_ms < 0:
+                raise ValueError("max_age_ms cannot be negative")
+            if age > max_age_ms:
+                raise ValueError(f"risk-tier snapshot is stale: age_ms={age}, max_age_ms={max_age_ms}")
+        tiers = selected.tiers_by_symbol.get(symbol.strip().upper())
+        if not tiers:
+            raise ValueError(f"{symbol} absent from dated risk-tier snapshot")
+        return tiers
+
     def get_tier(self, symbol: str, as_of_ts: int, position_value: Decimal | str | float,
                  *, leverage: Decimal | str | float, max_age_ms: int | None = None) -> RiskTier:
         timestamp = int(as_of_ts)

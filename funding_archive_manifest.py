@@ -30,6 +30,31 @@ def csv_data_row_count(path: str | Path) -> int:
         return max(0, sum(1 for _ in csv.DictReader(handle)))
 
 
+def verify_existing_funding_manifest(
+    csv_path: str | Path,
+    manifest_path: str | Path,
+    *,
+    symbol: str,
+) -> bool:
+    """Refuse to extend an archive whose previously attested bytes have changed."""
+    csv_path, manifest_path = Path(csv_path), Path(manifest_path)
+    if not manifest_path.is_file():
+        return False
+    if not csv_path.is_file():
+        raise ValueError("funding manifest exists but its CSV archive is missing")
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("existing funding manifest is unreadable; refusing to overwrite provenance") from exc
+    if payload.get("schema_version") != SCHEMA_VERSION or payload.get("symbol") != symbol.upper():
+        raise ValueError("existing funding manifest schema/symbol mismatch")
+    if payload.get("csv_sha256") != sha256_file(csv_path):
+        raise ValueError("existing funding CSV hash differs from its manifest; refusing to extend archive")
+    if payload.get("csv_data_rows") != csv_data_row_count(csv_path):
+        raise ValueError("existing funding CSV row count differs from its manifest; refusing to extend archive")
+    return True
+
+
 def record_funding_collection(
     csv_path: str | Path,
     manifest_path: str | Path,

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import os
 import re
@@ -303,6 +304,65 @@ def fetch_mark_klines(symbol: str, start_ms: int, end_ms: int, interval: str = "
     return [candles[ts] for ts in sorted(candles)]
 
 
+def load_universe_lifecycle(path: str | Path) -> tuple[dict[str, dict[str, Any]], str, str]:
+    """Load and validate a dated Bybit linear-universe snapshot."""
+    snapshot_path = Path(path).resolve()
+    try:
+        snapshot_path.relative_to(Path.cwd().resolve())
+    except ValueError as exc:
+        raise ValueError("universe snapshot must be inside the repository checkout") from exc
+    raw_bytes = snapshot_path.read_bytes()
+    snapshot = json.loads(raw_bytes.decode("utf-8"))
+    if not isinstance(snapshot, dict) or snapshot.get("category") != "linear":
+        raise ValueError("universe snapshot must be a Bybit linear snapshot")
+    instruments = snapshot.get("instruments")
+    if not isinstance(instruments, list) or not instruments:
+        raise ValueError("universe snapshot must contain a non-empty instruments list")
+    fetched_at = snapshot.get("fetched_at")
+    if not isinstance(fetched_at, str) or not fetched_at:
+        raise ValueError("universe snapshot is missing fetched_at provenance")
+    by_symbol: dict[str, dict[str, Any]] = {}
+    for row in instruments:
+        if not isinstance(row, dict):
+            raise ValueError("universe snapshot instrument must be an object")
+        symbol = normalize_symbol(row.get("symbol"))
+        if symbol in by_symbol:
+            raise ValueError(f"duplicate symbol in universe snapshot: {symbol}")
+        if row.get("contractType") != "LinearPerpetual" or row.get("quoteCoin") != "USDT" or row.get("settleCoin") != "USDT":
+            continue
+        try:
+            launch_ms = int(str(row.get("launchTime")))
+            delivery_ms = int(str(row.get("deliveryTime", "0")))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"invalid lifecycle timestamps for {symbol}") from exc
+        if launch_ms <= 0 or delivery_ms < 0 or (delivery_ms and delivery_ms < launch_ms):
+            raise ValueError(f"invalid lifecycle bounds for {symbol}")
+        by_symbol[symbol] = {"launch_ms": launch_ms, "delivery_ms": delivery_ms, "status": row.get("status")}
+    if not by_symbol:
+        raise ValueError("universe snapshot contains no USDT linear perpetual instruments")
+    return by_symbol, hashlib.sha256(raw_bytes).hexdigest(), fetched_at
+
+
+def clip_range_to_lifecycle(symbol: str, start_ms: int, end_ms: int, interval_ms: int,
+                            lifecycle: dict[str, dict[str, Any]]) -> tuple[int, int]:
+    """Clip to complete candles fully inside the instrument's launch/delivery lifecycle."""
+    symbol = normalize_symbol(symbol)
+    if interval_ms <= 0 or start_ms <= 0 or end_ms <= start_ms:
+        raise ValueError("valid range and interval are required")
+    if symbol not in lifecycle:
+        raise ValueError(f"{symbol} is absent from the supplied Bybit lifecycle snapshot")
+    item = lifecycle[symbol]
+    launch_ms = item["launch_ms"]
+    delivery_ms = item["delivery_ms"]
+    first_full_candle = ((launch_ms + interval_ms - 1) // interval_ms) * interval_ms
+    last_full_end = (delivery_ms // interval_ms) * interval_ms if delivery_ms else end_ms
+    clipped_start = max(start_ms, first_full_candle)
+    clipped_end = min(end_ms, last_full_end)
+    if clipped_end <= clipped_start:
+        raise ValueError(f"requested range has no complete {interval_ms // 60000}-minute candles inside {symbol} lifecycle")
+    return clipped_start, clipped_end
+
+
 def _atomic_csv(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
@@ -353,6 +413,7 @@ def main() -> None:
     parser.add_argument("--symbols", required=True, help="Comma-separated linear symbols")
     parser.add_argument("--start-ms", required=True, type=int)
     parser.add_argument("--end-ms", required=True, type=int, help="Exclusive end timestamp")
+    parser.add_argument("--universe-snapshot", required=True, help="Repository-relative Bybit linear universe snapshot JSON")
     parser.add_argument("--interval", default="60", choices=sorted(INTERVALS))
     parser.add_argument("--output-root", default="data/archives/bybit")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
@@ -361,14 +422,34 @@ def main() -> None:
     symbols = [normalize_symbol(s) for s in args.symbols.split(",") if s.strip()]
     if not symbols or len(symbols) != len(set(symbols)):
         parser.error("--symbols must contain unique non-empty symbols")
-    results = []
+    lifecycle, universe_sha256, universe_fetched_at = load_universe_lifecycle(args.universe_snapshot)
+    interval_ms = int(args.interval) * 60_000
+    prepared = []
     for symbol in symbols:
-        results.append(archive_symbol(
-            symbol, args.start_ms, args.end_ms, args.output_root,
+        effective_start, effective_end = clip_range_to_lifecycle(
+            symbol, args.start_ms, args.end_ms, interval_ms, lifecycle,
+        )
+        prepared.append((symbol, effective_start, effective_end))
+    results = []
+    for symbol, effective_start, effective_end in prepared:
+        result = archive_symbol(
+            symbol, effective_start, effective_end, args.output_root,
             args.interval, args.base_url, args.pause,
-        ))
+        )
+        result.update({
+            "requested_start_ms": args.start_ms,
+            "requested_end_exclusive_ms": args.end_ms,
+            "lifecycle_launch_ms": lifecycle[symbol]["launch_ms"],
+            "lifecycle_delivery_ms": lifecycle[symbol]["delivery_ms"],
+            "lifecycle_status_at_snapshot": lifecycle[symbol]["status"],
+            "lifecycle_clipped": effective_start != args.start_ms or effective_end != args.end_ms,
+        })
+        results.append(result)
     report = {
         "source": "Bybit V5 trade kline + funding history + mark price kline",
+        "universe_snapshot": args.universe_snapshot,
+        "universe_snapshot_sha256": universe_sha256,
+        "universe_snapshot_fetched_at": universe_fetched_at,
         "category": "linear", "interval": args.interval,
         "fetched_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "results": results,

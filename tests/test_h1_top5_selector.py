@@ -5,7 +5,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.select_h1_top5_train_only import rank_candidates, common_training_bar_count, common_training_window, first_validation_timestamp
+from scripts.select_h1_top5_train_only import rank_candidates, common_training_bar_count, common_training_window, first_validation_timestamp, candidate_training_slice
 
 
 def _row(symbol, trades, net, pf, exp, dd):
@@ -80,6 +80,34 @@ def test_common_training_window_uses_exact_shared_h1_intersection():
     assert first_validation_timestamp(histories) == 5 * 3_600_000
 
 
+def test_candidate_training_slice_rejects_short_symbol_validation_leakage():
+    class Candle:
+        def __init__(self, ts):
+            self.ts = ts
+
+    hour = 3_600_000
+    long_history = [Candle(i * hour) for i in range(10_000)]
+    # Shared cutoff comes from the longest archive. This shorter archive's own
+    # midpoint is much earlier, so using bars through the shared cutoff leaks.
+    short_history = [Candle(i * hour) for i in range(4_000)]
+    train, validation_ts, error = candidate_training_slice(
+        short_history, 0, 4_998 * hour
+    )
+    assert train == []
+    assert validation_ts == 2_000 * hour
+    assert error == "candidate_training_overlaps_own_validation"
+
+    # A candidate with the same long history remains strictly before its own
+    # first validation bar, including the one-bar embargo.
+    train, validation_ts, error = candidate_training_slice(
+        long_history, 0, 4_998 * hour
+    )
+    assert error is None
+    assert len(train) == 4_999
+    assert train[-1].ts < validation_ts
+    assert validation_ts == 5_000 * hour
+
+
 def test_insufficient_positive_candidates_are_not_promoted():
     rows = [_row("AAAUSDT", 60, 100, 1.3, 0.1, 8)]
     _, eligible = rank_candidates(rows)
@@ -116,6 +144,7 @@ if __name__ == "__main__":
         test_ties_are_resolved_by_drawdown_then_trade_count_then_symbol,
         test_common_training_overlap_requires_every_symbol_to_share_timestamps,
         test_common_training_window_uses_exact_shared_h1_intersection,
+        test_candidate_training_slice_rejects_short_symbol_validation_leakage,
         test_insufficient_positive_candidates_are_not_promoted,
         test_non_finite_candidate_metrics_fail_closed,
         test_negative_candidate_trade_count_is_rejected,

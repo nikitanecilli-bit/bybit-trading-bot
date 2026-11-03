@@ -223,3 +223,12 @@ Created H_C_POST_BREAK_INVALIDATION_PREREGISTRATION_RU.md and implemented the fr
 No new market PnL run is authorized by this preregistration. The current CryptoFetch/Binance-style archives are not Bybit-native and lack historical point-in-time Bybit universe, dated instrument specs/risk tiers and verified full funding/mark coverage. The user had previously deferred Bybit API connection until strategy research is ready; do not bypass that constraint. TradeRecord now retains TP1 hit/time/realized gross, remaining fraction, stop geometry and breakout level; existing H-A artifacts predate these journal extensions. Legacy state backups remain loadable when H-C is disabled.
 
 Next safe work: finish static review of position lifecycle, TP1-aware PnL/cost reconciliation, and sparse/shared-capital event ordering; add deterministic tests only for confirmed gaps. Do not run H-C on the already-used folds or tune the three-bar window.
+
+
+## 2026-11-03 — reporting gate for the user's 20% net monthly hurdle
+
+- H1 fold reports now include `duration_days`, `duration_months` and `geometric_monthly_return_pct`, derived from the fold's cumulative net PnL after modeled fees, slippage and funding and the exact inclusive H1 duration (first candle open through final candle close).
+- This is a geometric monthly-equivalent normalization of the whole fold, not proof that each calendar month was profitable and not a standalone deployment criterion.
+- The user's 20% net monthly objective must be evaluated against this normalized metric, alongside fold stability, max drawdown, trade count and cost stress. Before calling a candidate consistently profitable, a later report must also expose actual calendar-month returns and losing-month frequency; a single fold average cannot establish monthly consistency.
+- The metric is reporting-only: no strategy parameters, symbol ranking, entry/exit rules or risk sizing changed. No market PnL was run.
+- Regression coverage includes one-month +20% and two-month +44% compounded examples, invalid duration and total-loss handling. CI [#41708149842](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41708149842) and [#41708141158](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41708141158) both SUCCESS, 50/50 steps.

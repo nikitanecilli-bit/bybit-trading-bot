@@ -7,7 +7,7 @@ import unittest
 from types import SimpleNamespace
 from decimal import Decimal
 
-from funding_accounting import accrued_funding_cost
+from funding_accounting import accrued_funding_cost, accrued_funding_cost_for_remaining_margin
 
 
 ENTRY = 1_000
@@ -51,6 +51,20 @@ class AccruedFundingTests(unittest.TestCase):
         before_tp1 = position(tp1=True, tp1_ts=SETTLE_2 + 1, remaining="0.5")
         self.assertEqual(accrued_funding_cost(before_tp1, EVENTS, MARKS, SETTLE_2),
                          Decimal("22.00"))
+
+    def test_margin_funding_allocates_pre_tp1_cost_to_remaining_quantity(self):
+        pos = position(tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
+        self.assertEqual(
+            accrued_funding_cost_for_remaining_margin(pos, EVENTS, MARKS, SETTLE_2),
+            Decimal("11.00"),
+        )
+
+    def test_margin_funding_without_tp1_matches_actual_cashflow(self):
+        pos = position(tp1=False, tp1_ts=None, remaining="1")
+        self.assertEqual(
+            accrued_funding_cost_for_remaining_margin(pos, EVENTS, MARKS, SETTLE_2),
+            accrued_funding_cost(pos, EVENTS, MARKS, SETTLE_2),
+        )
 
     def test_exact_contract_remaining_quantity_overrides_legacy_fraction_after_tp1(self):
         pos = position(tp1=True, tp1_ts=SETTLE_1, remaining="0.5")

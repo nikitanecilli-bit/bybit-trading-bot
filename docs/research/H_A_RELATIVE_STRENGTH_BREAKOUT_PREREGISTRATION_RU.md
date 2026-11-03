@@ -1,7 +1,7 @@
 # H-A — Relative Strength Breakout: preregistration
 
 Дата фиксации: 2026-11-03  
-Статус: hypothesis specified; no market PnL run  
+Статус: preregistered replay completed; H-A rejected after negative net results in all three reused folds  
 Цель: проверить, добавляет ли cross-sectional relative strength информацию к H1 Donchian breakout после консервативных execution costs.
 
 ## 1. Universe and availability
@@ -39,7 +39,7 @@
 - Funding and mark-price histories are absent from these archives. Any OHLCV-only net result must explicitly state funding omitted and must not be presented as complete Bybit net PnL.
 - Shared-capital replay only; no independent per-symbol equity summation.
 
-## 4. Evaluation protocol
+## 4. Evaluation protocol (зафиксировано до replay)
 
 - First run corrected-engine frozen baseline on exactly the same sparse universe, date boundary, folds, costs and capital settings.
 - Then run this single frozen H-A definition once. No parameter sweep.

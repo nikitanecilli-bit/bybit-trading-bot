@@ -19,7 +19,7 @@ from run_h1_shared_capital_portfolio_validation import (
     BASE_TAKER_FEE, BASE_MAKER_FEE, BASE_TAKER_SLIP,
     resolve_validation_design, load_frozen_selection_manifest,
     validate_selection_cutoff, validate_selection_provenance, runtime_provenance,
-    selection_validation_boundary,
+    selection_validation_boundary, geometric_monthly_return_pct,
 )
 
 
@@ -183,6 +183,27 @@ def test_runtime_provenance_separates_research_checkout_from_workflow_ref():
             else:
                 os.environ[name] = value
 
+
+
+
+def test_geometric_monthly_return_normalizes_compounded_returns_by_exact_duration():
+    month_ms = int(round(365.2425 / 12.0 * 86_400_000))
+    one_month = geometric_monthly_return_pct(2_000.0, 10_000.0, 0, month_ms - 3_600_000)
+    two_months = geometric_monthly_return_pct(4_400.0, 10_000.0, 0, 2 * month_ms - 3_600_000)
+    assert abs(one_month["geometric_monthly_return_pct"] - 20.0) < 1e-8
+    assert abs(two_months["geometric_monthly_return_pct"] - 20.0) < 1e-8
+    assert abs(one_month["duration_months"] - 1.0) < 1e-8
+
+
+def test_geometric_monthly_return_rejects_invalid_duration_and_handles_total_loss():
+    try:
+        geometric_monthly_return_pct(100.0, 10_000.0, 2_000, 1_000)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("reversed fold timestamps must fail")
+    wiped = geometric_monthly_return_pct(-10_000.0, 10_000.0, 0, 30 * 86_400_000)
+    assert wiped["geometric_monthly_return_pct"] == -100.0
 
 
 def test_selection_boundary_remains_first_explore_fold_in_confirm_mode():
@@ -533,6 +554,8 @@ if __name__ == "__main__":
         test_selection_provenance_rejects_changed_data_and_code,
         test_selection_provenance_rejects_changed_universe_snapshot,
         test_runtime_provenance_separates_research_checkout_from_workflow_ref,
+        test_geometric_monthly_return_normalizes_compounded_returns_by_exact_duration,
+        test_geometric_monthly_return_rejects_invalid_duration_and_handles_total_loss,
         test_selection_boundary_remains_first_explore_fold_in_confirm_mode,
         test_selection_cutoff_must_precede_validation,
         test_confirm_mode_rejects_missing_or_unregistered_config,

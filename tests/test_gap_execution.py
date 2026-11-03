@@ -767,6 +767,7 @@ if __name__ == "__main__":
         test_long_gap_stop_journal_uses_actual_gap_fill_price,
         test_financial_rounding_uses_half_up_at_half_cent,
         test_pending_signal_is_removed_when_risk_gate_rejects_entry,
+        test_pending_entry_cannot_reuse_slot_freed_later_in_same_bar,
         test_fill_bar_long_stop_does_not_count_pre_entry_or_later_favorable_wick,
         test_fill_bar_short_stop_does_not_count_pre_entry_or_later_favorable_wick,
         test_new_trailing_stop_is_not_applied_retroactively_to_same_candle,

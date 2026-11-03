@@ -1042,7 +1042,7 @@ class PlanBStatePersistence:
                 pos = OpenPositionState(**pos_dict)
                 if (
                     getattr(risk_mgr.cfg, "enable_post_break_invalidation", False)
-                    and pos.strategy in {"H1-momentum-breakout", "H-A-relative-strength-breakout"}
+                    and pos.strategy in {"H1-momentum-breakout"}
                     and pos.bars_held <= POST_BREAK_INVALIDATION_BARS
                     and pos.breakout_level is None
                 ):
@@ -1105,7 +1105,7 @@ class PlanBStatePersistence:
                     raise ValueError(f"pending signal {sym}: strategy должен быть непустой строкой")
                 if (
                     getattr(risk_mgr.cfg, "enable_post_break_invalidation", False)
-                    and signal["strategy"] in {"H1-momentum-breakout", "H-A-relative-strength-breakout"}
+                    and signal["strategy"] in {"H1-momentum-breakout"}
                     and signal.get("breakout_level") is None
                 ):
                     raise ValueError(
@@ -1886,7 +1886,7 @@ class UnifiedQuantEngine:
         strategy_name = str(sig.get("strategy", ""))
         if (
             self.cfg.enable_post_break_invalidation
-            and strategy_name in {"H1-momentum-breakout", "H-A-relative-strength-breakout"}
+            and strategy_name in {"H1-momentum-breakout"}
             and sig.get("breakout_level") is None
         ):
             logger.error("H-C: отклонён pending %s — отсутствует signal-time breakout_level", symbol)
@@ -2168,7 +2168,7 @@ class UnifiedQuantEngine:
                 exit_price, exit_reason = self._intrabar_risk_marks.get(symbol, curr.close), "kill_switch"
             elif (
                 self.cfg.enable_post_break_invalidation
-                and pos.strategy in {"H1-momentum-breakout", "H-A-relative-strength-breakout"}
+                and pos.strategy in {"H1-momentum-breakout"}
                 and pos.bars_held <= POST_BREAK_INVALIDATION_BARS
             ):
                 if pos.breakout_level is None:

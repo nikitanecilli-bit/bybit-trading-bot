@@ -84,7 +84,7 @@ jobs:
       - name: Test as-of Bybit risk-tier history and selection
         run: python tests/test_bybit_risk_tiers.py
       - name: Test isolated USDT liquidation price model
-        run: python -m pytest -q tests/test_mark_price_liquidation.py
+        run: python tests/test_mark_price_liquidation.py
       - name: Test exchange-valid quantity sizing
         run: python tests/test_exchange_order_sizing.py
       - name: Test portfolio engine exchange sizing integration

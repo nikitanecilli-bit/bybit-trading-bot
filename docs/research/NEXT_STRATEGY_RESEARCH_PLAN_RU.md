@@ -269,3 +269,10 @@ A confirmed accounting-model mismatch was corrected: pre-TP1 funding settlements
 Remaining caveat: Bybit first deducts Funding from available balance and only deducts it from isolated position initial margin if available balance is insufficient. The simulator has no account-wide available-balance ledger and conservatively subtracts the remaining-leg Funding allocation from position margin. This is a stress assumption and may overstate liquidation risk. Do not describe the model as full UTA fidelity.
 
 CI run [#41715596303](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41715596303): all 50 configured steps, including Funding accounting and Mark liquidation integration tests, reported success at last inspection; overall run/job terminal status was not yet returned. No market PnL replay was run.
+
+
+### Exact entry/Funding boundary — 2026-11-03
+
+The funding ledger no longer silently excludes a settlement whose timestamp equals the modeled entry candle open. Bybit documents that fills within five seconds before/after settlement may or may not be included. With no exchange fill timestamp, the simulator now charges a possible payment and excludes a possible receipt at that exact boundary; events strictly before entry remain excluded. This is a conservative boundary convention, not a reconstruction of actual exchange event order.
+
+Research CI [#41716240400](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41716240400) passed 50/50 steps. The isolated margin funding treatment remains account-level approximate: net Funding is applied directly to position margin without modeling whether available balance covers it. Depending on funding sign and wallet balance this can overstate or understate liquidation risk. Do not interpret it as uniformly conservative or full UTA fidelity.

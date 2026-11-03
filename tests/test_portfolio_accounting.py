@@ -293,6 +293,42 @@ def test_open_maker_take_profit_mtm_remains_conservative_vs_final_maker_close():
     assert abs((trade.pnl_usdt - mtm) - expected_conservative_gap) < 0.01
 
 
+def test_conservative_maker_mtm_can_trip_daily_stop_before_modeled_maker_close():
+    mark_engine = make_engine()
+    mark_pos = make_position(size=1_000.0, order_type="limit", maker_exits=True)
+    mark_engine.open_positions["BTCUSDT"] = mark_pos
+    mark_engine._last_mark_prices["BTCUSDT"] = 110.0
+    exit_ts = 1_800_003_600_000
+    open_position_mtm = mark_engine._unrealized_pnl_at_marks(exit_ts)
+
+    close_engine = make_engine()
+    close_pos = make_position(size=1_000.0, order_type="limit", maker_exits=True)
+    close_engine._close_position(
+        close_pos, exit_price=110.0, exit_reason="take_profit",
+        exit_ts=exit_ts, mae_r=0.0, mfe_r=2.0,
+    )
+    modeled_maker_close_net = close_engine.closed_trades[-1].pnl_usdt
+
+    # A second open position contributes the same -$1,000 MTM in both cases.
+    # Put the daily-stop threshold strictly between the two resulting equity paths.
+    conservative_dd = -(open_position_mtm - 1_000.0) / 10_000.0 * 100.0
+    maker_close_dd = -(modeled_maker_close_net - 1_000.0) / 10_000.0 * 100.0
+    assert conservative_dd > maker_close_dd
+    threshold = (conservative_dd + maker_close_dd) / 2.0
+
+    cfg_mtm = engine_mod.BotConfig(capital_usdt=10_000.0, daily_stop_loss_pct=threshold,
+                                   emergency_kill_switch_pct=99.0)
+    mtm_risk = engine_mod.AdaptiveRiskManager(cfg_mtm)
+    mtm_risk.mark_to_market(open_position_mtm - 1_000.0, exit_ts)
+    assert mtm_risk.daily_stop_triggered is True
+
+    cfg_close = engine_mod.BotConfig(capital_usdt=10_000.0, daily_stop_loss_pct=threshold,
+                                     emergency_kill_switch_pct=99.0)
+    close_risk = engine_mod.AdaptiveRiskManager(cfg_close)
+    close_risk.mark_to_market(modeled_maker_close_net - 1_000.0, exit_ts)
+    assert close_risk.daily_stop_triggered is False
+
+
 def test_close_trade_reconciles_net_pnl_fees_slippage_and_realized_equity():
     e = make_engine()
     pos = make_position(size=1_000.0, order_type="market", maker_exits=False)

@@ -37,6 +37,7 @@ def make_engine():
     e.pending = {}
     e.trade_seq = 0
     e._bar_entry_risk_budgets = {}
+    e._bar_entry_equity = None
     e.instrument_spec_history = None
     e.max_instrument_spec_age_ms = 30 * 24 * 60 * 60 * 1000
     e.risk_tier_history = None

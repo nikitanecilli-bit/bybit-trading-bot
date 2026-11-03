@@ -140,7 +140,7 @@ Synthetic coverage: Research CI [#41720355038](https://github.com/nikitanecilli-
 - The current H-A artifacts predate the latest trade-journal extension and therefore still lack TP1 partial-state fields. The research branch now retains initial stop geometry, TP1 hit/time/realized gross, remaining fraction, final stop and breakout level in TradeRecord, and the H-A runner exports them on future runs. H-C itself now executes inside the engine lifecycle so event priority and partial quantities are exact; do not infer counterfactual PnL from old final trade rows.
 - Existing H-A folds are development data only.
 
-**No market PnL run has been launched for H-C.**
+**One reverse-time CryptoFetch proxy PnL replay has completed.** It is not Bybit-native, not forward OOS, and excludes funding/mark-price liquidation. H-C remains disabled-by-default and is rejected on this proxy window; see [H-C reverse-time results](../reports/H_C_REVERSE_TIME_RESULTS_2026-11-04_RU.md).
 
 
 ### 9.1. Reverse-time runner manifest correction — 2026-11-03
@@ -153,4 +153,13 @@ The runner now builds two explicit configs:
 
 Maker flags are valid Python bools and remain False in both configs. A regression test verifies both config dictionaries and the fixed horizon. Research CI [#41721944597](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41721944597) completed SUCCESS, 53/53 steps.
 
-This is manifest/configuration correctness only. The one-shot reverse-time CryptoFetch proxy workflow was not triggered; no proxy PnL replay, Bybit API access, Funding data collection or live orders were performed.
+The first one-shot workflow attempt [#41722181706](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41722181706) failed before archive loading or PnL because direct script execution lacked the repository root on sys.path. The runner path was fixed and a CLI regression test added; Research CI [#41722380421](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41722380421) passed 53/53. The first complete replay then succeeded as [#41722545731](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41722545731). The initial import failure did not start PnL and did not consume the preregistered replay. No Bybit API access, funding collection or live orders were performed.
+
+
+## 10. Reverse-time proxy result — 2026-11-04
+
+The single preregistered replay completed successfully. Baseline: 313 trades, proxy net before funding -2,720.47 USDT, PF 0.63, expectancy -0.213R, max DD 30.06%. H-C: 610 trades, proxy net before funding -2,880.12 USDT, PF 0.72, expectancy -0.120R, max DD 30.18%.
+
+H-C improved gross PnL by 1,502.18 USDT and reduced stop-loss exits from 180 to 138, but increased fees plus slippage by 1,661.83 USDT because trade count rose 94.9%. The 296 H-C invalidation exits averaged -0.399R and summed to -4,535.90 USDT net. H-C underperformed baseline by 159.65 USDT and both variants hit the 30% kill switch. It fails the preregistered promotion criterion. Do not tune or rerun this window.
+
+Full details, monthly equity and exit-reason decomposition: [H-C reverse-time results report](../reports/H_C_REVERSE_TIME_RESULTS_2026-11-04_RU.md).

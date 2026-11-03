@@ -1,5 +1,8 @@
 # Аудит leverage, margin и liquidation model
 
+> **Актуальный статус на 2026-11-03:** исходный статический аудит предшествовал интеграции ENG-EXEC-010/011 и Mark OHLC liquidation path. Dated risk tiers, entry-time position IM/MM и isolated USDT position-level Mark liquidation теперь реализованы и покрыты CI. Поэтому формулировки ниже об отсутствии любой liquidation-модели, exact contract quantity или risk-tier lookup являются историческими и superseded. Это **не** полный Bybit account engine: Cross/Portfolio Margin, shared collateral, partial-liquidation ladder и подтверждение реального account mode остаются вне модели. См. [Execution integration re-audit](EXECUTION_INTEGRATION_REAUDIT_2026-11-03.md).
+
+
 Дата: 2026-11-03
 Статус: CONFIRMED MODEL LIMITATION / EXECUTION GATE BLOCKED
 Scope: `Bybit_Trading_Engine_v14_research.py`, `exchange_order_sizing.py`, `bybit_instrument_specs.py`, `tests/test_portfolio_accounting.py`, `docs/audits/EXECUTION_REALISM_READINESS_RU.md`.

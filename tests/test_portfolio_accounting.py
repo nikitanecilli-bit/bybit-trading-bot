@@ -44,6 +44,12 @@ def make_engine():
     e.max_risk_tier_age_ms = 30 * 24 * 60 * 60 * 1000
     e._last_mark_prices = {}
     e._intrabar_risk_marks = {}
+    e._intrabar_risk_marks_ts = None
+    e._intrabar_mtm_marks = {}
+    e._intrabar_mtm_marks_ts = None
+    e._intrabar_liquidation_exits = {}
+    e._mark_price_candles = {}
+    e.liquidation_model_enabled = False
     e.closed_trades = []
     e._persist = lambda: None
     e.tg = type("TelegramSpy", (), {"send_message": staticmethod(lambda *_: None)})()

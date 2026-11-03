@@ -7,7 +7,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from scripts.run_h1_shared_capital_portfolio_validation import (
-    build_ema50_200_label_maps, h1_variant_name, resolve_ema50_200_gate,
+    build_ema50_200_label_maps, h1_variant_modes, h1_variant_name,
+    resolve_ema50_200_gate,
 )
 from market_structure import lookup_trend_label
 
@@ -47,6 +48,8 @@ def test_ema50_200_gate_is_explicitly_opt_in_and_rejects_invalid_values():
     assert baseline == "vol1.6_breakATR0.1_cost2"
     assert gated == "vol1.6_breakATR0.1_cost2_ema50_200_up"
     assert baseline != gated
+    assert h1_variant_modes(False) == (False,)
+    assert h1_variant_modes(True) == (False, True)
 
 
 

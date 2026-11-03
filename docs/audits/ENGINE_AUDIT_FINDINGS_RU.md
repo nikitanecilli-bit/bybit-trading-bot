@@ -651,3 +651,15 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 **Проверка:** Research CI [#41678553516 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41678553516), включая H1 runner execution-gate test и новую регрессию. Run выполнен на commit `a63d75965e710b12e6beaab22ac522c27644d7a3`; текущий head `cb31282a6e5e563048d71d1b7eee62e3f352a45d` отличается только пустым commit (compare: 0 changed files). Промежуточные CI попытки на неполных промежуточных commits падали в тестовом контуре; финальный workflow прошёл полностью.
 
 **Границы:** это исправление изоляции исследовательского процесса. Ни рыночный PnL, ни качество сигналов, ни реалистичность maker fills этим не подтверждаются. Новый market replay не запускался.
+
+### 2026-11-03 — sparse shared-capital replay: multi-position kill-switch integration
+
+**Проверено:** `run_sparse_simulation_pass()` проходит union timeline динамического набора символов, pre-marks весь активный портфель до обработки отдельных инструментов, затем выполняет MTM/risk gate и закрывает позиции через общий lifecycle. Ранее существующая регрессия проверяла позднее подключение символов, одинаковый ledger/equity path при обратном порядке символов и общий daily-stop результат.
+
+**Дополнительная регрессия:** `test_sparse_replay_kill_switch_flattens_all_positions_order_invariantly` запускает один и тот же sparse replay в прямом и обратном порядке инструментов. Две позиции одновременно попадают под портфельный kill-switch на adverse mark; обе должны закрыться с `exit_reason=kill_switch`, daily stop не должен подменять причину, ledger/PnL/max DD должны совпасть, а состав закрытых инструментов должен быть одинаковым. Проверка прошла в полном Research CI.
+
+**CI-конфигурация:** обнаружена устаревшая ссылка на отсутствующий `tests/test_sparse_simulation_replay.py` в compile-списке и отдельном workflow step. Sparse replay regressions фактически находятся в `tests/test_portfolio_accounting.py` и уже запускаются отдельным существующим шагом `Test portfolio accounting and risk budget`. Удалены только две мёртвые ссылки; тесты не отключались и не удалялись.
+
+**Проверка:** [Research CI #41679873986 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41679873986), commit `804911e977350037e769f327a5db2592676ec36c`. Portfolio accounting suite: **42/42 tests passed**, включая новую sparse kill-switch регрессию. Полный Research engine checks workflow завершился успешно.
+
+**Границы:** проверяется детерминированная модельная симуляция, а не exchange-side atomic liquidation. Это не доказывает реалистичность mark-price источника, fill цены при аварийном закрытии, очередность фактических биржевых fills или полноту cross-margin account модели.

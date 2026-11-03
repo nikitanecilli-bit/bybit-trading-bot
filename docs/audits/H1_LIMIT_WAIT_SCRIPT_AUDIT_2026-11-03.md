@@ -69,3 +69,18 @@
 - Условие OHLC penetration остаётся упрощённым fill proxy; позднее касание не доказывает maker execution.
 - Базовый engine и его строгая next-bar семантика не изменялись.
 - Исторические E09–E13 не пересчитывались и не объявляются затронутыми: ledger не связывает их с этим скриптом.
+
+## Дополнительная проверка provenance — 2026-11-03
+
+При повторном аудите обнаружен отдельный P2-дефект provenance: `prepare_signal_for_next_bar_fill()` сохранял исходный timestamp в `signal_origin_ts`, но после успешного delayed fill базовый engine переносил в `OpenPositionState` только fill timestamp. При закрытии исходный timestamp терялся, поэтому `TradeRecord` и JSON journal не позволяли восстановить возраст сигнала до исполнения.
+
+Исправлено без изменения fill/PnL semantics:
+- `OpenPositionState.signal_ts_ms` получает исходный timestamp из `signal_origin_ts`; для обычного next-bar entry используется исходный `signal_ts`.
+- Некорректный original timestamp отклоняется fail-closed.
+- `TradeRecord.signal_ts_ms` переносит provenance в закрытую сделку и автоматически попадает в `export_journal_for_dashboard()` через `asdict`.
+- State persistence сохраняет поле; старые backups без него восстанавливаются с `None`.
+- Добавлен end-to-end regression: helper адаптирует freshness timestamp → engine исполняет delayed fill → закрытая запись и экспортированный JSON содержат исходный signal timestamp.
+
+Проверка: Research CI [#41684988411 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41684988411), commit `f2d3f32dba40ae391f5e63ff378e9c8e6b19cb53`. Portfolio accounting **46/46**, state persistence **68/68**, gap execution **31/31**, H-C **9/9**; весь 48-step Research workflow SUCCESS.
+
+Граница: это исправляет provenance и воспроизводимость анализа сигнал→fill, не меняя entry/exit execution model и не подтверждая качество maker fills.

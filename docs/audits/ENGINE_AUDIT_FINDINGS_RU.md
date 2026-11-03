@@ -635,3 +635,6 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 
 
 **Покрытие после этапа 2:** `tests/test_mark_price_liquidation.py` теперь содержит 14 unittest-методов. Добавлен regression для TP1: при уменьшении остаточного quantity с 1 до 0.5 BTC без дополнительной маржи и funding, entry-based IM/close-fee и MM должны уменьшаться пропорционально. Workflow trigger теперь явно включает `mark_price_liquidation.py`, а не только `tests/**`.
+
+
+**Фактический CI результат после исправления импорта:** GitHub Actions run `41639323448`, commit `5aa2497d37f84ea0e1a43568d27d3eea3a4f282e`, завершился `success`. `tests/test_mark_price_liquidation.py`: 14/14 unittest passed; весь Research engine checks workflow завершился успешно. Первый запуск `41639134909` падал только на `ModuleNotFoundError: bybit_risk_tiers` из-за отсутствия repository root в `sys.path`; добавлен явный root path, после чего повторный полный workflow зелёный.

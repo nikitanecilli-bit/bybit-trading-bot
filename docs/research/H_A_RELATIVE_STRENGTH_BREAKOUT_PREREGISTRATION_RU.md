@@ -220,7 +220,7 @@ Investigate signal-candle and pre-break structure for stop-loss vs time/trailing
 
 ## 12. Signal-candle and post-break attribution — 2026-11-03
 
-Read-only artifact: workflow [41671977224](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41671977224), artifact ID 13248093501. It contains 2,055 trade rows across baseline and H-A, 41 cohort summaries, and a matching source archive SHA manifest. No PnL was recomputed; no signal or execution rule was changed.
+Final schema-validated read-only artifact: workflow [41672420459](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41672420459), artifact ID 13249307987. Earlier diagnostic run 41671977224 produced the same trade-level metrics before coverage-count fields were added. It contains 2,055 trade rows across baseline and H-A, 41 cohort summaries, and a matching source archive SHA manifest. No PnL was recomputed; no signal or execution rule was changed.
 
 ### Pre-entry signal-candle features
 

@@ -164,8 +164,8 @@ def test_utc_midnight_daily_baseline_uses_mark_at_boundary():
         emergency_kill_switch_pct=50.0,
     )
     risk = engine_mod.AdaptiveRiskManager(cfg)
-    before_midnight = 1_767_311_400_000  # 2026-01-01 23:00:00 UTC
-    midnight = 1_767_315_000_000         # 2026-01-02 00:00:00 UTC
+    before_midnight = 1_767_308_400_000  # 2026-01-01 23:00:00 UTC
+    midnight = 1_767_312_000_000         # 2026-01-02 00:00:00 UTC
 
     risk.mark_to_market(0.0, before_midnight)
     assert risk.day_start_equity == 10_000.0

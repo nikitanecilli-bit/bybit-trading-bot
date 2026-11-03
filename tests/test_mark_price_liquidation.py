@@ -6,6 +6,7 @@ from bybit_risk_tiers import RiskTier
 from mark_price_liquidation import (
     calculate_isolated_usdt_liquidation_price,
     calculate_mark_price_maintenance_margin,
+    evaluate_isolated_margin_health,
     calculate_isolated_usdt_bankruptcy_price,
     mark_candle_crosses_liquidation,
 )
@@ -97,6 +98,51 @@ class IsolatedLiquidationTests(unittest.TestCase):
         self.assertEqual(short.estimated_close_fee, Decimal("24.20"))
         self.assertEqual(long.maintenance_margin, Decimal("214.80"))
         self.assertEqual(short.maintenance_margin, Decimal("229.20"))
+
+    def test_dynamic_mark_tier_can_trigger_shortfall_before_fixed_entry_tier_lp(self):
+        tiers = [
+            tier(1, "100000", "0.005", "100"),
+            tier(2, "500000", "0.10", "50", "9500"),
+        ]
+        fixed_lp = calculate_isolated_usdt_liquidation_price(
+            symbol="BTCUSDT", direction="short", entry_price="99000",
+            quantity="1", leverage="50", tiers=tiers,
+        )
+        health = evaluate_isolated_margin_health(
+            symbol="BTCUSDT", direction="short", entry_price="99000",
+            mark_price="100450", quantity="1", leverage="50", tiers=tiers,
+        )
+        self.assertEqual(health.tier_id, 2)
+        self.assertLess(Decimal("100450"), fixed_lp.liquidation_price)
+        self.assertLessEqual(health.position_margin_balance, health.maintenance_margin)
+        self.assertTrue(health.liquidation_triggered)
+
+    def test_isolated_margin_balance_accounts_for_extra_margin_and_funding(self):
+        one_tier = [tier(1, "1000000", "0.005", "100")]
+        health = evaluate_isolated_margin_health(
+            symbol="BTCUSDT", direction="long", entry_price="40000",
+            mark_price="39000", quantity="1", leverage="10", tiers=one_tier,
+            extra_margin="200", funding_net_cost="10",
+        )
+        self.assertEqual(health.unrealized_pnl, Decimal("-1000"))
+        self.assertEqual(health.position_margin_balance, Decimal("3209.80"))
+        self.assertEqual(health.maintenance_margin, Decimal("214.80"))
+        self.assertEqual(health.margin_surplus, Decimal("2995.00"))
+        self.assertFalse(health.liquidation_triggered)
+
+    def test_funding_credit_increases_isolated_margin_balance(self):
+        one_tier = [tier(1, "1000000", "0.005", "100")]
+        paid = evaluate_isolated_margin_health(
+            symbol="BTCUSDT", direction="long", entry_price="40000",
+            mark_price="39000", quantity="1", leverage="10", tiers=one_tier,
+            funding_net_cost="20",
+        )
+        received = evaluate_isolated_margin_health(
+            symbol="BTCUSDT", direction="long", entry_price="40000",
+            mark_price="39000", quantity="1", leverage="10", tiers=one_tier,
+            funding_net_cost="-20",
+        )
+        self.assertEqual(received.position_margin_balance - paid.position_margin_balance, Decimal("40"))
 
     def test_isolated_bankruptcy_price_and_directional_tick_rounding(self):
         self.assertEqual(

@@ -413,3 +413,13 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 - `scripts/run_h_a_relative_strength_replay.py`: baseline/H-A shared-capital runner; default prepare-only, PnL requires explicit `--execute`; no exchange API or new data access. Adds timestamped equity snapshots for monthly attribution.
 - CI run `41632126319`: success. Actual prepare-only archive manifest: 50/50 H1 symbols included; six duplicate groups, zero conflicting bars, zero longest-file coverage failures; common terminal candle `2026-10-26T00:00:00Z`. First-history dates: 25 on 2025-10-27, 22 on 2026-04-29, and three later starts in July/September 2026.
 - The three old research folds remain reused, not blind holdout. Funding is absent; any OHLCV-only result is not full Bybit net PnL. No market PnL replay has been run.
+
+### 2026-11-03 — H-A replay outcome and execution-cost review
+
+- Preregistered H-A replay completed successfully in GitHub Actions run 41633199418 (commit 3ac4bb0c20c48e31e0264df7fe39235cb5c8a658). Results and archive manifest are preserved in artifact h-a-preregistered-ohlcv-results.
+- H-A lost in all three reused folds: -1,601.57 / -2,225.91 / -2,307.78 USDT; PF 0.74 / 0.66 / 0.74; expectancy -0.140 / -0.194 / -0.136R. The H-A candidate is rejected; do not tune on these folds.
+- Existing ledger attribution shows stop-loss cohorts dominate losses; the direction responsible changes by fold (long in fold 1, both in fold 2, short in fold 3). A global direction block is not supported.
+- Static review of _close_position(): gross PnL is formed from realized TP1 gross plus remaining-leg gross; fees/slippage are calculated on entry notional and each executed exit leg; net = gross - fees - slippage - funding. Existing reconciliation tests passed in run 41632815378 (including full shared-capital ledger/equity reconciliation and exchange-fee/slippage-related regression cases). This validates arithmetic consistency, not the empirical accuracy of fee/slippage assumptions.
+- H-A's total modeled fees + slippage were 6,164.79 USDT versus gross +29.53 USDT. Costs use 2x engine taker fee and slippage constants; maker fills were disabled. Funding is absent from the OHLCV replay.
+- Runner export was extended to retain MAE/MFE, gross-R, risk, session and order type for future diagnostic work. This reporting-only edit is after the last successful Research engine checks run; no claim is made that the latest export edit has been CI-tested.
+- No new PnL replay, API, runner, exchange download, or live order was initiated after the H-A result. Main remains untouched.

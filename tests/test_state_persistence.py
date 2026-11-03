@@ -157,6 +157,46 @@ class StatePersistenceTests(unittest.TestCase):
                 )
             self.assertFalse(path.exists())
 
+    def test_save_rejects_position_payload_reader_would_reject_and_preserves_backup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            cfg = engine.BotConfig()
+            risk = engine.AdaptiveRiskManager(cfg)
+            persistence = engine.PlanBStatePersistence(str(path), enabled=True)
+            valid = sample_position()
+            persistence.save_state(
+                cfg, risk, {"BTCUSDT": valid}, {}, 42,
+                last_mark_prices={"BTCUSDT": valid.entry_price},
+            )
+            previous = path.read_bytes()
+
+            invalid = sample_position()
+            invalid.direction = "sideways"
+            with self.assertRaisesRegex(ValueError, "строгую проверку восстановления"):
+                persistence.save_state(
+                    cfg, risk, {"BTCUSDT": invalid}, {}, 43,
+                    last_mark_prices={"BTCUSDT": invalid.entry_price},
+                )
+            self.assertEqual(path.read_bytes(), previous)
+            self.assertFalse(Path(str(path) + ".tmp").exists())
+
+    def test_save_rejects_pending_payload_reader_would_reject_and_preserves_backup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            cfg = engine.BotConfig()
+            risk = engine.AdaptiveRiskManager(cfg)
+            persistence = engine.PlanBStatePersistence(str(path), enabled=True)
+            persistence.save_state(cfg, risk, {}, {}, 42, last_mark_prices={})
+            previous = path.read_bytes()
+
+            with self.assertRaisesRegex(ValueError, "строгую проверку восстановления"):
+                persistence.save_state(
+                    cfg, risk, {}, {"BTCUSDT": {"direction": "long"}}, 43,
+                    last_mark_prices={},
+                )
+            self.assertEqual(path.read_bytes(), previous)
+            self.assertFalse(Path(str(path) + ".tmp").exists())
+
     def test_restored_engine_uses_persisted_mark_before_first_new_candle(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "marked-state.json"

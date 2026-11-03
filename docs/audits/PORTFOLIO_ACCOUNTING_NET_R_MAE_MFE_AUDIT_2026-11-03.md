@@ -181,6 +181,17 @@ Regression coverage:
 
 Research CI run [#41715596303](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41715596303): the cumulative Funding accounting test, realized Funding accounting test, and Mark OHLC liquidation engine integration test all report SUCCESS; all 50 configured workflow steps reported success at last inspection. GitHub still reported the overall run/job as `in_progress` despite the final `Complete job` step succeeding, so terminal run conclusion remains unconfirmed at this note's creation.
 
-**Remaining limitation:** the isolated margin calculator still subtracts all net funding allocated to the open leg from its position margin. Bybit documents that Funding is first deducted from available balance and only falls back to position initial margin when available balance is insufficient. Since the current model has no account-wide available-balance ledger, this is a conservative stress assumption, not exact account-level funding/margin behavior. It can overstate liquidation risk; it should not be described as a fully exchange-accurate margin path.
+**Remaining limitation:** the isolated margin calculator still subtracts all net funding allocated to the open leg from its position margin. Bybit documents that Funding is first deducted from available balance and only falls back to position initial margin when available balance is insufficient. Since the current model has no account-wide available-balance ledger, it applies net funding directly to position margin as a position-level approximation. This can overstate liquidation risk when paid Funding could have been covered by available balance, and can understate liquidation risk if received Funding is credited only to available balance rather than the isolated position. The direction of the error depends on funding sign and account balance; it is not uniformly conservative and is not an exchange-accurate account-level margin path.
 
 No strategy PnL replay was run. No strategy parameters, closed-trade funding accounting, or live execution behavior were changed.
+
+
+## Funding settlement exactly at entry timestamp — 2026-11-03
+
+The Funding ledger previously excluded every settlement with `funding_timestamp_ms == entry_ts`. In the H1 engine, `entry_ts` is the candle-open timestamp and market/limit fills are modeled at that open. When an H1 entry candle opens exactly at a Funding settlement timestamp, the model therefore assumed the fill was always after settlement and omitted the event.
+
+Bybit's Funding Fee documentation states that opening or closing within five seconds before/after settlement does not guarantee inclusion in that funding cycle. The engine has no exchange fill timestamp precise enough to resolve that order. Excluding the boundary event was therefore an unsupported optimistic assumption for positions that would pay Funding.
+
+**Correction:** exact entry-boundary payments are charged; exact entry-boundary receipts are not credited. This is a conservative event-order convention, not a claim that every real fill at that instant is charged. Events strictly before entry remain excluded. Both full trade PnL and remaining-margin funding use the same entry-boundary policy; Mark-price proxy is still required at that timestamp.
+
+Regression tests cover payment vs receipt, both funding helpers, strict pre-entry exclusion, and the realized close ledger. Research CI [#41716240400](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41716240400) completed SUCCESS: **50/50 workflow steps**, including cumulative Funding accounting, realized Funding PnL, and Mark OHLC liquidation integration. No market PnL replay was run.

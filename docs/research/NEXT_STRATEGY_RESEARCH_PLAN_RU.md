@@ -260,3 +260,12 @@ No actual Bybit archives or dated historical funding schedule evidence are prese
 
 
 Further active-collector hardening: output roots are immutable (no silent overwrite), duplicate Funding timestamps are rejected, and saturated 200-row API pages do not count as complete coverage; only complete recursive leaf windows count. The archive-level manifest records the active collector code hash. Research CI [#41713006331](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41713006331) passed 50/50 steps. Real H1 PnL remains blocked by absent Bybit archives and dated settlement schedule evidence.
+
+
+### TP1 Funding allocation into remaining isolated margin — 2026-11-03
+
+A confirmed accounting-model mismatch was corrected: pre-TP1 funding settlements were previously charged 100% to the remaining position after a partial close. Bybit's partial-close PnL rules prorate accumulated funding across the closed and remaining quantities. The margin helper now uses the exact remaining-contract ratio for all historical Funding once TP1 is effective; full trade-lifecycle Funding remains unchanged. Tests cover both funding signs, exact quantity, as-of timing and engine liquidation integration. See the portfolio-accounting and execution-integration audit reports.
+
+Remaining caveat: Bybit first deducts Funding from available balance and only deducts it from isolated position initial margin if available balance is insufficient. The simulator has no account-wide available-balance ledger and conservatively subtracts the remaining-leg Funding allocation from position margin. This is a stress assumption and may overstate liquidation risk. Do not describe the model as full UTA fidelity.
+
+CI run [#41715596303](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41715596303): all 50 configured steps, including Funding accounting and Mark liquidation integration tests, reported success at last inspection; overall run/job terminal status was not yet returned. No market PnL replay was run.

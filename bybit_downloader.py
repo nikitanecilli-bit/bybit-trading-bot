@@ -183,6 +183,8 @@ def collect(session, base_url, spec, base_params, start_ms, end_ms, delay, audit
                 "response_rows": len(parsed),
                 "first_ts": min(page_timestamps) if page_timestamps else None,
                 "last_ts": max(page_timestamps) if page_timestamps else None,
+                "complete": len(parsed) < spec["limit"],
+                "saturated": len(parsed) >= spec["limit"],
                 "out_of_window_rows": sum(
                     1 for ts in page_timestamps if ts < start_ms or ts > end_ms
                 ),

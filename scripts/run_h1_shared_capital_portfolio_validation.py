@@ -613,7 +613,6 @@ def build_validation_manifest(
         })
 
     kline_files = _directory_file_manifest(kline_dir, {".csv"})
-    kline_by_path = {record["path"]: record for record in kline_files}
     selected_sources = {}
     for symbol in selected_symbols:
         source_path = Path(archives[symbol])

@@ -32,6 +32,18 @@ class MarketStructureTests(unittest.TestCase):
         self.assertEqual(trend_direction(make_candles([100+i for i in range(10)])), "neutral")
 
 
+    def test_ema50_200_first_directional_label_requires_206_candles(self):
+        rising_205 = make_candles([100 + i * 0.5 for i in range(205)])
+        rising_206 = make_candles([100 + i * 0.5 for i in range(206)])
+        self.assertEqual(
+            trend_direction(rising_205, fast=50, slow=200, slope=5),
+            "neutral",
+        )
+        self.assertEqual(
+            trend_direction(rising_206, fast=50, slow=200, slope=5),
+            "up",
+        )
+
     def test_full_history_ema50_200_trend_up_and_down(self):
         rising = make_candles([100 + i * 0.5 for i in range(320)])
         falling = make_candles([500 - i * 0.5 for i in range(320)])

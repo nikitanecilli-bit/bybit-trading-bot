@@ -222,6 +222,11 @@ def download_dataset(session, base_url, name, category, symbol, interval, oi_int
     path = out_dir / f"{symbol}_{category}_{name}{suffix}.csv"
     tag = f"{symbol} {name}{suffix}"
 
+    if name == "funding" and path.is_file():
+        from funding_archive_manifest import verify_existing_funding_manifest
+        verify_existing_funding_manifest(
+            path, path.with_suffix(path.suffix + ".audit.json"), symbol=symbol
+        )
     existing = read_timestamps(path)
     if existing:
         start_ms = max(start_ms, existing[-1] + (step or 1))

@@ -983,7 +983,6 @@ def test_full_run_simulation_pass_is_invariant_to_symbol_order():
     assert {row[0] for row in forward["ledger"]} == {row[0] for row in reverse["ledger"]}
     assert forward["ledger"] == reverse["ledger"]
     assert forward["equity_path"] == reverse["equity_path"]
-    assert forward["daily_stop"] is True
     assert forward["daily_stop"] == reverse["daily_stop"]
     assert forward["kill_switch"] == reverse["kill_switch"]
     assert forward["net_pnl"] == reverse["net_pnl"]

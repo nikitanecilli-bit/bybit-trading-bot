@@ -1649,21 +1649,38 @@ class UnifiedQuantEngine:
         if timeframe not in timeframe_ms:
             raise ValueError(f"Неподдерживаемый timeframe для mark-to-market: {self.cfg.timeframe!r}")
         bar_close_ts = curr.ts + timeframe_ms[timeframe]
-        self._last_mark_prices[symbol] = curr.close
-        # Risk controls must not ignore adverse intrabar excursions that recover by close.
-        # If the protective stop was crossed, use the modeled stop fill (including gap),
-        # not the candle extreme: the position would have exited at the stop first.
-        risk_mark = curr.close
         pos_for_risk = self.open_positions.get(symbol)
-        if pos_for_risk is not None and hasattr(pos_for_risk, "direction") and hasattr(pos_for_risk, "stop_price"):
-            risk_mark = self._risk_mark_for_position(pos_for_risk, curr)
-        # Symbols are stepped one at a time. Preserve adverse marks for other symbols
-        # processed at the same bar-close timestamp, but never carry an old candle's
-        # extreme into a later bar.
+        mark_candle = self._mark_candle_for_symbol(
+            symbol, curr.ts, required=bool(pos_for_risk is not None and self.liquidation_model_enabled)
+        )
+        self._last_mark_prices[symbol] = float(mark_candle.close) if mark_candle is not None else curr.close
+        # Last Price continues to drive stop execution; Mark Price drives MTM and liquidation.
+        risk_mark = self._risk_mark_for_position(pos_for_risk, curr) if pos_for_risk is not None else curr.close
         if self._intrabar_risk_marks_ts != bar_close_ts:
             self._intrabar_risk_marks.clear()
             self._intrabar_risk_marks_ts = bar_close_ts
         self._intrabar_risk_marks[symbol] = risk_mark
+        if self._intrabar_mtm_marks_ts != bar_close_ts:
+            self._intrabar_mtm_marks.clear()
+            self._intrabar_liquidation_exits.clear()
+            self._intrabar_mtm_marks_ts = bar_close_ts
+        if mark_candle is None:
+            self._intrabar_mtm_marks[symbol] = risk_mark
+        elif pos_for_risk is None:
+            self._intrabar_mtm_marks[symbol] = float(mark_candle.close)
+        else:
+            liquidation_exit = self._intrabar_liquidation_exits.get(symbol)
+            if liquidation_exit is None:
+                liquidation_exit = self._liquidation_exit_price(pos_for_risk, curr, bar_close_ts)
+            if liquidation_exit is not None:
+                self._intrabar_liquidation_exits[symbol] = liquidation_exit
+                self._intrabar_mtm_marks[symbol] = liquidation_exit
+            else:
+                stop_crossed = curr.low <= pos_for_risk.stop_price if pos_for_risk.direction == "long" else curr.high >= pos_for_risk.stop_price
+                self._intrabar_mtm_marks[symbol] = (
+                    risk_mark if stop_crossed else
+                    float(mark_candle.low if pos_for_risk.direction == "long" else mark_candle.high)
+                )
         self.risk_mgr.on_new_timestamp(bar_close_ts)
         self._update_mark_to_market(bar_close_ts)
 

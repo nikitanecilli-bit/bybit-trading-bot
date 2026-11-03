@@ -582,3 +582,20 @@ H1 validation runner дополнен отдельным JSON manifest рядо�
 - Наличие зарегистрированного self-hosted runner с label `self-hosted` и egress вне US/CN пока не подтверждено. Через текущую GitHub-интеграцию список runners недоступен. Это единственный непосредственный внешний gate для первого запуска collectors.
 - H1 validation workflow по-прежнему отсутствует в main; не запускать market PnL, пока не будет официального Bybit архива, датированных specs/risk snapshots и выборочно опубликованного H1 validation workflow.
 - Runbook исправлен: `docs/research/BYBIT_DATA_ARCHIVE_RUNBOOK_RU.md`.
+
+
+## Дополнительный аудит H1 validation runner — 2026-11-03
+
+### Статус исполнения и воспроизводимости
+- Shared-capital runner перебирает 3 временных fold × 4 volume thresholds × 3 breakout-ATR thresholds × 3 cost multipliers = **108 replay-конфигураций**.
+- Это исследовательская сетка чувствительности, а не 108 независимых подтверждений. Если пороги выбираются по совокупным результатам этих fold, все три fold становятся validation/selection data; их нельзя после выбора продолжать называть независимым финальным OOS.
+- До первого запуска необходимо заранее определить primary metric, правило выбора конфигурации и запретить повторный подбор на финальном holdout. После выбора — заморозить параметры/код/fees и оценить один следующий, временно более поздний, неиспользованный период.
+- Временные fold: 50–65%, 65–80%, 80–100% общей синхронизированной истории. Это неперекрывающиеся scoring windows, но последний fold не является untouched holdout, если используется при выборе параметров.
+- Cost multipliers 1.0/1.5/2.0 — стресс фиксированных engine fee/slippage assumptions, не калибровка реальных комиссий конкретного Bybit аккаунта. Нужны подтверждённые fee tier и реальные execution observations, когда появится read-only reconciliation.
+- Maker fill модель требует OHLC penetration limit на 5 bps; она не моделирует очередь, спред, partial fills и adverse selection. Внутрисвечной касание не доказывает maker execution; marketable-at-open заявка правильно переводится движком в taker proxy, но optimistic maker assumption остаётся.
+- Ликвидация — position-level isolated approximation; Bybit partial-liquidation ladder/account mode и полная account-level UTA/Classic semantics не подтверждены.
+
+### Точность формулировок
+- Три успешных collector test suites подтверждают локальные/mock сценарии, а не сетевой сбор архива.
+- H1 PnL остаётся заблокированным до фактических Bybit H1 klines, funding/mark series и непрерывных point-in-time instrument/risk snapshots. Никакие PnL результаты не заявляются.
+- Нельзя публиковать 108 результатов как независимые OOS доказательства и нельзя выбирать top-5 монет по одному и тому же отрезку, на котором затем заявляется подтверждение прибыльности.

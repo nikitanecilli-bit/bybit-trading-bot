@@ -1,7 +1,6 @@
 """Fail-closed execution snapshot gate for the H1 market PnL runner."""
 from pathlib import Path
 from datetime import datetime, timezone
-import math
 import sys
 import tempfile
 
@@ -15,6 +14,7 @@ from run_h1_shared_capital_portfolio_validation import (
     resolve_funding_dirs, validate_funding_mark_coverage,
     resolve_bybit_kline_dir, load_bybit_h1_datasets,
     round_limit_quote_to_bybit_tick, engine_cost_stress,
+    BASE_TAKER_FEE, BASE_MAKER_FEE, BASE_TAKER_SLIP,
 )
 
 
@@ -22,9 +22,9 @@ from run_h1_shared_capital_portfolio_validation import (
 def test_cost_stress_restores_engine_globals_after_success_and_exception():
     original = (em.TAKER_FEE, em.MAKER_FEE, em.TAKER_SLIP)
     with engine_cost_stress(2.0):
-        assert em.TAKER_FEE == engine_cost_stress.__globals__["BASE_TAKER_FEE"] * 2.0
-        assert em.MAKER_FEE == engine_cost_stress.__globals__["BASE_MAKER_FEE"] * 2.0
-        assert em.TAKER_SLIP == engine_cost_stress.__globals__["BASE_TAKER_SLIP"] * 2.0
+        assert em.TAKER_FEE == BASE_TAKER_FEE * 2.0
+        assert em.MAKER_FEE == BASE_MAKER_FEE * 2.0
+        assert em.TAKER_SLIP == BASE_TAKER_SLIP * 2.0
     assert (em.TAKER_FEE, em.MAKER_FEE, em.TAKER_SLIP) == original
 
     try:

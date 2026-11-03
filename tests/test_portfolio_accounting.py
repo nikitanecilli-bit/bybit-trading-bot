@@ -1231,6 +1231,83 @@ def _run_sparse_replay_symbol_order(order, *, emergency_kill_switch_pct=35.0, da
     }
 
 
+
+def _run_aligned_replay_mode(use_sparse):
+    e = make_engine()
+    e._state_restored = False
+    e.journal_output_path = "/tmp/ignored_sparse_dense_equivalence.json"
+    e.cfg.bot_version = "sparse-dense-equivalence"
+    e.cfg.timeframe = "1h"
+    symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    e.cfg.active_trading_pool = list(symbols)
+    e.cfg.max_concurrent_positions = 2
+    e.cfg.max_risk_trade_pct = 1.0
+    e.cfg.max_portfolio_risk_pct = 2.0
+    e.cfg.daily_stop_loss_pct = 1.5
+    e.cfg.emergency_kill_switch_pct = 35.0
+    e.cfg.max_chase_limit_pct = 1.5
+    e.risk_mgr.cfg = e.cfg
+
+    hour = 3_600_000
+    start_ts = 1_800_000_000_000
+    signal_ts = start_ts + 35 * hour
+    vol_ratio = {"BTCUSDT": 1.8, "ETHUSDT": 2.4, "SOLUSDT": 2.1}
+    original_evaluate = engine_mod.QuantStrategyCore.evaluate_signal
+
+    def deterministic_signal(symbol, history, _cfg):
+        if history[-1].ts != signal_ts:
+            return None
+        return {
+            "direction": "long", "entry_price": 100.0, "order_type": "market",
+            "strategy": "sparse-dense-equivalence", "stop_dist": 5.0,
+            "signal_ts": signal_ts, "vol_ratio": vol_ratio[symbol],
+        }
+
+    candles = {}
+    for symbol in symbols:
+        rows = []
+        for index in range(61):
+            low = 90.0 if index == 37 else 99.0
+            rows.append(engine_mod.Candle(
+                ts=start_ts + index * hour,
+                open=100.0, high=101.0, low=low, close=100.0, volume=100.0,
+            ))
+        candles[symbol] = rows
+
+    engine_mod.QuantStrategyCore.evaluate_signal = staticmethod(deterministic_signal)
+    try:
+        audit = engine_mod.run_simulation_pass(
+            e, candles, symbols, data_label="SPARSE_DENSE_EQUIVALENCE",
+            allow_sparse_data=use_sparse,
+        )
+    finally:
+        engine_mod.QuantStrategyCore.evaluate_signal = staticmethod(original_evaluate)
+
+    ledger = sorted((
+        trade.token, trade.direction, trade.entry_date, trade.exit_date,
+        round(trade.entry_price, 8), round(trade.exit_price, 8),
+        round(trade.gross_pnl, 6), round(trade.exchange_fees_usdt, 6),
+        round(trade.slippage_cost_usdt, 6), round(trade.funding_cost_usdt, 6),
+        round(trade.pnl_usdt, 6), trade.exit_reason,
+    ) for trade in e.closed_trades)
+    return {
+        "ledger": ledger,
+        "net_pnl": round(audit["net_pnl"], 6),
+        "realized_equity": round(e.risk_mgr.realized_equity, 6),
+        "current_equity": round(e.risk_mgr.current_equity, 6),
+        "max_dd": round(audit["max_dd_pct"], 6),
+        "daily_stop": e.risk_mgr.daily_stop_triggered,
+        "kill_switch": e.risk_mgr.kill_switch_triggered,
+        "open": sorted(e.open_positions),
+        "pending": sorted(e.pending),
+    }
+
+
+def test_sparse_and_dense_replay_match_on_fully_aligned_universe():
+    dense = _run_aligned_replay_mode(False)
+    sparse = _run_aligned_replay_mode(True)
+    assert sparse == dense
+
 def test_sparse_replay_admits_late_symbols_after_warmup_and_is_order_invariant():
     forward = _run_sparse_replay_symbol_order(["BTCUSDT", "ETHUSDT", "SOLUSDT"])
     reverse = _run_sparse_replay_symbol_order(["SOLUSDT", "ETHUSDT", "BTCUSDT"])

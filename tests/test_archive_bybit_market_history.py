@@ -185,6 +185,46 @@ class BybitMarketHistoryTests(unittest.TestCase):
             finally:
                 os.chdir(original_cwd)
 
+    def test_universe_snapshot_rejects_closed_contract_without_delivery_time(self):
+        snapshot = {
+            "category": "linear",
+            "fetched_at": "2026-11-03T00:00:00Z",
+            "instruments": [{
+                "symbol": "OLDUSDT", "contractType": "LinearPerpetual",
+                "quoteCoin": "USDT", "settleCoin": "USDT",
+                "launchTime": "3600000", "deliveryTime": "0", "status": "Closed",
+            }],
+        }
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                os.chdir(tmp)
+                Path("universe.json").write_text(json.dumps(snapshot), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "lifecycle end is unknown"):
+                    load_universe_lifecycle("universe.json")
+            finally:
+                os.chdir(original_cwd)
+
+    def test_universe_snapshot_excludes_prelaunch_and_pending_open(self):
+        snapshot = {
+            "category": "linear",
+            "fetched_at": "2026-11-03T00:00:00Z",
+            "instruments": [{
+                "symbol": "FUTUREUSDT", "contractType": "LinearPerpetual",
+                "quoteCoin": "USDT", "settleCoin": "USDT",
+                "launchTime": "9999999999999", "deliveryTime": "0", "status": "PendingOpen",
+            }],
+        }
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                os.chdir(tmp)
+                Path("universe.json").write_text(json.dumps(snapshot), encoding="utf-8")
+                lifecycle, _, _ = load_universe_lifecycle("universe.json")
+                self.assertNotIn("FUTUREUSDT", lifecycle)
+            finally:
+                os.chdir(original_cwd)
+
     def test_symbol_path_traversal_and_invalid_characters_rejected(self):
         self.assertEqual(normalize_symbol("btcusdt"), "BTCUSDT")
         for symbol in ("../BTCUSDT", "BTC/USDT", "A", "BTC USDT"):

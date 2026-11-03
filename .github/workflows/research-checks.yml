@@ -27,6 +27,7 @@ on:
       - 'tests/test_snapshot_bybit_risk_limits.py'
       - 'scripts/bybit_private_api_check.py'
       - '.github/workflows/bybit-private-api-check.yml'
+      - 'scripts/run_h1_shared_capital_portfolio_validation.py'
       - 'scripts/validate_funding_coverage.py'
       - 'tests/**'
       - '.github/workflows/research-checks.yml'

@@ -49,6 +49,7 @@ class StatePersistenceTests(unittest.TestCase):
             risk.kill_switch_triggered = True
             risk.daily_stop_triggered = True
             position = sample_position()
+            position.signal_ts_ms = 1_789_996_400_000
             position.risk_tier_id = 2
             position.risk_limit_value = "500000"
             position.maintenance_margin_rate = "0.01"
@@ -81,6 +82,7 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertEqual(positions["BTCUSDT"].maintenance_margin_rate, "0.01")
             self.assertEqual(positions["BTCUSDT"].maintenance_margin_deduction, "500")
             self.assertEqual(positions["BTCUSDT"].breakout_level, 101.0)
+            self.assertEqual(positions["BTCUSDT"].signal_ts_ms, 1_789_996_400_000)
             self.assertEqual(restored_pending["ETHUSDT"]["breakout_level"], 2010.0)
             self.assertEqual(restored_risk.realized_equity, 9_500.0)
             self.assertEqual(restored_risk.unrealized_pnl, -125.0)
@@ -88,6 +90,26 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertEqual(restored_risk.peak_equity, 10_200.0)
             self.assertTrue(restored_risk.kill_switch_triggered)
             self.assertTrue(restored_risk.daily_stop_triggered)
+
+
+    def test_legacy_position_backup_without_signal_timestamp_loads_as_none(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "legacy-no-signal-ts.json"
+            cfg = engine.BotConfig()
+            risk = engine.AdaptiveRiskManager(cfg)
+            position = sample_position()
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {"BTCUSDT": position}, {}, 42,
+                last_mark_prices={"BTCUSDT": position.entry_price},
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["open_positions"]["BTCUSDT"].pop("signal_ts_ms", None)
+            path.write_text(json.dumps(payload), encoding="utf-8")
+
+            restored = engine.PlanBStatePersistence(str(path)).load_state(
+                engine.AdaptiveRiskManager(cfg)
+            )[0]
+            self.assertIsNone(restored["BTCUSDT"].signal_ts_ms)
 
 
     def test_restored_engine_uses_persisted_mark_before_first_new_candle(self):

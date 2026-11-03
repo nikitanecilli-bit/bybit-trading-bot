@@ -1036,3 +1036,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Official references: Bybit UTA isolated liquidation formula; V5 Mark Price Kline; USDT maintenance margin documentation (links in LEVERAGE_MARGIN_LIQUIDATION_AUDIT_2026-11-03.md).
 - Classification: code/formula re-audit; no market PnL test, no strategy change.
 - Decision: no ungrounded formula changes. Data/account-mode gate remains CLOSED; no PnL, private API, paper or live execution.
+
+
+## ENG-DATA-006 — Bybit historical data source audit (2026-11-04)
+
+- Official Bybit V5 public API supports H1 trade Kline, Mark Price Kline and Funding history. Official docs state US and Mainland China IPs are restricted (HTTP 403); exact egress location for the prior hosted-runner 403 was not recovered from old logs.
+- Existing instrument/risk snapshot and market archive workflows already require a self-hosted runner outside US/Mainland China and accept BYBIT_API_BASE_URL. Official mainnet hosts include api.bybit.com and api.bytick.com; collectors allow both.
+- Official Historical Market Data download page advertises public OHLCV/trade CSV, but current accessible page does not establish Mark/Funding/specification coverage. Treat as a possible trade-data source only until actual product coverage is verified.
+- Audited independent CryptoHFTData Bybit funding/mark archive: starts 2025-06-28; vendor documents Bybit missing hours 2025-11-26 10 UTC–2025-12-26 19 UTC and 2026-04-13 15 UTC–2026-04-14 21 UTC; before Sep 2026 integrity release, mark/ticker/OI fields were change-only deltas with null unchanged values. Vendor explicitly describes archive as independent, not official Bybit.
+- Decision: do not use third-party archive as sole PnL source; allow supplementary exploratory/cross-check only after forward-fill semantics, gaps and official sample reconciliation are handled.
+- Next hard dependency: a legally/regionally permitted self-hosted execution host for public Bybit market-data endpoints. No private account API, no PnL, paper or live orders.
+- Detailed evidence and source links: docs/audits/BYBIT_DATA_ACQUISITION_SOURCE_AUDIT_2026-11-04.md.

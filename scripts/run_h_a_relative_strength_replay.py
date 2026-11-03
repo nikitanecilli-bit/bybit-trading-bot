@@ -110,6 +110,8 @@ def run_variant(
     equity_path: list[dict[str, Any]] = []
 
     def capture_bar(ts_ms, current_engine):
+        if ts_ms < start_ts:
+            return
         risk = current_engine.risk_mgr
         equity_path.append({
             "timestamp_ms": ts_ms,
@@ -324,11 +326,20 @@ def main() -> int:
         for fold_result in results:
             for variant in ("baseline", "h_a"):
                 item = fold_result[variant]
+                metrics = item["metrics"]
                 writer.writerow({
                     "fold": fold_result["fold"],
                     "variant": item["variant"],
                     "symbols": item["symbols_in_fold"],
-                    **item["metrics"],
+                    "trades": metrics["trades"],
+                    "net_pnl_usdt": metrics["net_pnl_usdt"],
+                    "return_pct": metrics["return_pct"],
+                    "profit_factor": metrics["profit_factor"],
+                    "expectancy_r": metrics["expectancy_r"],
+                    "max_drawdown_pct": metrics["max_drawdown_pct"],
+                    "gross_pnl_usdt": metrics["gross_pnl_usdt"],
+                    "fees_usdt": metrics["fees_usdt"],
+                    "slippage_usdt": metrics["slippage_usdt"],
                 })
     print("Wrote preregistered baseline/H-A results. Funding is omitted; not Bybit net PnL.")
     return 0

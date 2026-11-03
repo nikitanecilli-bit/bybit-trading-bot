@@ -1134,7 +1134,10 @@ def build_validation_manifest(
             ),
             "duration_days": "inclusive H1 fold duration from first candle open through last candle close",
         },
-        "paired_ema_comparison": build_paired_ema_comparison(\n            result_rows, bool(design.get("ema50_200_gate_enabled", False))\n        ),\n        "result_rows": result_rows,
+        "paired_ema_comparison": build_paired_ema_comparison(
+            result_rows, bool(design.get("ema50_200_gate_enabled", False))
+        ),
+        "result_rows": result_rows,
     }
 
 

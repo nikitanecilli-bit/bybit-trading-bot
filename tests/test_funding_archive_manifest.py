@@ -29,9 +29,13 @@ class FundingArchiveManifestTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def attach_schedule(self, payload, expected_events):
+    def attach_schedule(
+        self, payload, expected_events, *,
+        coverage_start_ms=3_600_000, coverage_end_ms=7_200_000,
+        interval_minutes=60,
+    ):
         source_snapshots = []
-        for ts in (3_600_000, 7_200_000):
+        for ts in sorted(set((coverage_start_ms, coverage_end_ms))):
             snapshot_path = self.root / f"instrument_snapshot_{ts}.json"
             fetched_at = datetime.fromtimestamp(
                 ts / 1000, tz=timezone.utc
@@ -42,13 +46,16 @@ class FundingArchiveManifestTests(unittest.TestCase):
                 "category": "linear",
                 "fetched_at": fetched_at,
                 "count": 1,
-                "instruments": [{"symbol": "BTCUSDT", "fundingInterval": "60"}],
+                "instruments": [{
+                    "symbol": "BTCUSDT",
+                    "fundingInterval": str(interval_minutes),
+                }],
             }), encoding="utf-8")
             source_snapshots.append({
                 "path": snapshot_path.name,
                 "sha256": sha256_file(snapshot_path),
                 "fetched_at_ms": ts,
-                "funding_interval_minutes": 60,
+                "funding_interval_minutes": interval_minutes,
             })
         schedule_path = self.root / "BTCUSDT.schedule.json"
         schedule = {
@@ -56,8 +63,8 @@ class FundingArchiveManifestTests(unittest.TestCase):
             "source": "bybit_dated_instrument_snapshots",
             "symbol": "BTCUSDT",
             "category": "linear",
-            "coverage_start_ms": 3_600_000,
-            "coverage_end_ms": 7_200_000,
+            "coverage_start_ms": coverage_start_ms,
+            "coverage_end_ms": coverage_end_ms,
             "source_snapshots": source_snapshots,
             "expected_settlement_timestamps_ms": expected_events,
         }
@@ -230,8 +237,10 @@ class FundingArchiveManifestTests(unittest.TestCase):
             "request_start_ms": 3_600_000,
             "request_end_ms": 7_200_000,
             "response_rows": 200,
-            "first_ts": 3_600_000,
+            "first_ts": 5_400_000,
             "last_ts": 7_200_000,
+            "response_order_descending": True,
+            "response_timestamps_unique": True,
             "complete": False,
             "saturated": True,
         }]
@@ -241,6 +250,55 @@ class FundingArchiveManifestTests(unittest.TestCase):
             required_start_ms=3_600_000, required_end_ms=7_200_000,
         )
         self.assertIn("query_window_not_fully_covered", report["errors"])
+
+    def test_validator_accepts_complete_descending_saturated_page_chain(self):
+        start_ms = 0
+        end_ms = 200 * 3_600_000
+        timestamps = list(range(start_ms, end_ms + 1, 3_600_000))
+        self.csv.write_text(
+            "timestamp,datetime,funding_rate\\n"
+            + "".join(f"{ts},1970-01-01,0.001\\n" for ts in timestamps),
+            encoding="utf-8",
+        )
+        payload = record_funding_collection(
+            self.csv, self.manifest, symbol="BTCUSDT", category="linear",
+            api_base="https://api.bybit.com",
+            requested_start_ms=start_ms, requested_end_ms=end_ms,
+            pages=[
+                {
+                    "request_start_ms": start_ms,
+                    "request_end_ms": end_ms,
+                    "response_rows": 200,
+                    "first_ts": 3_600_000,
+                    "last_ts": end_ms,
+                    "response_order_descending": True,
+                    "response_timestamps_unique": True,
+                    "complete": False,
+                    "saturated": True,
+                    "out_of_window_rows": 0,
+                },
+                {
+                    "request_start_ms": start_ms,
+                    "request_end_ms": 3_599_999,
+                    "response_rows": 1,
+                    "first_ts": 0,
+                    "last_ts": 0,
+                    "complete": True,
+                    "saturated": False,
+                    "out_of_window_rows": 0,
+                },
+            ],
+            collected_at_ms=end_ms + 1,
+        )
+        self.attach_schedule(
+            payload, timestamps, coverage_start_ms=start_ms,
+            coverage_end_ms=end_ms, interval_minutes=60,
+        )
+        report = validate_funding_manifest(
+            self.csv, self.manifest, symbol="BTCUSDT",
+            required_start_ms=start_ms, required_end_ms=end_ms,
+        )
+        self.assertTrue(report["ok"], report["errors"])
 
     def test_validator_rejects_settlement_off_dated_funding_interval_grid(self):
         payload = self.record()

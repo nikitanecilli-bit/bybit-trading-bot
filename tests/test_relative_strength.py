@@ -100,6 +100,7 @@ def test_top_ranked_donchian_breakout_generates_long_signal():
     assert signal["direction"] == "long"
     assert signal["order_type"] == "market"
     assert signal["strategy"] == "H-A-relative-strength-breakout"
+    assert signal["breakout_level"] == 101.0
 
 
 def test_bottom_ranked_donchian_breakout_generates_short_signal():
@@ -115,6 +116,7 @@ def test_bottom_ranked_donchian_breakout_generates_short_signal():
     assert context["ranks"]["A"] == 0.0
     assert signal is not None
     assert signal["direction"] == "short"
+    assert signal["breakout_level"] == 99.0
 
 
 def test_signal_rejects_context_from_future_or_other_bar():

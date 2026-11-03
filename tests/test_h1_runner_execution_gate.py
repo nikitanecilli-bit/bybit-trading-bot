@@ -473,10 +473,10 @@ def test_funding_mark_coverage_requires_every_symbol_and_h1_mark_bar():
             "symbol,timestamp_ms,open\nBTCUSDT,3600000,100\n",
             encoding="utf-8",
         )
-        _write_funding_manifest(funding / "BTCUSDT.csv", 3600000, 3603600000)
+        _write_funding_manifest(funding / "BTCUSDT.csv", 3600000, 7200000)
         try:
             validate_funding_mark_coverage(
-                funding, marks, ["BTCUSDT"], [3600000, 3603600000], 3600000, 3603600000
+                funding, marks, ["BTCUSDT"], [3600000, 7200000], 3600000, 7200000
             )
         except SystemExit as exc:
             assert "missing 1 candles" in str(exc)

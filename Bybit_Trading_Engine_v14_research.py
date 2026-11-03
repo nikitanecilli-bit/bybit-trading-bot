@@ -405,6 +405,7 @@ class OpenPositionState:
     order_type: str
     maker_exits: Optional[bool] = None
     breakout_level: Optional[float] = None  # signal-time Donchian boundary
+    signal_ts_ms: Optional[int] = None  # original signal close; may precede delayed limit fill
     tp1_hit: bool = False
     tp1_ts_ms: Optional[int] = None  # conservative TP1 candle-close boundary
     realized_tp1_gross_usdt: float = 0.0
@@ -457,6 +458,7 @@ class TradeRecord:
     exit_reason: str
     order_type: str
     bot_version: str = "v6.1"
+    signal_ts_ms: Optional[int] = None  # original signal close timestamp, not delayed fill guard
     session: str = "eu"
     gross_r_multiple: float = 0.0
     risk_usdt: float = 0.0
@@ -1890,6 +1892,12 @@ class UnifiedQuantEngine:
             )
             return False
         sig = self.pending.pop(symbol)
+        signal_origin_ts = sig.get("signal_origin_ts", signal_ts)
+        if (isinstance(signal_origin_ts, bool) or not isinstance(signal_origin_ts, int)
+                or signal_origin_ts <= 0):
+            logger.error("Reject pending %s: invalid original signal timestamp %r", symbol, signal_origin_ts)
+            self._persist()
+            return False
         strategy_name = str(sig.get("strategy", ""))
         if (
             self.cfg.enable_post_break_invalidation
@@ -2017,6 +2025,7 @@ class UnifiedQuantEngine:
             initial_stop_dist=sig["stop_dist"], size_usdt=size_usdt, risk_usdt=risk_usdt,
             order_type=effective_order_type,
             breakout_level=sig.get("breakout_level"),
+            signal_ts_ms=signal_origin_ts,
             maker_exits=(self.cfg.maker_entry_and_tp1 if self.cfg.maker_tp1_and_target is None else self.cfg.maker_tp1_and_target),
             max_favorable_px=fill, max_adverse_px=fill,
             equity_at_entry=sizing_equity,
@@ -2280,6 +2289,7 @@ class UnifiedQuantEngine:
             mae=round(max(0.0, mae_r), 2), mfe=round(max(0.0, mfe_r), 2),
             exit_reason=exit_reason, order_type=pos.order_type,
             bot_version=self.cfg.bot_version,
+            signal_ts_ms=pos.signal_ts_ms,
             session=QuantStrategyCore.get_utc_session(pos.entry_ts),
             gross_r_multiple=gross_pnl / risk,
             risk_usdt=round(pos.risk_usdt, 4),

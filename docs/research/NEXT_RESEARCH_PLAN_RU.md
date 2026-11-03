@@ -647,3 +647,6 @@ H1 validation runner дополнен отдельным JSON manifest рядо�
 
 
 Дополнительная защита provenance (CI run [41696929040](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41696929040), SUCCESS 50/50): selection manifest теперь содержит SHA-256 всех Bybit H1/funding/mark/spec/risk файлов и всех replay-критичных исходников. Перед любым explore/confirm runner сверяет полный набор входных файлов и кодовые hashes с теми, на которых выбирался top-5. Любое изменение данных или replay-зависимости блокирует PnL и требует повторного train-only selection. Это предотвращает ситуацию, когда top-5 выбран на одном наборе данных, а validation незаметно выполняется на другом.
+
+
+Проверка reserve basket: next-five резерв не публикуется как готовая группа, если у всех пяти нет минимум 3,000 общих training timestamps; для primary действует тот же порог. Это исключает ситуацию, когда по отдельности сильные монеты невозможно сравнить на общей истории. Последний Research CI [41697426608](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41697426608) — SUCCESS, 50/50 job steps; включая новый тест общего временного пересечения корзин.

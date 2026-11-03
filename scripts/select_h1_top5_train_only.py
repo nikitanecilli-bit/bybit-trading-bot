@@ -173,6 +173,20 @@ def first_validation_timestamp(histories):
     return window["start_timestamp_ms"] + (window["bar_count"] // 2) * 3_600_000
 
 
+def candidate_training_slice(candles, reference_start, reference_cutoff):
+    """Clip one symbol to the shared calendar cutoff without crossing its own 50% split."""
+    validation_ts = first_validation_timestamp({"candidate": candles})
+    train_history = [
+        candle for candle in candles
+        if reference_start <= candle.ts <= reference_cutoff
+    ]
+    if validation_ts is None:
+        return [], None, "missing_candidate_validation_boundary"
+    if train_history and train_history[-1].ts >= validation_ts:
+        return [], validation_ts, "candidate_training_overlaps_own_validation"
+    return train_history, validation_ts, None
+
+
 def select_train_only(
     *,
     kline_dir,
@@ -203,15 +217,25 @@ def select_train_only(
         if instrument is None:
             exclusions.append({"symbol": symbol, "reason": "missing_from_lifecycle_snapshot"})
             continue
-        train_history = [
-            candle for candle in candles
-            if reference_start <= candle.ts <= reference_cutoff
-        ]
+        train_history, candidate_validation_ts, slice_error = candidate_training_slice(
+            candles, reference_start, reference_cutoff
+        )
+        if slice_error:
+            exclusions.append({
+                "symbol": symbol,
+                "reason": slice_error,
+                "train_bars": len(train_history),
+                "candidate_first_validation_timestamp_ms": candidate_validation_ts,
+                "candidate_last_archived_timestamp_ms": candles[-1].ts,
+                "shared_reference_cutoff_timestamp_ms": reference_cutoff,
+            })
+            continue
         if len(train_history) < MIN_TRAIN_BARS:
             exclusions.append({
                 "symbol": symbol,
                 "reason": "insufficient_train_history",
                 "train_bars": len(train_history),
+                "candidate_first_validation_timestamp_ms": candidate_validation_ts,
             })
             continue
         if not is_linear_usdt_perpetual_within_lifecycle_at(instrument, reference_cutoff):
@@ -269,6 +293,9 @@ def select_train_only(
             )
             result.update({
                 "symbol": symbol,
+                "candidate_first_validation_timestamp_ms": first_validation_timestamp({
+                    symbol: raw[symbol][1]
+                }),
                 "training_bars": len(train_candles),
                 "training_start_timestamp_ms": train_candles[0].ts,
                 "training_end_timestamp_ms": train_candles[-1].ts,
@@ -353,6 +380,10 @@ def select_train_only(
             "reference_start_timestamp_ms": reference_start,
             "reference_end_timestamp_ms": reference_end,
             "reference_cutoff_timestamp_ms": reference_cutoff,
+            "candidate_first_validation_timestamps_ms": {
+                symbol: first_validation_timestamp({symbol: item[1]})
+                for symbol, item in sorted(raw.items())
+            },
             "start_timestamp_ms": common_start,
             "cutoff_timestamp_ms": common_end,
             "start_utc": _utc(common_start) if common_start is not None else None,

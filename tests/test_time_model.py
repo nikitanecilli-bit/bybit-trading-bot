@@ -20,7 +20,12 @@ def bare_engine(timeframe="15m"):
     e.cfg = engine_mod.BotConfig(timeframe=timeframe)
     e._last_mark_prices = {}
     e._intrabar_risk_marks = {}
+    e._intrabar_mtm_marks = {}
+    e._intrabar_liquidation_exits = {}
+    e._mark_price_candles = {}
+    e.liquidation_model_enabled = False
     e._intrabar_risk_marks_ts = None
+    e._intrabar_mtm_marks_ts = None
     e.open_positions = {}
     e.pending = {}
     seen = []

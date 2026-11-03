@@ -80,6 +80,29 @@ def test_common_training_window_uses_exact_shared_h1_intersection():
     assert first_validation_timestamp(histories) == 5 * 3_600_000
 
 
+def test_common_training_window_rejects_gaps_duplicates_and_out_of_order_rows():
+    class Candle:
+        def __init__(self, ts):
+            self.ts = ts
+
+    hour = 3_600_000
+    cases = [
+        ("gap", [0, hour, 3 * hour], "not contiguous"),
+        ("duplicate", [0, hour, hour, 2 * hour], "duplicate or out-of-order"),
+        ("out_of_order", [0, 2 * hour, hour], "duplicate or out-of-order"),
+        ("unaligned", [1, hour + 1], "unaligned"),
+    ]
+    for symbol, timestamps, expected in cases:
+        try:
+            common_training_window({
+                symbol: [Candle(ts) for ts in timestamps],
+            })
+        except ValueError as exc:
+            assert expected in str(exc), (symbol, str(exc))
+        else:
+            raise AssertionError(f"{symbol} candidate history must fail closed")
+
+
 def test_candidate_training_slice_rejects_short_symbol_validation_leakage():
     class Candle:
         def __init__(self, ts):
@@ -144,6 +167,7 @@ if __name__ == "__main__":
         test_ties_are_resolved_by_drawdown_then_trade_count_then_symbol,
         test_common_training_overlap_requires_every_symbol_to_share_timestamps,
         test_common_training_window_uses_exact_shared_h1_intersection,
+        test_common_training_window_rejects_gaps_duplicates_and_out_of_order_rows,
         test_candidate_training_slice_rejects_short_symbol_validation_leakage,
         test_insufficient_positive_candidates_are_not_promoted,
         test_non_finite_candidate_metrics_fail_closed,

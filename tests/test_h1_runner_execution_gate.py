@@ -103,12 +103,14 @@ def test_selection_provenance_rejects_changed_data_and_code():
         "input_files": {
             "kline": [{"path": "data/BTC.csv", "sha256": "abc", "size_bytes": 10}],
             "funding": [], "mark_price": [], "instrument_specs": [], "risk_tiers": [],
+            "universe_snapshot": [{"path": "data/universe.json", "sha256": "universe1", "size_bytes": 30}],
         },
         "code_files": [{"path": "engine.py", "sha256": "code1", "size_bytes": 20}],
     }
     current = {
         "kline": [{"path": "data/BTC.csv", "sha256": "abc", "size_bytes": 10}],
         "funding": [], "mark_price": [], "instrument_specs": [], "risk_tiers": [],
+        "universe_snapshot": [{"path": "data/universe.json", "sha256": "universe1", "size_bytes": 30}],
     }
     validate_selection_provenance(
         selection, current,
@@ -134,6 +136,29 @@ def test_selection_provenance_rejects_changed_data_and_code():
         assert "code changed" in str(exc)
     else:
         raise AssertionError("changed replay code must force reselection")
+
+
+
+def test_selection_provenance_rejects_changed_universe_snapshot():
+    selection = {
+        "input_files": {
+            "kline": [], "funding": [], "mark_price": [],
+            "instrument_specs": [], "risk_tiers": [],
+            "universe_snapshot": [{"path": "universe.json", "sha256": "old", "size_bytes": 10}],
+        },
+        "code_files": [],
+    }
+    current = {
+        "kline": [], "funding": [], "mark_price": [],
+        "instrument_specs": [], "risk_tiers": [],
+        "universe_snapshot": [{"path": "universe.json", "sha256": "new", "size_bytes": 10}],
+    }
+    try:
+        validate_selection_provenance(selection, current, [])
+    except SystemExit as exc:
+        assert "universe_snapshot" in str(exc)
+    else:
+        raise AssertionError("changed lifecycle snapshot must force a new selection")
 
 
 def test_selection_cutoff_must_precede_validation():
@@ -468,6 +493,7 @@ if __name__ == "__main__":
         test_selection_manifest_and_allowlist_must_match_exactly,
         test_selection_manifest_must_be_valid_and_successful,
         test_selection_provenance_rejects_changed_data_and_code,
+        test_selection_provenance_rejects_changed_universe_snapshot,
         test_selection_cutoff_must_precede_validation,
         test_confirm_mode_rejects_missing_or_unregistered_config,
         test_cost_stress_restores_engine_globals_after_success_and_exception,

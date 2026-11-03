@@ -140,10 +140,6 @@ def validate_funding_manifest(
             if not isinstance(page, dict):
                 errors.append("invalid_page_metadata")
                 continue
-            if page.get("complete") is not True:
-                # A saturated API page is only a partial response; its window
-                # must be covered by recursive sub-queries or later pages.
-                continue
             lo, hi = page.get("request_start_ms"), page.get("request_end_ms")
             rows = page.get("response_rows")
             if (not isinstance(lo, int) or not isinstance(hi, int) or hi < lo
@@ -163,7 +159,26 @@ def validate_funding_manifest(
             if page.get("out_of_window_rows", 0) != 0:
                 errors.append("page_contains_out_of_window_rows")
                 continue
-            page_intervals.append((lo, hi))
+
+            if page.get("complete") is True:
+                if page.get("saturated") is not False or rows >= 200:
+                    errors.append("inconsistent_complete_page_metadata")
+                    continue
+                page_intervals.append((lo, hi))
+            elif page.get("saturated") is True:
+                # Bybit's funding-history endpoint returns the newest records
+                # up to endTime. A saturated page therefore attests the upper
+                # segment beginning at its oldest returned timestamp. The
+                # downloader must verify descending, unique response timestamps;
+                # the next request covers the earlier segment ending at first_ts-1.
+                if (rows != 200
+                        or page.get("response_order_descending") is not True
+                        or page.get("response_timestamps_unique") is not True):
+                    errors.append("unattested_saturated_page")
+                    continue
+                page_intervals.append((first_ts, hi))
+            else:
+                errors.append("invalid_page_completeness_metadata")
         page_intervals.sort()
         cursor = start
         for lo, hi in page_intervals:

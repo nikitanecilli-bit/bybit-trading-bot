@@ -161,8 +161,10 @@ def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
             ts = row["funding_timestamp_ms"]
             if not (window_start <= ts < window_end):
                 raise ValueError("funding timestamp outside requested window")
-            if ts in events and events[ts] != row:
-                raise ValueError(f"conflicting duplicate funding timestamp: {ts}")
+            if ts in events:
+                if events[ts] != row:
+                    raise ValueError(f"conflicting duplicate funding timestamp: {ts}")
+                raise ValueError(f"duplicate funding timestamp returned by Bybit: {ts}")
             events[ts] = row
 
     window_start = start_ms

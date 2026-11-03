@@ -41,7 +41,7 @@ class RiskTierHistoryTests(unittest.TestCase):
             Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")
             history = RiskTierHistory.from_directory(tmp)
             with self.assertRaisesRegex(ValueError, "no linear risk-tier snapshot"):
-                history.get_tier("BTCUSDT", 1793500000000, "1000", leverage="10")
+                history.get_tier("BTCUSDT", 1793400000000, "1000", leverage="10")
             with self.assertRaisesRegex(ValueError, "stale"):
                 history.get_tier("BTCUSDT", 1793606400000, "1000", leverage="10", max_age_ms=1)
 

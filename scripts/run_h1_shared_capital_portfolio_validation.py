@@ -613,10 +613,15 @@ def build_validation_manifest(
         })
 
     kline_files = _directory_file_manifest(kline_dir, {".csv"})
+    kline_file_paths = {record["path"] for record in kline_files}
     selected_sources = {}
     for symbol in selected_symbols:
         source_path = Path(archives[symbol])
         source_record = _selected_kline_manifest_record(symbol, source_path)
+        if source_record["path"] not in kline_file_paths:
+            raise ValueError(
+                f"selected kline source for {symbol} is outside the manifested kline directory"
+            )
         selected_sources[symbol] = source_record
 
     input_files = {
@@ -655,6 +660,9 @@ def build_validation_manifest(
         "bybit_instrument_specs.py",
         "instrument_spec_history.py",
         "exchange_order_sizing.py",
+        "market_regime.py",
+        "market_structure.py",
+        "scripts/validate_funding_coverage.py",
     ]
     code_files = [
         _file_manifest_record(repo_root / relative)

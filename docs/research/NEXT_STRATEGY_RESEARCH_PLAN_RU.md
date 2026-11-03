@@ -363,3 +363,12 @@ EMA200 initialization also needs a frozen burn-in policy: the helper seeds from 
 - Added an opt-in `ema_trend_labels_by_symbol` input to `run_portfolio_variant`; long-only H1 signals are allowed only when the same completed candle label is `up`. The default path remains unchanged.
 - Research CI [#41727906187](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41727906187) SUCCESS, 54/54.
 - This optional map is not yet passed by the H1 main grid and has no PnL evidence. Do not claim it improves results. Next implementation task is a separately identified fixed EMA-gated variant using the same frozen selected basket, execution assumptions and shared capital; only execute when Bybit-native data gates pass. No CryptoFetch PnL retest.
+
+
+### 2026-11-04 — paired EMA50/200 ablation wiring
+
+The earlier note saying the EMA labels were not passed into the main H1 grid is superseded. The current runner can build the exact-timestamp, 1,000-bar pre-roll EMA map and pass it into the signal wrapper when `H1_EMA50_200_GATE=1`. A follow-up comparison audit found that this opt-in previously replaced the baseline output instead of producing a paired control.
+
+Correction: default mode remains baseline-only. With `H1_EMA50_200_GATE=1`, every fold/volume/breakout/cost configuration now runs **both** baseline and EMA50/200-up-gated variants, each with the same frozen five-symbol basket, fold boundaries, shared starting capital, engine settings and cost multiplier. They are independent portfolio replays, not simultaneous capital-sharing portfolios. Output labels are deterministic and distinct (`...` vs `..._ema50_200_up`).
+
+This is comparison plumbing only, not evidence of improved expectancy. It does not relax the Bybit data gates. No market PnL replay was run. Research CI must pass before treating the paired runner as ready.

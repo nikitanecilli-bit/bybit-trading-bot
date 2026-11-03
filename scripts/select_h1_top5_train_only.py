@@ -40,7 +40,7 @@ MIN_TRADES = 30
 MIN_VOLUME_RATIO = 1.6
 MIN_BREAKOUT_ATR = 0.10
 COST_MULTIPLIER = 2.0
-PROTOCOL = "h1-top5-train-only-v1"
+PROTOCOL = "h1-top5-train-only-v2"
 
 
 def rank_candidates(rows, min_trades=MIN_TRADES):
@@ -126,6 +126,29 @@ def _utc(ts_ms):
     return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+
+def common_training_window(histories):
+    """Return the exact timestamp intersection shared by every candidate history."""
+    if not histories:
+        return {"start_timestamp_ms": None, "end_timestamp_ms": None, "bar_count": 0}
+    starts = [int(rows[0].ts) for rows in histories.values() if rows]
+    ends = [int(rows[-1].ts) for rows in histories.values() if rows]
+    if len(starts) != len(histories) or len(ends) != len(histories):
+        return {"start_timestamp_ms": None, "end_timestamp_ms": None, "bar_count": 0}
+    start = max(starts)
+    end = min(ends)
+    if end < start:
+        return {"start_timestamp_ms": start, "end_timestamp_ms": end, "bar_count": 0}
+    interval_ms = 3_600_000
+    if start % interval_ms or end % interval_ms or (end - start) % interval_ms:
+        raise ValueError("candidate histories do not share an aligned H1 timestamp grid")
+    return {
+        "start_timestamp_ms": start,
+        "end_timestamp_ms": end,
+        "bar_count": (end - start) // interval_ms + 1,
+    }
+
+
 def select_train_only(
     *,
     kline_dir,
@@ -144,70 +167,117 @@ def select_train_only(
     )
     reference_start = reference_candles[0].ts
     reference_end = reference_candles[-1].ts
-    cutoff = reference_start + int((reference_end - reference_start) * TRAIN_FRACTION) - 3_600_000
-    train_start = reference_start
+    reference_cutoff = (
+        reference_start + int((reference_end - reference_start) * TRAIN_FRACTION)
+        - 3_600_000
+    )
 
-    results = []
     exclusions = []
-    training_candles_by_symbol = {}
+    candidate_histories = {}
     for symbol, (source_path, candles) in sorted(raw.items()):
         instrument = universe.get(symbol)
         if instrument is None:
             exclusions.append({"symbol": symbol, "reason": "missing_from_lifecycle_snapshot"})
             continue
-        train_candles = [c for c in candles if train_start <= c.ts <= cutoff]
-        if len(train_candles) < MIN_TRAIN_BARS:
+        train_history = [
+            candle for candle in candles
+            if reference_start <= candle.ts <= reference_cutoff
+        ]
+        if len(train_history) < MIN_TRAIN_BARS:
             exclusions.append({
-                "symbol": symbol, "reason": "insufficient_train_history",
-                "train_bars": len(train_candles),
+                "symbol": symbol,
+                "reason": "insufficient_train_history",
+                "train_bars": len(train_history),
             })
             continue
-        if not is_linear_usdt_perpetual_within_lifecycle_at(instrument, cutoff):
-            exclusions.append({"symbol": symbol, "reason": "not_active_usdt_perpetual_at_train_cutoff"})
+        if not is_linear_usdt_perpetual_within_lifecycle_at(instrument, reference_cutoff):
+            exclusions.append({
+                "symbol": symbol,
+                "reason": "not_active_usdt_perpetual_at_train_cutoff",
+            })
             continue
         launch_ms = int(instrument["launchTime"])
         delivery_ms = int(instrument.get("deliveryTime") or 0)
-        if train_candles[0].ts < launch_ms:
+        if train_history[0].ts < launch_ms:
             raise SystemExit(f"{symbol}: Bybit H1 archive begins before recorded launchTime")
-        if delivery_ms and train_candles[-1].ts >= delivery_ms:
+        if delivery_ms and train_history[-1].ts >= delivery_ms:
             raise SystemExit(f"{symbol}: Bybit H1 archive extends to/after recorded deliveryTime")
-        training_candles_by_symbol[symbol] = train_candles
-        train_ts = [c.ts for c in train_candles]
-        result = run_portfolio_variant(
-            {symbol: train_candles}, [symbol], train_ts,
-            0, 0.0, 1.0,
-            MIN_VOLUME_RATIO, MIN_BREAKOUT_ATR, COST_MULTIPLIER,
-            instrument_specs_dir, risk_tiers_dir,
-            funding_dir, mark_price_dir, kline_dir,
-        )
-        result.update({
-            "symbol": symbol,
-            "training_bars": len(train_candles),
-            "training_start_timestamp_ms": train_candles[0].ts,
-            "training_end_timestamp_ms": train_candles[-1].ts,
-            "source_kline": _file_manifest_record(source_path),
-        })
-        results.append(result)
-        print(
-            f"TRAIN {symbol}: trades={result['trades']} net={result['net_pnl']:+.2f} "
-            f"PF={result['profit_factor']:.3f} expR={result['expectancy_r']:+.4f} "
-            f"DD={result['max_drawdown_pct']:.2f}%"
-        )
+        candidate_histories[symbol] = {
+            "source_path": source_path,
+            "candles": train_history,
+        }
+
+    common_window = common_training_window({
+        symbol: item["candles"] for symbol, item in candidate_histories.items()
+    })
+    common_start = common_window["start_timestamp_ms"]
+    common_end = common_window["end_timestamp_ms"]
+    common_bars = common_window["bar_count"]
+
+    results = []
+    training_candles_by_symbol = {}
+    if common_bars < MIN_TRAIN_BARS:
+        for symbol in sorted(candidate_histories):
+            exclusions.append({
+                "symbol": symbol,
+                "reason": "insufficient_common_training_overlap",
+                "common_training_bars": common_bars,
+            })
+    else:
+        common_timestamps = list(range(common_start, common_end + 1, 3_600_000))
+        for symbol, item in sorted(candidate_histories.items()):
+            source_path = item["source_path"]
+            train_candles = [
+                candle for candle in item["candles"]
+                if common_start <= candle.ts <= common_end
+            ]
+            if len(train_candles) != common_bars:
+                raise SystemExit(
+                    f"{symbol}: candidate history does not fully cover the common training window"
+                )
+            training_candles_by_symbol[symbol] = train_candles
+            result = run_portfolio_variant(
+                {symbol: train_candles}, [symbol], common_timestamps,
+                0, 0.0, 1.0,
+                MIN_VOLUME_RATIO, MIN_BREAKOUT_ATR, COST_MULTIPLIER,
+                instrument_specs_dir, risk_tiers_dir,
+                funding_dir, mark_price_dir, kline_dir,
+            )
+            result.update({
+                "symbol": symbol,
+                "training_bars": len(train_candles),
+                "training_start_timestamp_ms": train_candles[0].ts,
+                "training_end_timestamp_ms": train_candles[-1].ts,
+                "source_kline": _file_manifest_record(source_path),
+            })
+            results.append(result)
+            print(
+                f"TRAIN {symbol}: trades={result['trades']} net={result['net_pnl']:+.2f} "
+                f"PF={result['profit_factor']:.3f} expR={result['expectancy_r']:+.4f} "
+                f"DD={result['max_drawdown_pct']:.2f}%"
+            )
 
     evaluated, eligible = rank_candidates(results)
     primary = [row["symbol"] for row in eligible[:5]]
-    reserve = [row["symbol"] for row in eligible[5:10]]
-    status = "ok" if len(primary) == 5 else "insufficient_candidates"
-    primary_common_bars = common_training_bar_count(primary, training_candles_by_symbol)
-    if len(primary) == 5 and primary_common_bars < MIN_TRAIN_BARS:
-        status = "insufficient_common_training_overlap"
     reserve_candidates = [row["symbol"] for row in eligible[5:10]]
-    reserve_common_bars = common_training_bar_count(reserve_candidates, training_candles_by_symbol)
+    primary_common_bars = common_training_bar_count(primary, training_candles_by_symbol)
+    reserve_common_bars = common_training_bar_count(
+        reserve_candidates, training_candles_by_symbol
+    )
     reserve = (
         reserve_candidates
         if len(reserve_candidates) == 5 and reserve_common_bars >= MIN_TRAIN_BARS
         else []
     )
+    if common_bars < MIN_TRAIN_BARS:
+        status = "insufficient_common_training_overlap"
+    elif len(primary) != 5:
+        status = "insufficient_candidates"
+    elif primary_common_bars < MIN_TRAIN_BARS:
+        status = "insufficient_common_training_overlap"
+    else:
+        status = "ok"
+
     kline_files = _directory_file_manifest(kline_dir, {".csv"})
     input_files = {
         "kline": kline_files,
@@ -228,14 +298,22 @@ def select_train_only(
         "selection_status": status,
         "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "training_window": {
-            "definition": "first 50% of the longest archived instrument's launch-to-last-candle span",
+            "definition": (
+                "exact timestamp intersection of every eligible candidate inside the first "
+                "50% of the longest archived instrument span; every candidate is scored on "
+                "the same H1 bars"
+            ),
             "reference_symbol": reference_symbol,
-            "start_timestamp_ms": train_start,
-            "cutoff_timestamp_ms": cutoff,
-            "start_utc": _utc(train_start),
-            "cutoff_utc": _utc(cutoff),
+            "reference_start_timestamp_ms": reference_start,
+            "reference_end_timestamp_ms": reference_end,
+            "reference_cutoff_timestamp_ms": reference_cutoff,
+            "start_timestamp_ms": common_start,
+            "cutoff_timestamp_ms": common_end,
+            "start_utc": _utc(common_start) if common_start is not None else None,
+            "cutoff_utc": _utc(common_end) if common_end is not None else None,
             "train_fraction": TRAIN_FRACTION,
             "one_bar_embargo_before_validation": True,
+            "common_training_bars": common_bars,
             "common_primary_training_bars": primary_common_bars,
             "common_reserve_training_bars": reserve_common_bars,
         },
@@ -249,7 +327,10 @@ def select_train_only(
             "entry_penetration_bps": 5.0,
             "limit_wait_bars": 3,
             "capital_per_screen": 10000.0,
-            "screening_mode": "one-symbol isolated portfolio per candidate; ranking metrics are not a shared-capital portfolio",
+            "screening_mode": (
+                "one-symbol isolated portfolio per candidate; ranking metrics are not a "
+                "shared-capital portfolio"
+            ),
         },
         "eligibility_rule": {
             "minimum_training_bars_per_symbol": MIN_TRAIN_BARS,
@@ -269,7 +350,10 @@ def select_train_only(
         "universe_provenance": {
             "source": universe_payload["source"],
             "snapshot_fetched_at": universe_payload["fetched_at"],
-            "limitation": "snapshot lifecycle bounds do not prove temporary trading availability or complete historical closed-contract retention",
+            "limitation": (
+                "snapshot lifecycle bounds do not prove temporary trading availability "
+                "or complete historical closed-contract retention"
+            ),
             "archived_symbols": len(raw),
             "screened_symbols": len(results),
             "excluded_symbols": exclusions,
@@ -281,13 +365,13 @@ def select_train_only(
         "input_files": input_files,
         "code_files": code_files,
         "selection_note": (
-            "The selected top five are frozen using training data only. Explore and confirm must use "
-            "the exact primary list and this unchanged manifest. If fewer than five candidates pass, "
-            "the selection is invalid; do not fill slots with negative or weak candidates."
+            "The selected top five are frozen using a common training timestamp window. "
+            "Explore and confirm must use the exact primary list and this unchanged manifest. "
+            "If fewer than five candidates pass, the selection is invalid; do not fill slots "
+            "with negative or weak candidates."
         ),
     }
     return manifest
-
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)

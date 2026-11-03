@@ -73,7 +73,7 @@ class AccruedFundingTests(unittest.TestCase):
         pos.remaining_contract_qty = "0.4"
         self.assertEqual(
             accrued_funding_cost_for_remaining_margin(pos, EVENTS, MARKS, SETTLE_2),
-            Decimal("8.80"),
+            Decimal("0.88"),
         )
 
     def test_margin_funding_does_not_prorate_before_tp1_timestamp(self):

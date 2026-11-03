@@ -35,7 +35,8 @@
 - Engine fix commit: f6a3910024cd84543c22998a0b28885ba9ff094b.
 - Regression test commit: c5e566a60855419d6597a694fbe2ae682322a56a.
 - Full Research CI: [#41705849389](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41705849389) — SUCCESS.
-- Portfolio accounting suite passed, including the new legacy-limit TP1 regression.
+- Additional boundary coverage: `test_legacy_limit_position_uses_maker_tp1_fee_fallback_in_mtm` verifies the legacy `None → order_type` maker fallback numerically; `test_explicit_taker_tp1_override_is_preserved_in_mtm` verifies explicit `False` is not overridden. Test commit `6d00db961c510c3e2bca3e93f459947d83e3a332`; [CI #41707011122](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41707011122) SUCCESS, 50/50 steps; `test_funding_mark_to_market.py` passed 8/8.
+- Portfolio accounting suite passed, including the legacy-limit TP1 regression.
 
 ## Ограничения и решение
 

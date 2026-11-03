@@ -197,6 +197,13 @@ def run_variant(
             "funding": trade.funding_cost_usdt,
             "net_pnl": trade.pnl_usdt,
             "r_multiple": trade.r_multiple,
+            "gross_r_multiple": trade.gross_r_multiple,
+            "risk_usdt": trade.risk_usdt,
+            "risk_pct": trade.risk_pct,
+            "mae_r": trade.mae,
+            "mfe_r": trade.mfe,
+            "session": trade.session,
+            "order_type": trade.order_type,
             "exit_reason": trade.exit_reason,
         }
         trades.append(row)

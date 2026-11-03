@@ -76,6 +76,16 @@ class AccruedFundingTests(unittest.TestCase):
             Decimal("8.80"),
         )
 
+    def test_margin_funding_does_not_prorate_before_tp1_timestamp(self):
+        pos = position(tp1=True, tp1_ts=SETTLE_2, remaining="0.5")
+        earlier = [{"ts": SETTLE_1, "rate": "0.01"}]
+        self.assertEqual(
+            accrued_funding_cost_for_remaining_margin(
+                pos, earlier, MARKS, SETTLE_1
+            ),
+            Decimal("10.00"),
+        )
+
     def test_margin_funding_without_tp1_matches_actual_cashflow(self):
         pos = position(tp1=False, tp1_ts=None, remaining="1")
         self.assertEqual(

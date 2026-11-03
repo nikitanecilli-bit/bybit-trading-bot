@@ -187,6 +187,79 @@ def calculate_mark_price_maintenance_margin(
     )
 
 
+
+@dataclass(frozen=True)
+class IsolatedMarginHealth:
+    position_margin_balance: Decimal
+    maintenance_margin: Decimal
+    margin_surplus: Decimal
+    liquidation_triggered: bool
+    unrealized_pnl: Decimal
+    funding_net_cost: Decimal
+    tier_id: int
+
+
+def evaluate_isolated_margin_health(
+    *,
+    symbol: str,
+    direction: str,
+    entry_price,
+    mark_price,
+    quantity,
+    leverage,
+    tiers: Iterable[RiskTier],
+    taker_fee_rate="0.00055",
+    extra_margin="0",
+    funding_net_cost="0",
+) -> IsolatedMarginHealth:
+    """Evaluate one isolated USDT-linear position against current Mark-Price MM.
+
+    Funding net cost is positive when paid/debited from position margin and
+    negative when received/credited. Extra margin is the amount currently
+    allocated to the remaining position (caller must update it after partial
+    closes or manual margin changes). Realized PnL from partial closes is not
+    implicitly transferred into remaining position margin.
+
+    Position margin balance = entry-based initial margin (including estimated
+    close fee) + allocated extra margin + unrealized PnL - net funding cost.
+    Liquidation trigger is margin balance <= Mark-Price maintenance margin.
+    This is position-level isolated approximation; account/order tier
+    aggregation, actual funding transfer timestamps, AMR and exchange rounding
+    are not modeled.
+    """
+    side = str(direction).strip().lower()
+    if side not in {"long", "short"}:
+        raise ValueError("direction must be 'long' or 'short'")
+    entry = _d(entry_price, "entry_price")
+    mark = _d(mark_price, "mark_price")
+    qty = _d(quantity, "quantity")
+    lev = _d(leverage, "leverage")
+    fee = _d(taker_fee_rate, "taker_fee_rate")
+    extra = _d(extra_margin, "extra_margin")
+    funding = _d(funding_net_cost, "funding_net_cost")
+    if min(entry, mark, qty, lev) <= 0 or fee < 0 or fee >= 1 or extra < 0:
+        raise ValueError("prices, quantity and leverage must be positive; fee in [0,1); extra margin non-negative")
+
+    margin_req = calculate_mark_price_maintenance_margin(
+        symbol=symbol, direction=side, entry_price=entry, mark_price=mark,
+        quantity=qty, leverage=lev, tiers=tiers, taker_fee_rate=fee,
+    )
+    entry_notional = entry * qty
+    close_fee = margin_req.estimated_close_fee
+    initial_margin = entry_notional / lev + close_fee
+    unrealized = (mark - entry) * qty if side == "long" else (entry - mark) * qty
+    balance = initial_margin + extra + unrealized - funding
+    surplus = balance - margin_req.maintenance_margin
+    return IsolatedMarginHealth(
+        position_margin_balance=balance,
+        maintenance_margin=margin_req.maintenance_margin,
+        margin_surplus=surplus,
+        liquidation_triggered=surplus <= 0,
+        unrealized_pnl=unrealized,
+        funding_net_cost=funding,
+        tier_id=margin_req.tier_id,
+    )
+
 def mark_candle_crosses_liquidation(
     *, direction: str, liquidation_price, mark_low, mark_high
 ) -> bool:

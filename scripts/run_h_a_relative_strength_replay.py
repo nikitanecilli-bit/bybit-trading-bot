@@ -215,6 +215,8 @@ def run_variant(
             "remaining_fraction_at_exit": trade.remaining_fraction_at_exit,
             "final_stop_price": trade.final_stop_price,
             "breakout_level": trade.breakout_level,
+            "tp1_maker": trade.tp1_maker,
+            "final_exit_maker": trade.final_exit_maker,
         }
         trades.append(row)
         symbol = by_symbol[trade.token]

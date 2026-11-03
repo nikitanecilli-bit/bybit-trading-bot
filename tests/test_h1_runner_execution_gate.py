@@ -35,6 +35,7 @@ def test_confirm_mode_requires_one_frozen_predeclared_config():
         "H1_VALIDATION_MODE": "confirm",
         "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
         "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10",
+        "H1_SYMBOL_ALLOWLIST": "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT",
     })
     assert [fold[0] for fold in design["folds"]] == [3]
     assert design["volume_thresholds"] == [1.6]
@@ -42,16 +43,21 @@ def test_confirm_mode_requires_one_frozen_predeclared_config():
     assert design["cost_multipliers"] == [1.0, 1.5, 2.0]
     assert design["frozen_config"] == {
         "min_volume_ratio": 1.6, "min_breakout_atr": 0.10,
+        "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT"],
     }
 
 
 def test_confirm_mode_rejects_missing_or_unregistered_config():
     for env in (
         {"H1_VALIDATION_MODE": "confirm"},
-        {"H1_VALIDATION_MODE": "confirm", "H1_FROZEN_MIN_VOLUME_RATIO": "1.7",
-         "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10"},
         {"H1_VALIDATION_MODE": "confirm", "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
-         "H1_FROZEN_MIN_BREAKOUT_ATR": "0.20"},
+         "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10", "H1_SYMBOL_ALLOWLIST": "BTCUSDT,ETHUSDT"},
+        {"H1_VALIDATION_MODE": "confirm", "H1_FROZEN_MIN_VOLUME_RATIO": "1.7",
+         "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10",
+         "H1_SYMBOL_ALLOWLIST": "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT"},
+        {"H1_VALIDATION_MODE": "confirm", "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
+         "H1_FROZEN_MIN_BREAKOUT_ATR": "0.20",
+         "H1_SYMBOL_ALLOWLIST": "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT"},
         {"H1_VALIDATION_MODE": "other"},
     ):
         try:

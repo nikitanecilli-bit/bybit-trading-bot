@@ -875,7 +875,13 @@ def test_exchange_sized_final_close_uses_exact_remaining_contract_qty_for_pnl():
     e.open_positions["BTCUSDT"] = pos
     e._last_mark_prices["BTCUSDT"] = 112.0
     e._close_position(pos, 112.0, "take_profit", 1_800_007_200_000, 0.0, 2.4)
-    assert e.closed_trades[-1].gross_pnl == 9.0
+    trade = e.closed_trades[-1]
+    assert trade.gross_pnl == 9.0
+    assert trade.exchange_sized is True
+    assert trade.contract_qty == "1.0"
+    assert trade.tp1_contract_qty == "0.5"
+    assert trade.final_contract_qty == "0.5"
+    assert trade.qty_step == "0.1"
     assert "BTCUSDT" not in e.open_positions
 
 

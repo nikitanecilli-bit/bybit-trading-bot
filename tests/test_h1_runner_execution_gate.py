@@ -495,7 +495,7 @@ def test_funding_mark_coverage_requires_every_symbol_and_h1_mark_bar():
         )
         try:
             validate_funding_mark_coverage(
-                funding, marks, ["BTCUSDT"], [3600000, 7200000], 3600000, 7200000
+                funding, marks, ["BTCUSDT"], [0, 3600000, 7200000], 0, 7200000
             )
         except SystemExit as exc:
             assert "missing 1 candles" in str(exc)

@@ -24,7 +24,7 @@ class FundingArchiveManifestTests(unittest.TestCase):
             snapshot_path = self.root / f"instrument_snapshot_{ts}.json"
             fetched_at = "1970-01-01T00:00:01Z" if ts == 1000 else "1970-01-01T00:00:02Z"
             snapshot_path.write_text(json.dumps({
-                "schema_version": 1, "category": "linear", "fetched_at": fetched_at,
+                "schema_version": 1, "source": "Bybit V5 GET /v5/market/instruments-info", "category": "linear", "fetched_at": fetched_at,
                 "count": 1, "instruments": [{"symbol": "BTCUSDT", "fundingInterval": "480"}],
             }), encoding="utf-8")
             source_snapshots.append({

@@ -663,3 +663,7 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 **Проверка:** [Research CI #41679873986 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41679873986), commit `804911e977350037e769f327a5db2592676ec36c`. Portfolio accounting suite: **42/42 tests passed**, включая новую sparse kill-switch регрессию. Полный Research engine checks workflow завершился успешно.
 
 **Границы:** проверяется детерминированная модельная симуляция, а не exchange-side atomic liquidation. Это не доказывает реалистичность mark-price источника, fill цены при аварийном закрытии, очередность фактических биржевых fills или полноту cross-margin account модели.
+
+**Дополнительная проверка эквивалентности:** `test_sparse_and_dense_replay_match_on_fully_aligned_universe` прогоняет одинаковый синхронный набор OHLCV через обычный dense replay и sparse replay. Сравниваются полный закрытый ledger, итоговая и realized equity, max drawdown, daily-stop/kill-switch latches, а также остаточные open/pending позиции. Результаты полностью совпали. Research CI [#41680433416 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41680433416), commit `a8607e1a5bb2158645109225489573336500251e`; portfolio accounting suite: **43/43 tests passed**.
+
+Эта проверка закрывает важный риск: sparse event loop не должен менять расчёт, когда данные на самом деле полностью синхронизированы. Она не подтверждает правильность внешних market data или биржевых fills.

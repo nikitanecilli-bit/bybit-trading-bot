@@ -83,6 +83,20 @@ Required before a market replay:
 
 The earlier 2025-10 to 2026-04 CryptoFetch history may be considered only as a separately labelled reverse-time robustness check after the prior experiment ledger has been reconciled. It is not Bybit-native, its universe is survivor-selected, and it cannot be called forward OOS.
 
+
+## 6.1. Frozen reverse-time robustness protocol (2026-11-04)
+
+This is the only permitted next H-C proxy replay on the existing CryptoFetch archive. It is a reverse-time robustness check, **not forward OOS**, because H-C was formulated after examining the later 2026-04..2026-10 period.
+
+- Scoring window: 2025-10-30 00:00 UTC through 2026-04-26 23:00 UTC inclusive. The archive must provide at least 72 complete H1 warmup bars before the first scored bar; expected first candle is 2025-10-27 00:00 UTC.
+- Frozen archive-available symbol set (25; no ranking by PnL): AAVEUSDT, ASTERUSDT, BCHUSDT, CAKEUSDT, DASHUSDT, DOTUSDT, ENAUSDT, ETCUSDT, GMXUSDT, HBARUSDT, ICPUSDT, JSTUSDT, MORPHOUSDT, ONDOUSDT, PAXGUSDT, PUMPUSDT, QNTUSDT, RAYUSDT, RENDERUSDT, SHIBUSDT, SKYUSDT, TAOUSDT, WLDUSDT, WLFIUSDT, XLMUSDT. Missing symbol, missing exact terminal candle, insufficient warmup, or non-contiguous H1 data fails closed.
+- Compare only two variants on identical symbols/timestamps: frozen H1 Donchian(20)+volume(1.6) baseline, and the same baseline with H-C enabled. No H-A, no top-five selection, no additional filters, no threshold sweep.
+- Frozen risk/execution: 10,000 USDT starting capital per variant; 0.5% risk/trade; 2% portfolio risk cap; max 5 concurrent positions; 5x leverage; daily stop 5%; kill switch 30%; max chase 1.5%; ATR14; stop 2.5 ATR; TP1 2R; TP2 5R; ATR trail 3.0; max hold 32 H1 bars; market entries and exits; fee and taker-slippage constants multiplied by 2.0.
+- H-C rule is unchanged: on the first three completed H1 bars after fill, including the fill bar, close the remaining position at that bar's close if it has returned inside the signal-time Donchian boundary. Stop, liquidation, kill-switch and TP2 precedence are unchanged.
+- Funding and mark-price liquidation are not represented by this dataset. Any reported net value is only a fee/slippage-adjusted proxy before funding, not Bybit net PnL. The CryptoFetch archive is not a point-in-time Bybit universe and has survivorship/listing bias.
+- Report trade count, gross PnL, fees, slippage, proxy net before funding, PF, expectancy, drawdown, monthly equity, per-symbol attribution, retest exits, TP1 and liquidity classifications. Partial October 2025 and April 2026 are not full months; November 2025–March 2026 are the full calendar months.
+- Run exactly once after CI gates pass. Do not tune or rerun this window. A positive result can justify further research only; it cannot satisfy the 20% net/month target or authorize API connection/live trading.
+
 ## 7. Decision criteria and reporting
 
 Primary outcome: shared-account net PnL after fees, slippage and funding, compared with the frozen baseline.

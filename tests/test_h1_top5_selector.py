@@ -5,7 +5,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.select_h1_top5_train_only import rank_candidates
+from scripts.select_h1_top5_train_only import rank_candidates, common_training_bar_count
 
 
 def _row(symbol, trades, net, pf, exp, dd):
@@ -45,6 +45,22 @@ def test_ties_are_resolved_by_drawdown_then_trade_count_then_symbol():
     assert [row["symbol"] for row in eligible] == ["AAAUSDT", "BBBUSD", "ZZZUSDT"]
 
 
+
+def test_common_training_overlap_requires_every_symbol_to_share_timestamps():
+    class Candle:
+        def __init__(self, ts):
+            self.ts = ts
+    histories = {
+        "AAAUSDT": [Candle(ts) for ts in range(10)],
+        "BBBUSDT": [Candle(ts) for ts in range(2, 12)],
+        "CCCUSDT": [Candle(ts) for ts in range(5, 15)],
+    }
+    assert common_training_bar_count(["AAAUSDT", "BBBUSDT"], histories) == 8
+    assert common_training_bar_count(["AAAUSDT", "BBBUSDT", "CCCUSDT"], histories) == 5
+    assert common_training_bar_count(["AAAUSDT", "MISSINGUSDT"], histories) == 0
+    assert common_training_bar_count([], histories) == 0
+
+
 def test_insufficient_positive_candidates_are_not_promoted():
     rows = [_row("AAAUSDT", 60, 100, 1.3, 0.1, 8)]
     _, eligible = rank_candidates(rows)
@@ -56,6 +72,7 @@ if __name__ == "__main__":
     tests = [
         test_rank_uses_only_positive_net_candidates_and_deterministic_tiebreaks,
         test_ties_are_resolved_by_drawdown_then_trade_count_then_symbol,
+        test_common_training_overlap_requires_every_symbol_to_share_timestamps,
         test_insufficient_positive_candidates_are_not_promoted,
     ]
     for test in tests:

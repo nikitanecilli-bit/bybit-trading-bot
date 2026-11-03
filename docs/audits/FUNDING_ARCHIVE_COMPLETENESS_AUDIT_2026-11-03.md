@@ -191,3 +191,14 @@ Implemented:
 Research CI [#41729833792](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41729833792) completed **SUCCESS, 55/55 steps**, including Bybit market-history archive collector tests and Funding archive provenance/schedule-completeness tests. Tested commit: `7653ae9991f10e137f32c51c7665ade421cec585`.
 
 Residual limitation is explicit: point-in-time snapshots cannot rule out an interval change and reversion between observations. The snapshot workflow has previously been blocked by Bybit HTTP 403 and no real dated Bybit instrument/risk, trade-kline, Funding or Mark archive is committed. This is an offline implementation result only; the H1 market-PnL gate remains CLOSED.
+
+
+### Official API history boundary — 2026-11-04
+
+Checked the current official V5 endpoint documentation. `GET /v5/market/funding/history` returns historical funding rates/timestamps and explicitly says each symbol has its own funding interval, directing clients to `instruments-info` to query that interval. `GET /v5/market/instruments-info` exposes `fundingInterval` as a response field, but the documented endpoint is a current instruments-info query; no historical effective-time query for past interval changes is documented.
+
+Sources:
+- https://bybit-exchange.github.io/docs/v5/market/history-fund-rate
+- https://bybit-exchange.github.io/docs/v5/market/instrument
+
+Therefore, a present-day interval value cannot be back-projected across an old Funding archive. The new collector deliberately requires dated snapshots that bracket the archive range. If no snapshot exists before the requested start or after the requested end, it must reject the archive rather than silently assume the current interval applied historically. Even daily point-in-time snapshots cannot prove that an interval did not change and revert between observations; that residual uncertainty stays explicit.

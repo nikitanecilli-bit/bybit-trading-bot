@@ -25,7 +25,10 @@ GitHub-hosted runner в США уже дал HTTP 403 от Bybit. Для заг�
 
 1. Collector workflow теперь доступны в GitHub Actions из `main`: запустить Archive Bybit instrument specifications с runner=self-hosted. Текущий YAML содержит только `workflow_dispatch`; расписание не настроено.
 2. Запустить Archive Bybit risk-limit tiers с runner=self-hosted. Текущий YAML содержит только `workflow_dispatch`; расписание не настроено.
-3. Запустить Archive Bybit OHLCV, funding and mark-price history с runner=self-hosted. Указать symbols, start_ms и end_ms (end exclusive, границы H1), interval=60. Результат сохраняется в data/archives/bybit/<start_ms>_<end_ms>_<run_id>/{kline,funding,mark_price}. Текущий YAML также только ручной, без cron.
+3. Запустить Archive Bybit linear universe history с runner=self-hosted и дождаться коммита snapshot в research branch. Выбрать конкретный файл `data/universe_history/linear/<UTC timestamp>.json` из ветки.
+4. Запустить Archive Bybit OHLCV, funding and mark-price history с runner=self-hosted. Указать symbols, start_ms, end_ms (end exclusive, H1-aligned), interval=60 и точный repository-relative путь к universe_snapshot. Collector требует, чтобы каждый символ присутствовал в snapshot как USDT LinearPerpetual; символы вне snapshot не архивируются.
+5. Для каждого символа диапазон автоматически обрезается по launchTime/deliveryTime. Первый бар округляется вверх до первого полного H1 open не раньше launchTime; end-exclusive округляется вниз по deliveryTime, чтобы не включать бар, пересекающий delivery. Если после clipping нет ни одного полного бара, весь запуск прекращается до сетевых запросов. В archive_manifest записываются исходный и фактический диапазоны, lifecycle/status, snapshot fetched_at и SHA-256.
+Результат сохраняется в data/archives/bybit/<start_ms>_<end_ms>_<run_id>/{kline,funding,mark_price}. Workflow остаётся manual-only, без cron.
 
 ## 4. Запуск H1 validation
 
@@ -65,6 +68,15 @@ Workflow публикует два артефакта: итоговый `h1_shar
 - [ ] Проверить, что self-hosted runner зарегистрирован и имеет label `self-hosted`, а egress country не US/CN. Доступных через текущую GitHub-интеграцию сведений о registered runners нет, поэтому этот пункт пока UNVERIFIED.
 - [ ] Запустить сначала snapshots, затем ограниченный архив H1 и проверить coverage/artifacts до любого PnL.
 
+
+## 9. Per-symbol lifecycle clipping (2026-11-03)
+
+- Архиватор больше не использует один и тот же сырой интервал для всех символов без проверки жизненного цикла.
+- Для каждого запрошенного тикера обязателен конкретный Bybit linear universe snapshot из repository checkout. Входной файл проверяется по структуре и SHA-256 включается в archive manifest.
+- Границы считаются консервативно на уровне полных свечей: `effective_start = max(requested_start, ceil(launchTime / interval) * interval)`; `effective_end = min(requested_end, floor(deliveryTime / interval) * interval)`, если deliveryTime задан. Для бессрочного контракта deliveryTime=0, верхней границей остаётся requested_end.
+- Если тикер отсутствует в snapshot или пересечение не содержит полного бара, сбор прекращается до начала сетевых запросов. Это намеренный fail-closed подход.
+- Snapshot отражает только зафиксированный состав и lifecycle Bybit на момент сбора. Он не доказывает полноту исторического universe, не восстанавливает временные приостановки торгов и не гарантирует, что Bybit сохраняет все делистнутые контракты в endpoint. Неизвестный/отсутствующий инструмент не должен молча считаться «не торговался».
+- Workflow в `main` и соответствующий workflow в research branch синхронизированы по обязательному input `universe_snapshot`; исполняемый Python collector остаётся в research branch, которую workflow checkout-ит явно.
 
 ## 8. Статическая перепроверка 2026-11-03
 

@@ -9,7 +9,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from funding_archive_manifest import (
-    record_funding_collection, validate_funding_manifest, sha256_file,
+    attach_funding_settlement_schedule, record_funding_collection,
+    validate_funding_manifest, sha256_file,
 )
 
 
@@ -103,6 +104,59 @@ class FundingArchiveManifestTests(unittest.TestCase):
             ],
             collected_at_ms=7_200_001,
         )
+
+    def _write_interval_snapshot(self, timestamp_ms, interval_minutes=60):
+        path = self.root / f"interval_{timestamp_ms}.json"
+        fetched_at = datetime.fromtimestamp(
+            timestamp_ms / 1000, tz=timezone.utc
+        ).isoformat().replace("+00:00", "Z")
+        path.write_text(json.dumps({
+            "schema_version": 1,
+            "source": "Bybit V5 GET /v5/market/instruments-info",
+            "category": "linear",
+            "fetched_at": fetched_at,
+            "count": 1,
+            "instruments": [{
+                "symbol": "BTCUSDT",
+                "fundingInterval": str(interval_minutes),
+            }],
+        }), encoding="utf-8")
+        return path
+
+    def test_collector_attaches_hash_pinned_schedule_from_bracketing_snapshots(self):
+        self.record()
+        snapshots = [
+            self._write_interval_snapshot(3_599_999),
+            self._write_interval_snapshot(7_200_001),
+        ]
+        schedule = attach_funding_settlement_schedule(
+            self.csv, self.manifest, symbol="BTCUSDT", category="linear",
+            required_start_ms=3_600_000, required_end_ms=7_200_000,
+            snapshot_paths=snapshots, snapshot_copy_dir=self.root / "copied_snapshots",
+        )
+        self.assertEqual(
+            schedule["expected_settlement_timestamps_ms"],
+            [3_600_000, 7_200_000],
+        )
+        report = validate_funding_manifest(
+            self.csv, self.manifest, symbol="BTCUSDT",
+            required_start_ms=3_600_000, required_end_ms=7_200_000,
+        )
+        self.assertTrue(report["ok"], report["errors"])
+        self.assertTrue(report["settlement_schedule_verified"])
+
+    def test_collector_refuses_unresolved_interval_change(self):
+        self.record()
+        snapshots = [
+            self._write_interval_snapshot(3_599_999, 60),
+            self._write_interval_snapshot(7_200_001, 120),
+        ]
+        with self.assertRaisesRegex(ValueError, "effective boundary is unknown"):
+            attach_funding_settlement_schedule(
+                self.csv, self.manifest, symbol="BTCUSDT", category="linear",
+                required_start_ms=3_600_000, required_end_ms=7_200_000,
+                snapshot_paths=snapshots, snapshot_copy_dir=self.root / "copied_snapshots",
+            )
 
     def test_manifest_records_hash_rows_and_query_pages(self):
         payload = self.record()

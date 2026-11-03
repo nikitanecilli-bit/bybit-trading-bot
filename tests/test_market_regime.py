@@ -52,7 +52,7 @@ def test_rising_fast_ema_below_slow_ema_is_not_trend_up():
         ema_slow_period=8, slope_lookback=3, volatility_lookback=10,
         trend_er_min=0.3, trend_slope_atr_min=0.1,
     )
-    closes = [300.0] * 50 + [100.0 + i * 0.5 for i in range(30)]
+    closes = [300.0] * 50 + [100.0 + i * 0.01 for i in range(30)]
     row = classify_candles(make_candles(closes, width=0.2), cfg)[-1]
     assert row["ema_alignment"] == "down"
     assert row["regime"] != "trend_up"

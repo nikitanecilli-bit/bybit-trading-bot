@@ -22,6 +22,14 @@ on:
         type: choice
         options:
           - "60"
+      runner:
+        description: "Use self-hosted runner outside US/Mainland China; hosted US runners are blocked by Bybit"
+        required: true
+        type: choice
+        default: self-hosted
+        options:
+          - self-hosted
+          - ubuntu-latest
 
 permissions:
   contents: write
@@ -32,7 +40,7 @@ concurrency:
 
 jobs:
   archive:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
     steps:
       - name: Check out research branch
         uses: actions/checkout@v4

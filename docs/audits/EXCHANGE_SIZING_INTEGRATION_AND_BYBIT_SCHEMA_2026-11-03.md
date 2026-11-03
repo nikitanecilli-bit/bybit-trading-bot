@@ -324,3 +324,10 @@ Limitations: the archived minNotionalValue is conservatively applied to reduce l
 
 
 Official reduce-only semantics reviewed against Bybit V5 Place Order documentation (https://bybit-exchange.github.io/docs/v5/order/create-order): linear/perpetual order qty is contract quantity; reduceOnly=true is required for a closing/reducing order; if reduceOnly quantity exceeds max order quantity, Bybit automatically splits it. The endpoint documentation does not state a general exemption from minOrderQty/minNotionalValue for arbitrary partial reduce-only orders. Therefore this research implementation conservatively applies archived minima and explicitly labels the rule as unverified rather than assuming a bypass. No order was submitted.
+
+
+## 24. Position-level risk-tier margin requirements
+
+Added RiskTierHistory.calculate_margin_requirements() and RiskMarginRequirement. For a dated linear risk tier and configured leverage, it returns position-level initial margin = position value / leverage and maintenance margin = position value * tier maintenanceMargin - tier mmDeduction. The tier selection still enforces the dated riskLimitValue and tier maxLeverage. Regression tests cover tier 2, a 250,000 USDT position at 10x (25,000 USDT IM; 2,000 USDT MM under the synthetic fixture), and position values beyond the highest tier. Research CI #41618208413 — SUCCESS on 7775b0358d975715273185cb80a3fa76bdccb1f9.
+
+This helper deliberately does not calculate liquidation price, account solvency, or portfolio-margin requirements. Bybit's current help documentation distinguishes cross, isolated and portfolio margin; cross margin also depends on account-level available balance and aggregate positions/orders. The engine does not yet know the user's margin mode, account configuration, other positions/orders, extra isolated margin or fee reserve. The H1 runner also still uses legacy sizing and does not pass dated instrument/risk-tier snapshot directories. No market PnL replay was run.

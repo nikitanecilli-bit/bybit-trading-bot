@@ -829,3 +829,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - State persistence проверяет сохранность, шаг, TP1+остаток=исходное количество и согласованность доли.
 - CI #41617395285 — SUCCESS, commit 916cbd036e3b397773682fcbce3e212f3b1e816c.
 - Ограничения: фактические reduce-only исключения Bybit для minNotional не подтверждены реальными ответами биржи; строгий replay применяет сохранённый минимум консервативно. H1 runner всё ещё legacy proxy, исторические market PnL бэктесты не запускались.
+
+
+## ENG-EXEC-010 — position-level IM/MM from dated Bybit risk tiers (2026-11-03)
+
+- Added calculation: IM = position value / configured leverage; MM = position value × MMR − mmDeduction, using the selected point-in-time tier.
+- Enforces riskLimitValue and maxLeverage through RiskTierHistory.get_tier.
+- Test fixture: 250,000 USDT at 10x in tier 2 gives 25,000 USDT IM and 2,000 USDT MM.
+- Research CI #41618208413 — SUCCESS, commit 7775b0358d975715273185cb80a3fa76bdccb1f9.
+- Not a liquidation/account-solvency model: margin mode, other positions/orders, available balance, extra margin and fee reserve remain unknown. H1 runner remains legacy proxy; no market PnL backtest run.

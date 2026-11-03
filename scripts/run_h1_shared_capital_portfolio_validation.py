@@ -9,9 +9,11 @@ are not modelled.
 """
 from __future__ import annotations
 import csv
+import hashlib
 import json
 import math
 import os
+import platform
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
@@ -488,6 +490,8 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         "min_volume_ratio": min_vol,
         "min_breakout_atr": min_breakout_atr,
         "symbols": len(symbols),
+        "symbol_list": ",".join(symbols),
+        "common_h1_bars": len(timestamps),
         "shared_starting_capital": STARTING_CAPITAL,
         "max_concurrent_positions": MAX_CONCURRENT_POSITIONS,
         "trades": int(audit["total_trades"]),
@@ -501,6 +505,234 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         "test_start_ts": start_ts,
         "test_end_ts": end_ts,
     }
+
+
+def _manifest_path(path):
+    candidate = Path(path).resolve()
+    repo_root = Path(__file__).resolve().parents[1]
+    try:
+        return candidate.relative_to(repo_root).as_posix()
+    except ValueError:
+        return str(candidate)
+
+
+def _sha256_file(path):
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _file_manifest_record(path):
+    source = Path(path)
+    stat = source.stat()
+    return {
+        "path": _manifest_path(source),
+        "size_bytes": stat.st_size,
+        "sha256": _sha256_file(source),
+    }
+
+
+def _directory_file_manifest(directory, suffixes):
+    root = Path(directory)
+    if not root.is_dir():
+        raise SystemExit(f"Cannot manifest missing input directory: {root}")
+    allowed = {suffix.lower() for suffix in suffixes}
+    files = sorted(
+        path for path in root.rglob("*")
+        if path.is_file() and path.suffix.lower() in allowed
+    )
+    if not files:
+        raise SystemExit(f"Cannot manifest empty input directory: {root}")
+    return [_file_manifest_record(path) for path in files]
+
+
+def _selected_kline_manifest_record(symbol, path):
+    record = _file_manifest_record(path)
+    timestamps = []
+    with Path(path).open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if not reader.fieldnames or "timestamp_ms" not in reader.fieldnames:
+            raise SystemExit(f"{path}: cannot manifest missing timestamp_ms column")
+        for line_no, row in enumerate(reader, start=2):
+            try:
+                timestamps.append(int(row["timestamp_ms"]))
+            except (TypeError, ValueError, KeyError) as exc:
+                raise SystemExit(
+                    f"{path}:{line_no}: invalid timestamp while building run manifest"
+                ) from exc
+    if not timestamps:
+        raise SystemExit(f"{path}: selected Bybit H1 source is empty")
+    record.update({
+        "symbol": symbol,
+        "row_count": len(timestamps),
+        "first_timestamp_ms": min(timestamps),
+        "last_timestamp_ms": max(timestamps),
+    })
+    return record
+
+
+def build_validation_manifest(
+    *,
+    symbols,
+    archives,
+    common_timestamps,
+    kline_dir,
+    funding_dir,
+    mark_price_dir,
+    instrument_specs_dir,
+    risk_tiers_dir,
+    result_rows,
+    output_csv_path,
+):
+    """Build an immutable input/code/config manifest for the H1 portfolio report."""
+    selected_symbols = sorted(str(symbol).upper() for symbol in symbols)
+    if not selected_symbols or len(selected_symbols) != len(set(selected_symbols)):
+        raise ValueError("manifest symbols must be non-empty and unique")
+    missing_sources = sorted(set(selected_symbols) - set(archives))
+    if missing_sources:
+        raise ValueError(f"missing selected kline source paths: {missing_sources}")
+    timestamps = [int(value) for value in common_timestamps]
+    if not timestamps or timestamps != sorted(set(timestamps)):
+        raise ValueError("common H1 timestamps must be non-empty, unique and sorted")
+
+    folds = []
+    for fold, start_fraction, end_fraction in FOLDS:
+        start_index = int(len(timestamps) * start_fraction)
+        end_index = int(len(timestamps) * end_fraction)
+        if end_index <= start_index:
+            raise ValueError(f"fold {fold} has no timestamps in common grid")
+        folds.append({
+            "fold": fold,
+            "start_fraction": start_fraction,
+            "end_fraction": end_fraction,
+            "start_timestamp_ms": timestamps[start_index],
+            "end_timestamp_ms": timestamps[end_index - 1],
+            "bar_count": end_index - start_index,
+        })
+
+    kline_files = _directory_file_manifest(kline_dir, {".csv"})
+    kline_by_path = {record["path"]: record for record in kline_files}
+    selected_sources = {}
+    for symbol in selected_symbols:
+        source_path = Path(archives[symbol])
+        source_record = _selected_kline_manifest_record(symbol, source_path)
+        selected_sources[symbol] = source_record
+
+    input_files = {
+        "trade_kline": {
+            "directory": _manifest_path(kline_dir),
+            "all_csv_files": kline_files,
+            "selected_sources": selected_sources,
+        },
+        "funding": {
+            "directory": _manifest_path(funding_dir),
+            "files": _directory_file_manifest(funding_dir, {".csv"}),
+        },
+        "mark_price": {
+            "directory": _manifest_path(mark_price_dir),
+            "files": _directory_file_manifest(mark_price_dir, {".csv"}),
+        },
+        "instrument_specs": {
+            "directory": _manifest_path(instrument_specs_dir),
+            "files": _directory_file_manifest(instrument_specs_dir, {".json"}),
+        },
+        "risk_tiers": {
+            "directory": _manifest_path(risk_tiers_dir),
+            "files": _directory_file_manifest(risk_tiers_dir, {".json"}),
+        },
+    }
+
+    repo_root = Path(__file__).resolve().parents[1]
+    code_paths = [
+        "Bybit_Trading_Engine_v14_research.py",
+        "scripts/run_h1_shared_capital_portfolio_validation.py",
+        ".github/workflows/h1-shared-capital-portfolio-validation.yml",
+        "multibar_limit_wait.py",
+        "funding_accounting.py",
+        "mark_price_liquidation.py",
+        "bybit_risk_tiers.py",
+        "bybit_instrument_specs.py",
+        "instrument_spec_history.py",
+        "exchange_order_sizing.py",
+    ]
+    code_files = [
+        _file_manifest_record(repo_root / relative)
+        for relative in code_paths
+        if (repo_root / relative).is_file()
+    ]
+
+    allowlist = sorted({
+        item.strip().upper()
+        for item in os.getenv("H1_SYMBOL_ALLOWLIST", "").split(",")
+        if item.strip()
+    })
+    output_record = _file_manifest_record(output_csv_path)
+    return {
+        "schema_version": 1,
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "run": {
+            "git_commit": os.getenv("GITHUB_SHA"),
+            "workflow_run_id": os.getenv("GITHUB_RUN_ID"),
+            "workflow_run_attempt": os.getenv("GITHUB_RUN_ATTEMPT"),
+            "python_version": sys.version,
+            "platform": platform.platform(),
+            "bybit_api_base_url": os.getenv("BYBIT_API_BASE_URL"),
+        },
+        "data_source": (
+            "Official Bybit V5 archive paths; schemas and timestamps validated by the runner. "
+            "Hashes identify exact files but do not independently attest remote origin."
+        ),
+        "universe": {
+            "selection_mode": "explicit_allowlist" if allowlist else "coverage_filtered",
+            "allowlist": allowlist,
+            "selected_symbols": selected_symbols,
+            "selected_symbol_count": len(selected_symbols),
+        },
+        "common_h1_grid": {
+            "timeframe": "1h",
+            "bar_count": len(timestamps),
+            "first_timestamp_ms": timestamps[0],
+            "last_timestamp_ms": timestamps[-1],
+        },
+        "folds": folds,
+        "strategy_and_execution": {
+            "direction": "long_only",
+            "strategy": "H1-momentum-breakout",
+            "volume_thresholds": VOL_THRESHOLDS,
+            "breakout_atr_thresholds": BREAKOUT_ATR_THRESHOLDS,
+            "cost_multipliers": COST_MULTIPLIERS,
+            "entry_offset_bps": ENTRY_OFFSET_BPS,
+            "entry_penetration_bps": ENTRY_PENETRATION_BPS,
+            "limit_wait_bars": WAIT_BARS,
+            "starting_capital_usdt": STARTING_CAPITAL,
+            "max_concurrent_positions": MAX_CONCURRENT_POSITIONS,
+            "max_risk_trade_pct": 1.0,
+            "max_portfolio_risk_pct": 2.0,
+            "daily_stop_loss_pct": 5.0,
+            "emergency_kill_switch_pct": 30.0,
+            "maker_entry_and_tp1": True,
+            "maker_tp1_and_target": False,
+            "base_taker_fee": BASE_TAKER_FEE,
+            "base_maker_fee": BASE_MAKER_FEE,
+            "base_taker_slippage": BASE_TAKER_SLIP,
+        },
+        "input_files": input_files,
+        "code_files": code_files,
+        "outputs": {
+            "portfolio_results_csv": output_record,
+        },
+        "result_rows": result_rows,
+    }
+
+
+def write_validation_manifest(manifest, path):
+    target = Path(path)
+    with target.open("w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, indent=2, ensure_ascii=False, allow_nan=False)
+        handle.write("\n")
+    return target
 
 
 def main():
@@ -534,7 +766,23 @@ def main():
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         writer.writerows(rows)
+    manifest = build_validation_manifest(
+        symbols=symbols,
+        archives=archives,
+        common_timestamps=timestamps,
+        kline_dir=kline_dir,
+        funding_dir=funding_dir,
+        mark_price_dir=mark_price_dir,
+        instrument_specs_dir=instrument_specs_dir,
+        risk_tiers_dir=risk_tiers_dir,
+        result_rows=rows,
+        output_csv_path=path,
+    )
+    manifest_path = write_validation_manifest(
+        manifest, "h1_shared_capital_portfolio_validation_manifest.json"
+    )
     print(f"Saved {path}; {len(rows)} portfolio-fold-cost runs. Cost multipliers={COST_MULTIPLIERS}.")
+    print(f"Saved reproducibility manifest: {manifest_path}")
     print("CAVEAT: Bybit-native H1 trade OHLCV; OHLC limit penetration is not a real queue/fill model.")
     print("CAVEAT: Funding uses timestamp-aligned Mark-candle open as a settlement-price proxy; fees/slippage are fixed model assumptions.")
     print("CAVEAT: No historical bid/ask, L2 queue priority, partial-fill adverse selection, or account-specific fee tier is modelled.")

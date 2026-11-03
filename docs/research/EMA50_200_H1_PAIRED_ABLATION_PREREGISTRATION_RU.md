@@ -69,7 +69,7 @@ The manual workflow exposes `ema50_200_comparison=off|paired`. `off` is the defa
 | Risk per trade | 1.0% |
 | Portfolio risk cap | 2.0% |
 | Maximum concurrent positions | 5 |
-| Leverage | 5x isolated model |
+| Leverage | 5x isolated model (explicitly set in runner as ISOLATED_5X / 5.0) |
 | Daily stop | 5% |
 | Emergency kill switch | 30% |
 | Maximum chase | 1.5% |
@@ -82,7 +82,7 @@ No setting may be altered after the confirm fold begins. Existing execution-mode
 - **Explore:** folds 1 and 2 only. The volume and breakout-ATR thresholds may be selected from the predeclared grid using these folds. They are development/selection data, not OOS proof.
 - **Confirm:** fold 3 only, using one frozen volume threshold and one frozen breakout-ATR threshold chosen before the confirm run. Baseline and EMA candidate are paired on the same fold.
 - The three cost multipliers are stress cases, not three opportunities to choose the most flattering result. The primary cost case is 2.0x; 1.0x and 1.5x are sensitivity checks.
-- The paired manifest must contain exactly one baseline and one EMA candidate for every fold/config/cost key. Pair mismatch fails closed.
+- The paired manifest must contain exactly one baseline and one EMA candidate for every fold/config/cost key. Pair mismatch fails closed. It also verifies exact equality of timeframe, selected symbol list/count, common H1 bar count, fold start/end, starting capital and maximum concurrent positions before calculating deltas.
 - Fold 3 is a one-shot confirmation. If its result is used to change EMA parameters, thresholds, execution assumptions or risk settings, fold 3 is spent and cannot be called an untouched holdout afterward. Any changed candidate then requires a later independent holdout.
 
 ## 7. Metrics and decision rule
@@ -105,6 +105,6 @@ Passing this single confirm fold only permits a later independent holdout and pa
 ## 8. Current status
 
 - EMA context, paired runner mode, exact pairing and fail-closed comparison manifest are implemented.
-- Research CI [#41728994842](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41728994842) passed 55/55 deterministic steps.
+- Research CI [#41728994842](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41728994842) passed 55/55 paired-comparison steps; follow-up integrity hardening [#41730087544](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41730087544) passed 54/54.
 - Bybit-native H1/funding/mark/spec/risk archives are not currently available in the repository.
 - No EMA PnL replay, no Bybit API connection, no external data download and no orders have been performed.

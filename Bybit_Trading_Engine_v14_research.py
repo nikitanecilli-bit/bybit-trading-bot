@@ -2598,12 +2598,14 @@ def main() -> None:
     parser.add_argument("--persist-state", action="store_true", help="Писать план Б (для live-цикла; бэктесту не нужно)")
     parser.add_argument("--state-path", type=str, default="bot_state_backup.json")
     parser.add_argument("--funding-dir", type=str, default=None, help="Папка с <SYMBOL>.csv funding history")
-    parser.add_argument("--mark-price-dir", type=str, default=None, help="Папка с <SYMBOL>.csv mark-price klines")
+    parser.add_argument("--mark-price-dir", type=str, default=None, help="Папка с <SYMBOL>.csv Mark Price OHLC klines")
+    parser.add_argument("--risk-tiers-dir", type=str, default=None, help="Папка с dated Bybit linear risk-tier snapshots; together with Mark OHLC enables liquidation model")
     args = parser.parse_args()
 
     engine = UnifiedQuantEngine(config_path=args.config, journal_output_path=args.journal,
                                 persist_state=args.persist_state, state_path=args.state_path,
-                                funding_dir=args.funding_dir, mark_price_dir=args.mark_price_dir)
+                                funding_dir=args.funding_dir, mark_price_dir=args.mark_price_dir,
+                                risk_tiers_dir=args.risk_tiers_dir)
     pool = list(dict.fromkeys(engine.cfg.active_trading_pool))
 
     if args.data_dir:

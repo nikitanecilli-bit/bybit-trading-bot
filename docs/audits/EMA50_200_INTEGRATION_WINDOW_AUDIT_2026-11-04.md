@@ -71,3 +71,8 @@ Therefore, a future full-history precomputation must preserve a substantial pre-
 ### Non-finite input hardening — 2026-11-04
 
 The research-only EMA helper now rejects non-numeric/non-finite EMA inputs, and the trend helper rejects non-finite or non-positive close values instead of silently propagating NaN into neutral labels. Regression coverage includes NaN, +Infinity, -Infinity and zero close. Research CI [#41727040877](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41727040877) completed **SUCCESS, 53/53 steps** at code commit `18ea0707790e6830f0f9e40829d00cdf7c7a40fc`.
+
+
+### Chronological-input validation — 2026-11-04
+
+The causal trend-series helper now also rejects duplicate and out-of-order candle timestamps. This prevents a caller from silently producing labels from a malformed/non-chronological series. Regression tests cover both duplicate and descending timestamp cases. Research CI [#41727272300](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41727272300) completed **SUCCESS, 53/53 steps** at code commit `f3696125e73df95c663b95df07ef3d0cab3f6c16`.

@@ -142,3 +142,29 @@ H-A отклонена как текущий кандидат: не показа
 - Ledger reconciliation is exact at reported precision: gross − fees − slippage − funding = net for each fold; funding is 0 because unavailable, not because actual funding would be zero.
 
 **Research implication:** do not simply block long or short globally; the failing side flips by fold. The strongest diagnostic target is the stop-loss cohort versus profitable time/trailing exits, with entry quality and subsequent adverse/favourable excursion. Any next experiment must be a new preregistered hypothesis, not an optimized threshold or direction filter fitted to these already-used folds.
+
+## 10. Независимая проверка сохранённого artifact и ограничений trade ledger
+
+Artifact h-a-preregistered-ohlcv-results повторно скачан и прочитан как ZIP; проверены results.json, fold_summary.csv, archive_manifest.json. Это повторная проверка уже существующего результата, не новый рыночный replay.
+
+### Покрытие фактического universe
+
+- Manifest: 50 включённых H1 symbols, 6 duplicate symbol/timeframe groups, 6 pairwise comparisons, 0 conflicting overlap bars, 0 longest-file-not-superset pairs.
+- По folds: 47 symbols в fold 1, 49 в fold 2, 50 в fold 3. Внутри fold активный universe менялся: fold 1 — 25–47 (median 47), fold 2 — 47–49 (median 49), fold 3 — 49–50 (median 49).
+- Исторические начала файлов неоднородны: earliest 2025-10-27, median first timestamp 2026-01-27, latest first timestamp 2026-09-24. Поэтому число 50 — количество файлов/symbols, а не 50 одновременно торгуемых инструментов на всём периоде. Состав и breadth меняются во времени.
+- Это по-прежнему CryptoFetch Binance-style proxy; manifest не доказывает, что каждый инструмент был доступен на Bybit в соответствующий момент, и не содержит delisted instruments отсутствующих в архиве.
+
+### Важное ограничение уже использованного H-A ledger
+
+Сохранённый artifact был создан до расширения export в runner. В его trades_ledger присутствуют symbol, direction, entry/exit dates/prices, size, gross, fees, slippage, funding, net, R и exit_reason, но **нет MAE, MFE, risk_usdt, gross_R, session и order_type**. Следовательно, предыдущая attribution по направлениям и причинам закрытия подтверждается исходным ledger, но MAE/MFE-разбор по этому artifact выполнить нельзя. Новые поля добавлены в runner для будущих диагностических запусков, однако пока не проверены новым CI/replay; нельзя ретроспективно приписывать их старому artifact.
+
+### Интерпретация MAE/MFE в движке
+
+Текущие TradeRecord.mae / .mfe хранят excursion в R до модельного выхода, а не независимую полную внутрисвечную траекторию цены. При стоп-срабатывании adverse extreme ограничивается модельной ценой stop fill (или gap open); неоднозначный wick за stop не включается. На fill bar favourable extreme не обновляется, поскольку OHLC не показывает, был ли экстремум до или после входа. Это консервативное правило исполнения, но оно цензурирует MAE stop-out сделок примерно на уровне исполнения стопа. Поэтому нельзя сравнивать MAE stop-loss trades с winners как полную меру «насколько цена шла против сделки». Для будущей диагностики это нужно обозначать как execution-bounded MAE; если понадобится анализ полного OHLC диапазона stop-bar, он должен быть отдельной метрикой с явной оговоркой о неизвестном порядке high/low.
+
+### Обновлённый статус
+
+- Ledger direction/exit attribution — подтверждена повторным чтением artifact.
+- MAE/MFE attribution H-A — не выполнена; данных в сохранённом artifact нет.
+- Dynamic universe breadth — измерен из сохранённого artifact; 50 symbols не были активны одновременно на всём горизонте.
+- Никакой новый PnL replay не запускался.

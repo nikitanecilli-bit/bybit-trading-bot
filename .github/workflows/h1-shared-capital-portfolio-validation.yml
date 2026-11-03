@@ -25,6 +25,12 @@ on:
         type: choice
         options: [explore, confirm]
         default: explore
+      ema50_200_comparison:
+        description: "Paired ablation: run baseline and EMA50/200-up-gated variants on identical folds"
+        required: true
+        type: choice
+        options: [off, paired]
+        default: off
       frozen_min_volume_ratio:
         description: "Required in confirm mode; select one predeclared grid value"
         required: false
@@ -103,6 +109,7 @@ jobs:
           BYBIT_KLINE_DIR: ${{ inputs.kline_dir }}
           H1_SELECTION_MANIFEST: ${{ inputs.selection_manifest }}
           H1_VALIDATION_MODE: ${{ inputs.validation_mode }}
+          H1_EMA50_200_GATE: ${{ inputs.ema50_200_comparison == 'paired' && '1' || '0' }}
           H1_FROZEN_MIN_VOLUME_RATIO: ${{ inputs.frozen_min_volume_ratio }}
           H1_FROZEN_MIN_BREAKOUT_ATR: ${{ inputs.frozen_min_breakout_atr }}
           BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}

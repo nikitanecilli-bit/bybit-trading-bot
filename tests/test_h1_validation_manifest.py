@@ -126,6 +126,29 @@ class H1ValidationManifestTests(unittest.TestCase):
                 output_csv_path=__file__,
             )
 
+    def test_manifest_rejects_selected_kline_outside_input_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            kline_dir = root / "kline"
+            kline_dir.mkdir()
+            (kline_dir / "OTHERUSDT.csv").write_text("timestamp_ms\\n1\\n", encoding="utf-8")
+            outside = root / "BTCUSDT.csv"
+            outside.write_text("timestamp_ms\\n1800000000000\\n", encoding="utf-8")
+            timestamps = [1_800_000_000_000 + i * 3_600_000 for i in range(100)]
+            with self.assertRaisesRegex(ValueError, "outside the manifested kline directory"):
+                build_validation_manifest(
+                    symbols=["BTCUSDT"],
+                    archives={"BTCUSDT": str(outside)},
+                    common_timestamps=timestamps,
+                    kline_dir=kline_dir,
+                    funding_dir=root,
+                    mark_price_dir=root,
+                    instrument_specs_dir=root,
+                    risk_tiers_dir=root,
+                    result_rows=[],
+                    output_csv_path=__file__,
+                )
+
     def test_manifest_rejects_unsorted_or_duplicate_common_grid(self):
         for timestamps in (
             [1_800_003_600_000, 1_800_000_000_000],

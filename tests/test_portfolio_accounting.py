@@ -281,6 +281,15 @@ def test_close_trade_reconciles_net_pnl_fees_slippage_and_realized_equity():
     assert trade.exchange_fees_usdt == round(expected_fees, 2)
     assert trade.slippage_cost_usdt == round(expected_slippage, 2)
     assert trade.pnl_usdt == round(gross - expected_fees - expected_slippage, 2)
+    # The H-A diagnostic ledger consumes these persisted execution/risk fields.
+    assert trade.order_type == "market"
+    assert trade.session == "eu"  # entry_ts is 08:00 UTC
+    assert trade.mae == 0.0
+    assert trade.mfe == 2.0
+    assert trade.risk_usdt == 50.0
+    assert trade.risk_pct == 0.5
+    assert trade.gross_r_multiple == 2.0
+    assert trade.r_multiple == trade.pnl_usdt / trade.risk_usdt
     assert e.risk_mgr.realized_equity == round(10_000.0 + trade.pnl_usdt, 4)
     assert e.risk_mgr.current_equity == round(
         e.risk_mgr.realized_equity + e.risk_mgr.unrealized_pnl, 4

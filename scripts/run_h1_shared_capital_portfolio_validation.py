@@ -17,7 +17,6 @@ from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import Bybit_Trading_Engine_v14_research as em
-from run_uploaded_dataset_backtests import read_zip_datasets
 from multibar_limit_wait import evaluate_limit_wait, prepare_signal_for_next_bar_fill
 
 FOLDS = [(1, 0.50, 0.65), (2, 0.65, 0.80), (3, 0.80, 1.00)]
@@ -135,11 +134,14 @@ def resolve_funding_dirs(environ=None):
 
 def validate_funding_mark_coverage(
     funding_dir, mark_price_dir, symbols, h1_timestamps, start_ts, end_ts,
+    trade_kline_dir,
 ):
     """Require funding events and Bybit mark candles aligned to every scored H1 bar."""
     from scripts.validate_funding_coverage import validate_coverage
 
-    report = validate_coverage(funding_dir, mark_price_dir, symbols)
+    report = validate_coverage(
+        funding_dir, mark_price_dir, symbols, trade_kline_dir=trade_kline_dir
+    )
     if not report.get("ok"):
         bad = [row for row in report.get("results", []) if row.get("status") != "ok"]
         raise SystemExit(f"Incomplete Bybit funding/mark coverage: {bad[:10]}")
@@ -169,80 +171,137 @@ def validate_funding_mark_coverage(
             )
 
 
-def aligned_h1_datasets():
-    allowlist = {s.strip().upper() for s in os.getenv("H1_SYMBOL_ALLOWLIST", "").split(",") if s.strip()}
-    raw = {symbol: item for (symbol, tf), item in read_zip_datasets().items()
-           if tf == "1h" and len(item[2]) >= 500 and (not allowlist or symbol.upper() in allowlist)}
+def resolve_bybit_kline_dir(environ=None):
+    """Require official Bybit linear H1 trade-kline CSVs as the signal/execution price source."""
+    env = os.environ if environ is None else environ
+    raw = str(env.get("BYBIT_KLINE_DIR", "")).strip()
+    if not raw:
+        raise SystemExit(
+            "BYBIT_KLINE_DIR is required; refusing Binance/CryptoFetch proxy candles "
+            "for a Bybit execution PnL replay."
+        )
+    directory = Path(raw)
+    if not directory.is_dir() or not list(directory.glob("*.csv")):
+        raise SystemExit(
+            f"Missing or empty official Bybit H1 kline directory: {directory}."
+        )
+    return str(directory)
+
+
+def load_bybit_h1_datasets(directory):
+    """Load official Bybit V5 H1 trade candles, rejecting gaps and malformed rows."""
+    root = Path(directory)
+    required = {"timestamp_ms", "open", "high", "low", "close", "volume", "turnover"}
+    raw = {}
+    for path in sorted(root.glob("*.csv")):
+        symbol = path.stem.upper()
+        candles = []
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if not reader.fieldnames or not required.issubset(reader.fieldnames):
+                raise SystemExit(f"{path}: missing Bybit trade-kline columns {sorted(required)}")
+            for line_no, row in enumerate(reader, start=2):
+                try:
+                    ts = int(row["timestamp_ms"])
+                    op, hi, low, close, volume, turnover = (
+                        float(row[key]) for key in
+                        ("open", "high", "low", "close", "volume", "turnover")
+                    )
+                except (TypeError, ValueError, KeyError, OverflowError) as exc:
+                    raise SystemExit(f"{path}:{line_no}: invalid Bybit H1 candle: {exc}") from exc
+                values = (op, hi, low, close, volume, turnover)
+                if (ts <= 0 or not all(math.isfinite(value) for value in values)
+                        or min(op, hi, low, close) <= 0 or volume < 0 or turnover < 0
+                        or hi < max(op, low, close) or low > min(op, hi, close)):
+                    raise SystemExit(f"{path}:{line_no}: invalid Bybit H1 OHLCV values")
+                candles.append(em.Candle(ts, op, hi, low, close, volume))
+        candles.sort(key=lambda candle: candle.ts)
+        timestamps = [candle.ts for candle in candles]
+        if len(timestamps) != len(set(timestamps)):
+            raise SystemExit(f"{path}: duplicate Bybit H1 candle timestamps")
+        if len(candles) < 500:
+            continue
+        if any(b - a != 3_600_000 for a, b in zip(timestamps, timestamps[1:])):
+            raise SystemExit(f"{path}: missing or irregular H1 candles; refusing partial series")
+        raw[symbol] = (str(path), candles)
+    return raw
+
+
+def aligned_h1_datasets(kline_dir):
+    allowlist = {
+        s.strip().upper() for s in os.getenv("H1_SYMBOL_ALLOWLIST", "").split(",")
+        if s.strip()
+    }
+    raw = load_bybit_h1_datasets(kline_dir)
     if allowlist:
         missing = sorted(allowlist - set(raw))
         if missing:
-            raise SystemExit(f"Selected symbols missing H1 datasets: {missing}")
-        print("Selected-universe filter: " + ", ".join(sorted(allowlist)))
+            raise SystemExit(f"Selected symbols missing Bybit H1 datasets: {missing}")
+        raw = {symbol: raw[symbol] for symbol in sorted(allowlist)}
+        print("Selected Bybit universe: " + ", ".join(sorted(raw)))
     if len(raw) < 2:
-        raise SystemExit(f"Need at least 2 H1 symbols, found {len(raw)}")
+        raise SystemExit(f"Need at least 2 official Bybit H1 symbols, found {len(raw)}")
 
-    # Use the longest available H1 history as the reference window. Exclude
-    # newly listed/short-history symbols that would shrink the shared period.
-    ref_symbol, (_, _, ref_candles) = max(
-        raw.items(), key=lambda kv: kv[1][2][-1].ts - kv[1][2][0].ts
+    ref_symbol, (_, ref_candles) = max(
+        raw.items(), key=lambda item: item[1][1][-1].ts - item[1][1][0].ts
     )
     ref_start, ref_end = ref_candles[0].ts, ref_candles[-1].ts
     span = max(1, ref_end - ref_start)
-    selected = {}
-    coverage = {}
+    selected, coverage = {}, {}
     for symbol, item in raw.items():
-        candles = item[2]
+        candles = item[1]
         start_ts, end_ts = candles[0].ts, candles[-1].ts
         start_lag = max(0.0, (start_ts - ref_start) / span)
         end_lag = max(0.0, (ref_end - end_ts) / span)
         covered = (end_ts - start_ts) / span
-        coverage[symbol] = {"coverage_pct": round(covered * 100, 1),
-                            "start_lag_pct": round(start_lag * 100, 1),
-                            "end_lag_pct": round(end_lag * 100, 1)}
+        coverage[symbol] = {
+            "coverage_pct": round(covered * 100, 1),
+            "start_lag_pct": round(start_lag * 100, 1),
+            "end_lag_pct": round(end_lag * 100, 1),
+        }
         if allowlist or (covered >= 0.70 and start_lag <= 0.15 and end_lag <= 0.15):
             selected[symbol] = item
 
-    if allowlist:
-        if len(selected) != len(allowlist):
-            raise SystemExit(f"Expected {len(allowlist)} selected symbols, found {len(selected)}")
-    elif len(selected) < 10:
+    if allowlist and len(selected) != len(allowlist):
+        raise SystemExit(f"Expected {len(allowlist)} selected symbols, found {len(selected)}")
+    elif not allowlist and len(selected) < 10:
         raise SystemExit(
-            f"Only {len(selected)} symbols have >=70% reference-history coverage "
-            f"with <=15% start/end lag; refusing to run a misleading short-overlap portfolio."
+            f"Only {len(selected)} Bybit symbols have >=70% reference-history coverage "
+            "with <=15% start/end lag; refusing a misleading short-overlap portfolio."
         )
 
     common = None
-    for _, _, candles in selected.values():
-        ts = {c.ts for c in candles}
-        common = ts if common is None else common.intersection(ts)
+    for _, candles in selected.values():
+        timestamps = {candle.ts for candle in candles}
+        common = timestamps if common is None else common.intersection(timestamps)
     timestamps = sorted(common or [])
-    overlap_pct = (len(timestamps) / max(1, len(ref_candles))) * 100
+    ref_count = len(ref_candles)
+    overlap_pct = len(timestamps) / max(1, ref_count) * 100
     min_bars = 3000 if allowlist else 500
     min_overlap_pct = 30 if allowlist else 65
     if len(timestamps) < min_bars or overlap_pct < min_overlap_pct:
         raise SystemExit(
-            f"Insufficient synchronized overlap: {len(timestamps)} bars "
+            f"Insufficient synchronized Bybit H1 overlap: {len(timestamps)} bars "
             f"({overlap_pct:.1f}% of reference; minimum {min_bars} bars and {min_overlap_pct}%)."
         )
 
-    aligned = {}
-    archives = {}
-    for symbol, (_, archive, candles) in selected.items():
-        by_ts = {c.ts: c for c in candles}
-        aligned[symbol] = [by_ts[t] for t in timestamps]
-        archives[symbol] = archive
+    aligned, archives = {}, {}
+    for symbol, (path, candles) in selected.items():
+        by_ts = {candle.ts: candle for candle in candles}
+        aligned[symbol] = [by_ts[ts] for ts in timestamps]
+        archives[symbol] = path
     em.check_alignment(aligned)
-    print(f"Reference={ref_symbol}; selected {len(aligned)}/{len(raw)} symbols; "
+    print(f"Reference={ref_symbol}; selected {len(aligned)}/{len(raw)} Bybit symbols; "
           f"common overlap={overlap_pct:.1f}% ({len(timestamps)} H1 bars)")
-    print("Selected symbol coverage: " + ", ".join(
-        f"{s}:{coverage[s]['coverage_pct']}%" for s in sorted(aligned)
+    print("Selected Bybit symbol coverage: " + ", ".join(
+        f"{symbol}:{coverage[symbol]['coverage_pct']}%" for symbol in sorted(aligned)
     ))
     return aligned, archives, timestamps
 
 def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, end_frac,
                           min_vol, min_breakout_atr, cost_multiplier,
                           instrument_specs_dir, risk_tiers_dir,
-                          funding_dir, mark_price_dir):
+                          funding_dir, mark_price_dir, kline_dir):
     # Explicit cost stress: scale fees and taker slippage from engine defaults.
     em.TAKER_FEE = BASE_TAKER_FEE * cost_multiplier
     em.MAKER_FEE = BASE_MAKER_FEE * cost_multiplier
@@ -256,7 +315,8 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         instrument_specs_dir, risk_tiers_dir, start_ts, end_ts
     )
     validate_funding_mark_coverage(
-        funding_dir, mark_price_dir, symbols, timestamps, start_ts, end_ts
+        funding_dir, mark_price_dir, symbols, timestamps, start_ts, end_ts,
+        kline_dir,
     )
     # Truncate at fold end, while allowing pre-fold candles for indicator warm-up.
     fold_data = {sym: candles[:end_idx] for sym, candles in base_candles.items()}
@@ -360,7 +420,7 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         em.check_alignment(fold_data)
         audit = em.run_simulation_pass(
             engine, fold_data, list(symbols),
-            data_label=f"BINANCE_PROXY H1 portfolio fold={fold} vol>={min_vol} breakoutATR>={min_breakout_atr}",
+            data_label=f"BYBIT_V5 H1 portfolio fold={fold} vol>={min_vol} breakoutATR>={min_breakout_atr}",
         )
     finally:
         core.evaluate_signal = staticmethod(original_eval)
@@ -399,7 +459,8 @@ def main():
     funding_dir, mark_price_dir = resolve_funding_dirs()
     print(f"Strict Bybit execution snapshots: specs={instrument_specs_dir}; risk_tiers={risk_tiers_dir}")
     print(f"Official Bybit costs: funding={funding_dir}; mark_prices={mark_price_dir}")
-    datasets, archives, timestamps = aligned_h1_datasets()
+    kline_dir = resolve_bybit_kline_dir()
+    datasets, archives, timestamps = aligned_h1_datasets(kline_dir)
     symbols = sorted(datasets)
     print(f"Aligned H1 portfolio: {len(symbols)} symbols, {len(timestamps)} common bars")
     print(f"Archive sources: {len(set(archives.values()))}; starting capital={STARTING_CAPITAL:.0f} USDT")
@@ -412,7 +473,7 @@ def main():
                         datasets, symbols, timestamps, fold, start_frac, end_frac,
                         min_vol, min_breakout, cost_multiplier,
                         instrument_specs_dir, risk_tiers_dir,
-                        funding_dir, mark_price_dir,
+                        funding_dir, mark_price_dir, kline_dir,
                     )
                     rows.append(result)
                     print(f"fold={fold} {result['variant']} trades={result['trades']} "

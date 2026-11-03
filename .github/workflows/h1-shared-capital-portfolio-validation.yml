@@ -11,6 +11,10 @@ on:
         description: "Repository path to merged Bybit mark-price CSVs (one <SYMBOL>.csv per symbol)"
         required: true
         type: string
+      kline_dir:
+        description: "Repository path to official Bybit H1 trade-kline CSVs (one <SYMBOL>.csv per symbol)"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -26,6 +30,14 @@ jobs:
           python-version: "3.12"
       - name: Compile
         run: python -m py_compile Bybit_Trading_Engine_v14_research.py scripts/run_uploaded_dataset_backtests.py scripts/run_h1_shared_capital_portfolio_validation.py
+      - name: Require official Bybit H1 trade-kline archive
+        env:
+          KLINE_DIR: ${{ inputs.kline_dir }}
+        run: |
+          test -d "$KLINE_DIR" && test -n "$(find "$KLINE_DIR" -maxdepth 1 -name '*.csv' -print -quit)" || {
+            echo "Missing official Bybit H1 trade-kline archive; refusing Binance/CryptoFetch proxy PnL replay."
+            exit 1
+          }
       - name: Require Bybit funding and mark-price archives
         env:
           FUNDING_DIR: ${{ inputs.funding_dir }}
@@ -55,6 +67,7 @@ jobs:
           BYBIT_RISK_TIERS_DIR: data/instrument_specs/risk_limits
           BYBIT_FUNDING_DIR: ${{ inputs.funding_dir }}
           BYBIT_MARK_PRICE_DIR: ${{ inputs.mark_price_dir }}
+          BYBIT_KLINE_DIR: ${{ inputs.kline_dir }}
         run: python scripts/run_h1_shared_capital_portfolio_validation.py
       - name: Upload report
         uses: actions/upload-artifact@v4

@@ -10,6 +10,7 @@ sys.path.insert(0, str(repo_root / "scripts"))
 from run_h1_shared_capital_portfolio_validation import (
     resolve_execution_snapshot_dirs, validate_snapshot_history_coverage,
     resolve_funding_dirs, validate_funding_mark_coverage,
+    resolve_bybit_kline_dir, load_bybit_h1_datasets,
 )
 
 
@@ -188,6 +189,40 @@ def test_funding_mark_coverage_rejects_no_settlement_in_fold():
             raise AssertionError("no settlement in fold must fail")
 
 
+
+
+def test_bybit_kline_dir_is_mandatory():
+    try:
+        resolve_bybit_kline_dir({})
+    except SystemExit as exc:
+        assert "refusing Binance/CryptoFetch proxy" in str(exc)
+    else:
+        raise AssertionError("missing Bybit kline dir must fail")
+
+
+def test_load_bybit_h1_datasets_rejects_gaps_and_loads_exchange_candles():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        path = root / "BTCUSDT.csv"
+        rows = ["symbol,timestamp_ms,open,high,low,close,volume,turnover"]
+        for index in range(500):
+            ts = 1_700_000_000_000 + index * 3_600_000
+            rows.append(f"BTCUSDT,{ts},100,102,99,101,10,1010")
+        path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+        loaded = load_bybit_h1_datasets(root)
+        assert len(loaded["BTCUSDT"][1]) == 500
+        assert loaded["BTCUSDT"][1][0].ts == 1_700_000_000_000
+        rows[200] = rows[200].replace(str(1_700_000_000_000 + 200 * 3_600_000),
+                                      str(1_700_000_000_000 + 201 * 3_600_000))
+        path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+        try:
+            load_bybit_h1_datasets(root)
+        except SystemExit as exc:
+            assert "duplicate" in str(exc) or "missing or irregular" in str(exc)
+        else:
+            raise AssertionError("gapped/duplicate Bybit H1 series must fail")
+
+
 if __name__ == "__main__":
     for test in (
         test_missing_snapshot_directories_reject_legacy_replay,
@@ -199,6 +234,8 @@ if __name__ == "__main__":
         test_funding_dirs_are_mandatory_and_non_empty,
         test_funding_mark_coverage_requires_every_symbol_and_h1_mark_bar,
         test_funding_mark_coverage_rejects_no_settlement_in_fold,
+        test_bybit_kline_dir_is_mandatory,
+        test_load_bybit_h1_datasets_rejects_gaps_and_loads_exchange_candles,
     ):
         test()
         print(f"PASS {test.__name__}")

@@ -237,3 +237,10 @@ Next safe work: finish static review of position lifecycle, TP1-aware PnL/cost r
 ## 12. Funding archive completeness gate — 2026-11-03
 
 Static audit found a P1 preflight blind spot documented in `docs/audits/FUNDING_ARCHIVE_COMPLETENESS_AUDIT_2026-11-03.md`: current funding coverage checks prove that recorded settlement rows have matching Mark timestamps, but do not prove that no settlement rows are missing from the CSV. The H1 runner only additionally requires at least one settlement inside each scored fold. Do not run another market PnL replay until the collector emits per-symbol API pagination/coverage provenance, dated funding-interval evidence is preserved, and the validator rejects a missing-middle-settlement fixture without assuming a universal 8-hour cadence. Funding arithmetic tests remain valid for supplied events but do not close archive completeness.
+
+
+## 13. Funding archive provenance implementation — 2026-11-03
+
+Implemented query-provenance sidecars in `bybit_downloader.py` / `funding_archive_manifest.py`. H1 selector and portfolio validation now bind sidecar hashes; the H1 runner fails closed if the sidecar is missing, altered, does not cover the scored fold, or lacks dated settlement-schedule verification. Regression tests cover collector pagination metadata, incremental runs, hash tampering and query-window gaps.
+
+Do not manually set `settlement_schedule_verified=true`. The collector leaves it false by design. Remaining work is to derive a dated schedule from authoritative Bybit instrument-history evidence (including interval changes), prove expected settlement timestamps for each scored period, and only then allow a manifest to carry verifiable schedule evidence. Until then no H1 market PnL replay.

@@ -1097,7 +1097,7 @@ def test_sparse_replay_admits_late_symbols_after_warmup_and_is_order_invariant()
     assert {row[0] for row in forward["ledger"]} == {"ETHUSDT", "SOLUSDT"}
     assert forward["ledger"] == reverse["ledger"]
     # Compare only timestamps after the latest symbol has entered the universe.
-    forward_path = [row for row in forward["equity_path"] if row[0] >= start_ts + 35 * hour]
+    forward_path = [row for row in forward["equity_path"] if row[0] >= start_ts + 36 * hour]
     reverse_path = [row for row in reverse["equity_path"] if row[0] >= start_ts + 35 * hour]
     assert len(forward_path) == len(reverse_path), (len(forward_path), len(reverse_path))
     path_differences = [

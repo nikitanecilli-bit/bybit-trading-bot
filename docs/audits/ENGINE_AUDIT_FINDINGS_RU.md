@@ -524,3 +524,41 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 
 
 **Пробел в regression coverage:** найденные тесты проверяют MTM latch persistence, round-trip восстановление kill-switch флага, общий порядок одновременных stop-close и отказ pending fill при общем risk gate (в state persistence tests — stale pending lifecycle). Но в просмотренных тестах нет отдельного end-to-end regression test, который выставляет kill-switch, содержит несколько открытых позиций и подтверждает, что каждая получает `exit_reason="kill_switch"`, закрывается по adverse mark, а pending batch не открывает новых позиций. Поэтому forced-flatten подтверждён чтением кода, но не отдельным тестом полного сценария. Это следующий небольшой тестовый приоритет до любого live-подключения; движок не менялся, так как defect не установлен.
+
+
+### 2026-11-03 — аудит risk tiers, maintenance margin, mark price и liquidation model
+
+Проверены `bybit_risk_tiers.py`, `bybit_instrument_specs.py`, `exchange_order_sizing.py`, `Bybit_Trading_Engine_v14_research.py`, H1 validation runner `scripts/run_h1_shared_capital_portfolio_validation.py`, H-A runner `scripts/run_h_a_relative_strength_replay.py` и соответствующие тесты.
+
+**Что реализовано корректно как pre-trade metadata/validation:**
+- История instrument specs и risk tiers выбирается as-of timestamp, не использует будущие snapshots и отклоняет отсутствующий/устаревший symbol metadata.
+- Размер позиции округляется вниз по qtyStep; market/limit quantity caps различаются; проверяются minQty, minNotional, tickSize, trading status и leverage filter.
+- Risk tier выбирается по position value и проверяет maxLeverage. Maintenance margin рассчитывается как `position_value × MMR − mmDeduction`; mmDeduction проверяется на согласованность между ступенями.
+- Если risk-tier history передана в движок, вход отклоняется при отсутствии as-of tier, устаревшем snapshot, превышении highest riskLimitValue или maxLeverage.
+- H1 validation runner требует dated instrument-spec/risk-tier snapshots на всём scored fold с max-age 30 дней; требует Bybit mark/funding coverage и официальные Bybit H1 trade klines. Это хороший fail-closed preflight для источников данных.
+
+**Критическое ограничение: liquidation не моделируется.**
+- В engine нет расчёта liquidation price, нет сравнения mark price с liquidation threshold, нет liquidation event/exit reason и нет моделирования частичного/полного биржевого liquidation.
+- `initial_margin_usdt` и `maintenance_margin_usdt` записываются в OpenPositionState как metadata. В просмотренном lifecycle эти поля не участвуют в MTM equity, open-risk budget, stop management или forced exits.
+- Tier выбирается при открытии позиции по entry notional. Повторного выбора tier при изменении mark price/position value нет; следовательно, переход позиции между risk tiers во время удержания не моделируется.
+- Сам risk-tier module в docstring явно оговаривает: это position-level IM/MM, не account-level solvency или liquidation-price calculation. Это не скрытый арифметический баг в функции, а незакрытый слой модели.
+
+**Критическое расхождение last price vs mark price:**
+- `_prepare_portfolio_intrabar_marks()` формирует adverse marks из OHLCV trade candles: long использует low, short high (либо modeled stop/gap fill). Эти marks питают unrealized PnL, daily stop и kill-switch.
+- Mark-price OHLC архив загружается в `_funding_mark_prices` и используется в accrued funding accounting для settlement timestamp proxy. Он не подставляется в portfolio MTM, stop/kill-switch или liquidation logic.
+- H1 validation runner проверяет полноту Bybit mark-price свечей, но это покрытие используется для funding accounting; само наличие mark archive не означает, что риск оценивается по mark OHLC.
+- H-A replay ещё дальше от Bybit execution: runner использует CryptoFetch Binance-style OHLCV, явно указывает `funding_included=False` и `bybit_point_in_time_universe_confirmed=False`. Его PnL нельзя трактовать как liquidation-aware Bybit PnL.
+
+**Почему это материально:** официальные правила Bybit для USDT perpetual указывают, что liquidation trigger основан на Mark Price, а не Last Traded Price; position value и maintenance margin пересчитываются по Mark Price, и tier может измениться при изменении position value. Формула liquidation price зависит от entry, size, leverage, extra margin, MMR/MM deduction и estimated close fee. Поэтому OHLC last-price stop replay может не увидеть mark-price liquidation, произошедшую раньше stop, и может неверно оценить потери/выживаемость позиции.
+
+Источники для требований модели:
+- Bybit Help Center, Maintenance Margin (USDT Perpetual and Expiry Contracts): https://www.bybit.com/en/help-center/article/Maintenance-Margin-USDT-Contract
+- Bybit Help Center, Trading Rules: Liquidation Process (Unified Trading Account): https://www.bybit.com/en/help-center/article/UTA-Trading-Rules
+- Bybit KZ Help Center, FAQ — USDT Perpetual and Expiry Contracts: https://www.bybit.kz/en-KAZ/help-center/article/FAQ-USDT-Perpetual-and-Expiry-Contracts
+
+**Риск-мод режима и данных:**
+- `risk_tiers_dir` и `instrument_specs_dir` опциональны в базовом `UnifiedQuantEngine`; при их отсутствии движок способен открыть обычную не-exchange-sized позицию без Bybit tier validation. Это приемлемо для абстрактного OHLC research, но не является Bybit-executable validation.
+- H1 validation runner передаёт эти директории и fail-closed проверяет историю. Но даже этот runner не становится liquidation-aware, поскольку trade OHLC adverse marks остаются источником MTM/stop path.
+- `leverage_mode` хранит строку вроде `ISOLATED_5X` и парсит из неё leverage; отдельной реализации isolated/cross account margin, shared available balance, extra margin или account MMR в engine не обнаружено. Значит, режим маржи — конфигурационная метка/источник плеча, а не полноценная симуляция режима Bybit.
+
+**Итог и приоритет:** не обнаружен дефект в расчёте формулы IM/MM или округлении контрактов. Но обнаружен P0/P1 scope gap для любого утверждения о Bybit liquidation safety: движок не моделирует mark-price liquidation и не учитывает динамическое изменение tier/maintenance margin. До появления отдельной mark-price risk/liquidation модели и её тестов нельзя использовать текущий backtest для вывода «позиция не ликвидируется» или «stop гарантированно сработает раньше ликвидации». Это важнее следующего сигнального оптимизатора. Код торгового движка не менялся; market PnL replay и сбор новых данных не запускались.

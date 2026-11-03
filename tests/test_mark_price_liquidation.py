@@ -130,6 +130,19 @@ class IsolatedLiquidationTests(unittest.TestCase):
         self.assertEqual(health.margin_surplus, Decimal("2995.00"))
         self.assertFalse(health.liquidation_triggered)
 
+    def test_remaining_quantity_after_tp1_scales_position_margin(self):
+        one_tier = [tier(1, "1000000", "0.005", "100")]
+        full = evaluate_isolated_margin_health(
+            symbol="BTCUSDT", direction="long", entry_price="40000",
+            mark_price="39000", quantity="1", leverage="10", tiers=one_tier,
+        )
+        remaining = evaluate_isolated_margin_health(
+            symbol="BTCUSDT", direction="long", entry_price="40000",
+            mark_price="39000", quantity="0.5", leverage="10", tiers=one_tier,
+        )
+        self.assertEqual(remaining.position_margin_balance, full.position_margin_balance / 2)
+        self.assertEqual(remaining.maintenance_margin, full.maintenance_margin / 2)
+
     def test_funding_credit_increases_isolated_margin_balance(self):
         one_tier = [tier(1, "1000000", "0.005", "100")]
         paid = evaluate_isolated_margin_health(

@@ -101,3 +101,9 @@ E01–E13, E11 и E13 shared-capital цифры, а также другие ис
 Статический аудит выявил, что существующий shared-capital runner E11/E13 использует фиксированную синхронизированную панель: символ включается только если у него есть достаточное число баров во всех будущих folds, после чего временные сетки пересекаются. Это не point-in-time universe. Текущий `run_simulation_pass()` также требует полного совпадения timestamp arrays.
 
 Поэтому H-A не запускать на фиксированной панели E11/E13 как на «всех доступных инструментах». Сначала нужен sparse/dynamic replay: union timestamp grid, per-symbol actual availability, 72h warm-up до включения в cross-sectional rank, fail-closed для открытой позиции/заявки без следующей свечи, общий terminal boundary, сохранение order-invariant batch fills. Подробно — `ENGINE_AUDIT_FINDINGS_RU.md`.
+
+### Sparse replay gate — implemented, no PnL yet
+
+Добавлен `allow_sparse_data=True` режим shared-capital engine: union timestamp grid, индивидуальная continuous history, per-symbol warm-up, common terminal timestamp, fail-closed для отсутствующей свечи открытой позиции/pending заявки. Новый late-listing fixture проверяет разные first timestamps и order invariance. CI run 41629995066: success, portfolio accounting 37/37, все 39 steps успешны.
+
+Теперь следующий шаг — не запуск PnL немедленно, а аудит реализации H-A feature pipeline: causal 24h/72h relative strength, ATR normalization, cross-sectional ranks только среди активных символов с достаточной историей, без будущей информации; затем independent unit tests и preregistration. После этого — corrected-engine frozen baseline, и лишь затем один H-A replay.

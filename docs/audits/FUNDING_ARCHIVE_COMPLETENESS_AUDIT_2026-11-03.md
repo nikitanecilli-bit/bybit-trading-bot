@@ -151,3 +151,18 @@ Bybit's current public contract terms list 1h, 2h, 4h and 8h settlement grids in
 **Important residual limitation:** matching snapshots do not prove that an interval never changed and reverted between observations. The current collector is manual and live snapshot acquisition is blocked by HTTP 403; it does not produce a continuous historical interval series. The reconstructed grid is therefore an independent consistency check conditional on interval stability evidenced by the snapshots, not a cryptographic proof that no unobserved historical interval change occurred. Until authoritative historical effective-time evidence or sufficiently complete independently verifiable observations exist, the market-PnL gate remains closed.
 
 The new Funding archive manifest and downloader tests were previously absent from Research CI's execution list. They have now been added to research-checks.yml, including the modified-CSV incremental-download regression. The updated CI result is pending at the time of this note.
+
+
+### Saturated-page pagination coverage — 2026-11-03
+
+A second implementation issue was found in the archive query-provenance gate. The downloader paginates backward by setting the next request end to one millisecond before the oldest timestamp returned. However, the validator previously discarded every saturated 200-row page from query-coverage accounting. It therefore could not certify the upper segment of a normal multi-page archive, even when the subsequent page windows covered the earlier segment without a gap.
+
+Correction:
+- The collector now records whether the API response timestamps are descending and unique.
+- The validator counts a saturated page's upper segment from its oldest returned timestamp through that request's end time, but only when the response has exactly 200 unique descending timestamps.
+- Complete earlier page windows must join that segment without gaps. A saturated page without ordering/uniqueness evidence remains unattested and fails closed.
+- A 201-settlement fixture exercises one saturated 200-row page plus the final one-row page and verifies full-window coverage; the single saturated-parent test still verifies that a missing lower segment is rejected.
+
+This relies on the endpoint's observed descending-page behavior used by the collector's backward pagination. The official endpoint documentation confirms a maximum of 200 records and that an endTime query returns records up to that time, but does not spell out response ordering in the parameter table; the collector therefore records and checks the returned order rather than silently assuming it.
+
+The current test run is [Actions #41718905437](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41718905437), pending at the time of this note.

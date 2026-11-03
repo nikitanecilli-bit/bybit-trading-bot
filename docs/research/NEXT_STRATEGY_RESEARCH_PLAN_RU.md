@@ -411,3 +411,15 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 - CI [#41732028220](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41732028220) SUCCESS, 54/54 steps.
 - Это исправление целостности отбора, не рыночный результат. Bybit Top-5 manifest ещё не создавался; PnL replay не запускался. Survivorship bias и отсутствие исторического delisted-universe остаются отдельными ограничениями.
 - Полный аудит: `docs/audits/H1_TOP5_TRAIN_SPLIT_LEAKAGE_AUDIT_2026-11-04.md`.
+
+
+## 2026-11-04 — низкочастотная Donchian(48)+EMA50/EMA200 гипотеза зафиксирована
+
+Создана отдельная preregistration: `LOW_FREQUENCY_DONCHIAN48_EMA_H1_PREREGISTRATION_RU.md`.
+
+- Единственный primary candidate: H1 Donchian(48) + causal EMA50/EMA200-up.
+- Парные контроли: frozen Donchian(20) без EMA и Donchian(48) без EMA. Все варианты должны использовать одинаковые universe, shared capital, риск, исполнение и costs.
+- Donchian(96), micro-pullback, stop min 1.8%, breakeven +0.95R и TP 4.2R не смешивать в этот тест; это отдельные гипотезы/абляции.
+- Текущий runner фиксирует Donchian=20; для будущего теста нужен отдельный явный параметр и manifest provenance, baseline default менять нельзя.
+- Все CryptoFetch folds уже использованы и не являются OOS. Никакого нового PnL replay до закрытия funding completeness и остальных data/accounting gates.
+- Это дизайн/пререгистрация, не PnL evidence и не доказательство edge.

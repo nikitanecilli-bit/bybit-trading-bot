@@ -53,6 +53,21 @@ def rank_candidates(rows, min_trades=MIN_TRADES):
         net = float(row.get("net_pnl", 0.0))
         pf = float(row.get("profit_factor", 0.0))
         expectancy = float(row.get("expectancy_r", 0.0))
+        max_drawdown = float(row.get("max_drawdown_pct", 0.0))
+        numeric_metrics = {
+            "net_pnl": net,
+            "profit_factor": pf,
+            "expectancy_r": expectancy,
+            "max_drawdown_pct": max_drawdown,
+        }
+        invalid_metrics = [name for name, value in numeric_metrics.items() if not math.isfinite(value)]
+        if invalid_metrics:
+            raise ValueError(
+                f"{row.get('symbol', '<unknown>')}: non-finite candidate metrics: "
+                + ", ".join(invalid_metrics)
+            )
+        if trades < 0:
+            raise ValueError(f"{row.get('symbol', '<unknown>')}: trade count cannot be negative")
         if trades < min_trades:
             reasons.append("insufficient_trades")
         if net <= 0:

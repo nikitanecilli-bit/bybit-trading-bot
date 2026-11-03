@@ -5,6 +5,7 @@ import importlib.util
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 engine_spec = importlib.util.spec_from_file_location(
     "relative_strength_engine_integration", ROOT / "Bybit_Trading_Engine_v14_research.py",
 )

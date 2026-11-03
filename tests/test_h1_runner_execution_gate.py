@@ -9,6 +9,7 @@ sys.path.insert(0, str(repo_root))
 sys.path.insert(0, str(repo_root / "scripts"))
 from run_h1_shared_capital_portfolio_validation import (
     resolve_execution_snapshot_dirs, validate_snapshot_history_coverage,
+    resolve_funding_dirs, validate_funding_mark_coverage,
 )
 
 
@@ -119,6 +120,74 @@ def test_continuous_snapshot_history_covers_fold():
                 _write_dated_snapshot(directory / f"{idx}.json", start + day * 86400000)
         validate_snapshot_history_coverage(specs, tiers, start, end)
 
+
+
+def test_funding_dirs_are_mandatory_and_non_empty():
+    with tempfile.TemporaryDirectory() as tmp:
+        funding, marks = Path(tmp) / "funding", Path(tmp) / "marks"
+        funding.mkdir()
+        marks.mkdir()
+        try:
+            resolve_funding_dirs({})
+        except SystemExit as exc:
+            assert "funding as zero" in str(exc)
+        else:
+            raise AssertionError("missing funding env must fail")
+        (funding / "BTCUSDT.csv").write_text("symbol,funding_timestamp_ms,funding_rate\\nBTCUSDT,1000,0.001\\n", encoding="utf-8")
+        (marks / "BTCUSDT.csv").write_text("symbol,timestamp_ms,open\\nBTCUSDT,1000,100\\n", encoding="utf-8")
+        result = resolve_funding_dirs({
+            "BYBIT_FUNDING_DIR": str(funding),
+            "BYBIT_MARK_PRICE_DIR": str(marks),
+        })
+        assert result == (str(funding), str(marks))
+
+
+def test_funding_mark_coverage_requires_every_symbol_and_h1_mark_bar():
+    with tempfile.TemporaryDirectory() as tmp:
+        funding, marks = Path(tmp) / "funding", Path(tmp) / "marks"
+        funding.mkdir()
+        marks.mkdir()
+        (funding / "BTCUSDT.csv").write_text(
+            "symbol,funding_timestamp_ms,funding_rate\\nBTCUSDT,1000,0.001\\n",
+            encoding="utf-8",
+        )
+        (marks / "BTCUSDT.csv").write_text(
+            "symbol,timestamp_ms,open\\nBTCUSDT,1000,100\\n",
+            encoding="utf-8",
+        )
+        try:
+            validate_funding_mark_coverage(
+                funding, marks, ["BTCUSDT"], [1000, 3601000], 1000, 3601000
+            )
+        except SystemExit as exc:
+            assert "missing 1 candles" in str(exc)
+        else:
+            raise AssertionError("missing H1 mark candle must fail")
+
+
+def test_funding_mark_coverage_rejects_no_settlement_in_fold():
+    with tempfile.TemporaryDirectory() as tmp:
+        funding, marks = Path(tmp) / "funding", Path(tmp) / "marks"
+        funding.mkdir()
+        marks.mkdir()
+        (funding / "BTCUSDT.csv").write_text(
+            "symbol,funding_timestamp_ms,funding_rate\\nBTCUSDT,1000,0.001\\n",
+            encoding="utf-8",
+        )
+        (marks / "BTCUSDT.csv").write_text(
+            "symbol,timestamp_ms,open\\nBTCUSDT,1000,100\\n",
+            encoding="utf-8",
+        )
+        try:
+            validate_funding_mark_coverage(
+                funding, marks, ["BTCUSDT"], [2000], 2000, 2000
+            )
+        except SystemExit as exc:
+            assert "No Bybit funding settlements" in str(exc)
+        else:
+            raise AssertionError("no settlement in fold must fail")
+
+
 if __name__ == "__main__":
     for test in (
         test_missing_snapshot_directories_reject_legacy_replay,
@@ -127,6 +196,9 @@ if __name__ == "__main__":
         test_current_only_snapshots_reject_historical_fold,
         test_snapshot_history_rejects_stale_start_and_gaps,
         test_continuous_snapshot_history_covers_fold,
+        test_funding_dirs_are_mandatory_and_non_empty,
+        test_funding_mark_coverage_requires_every_symbol_and_h1_mark_bar,
+        test_funding_mark_coverage_rejects_no_settlement_in_fold,
     ):
         test()
         print(f"PASS {test.__name__}")

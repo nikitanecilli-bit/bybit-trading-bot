@@ -114,6 +114,61 @@ def validate_snapshot_history_coverage(
             )
 
 
+def resolve_funding_dirs(environ=None):
+    """Require explicit official Bybit funding and mark-price CSV archives."""
+    env = os.environ if environ is None else environ
+    funding_dir = Path(env.get("BYBIT_FUNDING_DIR", ""))
+    mark_dir = Path(env.get("BYBIT_MARK_PRICE_DIR", ""))
+    if not str(env.get("BYBIT_FUNDING_DIR", "")).strip() or not str(env.get("BYBIT_MARK_PRICE_DIR", "")).strip():
+        raise SystemExit(
+            "BYBIT_FUNDING_DIR and BYBIT_MARK_PRICE_DIR are required; "
+            "refusing a PnL replay that silently treats funding as zero."
+        )
+    for label, directory in (("funding", funding_dir), ("mark-price", mark_dir)):
+        if not directory.is_dir() or not list(directory.glob("*.csv")):
+            raise SystemExit(
+                f"Missing or empty Bybit {label} archive directory: {directory}; "
+                "refusing a PnL replay without funding coverage."
+            )
+    return str(funding_dir), str(mark_dir)
+
+
+def validate_funding_mark_coverage(
+    funding_dir, mark_price_dir, symbols, h1_timestamps, start_ts, end_ts,
+):
+    """Require funding events and Bybit mark candles aligned to every scored H1 bar."""
+    from scripts.validate_funding_coverage import validate_coverage
+
+    report = validate_coverage(funding_dir, mark_price_dir, symbols)
+    if not report.get("ok"):
+        bad = [row for row in report.get("results", []) if row.get("status") != "ok"]
+        raise SystemExit(f"Incomplete Bybit funding/mark coverage: {bad[:10]}")
+    expected = {int(ts) for ts in h1_timestamps if start_ts <= int(ts) <= end_ts}
+    for symbol in symbols:
+        funding_path = Path(funding_dir) / f"{symbol}.csv"
+        mark_path = Path(mark_price_dir) / f"{symbol}.csv"
+        with funding_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            funding_rows = list(csv.DictReader(handle))
+        events_in_fold = [
+            int(row["funding_timestamp_ms"]) for row in funding_rows
+            if start_ts <= int(row["funding_timestamp_ms"]) <= end_ts
+        ]
+        if not events_in_fold:
+            raise SystemExit(
+                f"No Bybit funding settlements for {symbol} inside scored fold "
+                f"[{start_ts}, {end_ts}]."
+            )
+        with mark_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            mark_rows = list(csv.DictReader(handle))
+        mark_ts = {int(row["timestamp_ms"]) for row in mark_rows}
+        missing = sorted(expected - mark_ts)
+        if missing:
+            raise SystemExit(
+                f"Bybit mark-price H1 coverage missing {len(missing)} candles for "
+                f"{symbol}; first missing timestamps={missing[:5]}."
+            )
+
+
 def aligned_h1_datasets():
     allowlist = {s.strip().upper() for s in os.getenv("H1_SYMBOL_ALLOWLIST", "").split(",") if s.strip()}
     raw = {symbol: item for (symbol, tf), item in read_zip_datasets().items()
@@ -186,7 +241,8 @@ def aligned_h1_datasets():
 
 def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, end_frac,
                           min_vol, min_breakout_atr, cost_multiplier,
-                          instrument_specs_dir, risk_tiers_dir):
+                          instrument_specs_dir, risk_tiers_dir,
+                          funding_dir, mark_price_dir):
     # Explicit cost stress: scale fees and taker slippage from engine defaults.
     em.TAKER_FEE = BASE_TAKER_FEE * cost_multiplier
     em.MAKER_FEE = BASE_MAKER_FEE * cost_multiplier
@@ -199,6 +255,9 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
     validate_snapshot_history_coverage(
         instrument_specs_dir, risk_tiers_dir, start_ts, end_ts
     )
+    validate_funding_mark_coverage(
+        funding_dir, mark_price_dir, symbols, timestamps, start_ts, end_ts
+    )
     # Truncate at fold end, while allowing pre-fold candles for indicator warm-up.
     fold_data = {sym: candles[:end_idx] for sym, candles in base_candles.items()}
 
@@ -206,6 +265,8 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         journal_output_path="/tmp/ignored_h1_portfolio_quality.json",
         instrument_specs_dir=instrument_specs_dir,
         risk_tiers_dir=risk_tiers_dir,
+        funding_dir=funding_dir,
+        mark_price_dir=mark_price_dir,
     )
     cfg = engine.cfg
     cfg.bot_version = f"h1-portfolio-v{min_vol:g}-b{min_breakout_atr:g}-cost{cost_multiplier:g}"
@@ -305,7 +366,11 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         core.evaluate_signal = staticmethod(original_eval)
 
     trades = engine.closed_trades
-    costs = sum(t.exchange_fees_usdt + t.slippage_cost_usdt for t in trades)
+    funding_costs = sum(t.funding_cost_usdt for t in trades)
+    costs = sum(
+        t.exchange_fees_usdt + t.slippage_cost_usdt + t.funding_cost_usdt
+        for t in trades
+    )
     return {
         "timeframe": "1h",
         "fold": fold,
@@ -323,6 +388,7 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         "expectancy_r": round(float(audit["expectancy_r"]), 4),
         "max_drawdown_pct": round(float(audit["max_dd_pct"]), 2),
         "costs": round(float(costs), 2),
+        "funding_costs": round(float(funding_costs), 2),
         "test_start_ts": start_ts,
         "test_end_ts": end_ts,
     }
@@ -330,7 +396,9 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
 
 def main():
     instrument_specs_dir, risk_tiers_dir = resolve_execution_snapshot_dirs()
+    funding_dir, mark_price_dir = resolve_funding_dirs()
     print(f"Strict Bybit execution snapshots: specs={instrument_specs_dir}; risk_tiers={risk_tiers_dir}")
+    print(f"Official Bybit costs: funding={funding_dir}; mark_prices={mark_price_dir}")
     datasets, archives, timestamps = aligned_h1_datasets()
     symbols = sorted(datasets)
     print(f"Aligned H1 portfolio: {len(symbols)} symbols, {len(timestamps)} common bars")
@@ -344,6 +412,7 @@ def main():
                         datasets, symbols, timestamps, fold, start_frac, end_frac,
                         min_vol, min_breakout, cost_multiplier,
                         instrument_specs_dir, risk_tiers_dir,
+                        funding_dir, mark_price_dir,
                     )
                     rows.append(result)
                     print(f"fold={fold} {result['variant']} trades={result['trades']} "

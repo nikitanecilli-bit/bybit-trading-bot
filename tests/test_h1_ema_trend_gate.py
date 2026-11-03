@@ -38,7 +38,7 @@ def test_ema_gate_precomputes_full_history_and_uses_exact_scored_timestamp():
     assert lookup_trend_label(labels["BTCUSDT"], first_scored_ts) == "up"
     assert lookup_trend_label(labels["BTCUSDT"], rows[999].ts) == "neutral"
     try:
-        lookup_trend_label(labels["BTCUSDT"], first_scored_ts + H1_MS)
+        lookup_trend_label(labels["BTCUSDT"], rows[-1].ts + H1_MS)
     except KeyError:
         pass
     else:

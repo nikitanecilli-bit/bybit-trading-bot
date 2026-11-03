@@ -134,13 +134,15 @@ def accrued_funding_cost_for_remaining_margin(
     as_of_ts: int,
     defer_boundary_receipts: bool = False,
 ) -> Decimal:
-    """Funding cashflows affecting the currently open isolated position.
+    """Funding cashflows allocated to the currently open isolated position.
 
-    Historical payments/receipts before TP1 remain charged at the quantity
-    actually exposed when they settled. After TP1, settlements use remaining
-    quantity; at an ambiguous TP1 boundary payments use full quantity and
-    receipts use remaining quantity. This mirrors accrued_funding_cost() but
-    does not include any post-exit cashflows.
+    If TP1 partially closed the original position, Bybit's partial-close PnL
+    accounting prorates accumulated funding across the closed and remaining
+    quantities. Therefore every funding cashflow accrued over the original
+    position lifecycle is allocated to the current remaining quantity ratio,
+    including settlements before TP1. This helper returns only the remaining
+    position's share; accrued_funding_cost() continues to return the full
+    position-lifecycle cashflow for final trade PnL.
     """
     entry_ts = int(position.entry_ts)
     as_of_ts = int(as_of_ts)
@@ -186,12 +188,13 @@ def accrued_funding_cost_for_remaining_margin(
         if mark <= 0:
             raise ValueError(f"funding mark price must be > 0 at {ts}")
         full_cost = sign * quantity * mark * rate
-        fraction = Decimal("1")
+        # Once TP1 has partially closed the position, only the
+        # remaining share of all accumulated funding belongs to the open leg.
+        # This includes settlements that happened before the TP1 timestamp.
+        fraction = ratio if tp1_ts is not None else Decimal("1")
         if defer_boundary_receipts and ts == as_of_ts and full_cost < 0:
+            # The current-boundary receipt is deferred until the next mark,
+            # because MTM is evaluated before same-candle exit resolution.
             fraction = Decimal("0")
-        elif tp1_ts is not None and ts > tp1_ts:
-            fraction = ratio
-        elif tp1_ts is not None and ts == tp1_ts and full_cost < 0:
-            fraction = ratio
         total += full_cost * fraction
     return total.quantize(CENT, rounding=ROUND_HALF_UP)

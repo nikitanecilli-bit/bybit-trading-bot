@@ -92,6 +92,31 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertTrue(restored_risk.daily_stop_triggered)
 
 
+
+    def test_actual_tp1_taker_classification_round_trips_false(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "tp1-liquidity.json"
+            cfg = engine.BotConfig()
+            risk = engine.AdaptiveRiskManager(cfg)
+            position = sample_position()
+            position.maker_exits = True
+            position.tp1_hit = True
+            position.tp1_ts_ms = position.entry_ts + 3_600_000
+            position.remaining_fraction = 0.5
+            position.tp1_maker = False
+
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {"BTCUSDT": position}, {}, 42,
+                last_mark_prices={"BTCUSDT": position.entry_price},
+            )
+            restored = engine.PlanBStatePersistence(str(path)).load_state(
+                engine.AdaptiveRiskManager(cfg)
+            )[0]["BTCUSDT"]
+            self.assertTrue(restored.maker_exits)
+            self.assertIs(restored.tp1_maker, False)
+
+
+
     def test_legacy_position_backup_without_signal_timestamp_loads_as_none(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "legacy-no-signal-ts.json"

@@ -82,7 +82,4 @@ jobs:
           path: |
             h1_shared_capital_portfolio_validation.csv
             h1_shared_capital_portfolio_validation_manifest.json
-            h1_fold2_trade_diagnostics.csv
-            h1_fold2_risk_events.csv
-            h1_fold2_risk_block_counts.csv
           if-no-files-found: error

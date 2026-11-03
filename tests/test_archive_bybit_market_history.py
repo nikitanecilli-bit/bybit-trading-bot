@@ -108,6 +108,18 @@ class BybitMarketHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "minimum window"):
             fetch_funding_history("BTCUSDT", 10_000, 10_001, fetch, pause=0)
 
+    def test_funding_rejects_duplicate_timestamps(self):
+        duplicate = {
+            "symbol": "BTCUSDT",
+            "fundingRateTimestamp": "10001",
+            "fundingRate": "0.001",
+        }
+        with self.assertRaisesRegex(ValueError, "duplicate funding timestamp"):
+            fetch_funding_history(
+                "BTCUSDT", 10_000, 20_000,
+                lambda a, b: [duplicate, dict(duplicate)], pause=0,
+            )
+
     def test_funding_rejects_empty_history_and_symbol_mismatch(self):
         with self.assertRaisesRegex(RuntimeError, "no funding events"):
             fetch_funding_history("BTCUSDT", 10_000, 20_000, lambda a, b: [])

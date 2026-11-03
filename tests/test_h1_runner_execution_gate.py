@@ -15,8 +15,50 @@ from run_h1_shared_capital_portfolio_validation import (
     resolve_bybit_kline_dir, load_bybit_h1_datasets,
     round_limit_quote_to_bybit_tick, engine_cost_stress,
     BASE_TAKER_FEE, BASE_MAKER_FEE, BASE_TAKER_SLIP,
+    resolve_validation_design,
 )
 
+
+
+
+def test_explore_mode_never_scores_final_holdout():
+    design = resolve_validation_design({"H1_VALIDATION_MODE": "explore"})
+    assert [fold[0] for fold in design["folds"]] == [1, 2]
+    assert design["volume_thresholds"] == [1.2, 1.6, 2.0, 2.5]
+    assert design["breakout_atr_thresholds"] == [0.0, 0.10, 0.25]
+    assert design["cost_multipliers"] == [1.0, 1.5, 2.0]
+    assert design["frozen_config"] is None
+
+
+def test_confirm_mode_requires_one_frozen_predeclared_config():
+    design = resolve_validation_design({
+        "H1_VALIDATION_MODE": "confirm",
+        "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
+        "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10",
+    })
+    assert [fold[0] for fold in design["folds"]] == [3]
+    assert design["volume_thresholds"] == [1.6]
+    assert design["breakout_atr_thresholds"] == [0.10]
+    assert design["cost_multipliers"] == [1.0, 1.5, 2.0]
+    assert design["frozen_config"] == {
+        "min_volume_ratio": 1.6, "min_breakout_atr": 0.10,
+    }
+
+
+def test_confirm_mode_rejects_missing_or_unregistered_config():
+    for env in (
+        {"H1_VALIDATION_MODE": "confirm"},
+        {"H1_VALIDATION_MODE": "confirm", "H1_FROZEN_MIN_VOLUME_RATIO": "1.7",
+         "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10"},
+        {"H1_VALIDATION_MODE": "confirm", "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
+         "H1_FROZEN_MIN_BREAKOUT_ATR": "0.20"},
+        {"H1_VALIDATION_MODE": "other"},
+    ):
+        try:
+            resolve_validation_design(env)
+        except SystemExit:
+            continue
+        raise AssertionError(f"invalid validation design accepted: {env!r}")
 
 
 def test_cost_stress_restores_engine_globals_after_success_and_exception():
@@ -319,6 +361,9 @@ def test_delayed_limit_quotes_are_tick_aligned_without_crossing():
 
 if __name__ == "__main__":
     for test in (
+        test_explore_mode_never_scores_final_holdout,
+        test_confirm_mode_requires_one_frozen_predeclared_config,
+        test_confirm_mode_rejects_missing_or_unregistered_config,
         test_cost_stress_restores_engine_globals_after_success_and_exception,
         test_missing_snapshot_directories_reject_legacy_replay,
         test_empty_snapshot_directory_rejects_legacy_replay,

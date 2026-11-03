@@ -562,3 +562,27 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 - `leverage_mode` хранит строку вроде `ISOLATED_5X` и парсит из неё leverage; отдельной реализации isolated/cross account margin, shared available balance, extra margin или account MMR в engine не обнаружено. Значит, режим маржи — конфигурационная метка/источник плеча, а не полноценная симуляция режима Bybit.
 
 **Итог и приоритет:** не обнаружен дефект в расчёте формулы IM/MM или округлении контрактов. Но обнаружен P0/P1 scope gap для любого утверждения о Bybit liquidation safety: движок не моделирует mark-price liquidation и не учитывает динамическое изменение tier/maintenance margin. До появления отдельной mark-price risk/liquidation модели и её тестов нельзя использовать текущий backtest для вывода «позиция не ликвидируется» или «stop гарантированно сработает раньше ликвидации». Это важнее следующего сигнального оптимизатора. Код торгового движка не менялся; market PnL replay и сбор новых данных не запускались.
+
+
+### 2026-11-03 — этап 1: изолированная liquidation-price формула
+
+Добавлен отдельный чистый модуль `mark_price_liquidation.py` без изменения lifecycle торгового движка.
+
+**Реализовано:**
+- Decimal-расчёт liquidation price для USDT-linear isolated long/short по опубликованной Bybit формуле.
+- Учитываются entry price, quantity, leverage, extra isolated margin, taker fee rate, MMR и mmDeduction.
+- Проверяется entry notional против dated risk tiers и maxLeverage.
+- Для LP рассчитываются кандидаты по каждому tier; выбирается tier, чей riskLimitValue покрывает notional именно на candidate liquidation price. Это важно, поскольку long при падении цены может перейти в более низкий tier, а short при росте — в более высокий.
+- Неоднозначный/неразрешимый tier selection закрывается ошибкой, а не подстановкой значения.
+
+**Тесты:** `tests/test_mark_price_liquidation.py` покрывает официальный пример Bybit (40,000 entry, 1 BTC, 50x, 0.5% MMR, 3,000 extra margin → 36,380.25 LP), long/short adverse direction, tier switch на liquidation notional, превышение risk limit, maxLeverage и некорректные входы. Тест подключён к Research CI.
+
+**Границы модели (не заявлять как готовую Bybit liquidation simulation):**
+- Это только isolated position-level LP estimator. Он не моделирует Cross/Portfolio Margin, account-wide MMR/available balance, hedged offsets, AMR, funding-driven margin depletion, partial liquidation, ADL, bankruptcy-price execution или задержки/очередность биржевого liquidation engine.
+- Текущий движок пока не вызывает этот модуль и не использует mark-price OHLC для liquidation events. Интеграция с mark candles — отдельный следующий этап.
+- При TP1/частичном сокращении quantity и entry/position margin должны пересчитываться для оставшейся позиции; пока lifecycle integration отсутствует.
+- Формула и результат являются оценкой по опубликованным правилам; фактический LP может немного отличаться из-за биржевых fee/margin details.
+
+Источник формулы и опубликованного контрольного примера: Bybit Help Center, "Trading Rules: Liquidation Process (Unified Trading Account)", https://www.bybit.kz/en-KAZ/help-center/article/UTA-Trading-Rules-Liquidation-Process (USDT perpetual isolated long/short formulas and 40,000/50x/3,000 extra-margin example).
+
+Изменены только новый модуль, его тест и Research CI workflow; торговый движок и торговая логика не менялись. PnL replay, API и новые market data не запускались.

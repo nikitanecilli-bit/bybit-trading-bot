@@ -105,7 +105,7 @@ class FundingArchiveManifestTests(unittest.TestCase):
             collected_at_ms=7_200_001,
         )
 
-    def _write_interval_snapshot(self, timestamp_ms, interval_minutes=60):
+    def _write_interval_snapshot(self, timestamp_ms, interval_minutes=60, include_symbol=True):
         path = self.root / f"interval_{timestamp_ms}.json"
         fetched_at = datetime.fromtimestamp(
             timestamp_ms / 1000, tz=timezone.utc
@@ -115,11 +115,11 @@ class FundingArchiveManifestTests(unittest.TestCase):
             "source": "Bybit V5 GET /v5/market/instruments-info",
             "category": "linear",
             "fetched_at": fetched_at,
-            "count": 1,
-            "instruments": [{
+            "count": 1 if include_symbol else 0,
+            "instruments": ([{
                 "symbol": "BTCUSDT",
                 "fundingInterval": str(interval_minutes),
-            }],
+            }] if include_symbol else []),
         }), encoding="utf-8")
         return path
 
@@ -144,6 +144,40 @@ class FundingArchiveManifestTests(unittest.TestCase):
         )
         self.assertTrue(report["ok"], report["errors"])
         self.assertTrue(report["settlement_schedule_verified"])
+
+
+    def test_collector_allows_symbol_absence_outside_its_lifecycle_window(self):
+        self.record()
+        snapshots = [
+            self._write_interval_snapshot(1_000_000, include_symbol=False),
+            self._write_interval_snapshot(3_599_999, include_symbol=True),
+            self._write_interval_snapshot(7_200_001, include_symbol=True),
+            self._write_interval_snapshot(8_000_000, include_symbol=False),
+        ]
+        schedule = attach_funding_settlement_schedule(
+            self.csv, self.manifest, symbol="BTCUSDT", category="linear",
+            required_start_ms=3_600_000, required_end_ms=7_200_000,
+            snapshot_paths=snapshots, snapshot_copy_dir=self.root / "copied_snapshots",
+        )
+        self.assertEqual(
+            schedule["expected_settlement_timestamps_ms"],
+            [3_600_000, 7_200_000],
+        )
+
+    def test_collector_rejects_symbol_absence_inside_its_lifecycle_window(self):
+        self.record()
+        snapshots = [
+            self._write_interval_snapshot(3_599_999, include_symbol=True),
+            self._write_interval_snapshot(5_000_000, include_symbol=False),
+            self._write_interval_snapshot(7_200_001, include_symbol=True),
+        ]
+        with self.assertRaisesRegex(ValueError, "absent from a dated instrument snapshot"):
+            attach_funding_settlement_schedule(
+                self.csv, self.manifest, symbol="BTCUSDT", category="linear",
+                required_start_ms=3_600_000, required_end_ms=7_200_000,
+                snapshot_paths=snapshots, snapshot_copy_dir=self.root / "copied_snapshots",
+            )
+
 
     def test_collector_refuses_unresolved_interval_change(self):
         self.record()

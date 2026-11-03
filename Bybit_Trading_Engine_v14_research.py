@@ -2229,6 +2229,7 @@ def run_sparse_simulation_pass(
     symbols: List[str], data_label: str = "СИНТЕТИКА",
     signal_evaluator: Optional[Callable] = None,
     signal_context_provider: Optional[Callable] = None,
+    bar_complete_callback: Optional[Callable] = None,
 ) -> Dict:
     """Shared-capital replay over a dynamic universe with per-symbol availability.
 
@@ -2318,6 +2319,8 @@ def run_sparse_simulation_pass(
             if sig:
                 engine.pending[sym] = sig
                 engine._persist()
+        if bar_complete_callback is not None:
+            bar_complete_callback(bar_close_ts, engine)
 
     final_marks = {sym: trimmed[sym][-1] for sym in engine.open_positions}
     engine.finalize_open_positions(final_marks, exit_reason="end_of_test")
@@ -2341,7 +2344,8 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
                         symbols: List[str], data_label: str = "СИНТЕТИКА",
                         allow_sparse_data: bool = False,
                         signal_evaluator: Optional[Callable] = None,
-                        signal_context_provider: Optional[Callable] = None) -> Dict:
+                        signal_context_provider: Optional[Callable] = None,
+                        bar_complete_callback: Optional[Callable] = None) -> Dict:
     # Это именно новый независимый бэктест, не восстановление live-сессии.
     if engine._state_restored:
         raise RuntimeError("Нельзя запускать backtest поверх восстановленного состояния. "
@@ -2357,9 +2361,11 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
             engine, selected_candles, symbols, data_label=data_label,
             signal_evaluator=signal_evaluator,
             signal_context_provider=signal_context_provider,
+            bar_complete_callback=bar_complete_callback,
         )
-    if signal_evaluator is not None or signal_context_provider is not None:
-        raise ValueError("Custom signal callbacks currently require allow_sparse_data=True")
+    if (signal_evaluator is not None or signal_context_provider is not None
+            or bar_complete_callback is not None):
+        raise ValueError("Custom replay callbacks currently require allow_sparse_data=True")
     validate_candle_timeframe(selected_candles, engine.cfg.timeframe)
     check_alignment(selected_candles)
     engine.reset_state_for_new_run()

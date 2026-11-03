@@ -59,3 +59,10 @@ Research CI [#41726204938](https://github.com/nikitanecilli-bit/bybit-trading-bo
 ### Warm-up boundary regression — 2026-11-04
 
 Added an explicit unit regression proving that the 50/200 helper remains neutral at 205 candles and emits the first directional label at 206 candles for the configured 5-bar slow-EMA slope. Research CI [#41726808976](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41726808976) completed **SUCCESS, 53/53 steps** at commit `8876ee399118837b35a3fcfdf58d2e117ec9fb72`. This locks the warm-up contract and makes the 200-bar engine-window mismatch executable rather than documentation-only.
+
+
+## EMA initialization burn-in — additional caveat
+
+The helper seeds each recursive EMA with the first close in the supplied series. The 206-candle minimum above is only the first mathematically computable directional label; it is **not** proof that EMA200 has converged away from its initial seed. With α=2/201, the seed's remaining weight after 200 updates is approximately 13.53%; after 1,000 updates (five EMA periods) it is approximately 0.00454%.
+
+Therefore, a future full-history precomputation must preserve a substantial pre-roll before the first scored signal. A conservative design candidate is at least 5× the slow period (1,000 H1 bars for EMA200) before scoring, or an explicitly specified SMA-seeded EMA implementation with its own parity tests. The chosen initialization and burn-in must be frozen before any experiment; do not tune it on PnL. The 206-candle test documents the helper's current first-label boundary, not the recommended scoring pre-roll.

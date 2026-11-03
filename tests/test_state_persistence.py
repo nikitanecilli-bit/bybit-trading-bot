@@ -881,6 +881,47 @@ class StatePersistenceTests(unittest.TestCase):
                     engine.AdaptiveRiskManager(cfg)
                 )
 
+    def test_hc_enabled_rejects_open_breakout_without_boundary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "hc-open-without-boundary.json"
+            cfg = engine.BotConfig(timeframe="1h", enable_post_break_invalidation=True)
+            position = sample_position()
+            position.strategy = "H1-momentum-breakout"
+            risk = engine.AdaptiveRiskManager(cfg)
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {"BTCUSDT": position}, {}, 42,
+                last_mark_prices={"BTCUSDT": position.entry_price},
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["open_positions"]["BTCUSDT"].pop("breakout_level")
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(
+                    engine.AdaptiveRiskManager(cfg)
+                )
+
+    def test_hc_enabled_rejects_pending_breakout_without_boundary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "hc-pending-without-boundary.json"
+            cfg = engine.BotConfig(timeframe="1h", enable_post_break_invalidation=True)
+            pending = {
+                "BTCUSDT": {
+                    "symbol": "BTCUSDT", "direction": "long",
+                    "strategy": "H1-momentum-breakout", "signal_ts": 1_790_000_000_000,
+                    "entry_price": 100.0, "stop_price": 95.0,
+                    "tp1_price": 110.0, "tp2_price": 120.0,
+                    "stop_dist": 5.0, "order_type": "market",
+                }
+            }
+            risk = engine.AdaptiveRiskManager(cfg)
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {}, pending, 42, last_mark_prices={},
+            )
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(
+                    engine.AdaptiveRiskManager(cfg)
+                )
+
     def test_invalid_trade_sequence_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "sequence.json"

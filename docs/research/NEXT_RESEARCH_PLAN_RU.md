@@ -503,7 +503,7 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 Завершено:
 - H-A frozen relative-strength breakout replay выполнен на трёх ранее исследованных fold; обе версии (baseline и H-A) отрицательны после costs во всех fold. H-A хуже baseline на 499.28 USDT суммарно; fold 3 ухудшен на 1,321.93 USDT и max DD вырос на 14.97 п.п. Подробности: `docs/reports/H_A_RELATIVE_STRENGTH_BREAKOUT_RESULTS_2026-11-03_RU.md`.
 - E14 read-only post-break diagnostics completed: 3-bar/6-bar follow-through и retest связаны с последующим stop-loss outcome, но это post-entry association на уже просмотренных fold, не counterfactual PnL и не независимая проверка.
-- H-C close-based post-break invalidation preregistered, но намеренно не реализуется/не запускается на тех же folds: требуется untouched period и полноценный execution data gate.
+- H-C close-based post-break invalidation реализована за disabled-by-default H1 flag, ограничена baseline H1-momentum-breakout и покрыта синтетическим CI (9/9 H-C tests; state persistence 67/67). Рыночный PnL не запускался: старые folds запрещены для оценки H-C, нужен untouched period и полноценный execution data gate. Подробности: `docs/research/H_C_POST_BREAK_INVALIDATION_PREREGISTRATION_RU.md`.
 - TradeRecord TP1/remaining-leg provenance перенесён в закрытую запись и проверен full Research CI #41673525597 SUCCESS на commit `69358a1f720e6b91046d2afaf7da8696f5958836`.
 - Старые sizing/liquidation audit notes получили supersession notices; текущий статус сосредоточен в `EXECUTION_INTEGRATION_REAUDIT_2026-11-03.md`.
 
@@ -515,5 +515,5 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 1. Не делать H-A threshold sweep и не переиспользовать старые fold для оценки H-C.
 2. Проверить, настроен ли non-US/non-CN self-hosted runner; после его появления выполнить ручные dated instrument/risk-tier captures и Bybit H1/funding/Mark archive с проверкой coverage.
 3. До появления архива продолжить только инженерный аудит: journal serialization/metrics, H1 runner/data manifests, старые audit-note supersession и PR #4 file classification.
-4. Разобрать PR #4 (207 changed files, 1,220 commits ahead / 14 behind current main) по пакетам; не merge/rebase/force-push whole branch. Любая интеграция — отдельная чистая ветка от актуального main с небольшими проверяемыми патчами.
+4. Разобрать PR #4 (210 changed files, 1,268 commits ahead / 15 behind current main; +17,657 / −162) по пакетам; не merge/rebase/force-push whole branch. Любая интеграция — отдельная чистая ветка от актуального main с небольшими проверяемыми патчами.
 5. После закрытия data/account-mode gates — один frozen shared-capital Bybit-native validation. Никаких новых параметрических сеток на proxy данных.

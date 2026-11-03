@@ -449,3 +449,14 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 - CI: [41734540443](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41734540443), SUCCESS. Проверены компиляция и детерминированные тесты; market PnL не запускался.
 - Изменение runner hash инвалидирует старый train-only selection provenance; новый selector manifest потребуется только после прохождения разрешённого data gate.
 - Bybit/Funding/Mark/accounting gate остаётся закрытым. Никаких новых архивов, PnL runs, API подключений, paper или live orders.
+
+
+## 2026-11-04 — Mark / liquidation re-audit
+
+- Mark OHLC collector and exact-timestamp engine integration re-audited; no new confirmed arithmetic defect found in isolated USDT liquidation/MM formula.
+- Formula cross-check: Bybit UTA isolated USDT LP and estimated close fee agree with current implementation and published example test. Dynamic Mark-price MM tier transition is modeled separately from entry LP tier.
+- Important boundary: implementation is single-position isolated UTA approximation; account mode is not known. Cross/Portfolio Margin, shared collateral, active orders, AMR and partial liquidation ladder remain out of scope.
+- Mark OHLC stress replay has no intrabar tick order. It conservatively prioritizes liquidation over same-bar Last stop; do not interpret as exact exchange event replay.
+- Instrument/risk-tier snapshots are point-in-time observations, not historical effective-time series. No complete Bybit Mark/risk-tier/instrument-spec archives exist yet; public GitHub runner API access has previously returned HTTP 403.
+- Next actionable task is data acquisition/validation infrastructure, not strategy PnL: secure a permitted public Bybit API execution environment or independently archived Bybit-native datasets, then close lifecycle, Mark, risk-tier, instrument-spec and Funding completeness gates. Do not switch to Binance proxies for proof of Bybit execution or liquidation.
+- No PnL run, strategy changes, private API, paper trading or live orders.

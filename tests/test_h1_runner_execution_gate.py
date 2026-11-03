@@ -40,7 +40,7 @@ def _write_funding_manifest(
                 else datetime.fromtimestamp(ts / 1000, tz=timezone.utc).isoformat().replace("+00:00", "Z")
             )
             snapshot_path.write_text(json.dumps({
-                "schema_version": 1, "category": "linear", "fetched_at": fetched_at,
+                "schema_version": 1, "source": "Bybit V5 GET /v5/market/instruments-info", "category": "linear", "fetched_at": fetched_at,
                 "count": 1, "instruments": [{"symbol": funding_path.stem, "fundingInterval": "480"}],
             }), encoding="utf-8")
             source_snapshots.append({

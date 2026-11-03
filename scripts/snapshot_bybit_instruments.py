@@ -91,6 +91,8 @@ def _request_page(base_url: str, category: str, cursor: str | None,
     return rows, next_cursor
 
 
+# Query each lifecycle status explicitly: Bybit's unfiltered linear endpoint
+# defaults to Trading and PendingOpen, which is not a complete lifecycle snapshot.
 INSTRUMENT_STATUS_FILTERS = {
     "linear": ("PreLaunch", "Trading", "Settling", "Delivering", "Closed"),
     "inverse": ("PreLaunch", "Trading", "Settling", "Delivering", "Closed"),

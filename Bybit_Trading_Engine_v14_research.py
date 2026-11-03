@@ -454,6 +454,19 @@ class TradeRecord:
     risk_usdt: float = 0.0
     risk_pct: float = 0.0        # фактический риск в % от эквити на входе
     funding_cost_usdt: float = 0.0  # positive=paid, negative=received
+    # Execution provenance retained after the position leaves OpenPositionState.
+    exchange_sized: bool = False
+    contract_qty: Optional[str] = None
+    tp1_contract_qty: Optional[str] = None
+    final_contract_qty: Optional[str] = None
+    qty_step: Optional[str] = None
+    leverage: Optional[float] = None
+    risk_tier_id: Optional[int] = None
+    risk_limit_value: Optional[str] = None
+    maintenance_margin_rate: Optional[str] = None
+    maintenance_margin_deduction: Optional[str] = None
+    initial_margin_usdt: Optional[str] = None
+    maintenance_margin_usdt: Optional[str] = None
 
 
 # =====================================================================
@@ -2165,6 +2178,18 @@ class UnifiedQuantEngine:
             risk_usdt=round(pos.risk_usdt, 4),
             risk_pct=round(pos.risk_usdt / eq0 * 100.0, 3),
             funding_cost_usdt=funding_cost,
+            exchange_sized=bool(pos.exchange_sized),
+            contract_qty=str(pos.contract_qty) if pos.exchange_sized else None,
+            tp1_contract_qty=str(pos.tp1_contract_qty) if pos.exchange_sized and pos.tp1_contract_qty is not None else None,
+            final_contract_qty=str(remaining_qty) if pos.exchange_sized else None,
+            qty_step=str(pos.qty_step) if pos.exchange_sized else None,
+            leverage=float(pos.leverage) if pos.leverage is not None else None,
+            risk_tier_id=pos.risk_tier_id,
+            risk_limit_value=pos.risk_limit_value,
+            maintenance_margin_rate=pos.maintenance_margin_rate,
+            maintenance_margin_deduction=pos.maintenance_margin_deduction,
+            initial_margin_usdt=pos.initial_margin_usdt,
+            maintenance_margin_usdt=pos.maintenance_margin_usdt,
         )
         self.closed_trades.append(record)
         del self.open_positions[pos.symbol]

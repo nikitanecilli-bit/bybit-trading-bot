@@ -96,6 +96,9 @@ def load_frozen_selection_manifest(environ=None):
         raise SystemExit("Unsupported H1 selection manifest schema/protocol")
     if payload.get("selection_status") != "ok":
         raise SystemExit("H1 selection manifest has no valid top-five set; refusing validation")
+    strategy_config = payload.get("strategy_config")
+    if not isinstance(strategy_config, dict) or strategy_config.get("direction") != "long_only":
+        raise SystemExit("H1 runner is long-only; selection manifest must explicitly declare strategy_config.direction=long_only")
     if not isinstance(payload.get("input_files"), dict) or not isinstance(payload.get("code_files"), list):
         raise SystemExit("H1 selection manifest lacks immutable data/code provenance")
     primary = payload.get("primary")

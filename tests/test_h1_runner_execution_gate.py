@@ -17,7 +17,7 @@ from run_h1_shared_capital_portfolio_validation import (
     round_limit_quote_to_bybit_tick, engine_cost_stress,
     BASE_TAKER_FEE, BASE_MAKER_FEE, BASE_TAKER_SLIP,
     resolve_validation_design, load_frozen_selection_manifest,
-    validate_selection_cutoff,
+    validate_selection_cutoff, validate_selection_provenance,
 )
 
 
@@ -31,6 +31,8 @@ def _selection_env(tmpdir):
         "selection_status": "ok",
         "generated_at_utc": "2026-11-03T00:00:00Z",
         "training_window": {"cutoff_timestamp_ms": 1000},
+        "input_files": {key: [] for key in ("kline", "funding", "mark_price", "instrument_specs", "risk_tiers")},
+        "code_files": [],
         "primary": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT"],
     }), encoding="utf-8")
     return {
@@ -93,6 +95,45 @@ def test_selection_manifest_must_be_valid_and_successful():
             assert "no valid top-five" in str(exc)
         else:
             raise AssertionError("failed selector manifest must fail closed")
+
+
+
+def test_selection_provenance_rejects_changed_data_and_code():
+    selection = {
+        "input_files": {
+            "kline": [{"path": "data/BTC.csv", "sha256": "abc", "size_bytes": 10}],
+            "funding": [], "mark_price": [], "instrument_specs": [], "risk_tiers": [],
+        },
+        "code_files": [{"path": "engine.py", "sha256": "code1", "size_bytes": 20}],
+    }
+    current = {
+        "kline": [{"path": "data/BTC.csv", "sha256": "abc", "size_bytes": 10}],
+        "funding": [], "mark_price": [], "instrument_specs": [], "risk_tiers": [],
+    }
+    validate_selection_provenance(
+        selection, current,
+        [{"path": "engine.py", "sha256": "code1", "size_bytes": 20}],
+    )
+    changed_data = dict(current)
+    changed_data["kline"] = [{"path": "data/BTC.csv", "sha256": "changed", "size_bytes": 10}]
+    try:
+        validate_selection_provenance(
+            selection, changed_data,
+            [{"path": "engine.py", "sha256": "code1", "size_bytes": 20}],
+        )
+    except SystemExit as exc:
+        assert "provenance mismatch" in str(exc)
+    else:
+        raise AssertionError("changed training/validation data must force reselection")
+    try:
+        validate_selection_provenance(
+            selection, current,
+            [{"path": "engine.py", "sha256": "changed", "size_bytes": 20}],
+        )
+    except SystemExit as exc:
+        assert "code changed" in str(exc)
+    else:
+        raise AssertionError("changed replay code must force reselection")
 
 
 def test_selection_cutoff_must_precede_validation():
@@ -426,6 +467,7 @@ if __name__ == "__main__":
         test_confirm_mode_requires_one_frozen_predeclared_config_and_selection_manifest,
         test_selection_manifest_and_allowlist_must_match_exactly,
         test_selection_manifest_must_be_valid_and_successful,
+        test_selection_provenance_rejects_changed_data_and_code,
         test_selection_cutoff_must_precede_validation,
         test_confirm_mode_rejects_missing_or_unregistered_config,
         test_cost_stress_restores_engine_globals_after_success_and_exception,

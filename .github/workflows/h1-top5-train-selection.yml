@@ -21,7 +21,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   select:
@@ -53,10 +53,23 @@ jobs:
           BYBIT_UNIVERSE_SNAPSHOT_FILE: ${{ inputs.universe_snapshot }}
           BYBIT_INSTRUMENT_SPECS_DIR: data/instrument_specs/linear
           BYBIT_RISK_TIERS_DIR: data/instrument_specs/risk_limits
-        run: python scripts/select_h1_top5_train_only.py --output-dir h1_top5_selection
+        run: python scripts/select_h1_top5_train_only.py --output-dir data/research/h1_top5_selection
+      - name: Commit frozen selection manifest to the selected research branch
+        if: always()
+        run: |
+          if [ -f data/research/h1_top5_selection/h1_top5_selection_manifest.json ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/research/h1_top5_selection/
+            if ! git diff --cached --quiet; then
+              git commit -m "research(h1): archive train-only top-five selection"
+              git push origin "HEAD:${GITHUB_REF_NAME}"
+            fi
+          fi
       - name: Upload frozen selection manifest and ranking
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: h1-top5-train-only-selection
-          path: h1_top5_selection/
-          if-no-files-found: error
+          path: data/research/h1_top5_selection/
+          if-no-files-found: warn

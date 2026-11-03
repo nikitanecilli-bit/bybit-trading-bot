@@ -17,7 +17,7 @@ GitHub-hosted runner в США уже дал HTTP 403 от Bybit. Для заг�
 
 В репозитории: Settings → Actions → Runners → New self-hosted runner. Установить runner на постоянно доступном компьютере/VPS в разрешённом регионе и выполнить выданные GitHub команды. Не добавлять API keys: перечисленные market-data endpoints публичные.
 
-**Статус публикации collector workflow (обновлено 2026-11-03):** три collector workflow выборочно опубликованы в default branch `main` через PR #8 (`a0ceb66d9b2cf818b3a24d723130d1125c8ca382`). Они явно checkout-ят `research/market-regime-v1-main`, запускают код из этой ветки и сохраняют архивы обратно туда. H1 validation workflow в `main` пока отсутствует. PR #4 целиком для этого не использовать: он сильно diverged.
+**Статус публикации collector workflow (обновлено 2026-11-03):** четыре необходимых collector workflow доступны в default branch `main`: три исходных workflow опубликованы через PR #8 (`a0ceb66d9b2cf818b3a24d723130d1125c8ca382`), а `bybit-linear-universe-history.yml` добавлен отдельным commit `49fb4c42aae2c41f008e5668e79680aaf123a026`. Все они явно checkout-ят `research/market-regime-v1-main`, запускают код из этой ветки и сохраняют архивы обратно туда. H1 validation workflow в `main` пока отсутствует. PR #4 целиком для этого не использовать: он сильно diverged.
 
 Если аккаунт зарегистрирован на казахстанском сайте Bybit, задать repository variable BYBIT_API_BASE_URL=https://api.bybit.kz; в любом случае hostname должен соответствовать сайту регистрации аккаунта.
 
@@ -62,7 +62,7 @@ Workflow публикует два артефакта: итоговый `h1_shar
 
 ## 7. Что требуется до первого запуска
 
-- [x] Выборочно опубликовать три collector workflow из актуального `main` (PR #8, merge commit `a0ceb66d9b2cf818b3a24d723130d1125c8ca382`). Они намеренно checkout-ят `research/market-regime-v1-main`, где остаются Python-модули и зависимости; переносить весь PR #4 нельзя.
+- [x] Опубликовать четыре необходимых collector workflow в `main`: три workflow через PR #8 и `bybit-linear-universe-history.yml` отдельным commit `49fb4c42aae2c41f008e5668e79680aaf123a026`. Они намеренно checkout-ят `research/market-regime-v1-main`, где остаются Python-модули и зависимости; переносить весь PR #4 нельзя.
 - [x] Добавить три collector workflow в default branch. H1 validation workflow остаётся только в research branch.
 - [ ] Отдельно решить и реализовать расписание snapshots после успешного первого ручного сбора; сейчас `schedule`/cron отсутствует.
 - [ ] Проверить, что self-hosted runner зарегистрирован и имеет label `self-hosted`, а egress country не US/CN. Доступных через текущую GitHub-интеграцию сведений о registered runners нет, поэтому этот пункт пока UNVERIFIED.
@@ -99,3 +99,11 @@ Workflow публикует два артефакта: итоговый `h1_shar
 - Изменён protocol id на `h1-top5-train-only-v2`; H1 runner принимает только v2 manifest. Старые v1 manifests несовместимы и должны быть пересозданы.
 - Добавлен детерминированный тест общей временной сетки. Research CI [#41702488088](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41702488088) — SUCCESS, 50/50 steps; selector test и runner execution gate прошли.
 - Это исправление сопоставимости train-only ranking, не рыночный результат. Selector пока не запускался: нет Bybit H1/funding/mark архивов и датированных instrument/risk snapshots. PnL не рассчитывался.
+
+
+## 11. Публикация universe-history workflow в main (2026-11-03)
+
+- Проверка показала, что runbook требовал запускать `Archive Bybit linear universe history`, но соответствующий `.github/workflows/bybit-linear-universe-history.yml` существовал только в research branch и отсутствовал в default branch `main`. Manual `workflow_dispatch` workflow из не-default branch нельзя считать доступным для обычного запуска из Actions UI.
+- Узкое исправление: добавлен только этот workflow в `main` (commit `49fb4c42aae2c41f008e5668e79680aaf123a026`). Он использует self-hosted runner, проверяет egress country, checkout-ит research branch, запускает point-in-time universe collector и коммитит snapshot обратно в research branch.
+- Теперь в `main` опубликованы все четыре нужных коллектора: instrument specs, risk tiers, linear universe history и OHLCV/funding/mark archive. H1 selector/validation и Python research modules остаются в research branch.
+- Workflow не запускался: self-hosted runner availability не подтверждена. Это публикация/исправление orchestration, не реальный API download и не PnL.

@@ -78,6 +78,12 @@ jobs:
           if country == "unknown":
               raise SystemExit("Cannot verify runner egress country; refusing Bybit archive request.")
           PY
+      - name: Require dated Bybit instrument interval snapshots
+        run: |
+          test -d data/instrument_specs/linear && test -n "$(find data/instrument_specs/linear -maxdepth 1 -name '*.json' -print -quit)" || {
+            echo "Missing dated Bybit instruments-info snapshots; cannot evidence Funding settlement interval."
+            exit 1
+          }
       - name: Download official Bybit history
         env:
           SYMBOLS: ${{ inputs.symbols }}
@@ -88,7 +94,7 @@ jobs:
           BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}
         run: |
           echo "Using configured official Bybit API base URL: $BYBIT_API_BASE_URL"
-          python scripts/archive_bybit_market_history.py --symbols "$SYMBOLS" --start-ms "$START_MS" --end-ms "$END_MS" --universe-snapshot "$UNIVERSE_SNAPSHOT" --interval "$INTERVAL" --base-url "$BYBIT_API_BASE_URL" --output-root "data/archives/bybit/${START_MS}_${END_MS}_${GITHUB_RUN_ID}"
+          python scripts/archive_bybit_market_history.py --symbols "$SYMBOLS" --start-ms "$START_MS" --end-ms "$END_MS" --universe-snapshot "$UNIVERSE_SNAPSHOT" --interval "$INTERVAL" --instrument-snapshot-dir "data/instrument_specs/linear" --base-url "$BYBIT_API_BASE_URL" --output-root "data/archives/bybit/${START_MS}_${END_MS}_${GITHUB_RUN_ID}"
       - name: Require exact funding-settlement mark coverage
         env:
           SYMBOLS: ${{ inputs.symbols }}

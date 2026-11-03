@@ -71,8 +71,15 @@ def calculate_isolated_usdt_liquidation_price(
     ordered = tuple(sorted(tiers, key=lambda item: item.risk_limit_value))
     if not ordered:
         raise ValueError("at least one dated risk tier is required")
+    if any(tier.symbol.strip().upper() != symbol.strip().upper() for tier in ordered):
+        raise ValueError("all risk tiers must belong to the requested symbol")
     if len({tier.risk_limit_value for tier in ordered}) != len(ordered):
         raise ValueError("risk-tier limits must be unique")
+    for tier in ordered:
+        if (tier.risk_limit_value <= 0 or tier.maintenance_margin_rate < 0
+                or tier.maintenance_margin_rate >= 1 or tier.mm_deduction < 0
+                or tier.max_leverage <= 0):
+            raise ValueError("risk-tier values are outside supported linear isolated ranges")
 
     entry_value = entry * qty
     entry_tier = next((tier for tier in ordered if entry_value <= tier.risk_limit_value), None)

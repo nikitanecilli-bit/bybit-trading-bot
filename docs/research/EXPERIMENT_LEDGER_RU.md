@@ -947,4 +947,4 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - H-C: 610 trades, gross +404.08, fees 2,330.71, slippage 953.49, proxy net before funding -2,880.12, PF 0.72, expectancy -0.120R, max DD 30.18%.
 - H-C gross improved +1,502.18, but fees+slippage increased +1,661.83; trade count rose 94.9%; proxy net worsened -159.65. 296 invalidation exits averaged -0.399R and totalled -4,535.90 net. Stop-loss count fell 180→138; both variants hit the 30% kill switch.
 - Decision: reject H-C for this proxy window; no tuning or rerun. CryptoFetch is not Bybit-native, not forward OOS, survivor-biased and excludes funding/mark. Full detail in docs/reports/H_C_REVERSE_TIME_RESULTS_2026-11-04_RU.md.
-- Bootstrap failure [#41722181706] occurred before import/archive/PnL; path fix passed [#41722380421] 53/53 before the first complete run.
+- Bootstrap failure [#41722181706] occurred before import/archive/PnL; path fix passed [#41722380421] 53/53 before the first complete run. The exact execution commit passed [#41722545755] 53/53.

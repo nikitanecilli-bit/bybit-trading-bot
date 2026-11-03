@@ -119,3 +119,19 @@ Additional protections:
 Research CI [#41713006331](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41713006331) completed successfully: 50 workflow steps, zero failures. This includes the active archive collector integration test, duplicate-timestamp regression, saturated-page coverage tests, funding manifest checks, H1 execution/provenance gates, portfolio accounting, and sparse shared-capital replay.
 
 The gate is still intentionally not green for real H1 PnL: no actual Bybit archive sidecars or dated funding schedule evidence exist in the repository.
+
+
+### Remaining schedule-validator trust boundary — 2026-11-03
+
+A further static review of `validate_funding_manifest()` found a limitation in what the schedule evidence currently proves:
+
+- It compares the Funding CSV timestamps with `expected_settlement_timestamps_ms` supplied inside the schedule JSON.
+- It checks that each supplied expected event is aligned to the most recent preceding instrument snapshot's `fundingInterval`.
+- It checks that source snapshots bracket the scored interval.
+- It does **not** independently derive every expected settlement timestamp from the dated interval history, and it does not enforce a maximum observation gap or prove the effective timestamp of an interval change.
+
+Therefore, if a Funding settlement is absent from both the CSV and the supplied expected-event list, those two incomplete artifacts can still be internally consistent. The hash protects the schedule file from later modification; it does not prove that the list was generated completely. Likewise, a snapshot's `fetched_at` is an observation time, not proof of the exact effective time of a Funding interval change.
+
+This does not establish that any current archive is missing an event. It establishes that the current validator is a consistency check against supplied schedule evidence, not an independent proof that the schedule itself is complete.
+
+**Decision:** keep the H1 market-PnL gate closed. Do not claim Funding completeness solely because `validate_funding_manifest()` returns `ok`. Closing this gap requires an authoritative, independently auditable source for historical interval effective times (or an independently generated schedule with verifiable completeness provenance). Do not infer change-effective timestamps from snapshot fetch times, and do not invent a fixed 8-hour cadence.

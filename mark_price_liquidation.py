@@ -1,8 +1,10 @@
-"""Isolated USDT-linear liquidation price model based on Bybit's published formula.
+"""Position-level Bybit USDT-linear isolated liquidation and mark-MM estimates.
 
-This module is deliberately position-level. It does NOT model cross/portfolio
-margin, account balance sharing, auto-margin replenishment, hedging offsets,
-ADL, partial liquidation, bankruptcy execution, or exchange matching.
+This is not an account-level cross/portfolio margin or liquidation-engine model.
+The liquidation price uses the position's tier at entry. Current maintenance
+margin uses the tier selected at current Mark Price for this single position.
+Bybit may aggregate positions/orders when determining account risk tiers; that
+aggregation is outside this module.
 """
 from __future__ import annotations
 
@@ -23,6 +25,29 @@ def _d(value, field: str) -> Decimal:
     return result
 
 
+def _ordered_tiers(symbol: str, tiers: Iterable[RiskTier]) -> tuple[RiskTier, ...]:
+    ordered = tuple(sorted(tiers, key=lambda item: item.risk_limit_value))
+    if not ordered:
+        raise ValueError("at least one dated risk tier is required")
+    if any(tier.symbol.strip().upper() != symbol.strip().upper() for tier in ordered):
+        raise ValueError("all risk tiers must belong to the requested symbol")
+    if len({tier.risk_limit_value for tier in ordered}) != len(ordered):
+        raise ValueError("risk-tier limits must be unique")
+    for tier in ordered:
+        if (tier.risk_limit_value <= 0 or tier.maintenance_margin_rate < 0
+                or tier.maintenance_margin_rate >= 1 or tier.mm_deduction < 0
+                or tier.max_leverage <= 0):
+            raise ValueError("risk-tier values are outside supported linear isolated ranges")
+    return ordered
+
+
+def _select_tier(ordered: tuple[RiskTier, ...], position_value: Decimal) -> RiskTier:
+    tier = next((item for item in ordered if position_value <= item.risk_limit_value), None)
+    if tier is None:
+        raise ValueError("position value exceeds highest riskLimitValue")
+    return tier
+
+
 @dataclass(frozen=True)
 class IsolatedLiquidationEstimate:
     direction: str
@@ -35,9 +60,15 @@ class IsolatedLiquidationEstimate:
     extra_margin: Decimal
 
 
-def _tier_band_contains(tiers: tuple[RiskTier, ...], index: int, value: Decimal) -> bool:
-    lower = tiers[index - 1].risk_limit_value if index else Decimal("0")
-    return lower < value <= tiers[index].risk_limit_value
+@dataclass(frozen=True)
+class MarkPriceMaintenanceMargin:
+    mark_price: Decimal
+    position_value: Decimal
+    maintenance_margin: Decimal
+    estimated_close_fee: Decimal
+    tier_id: int
+    maintenance_margin_rate: Decimal
+    mm_deduction: Decimal
 
 
 def calculate_isolated_usdt_liquidation_price(
@@ -51,11 +82,11 @@ def calculate_isolated_usdt_liquidation_price(
     taker_fee_rate="0.00055",
     extra_margin="0",
 ) -> IsolatedLiquidationEstimate:
-    """Solve the isolated USDT-linear LP using Bybit's tiered published formula.
+    """Calculate the published isolated LP using the entry-selected risk tier.
 
-    The risk tier is selected at the *candidate liquidation notional*, rather
-    than blindly reusing the entry tier. The returned estimate assumes constant
-    quantity, fixed isolated leverage and no funding/partial close before LP.
+    Bybit's published formula treats LP as fixed for an unchanged position.
+    Tier selection here is therefore based on entry notional, not candidate LP
+    notional. Dynamic Mark-Price maintenance-margin tiering is separate.
     """
     side = str(direction).strip().lower()
     if side not in {"long", "short"}:
@@ -68,64 +99,88 @@ def calculate_isolated_usdt_liquidation_price(
     if min(entry, qty, lev) <= 0 or fee < 0 or fee >= 1 or margin < 0:
         raise ValueError("prices, quantity and leverage must be positive; fee in [0,1); margin non-negative")
 
-    ordered = tuple(sorted(tiers, key=lambda item: item.risk_limit_value))
-    if not ordered:
-        raise ValueError("at least one dated risk tier is required")
-    if any(tier.symbol.strip().upper() != symbol.strip().upper() for tier in ordered):
-        raise ValueError("all risk tiers must belong to the requested symbol")
-    if len({tier.risk_limit_value for tier in ordered}) != len(ordered):
-        raise ValueError("risk-tier limits must be unique")
-    for tier in ordered:
-        if (tier.risk_limit_value <= 0 or tier.maintenance_margin_rate < 0
-                or tier.maintenance_margin_rate >= 1 or tier.mm_deduction < 0
-                or tier.max_leverage <= 0):
-            raise ValueError("risk-tier values are outside supported linear isolated ranges")
-
+    ordered = _ordered_tiers(symbol, tiers)
     entry_value = entry * qty
-    entry_tier = next((tier for tier in ordered if entry_value <= tier.risk_limit_value), None)
-    if entry_tier is None:
-        raise ValueError(f"{symbol} entry notional exceeds highest riskLimitValue")
-    if lev > entry_tier.max_leverage:
+    tier = _select_tier(ordered, entry_value)
+    if lev > tier.max_leverage:
         raise ValueError(f"{symbol} leverage exceeds entry tier maxLeverage")
 
-    candidates = []
-    for index, tier in enumerate(ordered):
-        mmr = tier.maintenance_margin_rate
-        deduction = tier.mm_deduction
-        if lev > tier.max_leverage:
-            continue
-        if side == "long":
-            denominator = qty * (Decimal("1") - mmr)
-            numerator = entry_value * (Decimal("1") - Decimal("1") / lev)
-            numerator -= margin / (Decimal("1") - fee)
-            numerator -= deduction
-        else:
-            denominator = qty * (Decimal("1") + mmr)
-            numerator = entry_value * (Decimal("1") + Decimal("1") / lev)
-            numerator += margin / (Decimal("1") + fee)
-            numerator += deduction
-        if denominator <= 0:
-            continue
-        price = numerator / denominator
-        if price <= 0:
-            continue
-        liquidation_value = price * qty
-        if _tier_band_contains(ordered, index, liquidation_value):
-            candidates.append((price, tier, liquidation_value))
+    mmr = tier.maintenance_margin_rate
+    deduction = tier.mm_deduction
+    if side == "long":
+        denominator = qty * (Decimal("1") - mmr)
+        numerator = entry_value * (Decimal("1") - Decimal("1") / lev)
+        numerator -= margin / (Decimal("1") - fee)
+        numerator -= deduction
+    else:
+        denominator = qty * (Decimal("1") + mmr)
+        numerator = entry_value * (Decimal("1") + Decimal("1") / lev)
+        numerator += margin / (Decimal("1") + fee)
+        numerator += deduction
+    if denominator <= 0:
+        raise ValueError("selected risk tier produces a non-positive liquidation denominator")
+    price = numerator / denominator
+    if price <= 0:
+        raise ValueError("selected risk tier produces a non-positive liquidation price")
 
-    if len(candidates) != 1:
-        raise ValueError(
-            f"{symbol} could not resolve a unique liquidation tier "
-            f"from candidate notional (matches={len(candidates)})"
-        )
-    price, tier, value = candidates[0]
     return IsolatedLiquidationEstimate(
         direction=side,
         liquidation_price=price,
-        liquidation_position_value=value,
+        liquidation_position_value=price * qty,
+        tier_id=tier.tier_id,
+        maintenance_margin_rate=mmr,
+        mm_deduction=deduction,
+        leverage=lev,
+        extra_margin=margin,
+    )
+
+
+def calculate_mark_price_maintenance_margin(
+    *,
+    symbol: str,
+    direction: str,
+    entry_price,
+    mark_price,
+    quantity,
+    leverage,
+    tiers: Iterable[RiskTier],
+    taker_fee_rate="0.00055",
+) -> MarkPriceMaintenanceMargin:
+    """Calculate single-position MM using the tier selected at current Mark Price.
+
+    Uses Bybit's current USDT-linear isolated MM components:
+    mark notional * MMR - mmDeduction + estimated close fee. The estimated
+    close fee is based on entry price and leverage. This function does not
+    aggregate other positions or active orders into the risk tier.
+    """
+    side = str(direction).strip().lower()
+    if side not in {"long", "short"}:
+        raise ValueError("direction must be 'long' or 'short'")
+    entry = _d(entry_price, "entry_price")
+    mark = _d(mark_price, "mark_price")
+    qty = _d(quantity, "quantity")
+    lev = _d(leverage, "leverage")
+    fee = _d(taker_fee_rate, "taker_fee_rate")
+    if min(entry, mark, qty, lev) <= 0 or fee < 0 or fee >= 1:
+        raise ValueError("prices, quantity and leverage must be positive; fee in [0,1)")
+
+    ordered = _ordered_tiers(symbol, tiers)
+    position_value = mark * qty
+    tier = _select_tier(ordered, position_value)
+    if lev > tier.max_leverage:
+        raise ValueError(f"{symbol} leverage exceeds Mark-Price tier maxLeverage")
+
+    fee_factor = Decimal("1") - Decimal("1") / lev if side == "long" else Decimal("1") + Decimal("1") / lev
+    close_fee = qty * entry * fee_factor * fee
+    maintenance = position_value * tier.maintenance_margin_rate - tier.mm_deduction + close_fee
+    if maintenance < 0:
+        raise ValueError("selected tier produces negative maintenance margin")
+    return MarkPriceMaintenanceMargin(
+        mark_price=mark,
+        position_value=position_value,
+        maintenance_margin=maintenance,
+        estimated_close_fee=close_fee,
         tier_id=tier.tier_id,
         maintenance_margin_rate=tier.maintenance_margin_rate,
         mm_deduction=tier.mm_deduction,
-        leverage=lev,
-        extra_margin=margin,
     )

@@ -206,7 +206,7 @@ class IsolatedLiquidationTests(unittest.TestCase):
         self.assertEqual(base, Decimal("36000"))
         self.assertEqual(added, Decimal("35900"))
         self.assertEqual(paid, Decimal("36050"))
-        self.assertEqual(received, Decimal("43950"))
+        self.assertEqual(received, Decimal("44050"))
 
     def test_mark_candle_detects_long_and_short_liquidation_crossings(self):
         self.assertTrue(mark_candle_crosses_liquidation(

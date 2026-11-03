@@ -345,3 +345,25 @@ Do not integrate current instrument specifications retrospectively and do not cl
 **Чего это не доказывает:** корректность источника/биржи OHLCV, отсутствие survivorship bias, исторический point-in-time состав Bybit universe, полноту листингов/делистингов, корректность свечей относительно биржевого оригинала, наличие funding/mark-price данных или прибыльность стратегии. Разные инструменты имеют разные первые timestamps; это не единая синхронная 53-символьная выборка на всём интервале. Три пустых файла нельзя считать торговыми инструментами и они должны быть исключены из загрузки.
 
 Workflow успешно прошёл все последующие deterministic checks после archive audit. Новых рыночных PnL backtests не запускалось; API/runner не использовались.
+
+### 2026-11-03 — подтверждена и исправлена зависимость полного replay от порядка символов
+
+Полный синхронизированный synthetic replay с тремя символами и двумя доступными слотами обнаружил реальный дефект, который не ловили прежние component-level тесты.
+
+**Причина 1 — discovery bias (confirmed):** `step_candle()` проверял `can_open_new_trade(len(open_positions) + len(pending))` до вычисления нового сигнала. При одновременных сигналах цикл прекращал discovery после первых N символов по порядку списка. Остальные инструменты не попадали в пакетный рейтинг `vol_ratio`; фактический приоритет получали первые символы, а не самые сильные сигналы.
+
+**Причина 2 — batch sizing drift (confirmed):** даже после предварительного распределения общего risk budget `_try_fill_pending()` пересчитывал размер очередной позиции по текущему `risk_mgr.current_equity`. Комиссии/MTM от более раннего fill меняли equity до расчёта следующего fill, поэтому порядок исполнения давал разные размеры, PnL и ledger.
+
+**Исправление в engine:**
+- `run_simulation_pass()` теперь сначала обрабатывает текущие позиции и pending orders всех символов, затем собирает новые сигналы отдельной portfolio-wide фазой. Полный набор сигналов доступен для пакетного ранжирования на следующем баре.
+- `step_candle(..., evaluate_new_signal=False)` используется в portfolio replay для отделения lifecycle processing от signal discovery; прямые вызовы с default сохраняют прежний односивольный путь.
+- `_prepare_pending_entry_risk_budgets()` фиксирует equity snapshot начала batch.
+- `_try_fill_pending()` применяет заранее выделенную долю риска и один equity snapshot для всех fills этого batch; `calculate_position_size()` получил необязательный `equity_override`. Это устраняет зависимость последующих размеров от комиссии/MTM первого fill.
+
+**Проверка:** новый тест `test_full_run_simulation_pass_is_invariant_to_symbol_order` выполняет полный `run_simulation_pass()` для `[BTC, ETH, SOL]` и обратного порядка. При лимите двух позиций в обоих случаях выбираются ETH и SOL по силе сигналов; совпадают полный trade ledger, equity path, итоговый PnL, max DD и risk latches. Сценарий включает одновременное открытие, adverse stop на общей свече и срабатывание daily stop.
+
+CI [41628558820](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41628558820) завершился success. Portfolio accounting script: 36/36 тестов; включая четыре exchange-sized regression, которые раньше не запускались при прямом выполнении файла.
+
+**Дополнительный дефект тестового harness (confirmed and fixed):** блок `if __name__ == "__main__"` стоял до четырёх последних exchange-sizing тестов. Поскольку CI вызывает файл напрямую через `python tests/test_portfolio_accounting.py`, эти четыре теста объявлялись уже после выполнения test runner и пропускались. Блок перемещён в конец файла; теперь все 36 тестов исполняются.
+
+Это закрывает full-replay symbol-order audit gate на проверенном synthetic fixture. Это не доказывает прибыльность и не является рыночным PnL тестом. Рыночный replay не запускался.

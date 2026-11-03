@@ -164,7 +164,7 @@ def find_gaps(timestamps, step_ms):
     return gaps
 
 
-def collect(session, base_url, spec, base_params, start_ms, end_ms, delay):
+def collect(session, base_url, spec, base_params, start_ms, end_ms, delay, audit_pages=None):
     """Листает историю от новых записей к старым и возвращает {ts: [значения]}."""
     start_key, end_key = spec["keys"]
     rows, cursor_end, api_cursor = {}, end_ms, None
@@ -174,9 +174,21 @@ def collect(session, base_url, spec, base_params, start_ms, end_ms, delay):
             params["cursor"] = api_cursor
         result = api_get(session, base_url, spec["path"], params)
         items = result.get("list") or []
+        parsed = [spec["parse"](it) for it in items]
+        if audit_pages is not None:
+            page_timestamps = [ts for ts, _ in parsed]
+            audit_pages.append({
+                "request_start_ms": int(params[start_key]),
+                "request_end_ms": int(params[end_key]),
+                "response_rows": len(parsed),
+                "first_ts": min(page_timestamps) if page_timestamps else None,
+                "last_ts": max(page_timestamps) if page_timestamps else None,
+                "out_of_window_rows": sum(
+                    1 for ts in page_timestamps if ts < start_ms or ts > end_ms
+                ),
+            })
         if not items:
             break
-        parsed = [spec["parse"](it) for it in items]
         for ts, vals in parsed:
             rows[ts] = vals
         oldest = min(ts for ts, _ in parsed)
@@ -218,13 +230,23 @@ def download_dataset(session, base_url, name, category, symbol, interval, oi_int
         log.info("%s: нечего докачивать", tag)
         return path
 
-    rows = collect(session, base_url, spec, params, start_ms, end_ms, delay)
+    collection_start_ms = start_ms
+    audit_pages = [] if name == "funding" else None
+    rows = collect(session, base_url, spec, params, start_ms, end_ms, delay, audit_pages=audit_pages)
 
     cutoff = now_ms()
     keep = [ts for ts in sorted(rows)
             if start_ms <= ts <= end_ms and (kind != "kline" or ts + step <= cutoff)]  # только закрытые свечи
     if not keep:
         log.info("%s: новых данных нет", tag)
+        if name == "funding" and path.is_file() and audit_pages is not None:
+            from funding_archive_manifest import record_funding_collection
+            record_funding_collection(
+                path, path.with_suffix(path.suffix + ".audit.json"),
+                symbol=symbol, category=category, api_base=base_url,
+                requested_start_ms=collection_start_ms, requested_end_ms=end_ms,
+                pages=audit_pages, collected_at_ms=now_ms(),
+            )
         return path
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -236,6 +258,15 @@ def download_dataset(session, base_url, name, category, symbol, interval, oi_int
         for ts in keep:
             w.writerow([ts, ms_to_str(ts)] + list(rows[ts]))
     log.info("%s: записано %s -> %s", tag, len(keep), path.name)
+
+    if name == "funding" and audit_pages is not None:
+        from funding_archive_manifest import record_funding_collection
+        record_funding_collection(
+            path, path.with_suffix(path.suffix + ".audit.json"),
+            symbol=symbol, category=category, api_base=base_url,
+            requested_start_ms=collection_start_ms, requested_end_ms=end_ms,
+            pages=audit_pages, collected_at_ms=now_ms(),
+        )
 
     if step and (kind == "oi" or interval in GAP_CHECK_INTERVALS):
         gaps = find_gaps(read_timestamps(path), step)

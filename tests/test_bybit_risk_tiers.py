@@ -35,7 +35,7 @@ class RiskTierHistoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")
             history = RiskTierHistory.from_directory(tmp)
-            tiers = history.get_tiers("BTCUSDT", 1793606400000, max_age_ms=1)
+            tiers = history.get_tiers("BTCUSDT", 1793606400000)
             self.assertEqual([item.tier_id for item in tiers], [1, 2])
             self.assertEqual(tiers[1].max_leverage, Decimal("50"))
 

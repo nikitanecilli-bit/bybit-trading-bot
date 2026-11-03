@@ -55,3 +55,10 @@ Do not run this experiment until the Funding archive completeness gate, Mark cov
 ## Provenance clarification
 
 The long-only scope is explicitly recorded in both artifacts: the selector writes strategy_config.direction = long_only, and the portfolio runner writes strategy_and_execution.direction = long_only. This is not a missing-manifest-field defect. The blocker is that the selected strategy scope is narrower than a generic/two-sided H1 claim and conflicts with the research plan's instruction not to make permanent directional restrictions from proxy evidence.
+
+
+## Fail-closed provenance guard added
+
+The shared-capital runner now refuses a selection manifest unless strategy_config.direction explicitly equals long_only. This prevents a two-sided or unspecified selection manifest from being accepted by a long-only runner. The selector already writes this direction into its manifest, and the portfolio output already records direction=long_only. Regression coverage verifies that a manifest declaring both is rejected.
+
+Research CI [#41721944597](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41721944597) completed SUCCESS, 53/53 steps. This makes the existing scope explicit and fail-closed; it does not solve the directional strategy question or change the long-only runner.

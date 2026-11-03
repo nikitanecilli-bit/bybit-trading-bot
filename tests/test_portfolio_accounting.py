@@ -399,6 +399,7 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
                 "tier_id": 2, "risk_limit_value": Decimal("500000"),
                 "maintenance_margin_rate": Decimal("0.01"),
                 "mm_deduction": Decimal("500"), "leverage": leverage,
+                "max_leverage": Decimal("50"),
                 "initial_margin": position_value / leverage,
                 "maintenance_margin": position_value * Decimal("0.01") - Decimal("500"),
             })()
@@ -422,7 +423,7 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
     assert position.risk_limit_value == "500000"
     assert position.maintenance_margin_rate == "0.01"
     assert position.maintenance_margin_deduction == "500"
-    assert position.risk_tier_max_leverage == "5"
+    assert position.risk_tier_max_leverage == "50"
     assert Decimal(position.initial_margin_usdt) == Decimal(str(position.size_usdt)) / Decimal("5")
     assert Decimal(position.maintenance_margin_usdt) == Decimal(str(position.size_usdt)) * Decimal("0.01") - Decimal("500")
 

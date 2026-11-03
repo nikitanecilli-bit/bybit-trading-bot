@@ -1730,7 +1730,7 @@ class UnifiedQuantEngine:
             risk_limit_value=str(risk_margin.risk_limit_value) if risk_margin else None,
             maintenance_margin_rate=str(risk_margin.maintenance_margin_rate) if risk_margin else None,
             maintenance_margin_deduction=str(risk_margin.mm_deduction) if risk_margin else None,
-            risk_tier_max_leverage=str(risk_margin.leverage) if risk_margin else None,
+            risk_tier_max_leverage=str(risk_margin.max_leverage) if risk_margin else None,
             initial_margin_usdt=str(risk_margin.initial_margin) if risk_margin else None,
             maintenance_margin_usdt=str(risk_margin.maintenance_margin) if risk_margin else None,
             contract_qty=str(exchange_order.qty) if exchange_order else None,

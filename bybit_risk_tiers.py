@@ -45,6 +45,7 @@ class RiskTier:
 class RiskMarginRequirement:
     position_value: Decimal
     leverage: Decimal
+    max_leverage: Decimal
     initial_margin: Decimal
     maintenance_margin: Decimal
     tier_id: int
@@ -203,6 +204,7 @@ class RiskTierHistory:
         return RiskMarginRequirement(
             position_value=value,
             leverage=lev,
+            max_leverage=tier.max_leverage,
             initial_margin=initial_margin,
             maintenance_margin=maintenance_margin,
             tier_id=tier.tier_id,

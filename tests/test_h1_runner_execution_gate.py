@@ -11,10 +11,13 @@ sys.path.insert(0, str(repo_root))
 sys.path.insert(0, str(repo_root / "scripts"))
 
 import Bybit_Trading_Engine_v14_research as em
-from funding_archive_manifest import record_funding_collection
+from funding_archive_manifest import record_funding_collection, sha256_file
 
 
-def _write_funding_manifest(funding_path, start_ms, end_ms, schedule_verified=True):
+def _write_funding_manifest(
+    funding_path, start_ms, end_ms, *,
+    schedule_start_ms=None, expected_events=None, include_schedule=True,
+):
     manifest_path = funding_path.with_suffix(funding_path.suffix + ".audit.json")
     payload = record_funding_collection(
         funding_path, manifest_path, symbol=funding_path.stem,
@@ -26,7 +29,32 @@ def _write_funding_manifest(funding_path, start_ms, end_ms, schedule_verified=Tr
         }],
         collected_at_ms=max(end_ms, start_ms) + 1,
     )
-    payload["settlement_schedule_verified"] = schedule_verified
+    if include_schedule:
+        snapshot_path = funding_path.parent / "instrument_snapshot.json"
+        snapshot_path.write_text('{"source":"Bybit V5 instruments-info"}', encoding="utf-8")
+        schedule_path = funding_path.parent / f"{funding_path.stem}.schedule.json"
+        schedule = {
+            "schema_version": 1,
+            "source": "bybit_dated_instrument_snapshots",
+            "symbol": funding_path.stem,
+            "category": "linear",
+            "coverage_start_ms": schedule_start_ms if schedule_start_ms is not None else start_ms,
+            "coverage_end_ms": end_ms,
+            "source_snapshots": [{
+                "path": snapshot_path.name,
+                "sha256": sha256_file(snapshot_path),
+                "fetched_at_ms": schedule_start_ms if schedule_start_ms is not None else start_ms,
+                "funding_interval_minutes": 480,
+            }],
+            "expected_settlement_timestamps_ms": (
+                expected_events if expected_events is not None else [start_ms]
+            ),
+        }
+        schedule_path.write_text(json.dumps(schedule), encoding="utf-8")
+        payload["settlement_schedule_evidence"] = {
+            "path": schedule_path.name,
+            "sha256": sha256_file(schedule_path),
+        }
     manifest_path.write_text(json.dumps(payload), encoding="utf-8")
     return manifest_path
 
@@ -459,7 +487,7 @@ def test_funding_mark_coverage_rejects_no_settlement_in_fold():
             "symbol,timestamp_ms,open\nBTCUSDT,1000,100\n",
             encoding="utf-8",
         )
-        _write_funding_manifest(funding / "BTCUSDT.csv", 2000, 2000)
+        _write_funding_manifest(funding / "BTCUSDT.csv", 2000, 2000, schedule_start_ms=1000, expected_events=[1000])
         try:
             validate_funding_mark_coverage(
                 funding, marks, ["BTCUSDT"], [2000], 2000, 2000
@@ -486,13 +514,13 @@ def test_funding_mark_coverage_rejects_missing_or_unverified_archive_manifest():
             "symbol,timestamp_ms,open\nBTCUSDT,1000,100\n",
             encoding="utf-8",
         )
-        _write_funding_manifest(funding_path, 1000, 1000, schedule_verified=False)
+        _write_funding_manifest(funding_path, 1000, 1000, include_schedule=False)
         try:
             validate_funding_mark_coverage(
                 funding, marks, ["BTCUSDT"], [1000], 1000, 1000
             )
         except SystemExit as exc:
-            assert "dated_settlement_schedule_not_verified" in str(exc)
+            assert "dated_settlement_schedule_evidence_missing" in str(exc)
         else:
             raise AssertionError("unverified funding schedule must block H1 replay")
 

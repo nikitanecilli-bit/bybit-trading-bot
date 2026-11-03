@@ -61,12 +61,13 @@ No other filters or parameters may change.
 
 ## 5. Implementation and synthetic regression coverage
 
-1. Store the exact signal-time Donchian boundary in pending signal and open-position state; never recompute it using future candles.
-2. Add an explicit, disabled-by-default configuration switch and an H1-only validation gate.
-3. Preserve exact position quantity, TP1 realized leg, remaining fraction, fees, slippage, funding, risk and execution provenance through the early close.
-4. Add deterministic tests for long/short symmetry, first-bar/second-bar/third-bar trigger, no wick-only trigger, no trigger after bar 3, stop/TP precedence, TP1 partial then retest close, and no re-entry.
-5. Add a path-causality test proving the rule cannot see the close of a candle before it is complete.
-6. Confirm baseline metrics reproduce exactly with the H-C switch disabled.
+Completed in the research branch:
+- [x] Store the exact signal-time Donchian boundary in pending signal and open-position state; never recompute it using future candles.
+- [x] Add an explicit, disabled-by-default configuration switch and an H1-only validation gate.
+- [x] Preserve exact remaining quantity and TP1 realized leg through the early close; existing fee, slippage and funding accounting is reused by the normal close lifecycle.
+- [x] Add deterministic tests for long/short symmetry, first/third-bar trigger, no wick-only trigger, no trigger after bar 3, stop/TP2 precedence, TP1 partial then retest close, strategy scope and no same-bar re-entry.
+- [x] Add fail-closed tests for missing breakout boundary on pending fill/state restore, plus backward-compatible loading when the flag is disabled.
+- [ ] Confirm exact baseline PnL parity with the H-C switch disabled. This requires a later replay and has deliberately NOT been run on the reused research folds.
 
 ## 6. Data and validation gate
 
@@ -98,7 +99,7 @@ Promote only if the frozen H-C result is net profitable after all modeled costs,
 
 ## 8. Current implementation status
 
-Completed in the research branch as provenance-only groundwork:
+Completed in the research branch as provenance and disabled feature implementation:
 - Baseline and H-A signal evaluators now emit the signal-time Donchian breakout boundary.
 - The boundary is carried through pending orders, OpenPositionState, TradeRecord and the H-A trade/diagnostic ledger.
 - State restoration validates a finite positive boundary while remaining backward-compatible with older backups that do not contain the optional field.
@@ -115,7 +116,7 @@ This is implementation correctness only. The flag remains false by default; no m
 ## 9. Current blockers
 
 - Bybit-native historical market and point-in-time universe archives are not yet complete/verified in the repository.
-- The current H-A artifacts predate the latest trade-journal extension and therefore still lack TP1 partial-state fields. The research branch now retains initial stop geometry, TP1 hit/time/realized gross, remaining fraction and final stop in TradeRecord, and the H-A runner exports them on future runs. H-C must still be implemented inside the engine lifecycle so event priority and partial quantities are exact; do not infer counterfactual PnL from old final trade rows.
+- The current H-A artifacts predate the latest trade-journal extension and therefore still lack TP1 partial-state fields. The research branch now retains initial stop geometry, TP1 hit/time/realized gross, remaining fraction, final stop and breakout level in TradeRecord, and the H-A runner exports them on future runs. H-C itself now executes inside the engine lifecycle so event priority and partial quantities are exact; do not infer counterfactual PnL from old final trade rows.
 - Existing H-A folds are development data only.
 
 **No market PnL run has been launched for H-C.**

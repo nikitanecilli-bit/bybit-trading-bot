@@ -80,3 +80,8 @@ The initial boolean schedule flag was replaced by a required sidecar reference t
 ### Dated interval alignment check
 
 The schedule validator also rejects unsupported interval values and requires every expected settlement timestamp to align with the applicable preceding snapshot's recorded interval. Bybit's V5 Funding Rate History documentation explicitly says each symbol can have a different interval and points to Instruments Info for that interval; the H1 gate therefore must not use a global hard-coded cadence. The implementation accepts the documented 1h/2h/4h/8h interval values and uses UTC-aligned settlement boundaries. See the official API documentation: https://bybit-exchange.github.io/docs/v5/market/history-fund-rate and https://bybit-exchange.github.io/docs/v5/market/instrument.
+
+
+### Incremental-download integrity protection
+
+The Funding downloader now verifies an existing sidecar's CSV SHA-256 and data-row count **before** making an incremental API request or appending new rows. If the existing CSV has drifted from its last manifest, the downloader refuses to extend or re-attest it. This closes a provenance-reset loophole where a modified historical CSV could otherwise receive a fresh hash during a later append. Offline regression coverage was added.

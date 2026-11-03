@@ -307,3 +307,6 @@ Research CI [#41719390878](https://github.com/nikitanecilli-bit/bybit-trading-bo
 The replay previously treated configured TP1/TP2 exits as maker even when a candle opened beyond the resting limit target. This is now gap-aware: a target crossed by the open is taker (fee + slippage); a non-gap intrabar touch remains the configured maker proxy. TP1 per-leg liquidity status is persisted and applied consistently in MTM/final PnL; final TP2 status is recorded. Gap prices remain at the target level, without optimistic opening-price improvement.
 
 Research CI [#41720537099](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41720537099) passed 52/52. This corrects execution-cost accounting but does not establish queue fills. Do not interpret it as evidence of profitability. No market PnL replay was run; the Bybit Funding completeness gate remains the next blocker before any frozen-baseline replay.
+
+
+H1 runner scope check: the shared-capital H1 validator explicitly uses maker entry and taker TP1/TP2 exits (maker_entry_and_tp1=True, maker_tp1_and_target=False). The new gap-aware maker-target logic therefore does not change the frozen H1 baseline; it hardens the generic engine and future maker-exit experiments.

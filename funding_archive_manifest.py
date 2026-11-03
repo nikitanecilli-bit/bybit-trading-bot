@@ -183,6 +183,7 @@ def validate_funding_manifest(
                         errors.append("schedule_source_snapshots_missing")
                     else:
                         snapshot_times = []
+                    snapshot_intervals = []
                         for snapshot in source_snapshots:
                             if not isinstance(snapshot, dict):
                                 errors.append("invalid_schedule_source_snapshot")
@@ -223,9 +224,10 @@ def validate_funding_manifest(
                                         errors.append("schedule_source_snapshot_metadata_mismatch")
                                 except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
                                     errors.append("invalid_schedule_source_snapshot")
-                            if interval_minutes <= 0:
+                            if interval_minutes not in {60, 120, 240, 480}:
                                 errors.append("invalid_funding_interval_minutes")
                             snapshot_times.append(fetched_at_ms)
+                            snapshot_intervals.append((fetched_at_ms, interval_minutes))
                         if snapshot_times != sorted(set(snapshot_times)):
                             errors.append("schedule_source_snapshots_not_strictly_ordered")
                         elif snapshot_times and (
@@ -288,7 +290,22 @@ def validate_funding_manifest(
                         }
                         if expected_in_interval != actual_in_interval:
                             errors.append("funding_events_do_not_match_dated_schedule")
-                        else:
+                        for event_ts in expected_in_interval:
+                            applicable = [
+                                interval for snapshot_ts, interval in snapshot_intervals
+                                if snapshot_ts <= event_ts
+                            ]
+                            if not applicable:
+                                errors.append("funding_event_has_no_preceding_interval_snapshot")
+                                continue
+                            interval_ms = applicable[-1] * 60_000
+                            if event_ts % interval_ms != 0:
+                                errors.append("funding_event_not_aligned_to_dated_interval")
+                        if not any(error in errors for error in (
+                            "funding_events_do_not_match_dated_schedule",
+                            "funding_event_has_no_preceding_interval_snapshot",
+                            "funding_event_not_aligned_to_dated_interval",
+                        )):
                             schedule_verified = True
     return {
         "ok": not errors,

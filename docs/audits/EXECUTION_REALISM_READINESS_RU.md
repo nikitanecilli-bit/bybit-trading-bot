@@ -1,5 +1,8 @@
 # Execution realism readiness audit — 2026-11-02
 
+> **Актуальный статус на 2026-11-03:** этот аудит датирован 2026-11-02 и описывает состояние до ENG-EXEC-009–014. Exchange-valid contract sizing, dated risk-tier entry checks, position-level IM/MM, isolated Mark liquidation и Bybit-native H1/funding/Mark data gates с тех пор интегрированы. Утверждения ниже об отсутствии этих механизмов относятся к прежнему коду и superseded текущим [Execution integration re-audit](EXECUTION_INTEGRATION_REAUDIT_2026-11-03.md). Остаются блокеры: официальные исторические архивы/снимки ещё не собраны, account margin mode не подтверждён, queue/spread/partial-fill adverse selection не моделируются, funding settlement mark — candle-open proxy, fees/slippage — базовые константы.
+
+
 Статус: статический аудит и проверка доступности источников; **новый market backtest не запускался**. Реальные ордера не размещались.
 
 ## Краткий вывод

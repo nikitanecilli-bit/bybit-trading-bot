@@ -573,9 +573,8 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 - Учитываются entry price, quantity, leverage, extra isolated margin, taker fee rate, MMR и mmDeduction.
 - Проверяется entry notional против dated risk tiers и maxLeverage.
 - LP рассчитывается по tier, выбранному на entry notional; не подменяет фиксированную LP динамическим tier на candidate LP. Отдельная функция считает текущую MM по mark notional и соответствующему Mark-Price tier для одной позиции.
-- Неоднозначный/неразрешимый tier selection закрывается ошибкой, а не подстановкой значения.
 
-**Тесты:** `tests/test_mark_price_liquidation.py` покрывает официальный пример Bybit (40,000 entry, 1 BTC, 50x, 0.5% MMR, 3,000 extra margin → 36,380.25 LP), long/short adverse direction, tier switch на liquidation notional, превышение risk limit, maxLeverage и некорректные входы. Тест подключён к Research CI.
+**Тесты:** `tests/test_mark_price_liquidation.py` покрывает официальный пример Bybit (40,000 entry, 1 BTC, 50x, 0.5% MMR, 3,000 extra margin → 36,380.25 LP), long/short adverse direction, fixed entry-tier LP despite crossing LP notional boundaries, dynamic Mark-Price tier/MM changes for long and short, directional estimated close fees, превышение risk limit, maxLeverage и некорректные входы. Тест подключён к Research CI.
 
 **Границы модели (не заявлять как готовую Bybit liquidation simulation):**
 - Это только isolated position-level LP estimator. Он не моделирует Cross/Portfolio Margin, account-wide MMR/available balance, hedged offsets, AMR, funding-driven margin depletion, partial liquidation, ADL, bankruptcy-price execution или задержки/очередность биржевого liquidation engine.

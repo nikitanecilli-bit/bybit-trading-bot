@@ -105,7 +105,7 @@ Completed in the research branch as provenance and disabled feature implementati
 - State restoration validates a finite positive boundary while remaining backward-compatible with older backups that do not contain the optional field.
 - Tests cover long/short signal boundaries, state round-trip, invalid values and legacy backup loading.
 
-The H-C close-based exit event is now implemented behind config key execution_and_exits.enable_post_break_invalidation, default false. It is H1-only and uses the fixed three-bar horizon. It applies only to H1-momentum-breakout and H-A-relative-strength-breakout.
+The H-C close-based exit event is now implemented behind config key execution_and_exits.enable_post_break_invalidation, default false. It is H1-only and uses the fixed three-bar horizon. Its preregistered scope is the frozen H1 baseline strategy H1-momentum-breakout only. H-A-relative-strength-breakout is a rejected candidate and is explicitly excluded; the implementation and tests preserve that exclusion.
 
 The event runs after intrabar stop/liquidation/TP handling and kill-switch priority. It closes at the completed candle close only when the position remains open and the close has returned inside the stored boundary. TP1 partial state is preserved and only the remaining quantity is closed. Missing signal-time boundary fails closed on pending fill, state restore or active position management.
 

@@ -26,7 +26,7 @@ def make_position(symbol="BTCUSDT", direction="short", entry=99_000.0,
         tp1_price=entry - 1_000 if direction == "short" else entry + 1_000,
         tp2_price=entry - 2_000 if direction == "short" else entry + 2_000,
         initial_stop_dist=1_000.0, size_usdt=size, risk_usdt=1_000.0,
-        order_type="market", equity_at_entry=10_000.0,
+        order_type="market", equity_at_entry=10_000.0, leverage=50.0,
     )
 
 
@@ -102,6 +102,25 @@ class MarkPriceEngineIntegrationTests(unittest.TestCase):
                 assert "requires timestamp_ms,open,high,low,close" in str(exc)
             else:
                 raise AssertionError("open-only Mark archive must be rejected for liquidation-aware replay")
+
+    def test_liquidation_uses_position_entry_leverage_not_hot_reloaded_config(self):
+        engine = make_engine()
+        pos = make_position()
+        ts = pos.entry_ts
+        close_ts = ts + 3_600_000
+        engine.liquidation_model_enabled = True
+        engine.cfg.leverage_val = 10.0
+        engine.risk_tier_history = make_risk_history(close_ts)
+        engine._mark_price_candles = {"BTCUSDT": {
+            ts: em.MarkPriceCandle(
+                ts, Decimal("99000"), Decimal("100450"),
+                Decimal("98500"), Decimal("100000"),
+            )
+        }}
+        exit_price = engine._liquidation_exit_price(
+            pos, em.Candle(ts, 99000, 100500, 98500, 100000, 1), close_ts,
+        )
+        self.assertEqual(exit_price, 100_980.0)
 
     def test_dynamic_mark_tier_shortfall_triggers_before_fixed_lp(self):
         engine = make_engine()

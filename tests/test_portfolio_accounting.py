@@ -1514,6 +1514,109 @@ def test_sparse_replay_kill_switch_flattens_all_positions_order_invariantly():
     assert forward["max_dd"] == reverse["max_dd"]
 
 
+
+
+def test_full_replay_reconciles_tp1_funding_mtm_and_final_close():
+    e = make_engine()
+    e._state_restored = False
+    e.journal_output_path = "/tmp/ignored_tp1_funding_lifecycle.json"
+    e.cfg.bot_version = "tp1-funding-lifecycle-regression"
+    e.cfg.timeframe = "1h"
+    e.cfg.active_trading_pool = ["BTCUSDT"]
+    e.cfg.max_concurrent_positions = 1
+    e.cfg.max_risk_trade_pct = 1.0
+    e.cfg.max_portfolio_risk_pct = 2.0
+    e.cfg.daily_stop_loss_pct = 99.0
+    e.cfg.emergency_kill_switch_pct = 99.0
+    e.cfg.max_chase_limit_pct = 1.5
+    e.cfg.tp1_r_multiple = 1.0
+    e.cfg.tp2_r_multiple = 2.0
+    e.cfg.atr_trail_mult = 2.5
+    e.cfg.validate()
+    e.risk_mgr.cfg = e.cfg
+
+    hour = 3_600_000
+    start_ts = 1_800_000_000_000
+    signal_ts = start_ts + 25 * hour
+    entry_ts = start_ts + 26 * hour
+    tp1_boundary_ts = start_ts + 28 * hour
+    funding_rate = "0.001"
+    funding_timestamps = [
+        entry_ts + hour,          # before TP1: full initial quantity
+        tp1_boundary_ts,           # exact TP1 boundary: conservative full quantity
+        tp1_boundary_ts + hour,    # after TP1: remaining half only
+    ]
+    e.funding_dir = "fixture"
+    e.funding_by_symbol = {
+        "BTCUSDT": [{"ts": ts, "rate": funding_rate} for ts in funding_timestamps]
+    }
+    e._funding_mark_prices = {
+        "BTCUSDT": {ts: "100" for ts in funding_timestamps}
+    }
+
+    original_evaluate = engine_mod.QuantStrategyCore.evaluate_signal
+
+    def deterministic_signal(symbol, history, _cfg):
+        if symbol != "BTCUSDT" or history[-1].ts != signal_ts:
+            return None
+        return {
+            "direction": "long",
+            "entry_price": 100.0,
+            "order_type": "market",
+            "strategy": "tp1-funding-lifecycle-fixture",
+            "stop_dist": 5.0,
+            "signal_ts": signal_ts,
+            "vol_ratio": 2.0,
+        }
+
+    candles = []
+    for index in range(30):
+        high, low, close = 101.0, 99.0, 100.0
+        if index == 27:  # TP1 at 105; do not apply the newly raised stop retroactively
+            high, low, close = 106.0, 102.0, 105.0
+        elif index == 28:  # keep the remaining half open after TP1
+            high, low, close = 103.0, 102.0, 102.5
+        elif index == 29:  # trigger the post-TP1 trailing stop
+            high, low, close = 103.0, 100.0, 101.0
+        candles.append(engine_mod.Candle(
+            ts=start_ts + index * hour,
+            open=100.0 if index != 29 else 102.0,
+            high=high,
+            low=low,
+            close=close,
+            volume=100.0,
+        ))
+
+    engine_mod.QuantStrategyCore.evaluate_signal = staticmethod(deterministic_signal)
+    try:
+        audit = engine_mod.run_simulation_pass(
+            e, {"BTCUSDT": candles}, ["BTCUSDT"],
+            data_label="SYNTHETIC_TP1_FUNDING_LIFECYCLE",
+        )
+    finally:
+        engine_mod.QuantStrategyCore.evaluate_signal = staticmethod(original_evaluate)
+
+    assert len(e.closed_trades) == 1
+    trade = e.closed_trades[0]
+    assert trade.tp1_hit is True
+    assert trade.tp1_ts_ms == tp1_boundary_ts
+    assert trade.remaining_fraction_at_exit == 0.5
+    assert trade.exit_reason == "trailing_stop"
+
+    # Two full-quantity settlements (including the exact TP1 boundary), then
+    # one post-TP1 settlement on the remaining half of the position.
+    expected_funding = round(trade.size_usdt * 0.001 * 2.5, 2)
+    assert abs(trade.funding_cost_usdt - expected_funding) < 0.01
+    assert abs(
+        trade.pnl_usdt
+        - (trade.gross_pnl - trade.exchange_fees_usdt
+           - trade.slippage_cost_usdt - trade.funding_cost_usdt)
+    ) < 0.01
+    assert abs(audit["net_pnl"] - trade.pnl_usdt) < 0.01
+    assert abs(e.risk_mgr.realized_equity - (10_000.0 + trade.pnl_usdt)) < 0.01
+    assert abs(e.risk_mgr.current_equity - e.risk_mgr.realized_equity) < 0.001
+
+
 if __name__ == "__main__":
     tests = [(name, value) for name, value in sorted(globals().items())
              if name.startswith("test_") and callable(value)]

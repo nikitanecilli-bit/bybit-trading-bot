@@ -87,6 +87,29 @@ def test_insufficient_positive_candidates_are_not_promoted():
     assert len(eligible[:5]) != 5
 
 
+def test_non_finite_candidate_metrics_fail_closed():
+    for metric in ("net_pnl", "profit_factor", "expectancy_r", "max_drawdown_pct"):
+        for invalid in (float("nan"), float("inf"), float("-inf")):
+            row = _row("BADUSDT", 50, 100, 1.5, 0.1, 8)
+            row[metric] = invalid
+            try:
+                rank_candidates([row])
+            except ValueError as exc:
+                assert "non-finite candidate metrics" in str(exc)
+                assert metric in str(exc)
+            else:
+                raise AssertionError(f"non-finite {metric} must fail closed: {invalid!r}")
+
+
+def test_negative_candidate_trade_count_is_rejected():
+    try:
+        rank_candidates([_row("BADUSDT", -1, 100, 1.5, 0.1, 8)])
+    except ValueError as exc:
+        assert "trade count cannot be negative" in str(exc)
+    else:
+        raise AssertionError("negative trade count must fail closed")
+
+
 if __name__ == "__main__":
     tests = [
         test_rank_uses_only_positive_net_candidates_and_deterministic_tiebreaks,

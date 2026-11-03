@@ -1,0 +1,120 @@
+name: H1 Shared-Capital Portfolio Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      funding_dir:
+        description: "Repository path to merged Bybit funding CSVs (one <SYMBOL>.csv per symbol)"
+        required: true
+        type: string
+      mark_price_dir:
+        description: "Repository path to merged Bybit mark-price CSVs (one <SYMBOL>.csv per symbol)"
+        required: true
+        type: string
+      kline_dir:
+        description: "Repository path to official Bybit H1 trade-kline CSVs (one <SYMBOL>.csv per symbol)"
+        required: true
+        type: string
+      selection_manifest:
+        description: "Committed JSON output from the H1 top-five train-only selector"
+        required: true
+        type: string
+      validation_mode:
+        description: "Explore = grid on folds 1-2 only; confirm = one frozen configuration on final fold 3 only"
+        required: true
+        type: choice
+        options: [explore, confirm]
+        default: explore
+      frozen_min_volume_ratio:
+        description: "Required in confirm mode; select one predeclared grid value"
+        required: false
+        type: string
+      frozen_min_breakout_atr:
+        description: "Required in confirm mode; select one predeclared grid value"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  portfolio-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/market-regime-v1-main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile
+        run: python -m py_compile Bybit_Trading_Engine_v14_research.py scripts/run_uploaded_dataset_backtests.py scripts/run_h1_shared_capital_portfolio_validation.py
+      - name: Require official Bybit H1 trade-kline archive
+        env:
+          KLINE_DIR: ${{ inputs.kline_dir }}
+        run: |
+          test -d "$KLINE_DIR" && test -n "$(find "$KLINE_DIR" -maxdepth 1 -name '*.csv' -print -quit)" || {
+            echo "Missing official Bybit H1 trade-kline archive; refusing Binance/CryptoFetch proxy PnL replay."
+            exit 1
+          }
+      - name: Require Bybit funding and mark-price archives
+        env:
+          FUNDING_DIR: ${{ inputs.funding_dir }}
+          MARK_PRICE_DIR: ${{ inputs.mark_price_dir }}
+        run: |
+          test -d "$FUNDING_DIR" && test -n "$(find "$FUNDING_DIR" -maxdepth 1 -name '*.csv' -print -quit)" || {
+            echo "Missing Bybit funding CSV archive; refusing zero-funding PnL replay."
+            exit 1
+          }
+          test -d "$MARK_PRICE_DIR" && test -n "$(find "$MARK_PRICE_DIR" -maxdepth 1 -name '*.csv' -print -quit)" || {
+            echo "Missing Bybit mark-price CSV archive; refusing PnL replay without mark data."
+            exit 1
+          }
+      - name: Require official dated Bybit execution snapshots
+        run: |
+          test -n "$(find data/instrument_specs/linear -maxdepth 1 -name '*.json' -print -quit 2>/dev/null)" || {
+            echo "Missing dated Bybit instrument specs; refusing legacy notional-proxy PnL replay."
+            exit 1
+          }
+          test -n "$(find data/instrument_specs/risk_limits -maxdepth 1 -name '*.json' -print -quit 2>/dev/null)" || {
+            echo "Missing dated Bybit risk tiers; refusing legacy notional-proxy PnL replay."
+            exit 1
+          }
+      - name: Derive the exact frozen allowlist from the selection manifest
+        env:
+          SELECTION_MANIFEST: ${{ inputs.selection_manifest }}
+        run: |
+          python - <<'PY'
+          import json, os
+          with open(os.environ["SELECTION_MANIFEST"], encoding="utf-8") as handle:
+              payload = json.load(handle)
+          symbols = payload.get("primary")
+          if payload.get("selection_status") != "ok" or not isinstance(symbols, list) or len(symbols) != 5 or len(set(symbols)) != 5:
+              raise SystemExit("Selection manifest must contain exactly five unique approved primary symbols")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+              env.write("H1_SYMBOL_ALLOWLIST=" + ",".join(symbols) + "\n")
+          print("Frozen top-five: " + ",".join(symbols))
+          PY
+      - name: Run strict shared-capital portfolio validation
+        env:
+          BYBIT_INSTRUMENT_SPECS_DIR: data/instrument_specs/linear
+          BYBIT_RISK_TIERS_DIR: data/instrument_specs/risk_limits
+          BYBIT_FUNDING_DIR: ${{ inputs.funding_dir }}
+          BYBIT_MARK_PRICE_DIR: ${{ inputs.mark_price_dir }}
+          BYBIT_KLINE_DIR: ${{ inputs.kline_dir }}
+          H1_SELECTION_MANIFEST: ${{ inputs.selection_manifest }}
+          H1_VALIDATION_MODE: ${{ inputs.validation_mode }}
+          H1_FROZEN_MIN_VOLUME_RATIO: ${{ inputs.frozen_min_volume_ratio }}
+          H1_FROZEN_MIN_BREAKOUT_ATR: ${{ inputs.frozen_min_breakout_atr }}
+          BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}
+        run: python scripts/run_h1_shared_capital_portfolio_validation.py
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: h1-shared-capital-portfolio-validation
+          path: |
+            h1_shared_capital_portfolio_validation.csv
+            h1_shared_capital_portfolio_validation_manifest.json
+          if-no-files-found: error

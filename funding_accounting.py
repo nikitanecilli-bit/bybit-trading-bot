@@ -121,7 +121,7 @@ def accrued_funding_cost(
             # TP1 and funding share a candle-close boundary, but position remains
             # open: use full size for payments and remaining size for receipts.
             if full_position_cost < 0:
-                fraction = remaining_fraction
+                fraction = remaining_ratio
         total += sign * quantity * mark * fraction * rate
 
     return total.quantize(CENT, rounding=ROUND_HALF_UP)

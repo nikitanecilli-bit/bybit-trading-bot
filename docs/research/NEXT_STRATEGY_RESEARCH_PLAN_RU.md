@@ -232,3 +232,8 @@ Next safe work: finish static review of position lifecycle, TP1-aware PnL/cost r
 - The user's 20% net monthly objective must be evaluated against this normalized metric, alongside fold stability, max drawdown, trade count and cost stress. Before calling a candidate consistently profitable, a later report must also expose actual calendar-month returns and losing-month frequency; a single fold average cannot establish monthly consistency.
 - The metric is reporting-only: no strategy parameters, symbol ranking, entry/exit rules or risk sizing changed. No market PnL was run.
 - Regression coverage includes one-month +20% and two-month +44% compounded examples, invalid duration and total-loss handling. CI [#41708149842](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41708149842) and [#41708141158](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41708141158) both SUCCESS, 50/50 steps.
+
+
+## 12. Funding archive completeness gate — 2026-11-03
+
+Static audit found a P1 preflight blind spot documented in `docs/audits/FUNDING_ARCHIVE_COMPLETENESS_AUDIT_2026-11-03.md`: current funding coverage checks prove that recorded settlement rows have matching Mark timestamps, but do not prove that no settlement rows are missing from the CSV. The H1 runner only additionally requires at least one settlement inside each scored fold. Do not run another market PnL replay until the collector emits per-symbol API pagination/coverage provenance, dated funding-interval evidence is preserved, and the validator rejects a missing-middle-settlement fixture without assuming a universal 8-hour cadence. Funding arithmetic tests remain valid for supplied events but do not close archive completeness.

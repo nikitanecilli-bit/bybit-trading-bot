@@ -206,6 +206,9 @@ Therefore, a present-day interval value cannot be back-projected across an old F
 
 ### Второй аудит Funding validator — 2026-11-04
 
+CI [41735002481](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41735002481) и [41735022125](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41735022125) завершились SUCCESS: оба прогона выполнили 55/55 шагов, без ошибок. Второй прогон включает новый duplicate-timestamp regression.
+
+
 **Подтверждённый дефект (закрыт кодом): дубли timestamp в CSV могли схлопываться в set.**
 
 В validate_funding_manifest() при сравнении Funding CSV с расписанием timestamp добавлялись в set. Если CSV содержал повтор одной и той же выплаты, дубликат терялся при преобразовании в множество; список уникальных timestamps мог совпасть с ожидаемым schedule. Основной collector уже запрещает дубликаты, а отдельный validate_funding_coverage.py тоже их отвергает, но manifest validator сам по себе не обеспечивал fail-closed поведение.

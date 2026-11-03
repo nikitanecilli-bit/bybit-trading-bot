@@ -91,3 +91,7 @@ CI проверил все шесть уже имеющихся CryptoFetch ZIP 
 Проверка полного replay permutation regression теперь закрыта: обнаруженная зависимость signal discovery и batch sizing от порядка символов исправлена; CI run 41628558820 прошёл, полный portfolio accounting suite исполнил 36/36 тестов. Подробности — в `ENGINE_AUDIT_FINDINGS_RU.md`.
 
 Оставшиеся audit gates до PnL: независимая сквозная reconciliation торгового журнала/equity path, сверка accounting на полном сценарии с partial TP1 + funding, и подтверждение, что каждый будущий research runner использует один и тот же audited input manifest и исправленный engine. Stop/TP gap semantics покрыты отдельными deterministic regressions (включая stop precedence и gap fills), но перед новым экспериментом нужно проверить, что выбранный runner не обходит эти правила. До закрытия оставшихся gates рыночный PnL replay не запускать.
+
+### Важное последствие engine fix для прежних результатов
+
+E01–E13, E11 и E13 shared-capital цифры, а также другие исторические отчёты, полученные до исправления signal-discovery/batch-sizing, остаются историческими наблюдениями, но **не являются baseline для сравнения с будущим replay на исправленном движке**. Новый порядок может изменить набор сделок, приоритет одновременных сигналов и размеры fills. После закрытия audit gates потребуется заново выполнить frozen baseline на исправленном engine и тех же audited CryptoFetch inputs; только затем сравнивать H-A с baseline. Уже использованные временные folds всё равно остаются исследованными и не становятся blind holdout.

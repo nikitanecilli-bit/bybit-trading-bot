@@ -135,3 +135,19 @@ Therefore, if a Funding settlement is absent from both the CSV and the supplied 
 This does not establish that any current archive is missing an event. It establishes that the current validator is a consistency check against supplied schedule evidence, not an independent proof that the schedule itself is complete.
 
 **Decision:** keep the H1 market-PnL gate closed. Do not claim Funding completeness solely because `validate_funding_manifest()` returns `ok`. Closing this gap requires an authoritative, independently auditable source for historical interval effective times (or an independently generated schedule with verifiable completeness provenance). Do not infer change-effective timestamps from snapshot fetch times, and do not invent a fixed 8-hour cadence.
+
+
+### Independent UTC-grid reconstruction — 2026-11-03
+
+The validator has been strengthened after this review:
+
+- For a scored interval whose dated instrument snapshots all report the same fundingInterval, it independently reconstructs the UTC settlement grid from that interval and the required start/end timestamps.
+- It compares the supplied expected-event list, restricted to the scored interval, with the reconstructed grid. A CSV and schedule that both omit the same settlement now fail.
+- If observed snapshots report different funding intervals, validation fails closed with funding_interval_changed_without_effective_boundary_evidence. A snapshot fetch time is not silently treated as the exact effective time of the change.
+- Regression tests cover a matching-but-incomplete CSV+schedule pair and an unresolved interval transition.
+
+Bybit's current public contract terms list 1h, 2h, 4h and 8h settlement grids in UTC (1h on every hour; the other intervals at their corresponding UTC multiples). The validator's grid reconstruction is limited to those documented intervals and does not hardcode 8h.
+
+**Important residual limitation:** matching snapshots do not prove that an interval never changed and reverted between observations. The current collector is manual and live snapshot acquisition is blocked by HTTP 403; it does not produce a continuous historical interval series. The reconstructed grid is therefore an independent consistency check conditional on interval stability evidenced by the snapshots, not a cryptographic proof that no unobserved historical interval change occurred. Until authoritative historical effective-time evidence or sufficiently complete independently verifiable observations exist, the market-PnL gate remains closed.
+
+The new Funding archive manifest and downloader tests were previously absent from Research CI's execution list. They have now been added to research-checks.yml, including the modified-CSV incremental-download regression. The updated CI result is pending at the time of this note.

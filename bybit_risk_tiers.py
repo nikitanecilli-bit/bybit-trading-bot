@@ -38,6 +38,7 @@ class RiskTier:
     initial_margin_rate: Decimal
     max_leverage: Decimal
     mm_deduction: Decimal
+    is_lowest_risk: bool
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,8 @@ class RiskTierHistory:
             rows = payload.get("tiers")
             if not isinstance(rows, list) or not rows:
                 raise ValueError(f"{path}: tiers must be a non-empty list")
+            if payload.get("tier_count") != len(rows):
+                raise ValueError(f"{path}: tier_count does not match rows")
             grouped: dict[str, list[RiskTier]] = {}
             seen: set[tuple[str, int]] = set()
             for row in rows:
@@ -101,18 +104,21 @@ class RiskTierHistory:
                 imr = _d(row.get("initialMargin"), "initialMargin")
                 max_lev = _d(row.get("maxLeverage"), "maxLeverage")
                 deduction = _d(row.get("mmDeduction") or "0", "mmDeduction")
+                lowest = row.get("isLowestRisk")
+                if isinstance(lowest, bool) or lowest not in (0, 1):
+                    raise ValueError(f"{path}: isLowestRisk must be integer 0 or 1")
                 if min(risk_limit, mmr, imr, max_lev) <= 0 or deduction < 0:
                     raise ValueError(f"{path}: risk tier values outside valid range")
                 grouped.setdefault(symbol, []).append(RiskTier(
-                    symbol, tier_id, risk_limit, mmr, imr, max_lev, deduction
+                    symbol, tier_id, risk_limit, mmr, imr, max_lev, deduction, bool(lowest)
                 ))
             final: dict[str, tuple[RiskTier, ...]] = {}
             for symbol, tiers in grouped.items():
                 tiers.sort(key=lambda item: item.risk_limit_value)
                 if len({item.risk_limit_value for item in tiers}) != len(tiers):
                     raise ValueError(f"{path}: duplicate risk limit for {symbol}")
-                if sum(1 for item in tiers if item.tier_id == tiers[0].tier_id) != 1:
-                    raise ValueError(f"{path}: invalid lowest tier for {symbol}")
+                if sum(1 for item in tiers if item.is_lowest_risk) != 1 or not tiers[0].is_lowest_risk:
+                    raise ValueError(f"{path}: exactly the lowest tier must have isLowestRisk=1 for {symbol}")
                 for i, tier in enumerate(tiers):
                     if i == 0:
                         continue
@@ -125,6 +131,9 @@ class RiskTierHistory:
                         raise ValueError(f"{path}: IMR decreases for {symbol}")
                     if tier.max_leverage > prev.max_leverage:
                         raise ValueError(f"{path}: max leverage increases for {symbol}")
+                    expected = prev.risk_limit_value * (tier.maintenance_margin_rate - prev.maintenance_margin_rate) + prev.mm_deduction
+                    if abs(tier.mm_deduction - expected) > Decimal("0.00000001"):
+                        raise ValueError(f"{path}: mmDeduction recurrence mismatch for {symbol} tier {tier.tier_id}")
                 final[symbol] = tuple(tiers)
             snapshots.append(RiskTierSnapshot(fetched_at, fetched_at_ms, category, final))
         return cls(snapshots)

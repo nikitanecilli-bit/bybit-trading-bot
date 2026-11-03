@@ -12,8 +12,8 @@ def payload(fetched_at="2026-11-01T00:00:00Z", tiers=None):
     return {
         "schema_version": 1, "category": "linear", "fetched_at": fetched_at,
         "tiers": tiers or [
-            {"symbol":"BTCUSDT","id":1,"riskLimitValue":"100000","maintenanceMargin":"0.005","initialMargin":"0.01","maxLeverage":"100","mmDeduction":"0"},
-            {"symbol":"BTCUSDT","id":2,"riskLimitValue":"500000","maintenanceMargin":"0.01","initialMargin":"0.02","maxLeverage":"50","mmDeduction":"500"},
+            {"symbol":"BTCUSDT","id":1,"riskLimitValue":"100000","maintenanceMargin":"0.005","initialMargin":"0.01","maxLeverage":"100","mmDeduction":"0","isLowestRisk":1},
+            {"symbol":"BTCUSDT","id":2,"riskLimitValue":"500000","maintenanceMargin":"0.01","initialMargin":"0.02","maxLeverage":"50","mmDeduction":"500","isLowestRisk":0},
         ],
     }
 
@@ -53,6 +53,22 @@ class RiskTierHistoryTests(unittest.TestCase):
                 history.get_tier("ETHUSDT", 1793606400000, "1000", leverage="10")
             with self.assertRaisesRegex(ValueError, "exceeds highest"):
                 history.get_tier("BTCUSDT", 1793606400000, "500001", leverage="10")
+
+    def test_rejects_invalid_lowest_flag_and_mm_deduction_recurrence(self):
+        bad_lowest = payload(tiers=[
+            {"symbol":"BTCUSDT","id":1,"riskLimitValue":"100000","maintenanceMargin":"0.005","initialMargin":"0.01","maxLeverage":"100","mmDeduction":"0","isLowestRisk":0},
+            {"symbol":"BTCUSDT","id":2,"riskLimitValue":"500000","maintenanceMargin":"0.01","initialMargin":"0.02","maxLeverage":"50","mmDeduction":"500","isLowestRisk":1},
+        ])
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(bad_lowest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "lowest tier"):
+                RiskTierHistory.from_directory(tmp)
+        bad_deduction = payload()
+        bad_deduction["tiers"][1]["mmDeduction"] = "499"
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(bad_deduction), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "mmDeduction recurrence"):
+                RiskTierHistory.from_directory(tmp)
 
     def test_rejects_invalid_tier_structure(self):
         bad = payload(tiers=[

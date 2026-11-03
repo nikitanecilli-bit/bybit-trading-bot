@@ -595,3 +595,6 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 - Предыдущая гипотеза о выборе LP tier по candidate liquidation notional была снята до интеграции в движок; тесты теперь проверяют fixed LP entry-tier и отдельно dynamic Mark-Price MM tier.
 
 Официальный источник: Bybit, "The New Margin Calculation: Adjustments and Implications", last updated 2026-06-18, https://www.bybit.com/en/help-center/article/Understanding-the-Adjustment-and-Impact-of-the-New-Margin-Calculation (isolated IM/MM, dynamic Mark-Price risk tiers, fixed liquidation price, lines 160–165, 169–173, 256–265). Bankruptcy price reference: https://www.bybit.com/ru-RU/help-center/article/Bankruptcy-Price-Perpetual-and-Expiry-Contracts.
+
+
+**Статус проверки кода на момент фиксации:** 10 unittest-методов добавлены и включены в Research CI (py_compile + отдельный запуск тестового файла). GitHub connector вернул пустой список commit statuses; поэтому автоматический CI run нельзя считать подтверждённо завершившимся. Независимые арифметические проверки контрольного примера, fixed-entry-tier LP, dynamic Mark-Price MM, directional fees, bankruptcy price и tick rounding выполнены отдельно (15/15 assertions), но это не подменяет запуск полного unittest-файла.

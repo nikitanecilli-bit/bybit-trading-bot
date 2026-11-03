@@ -34,7 +34,11 @@ def _fixture(direction="long"):
         "symbol": "BTCUSDT",
         "direction": direction,
         "entry_date": entry_date,
+        "exit_date": datetime.fromtimestamp(entry_ts + H1_MS, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "exit_reason": "stop_loss",
         "entry_price": entry_price,
+        "size_usdt": 1_000.0,
+        "risk_usdt": 50.0,
     }
     index = {row.ts: i for i, row in enumerate(rows)}
     return rows, index, trade
@@ -81,6 +85,34 @@ def test_signal_diagnostics_fail_closed_without_exact_entry_bar():
         raise AssertionError("missing entry candle must fail closed")
 
 
+def test_post_entry_followthrough_is_causal_and_exit_bar_is_excluded():
+    rows, index, trade = _fixture("long")
+    entry_ts = rows[-1].ts
+    entry_price = float(trade["entry_price"])
+    closes = [100.8, 102.0, 103.0, 104.0, 105.0]
+    for offset, close in enumerate(closes, start=1):
+        ts = entry_ts + offset * H1_MS
+        rows.append(_candle(ts, close - 0.1, close + 0.5, close - 0.5, close, 12.0))
+    index = {row.ts: i for i, row in enumerate(rows)}
+
+    # A time-stop occurs at the sixth completed bar close, so all six bars count.
+    trade["exit_date"] = datetime.fromtimestamp(entry_ts + 6 * H1_MS, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    trade["exit_reason"] = "time_stop"
+    features = extract_signal_features(rows, index, trade)
+    assert features["post_entry_completed_bars"] == 6
+    assert features["post_entry_retest_inside_3bars"] == 1
+    assert features["post_entry_3bar_close_return_r"] < 0
+    assert features["post_entry_6bar_close_return_r"] > 0
+    assert features["post_entry_first3_max_adverse_r"] > 0
+
+    # An intrabar stop on the sixth bar must not use that bar's later close.
+    trade["exit_reason"] = "stop_loss"
+    stopped = extract_signal_features(rows, index, trade)
+    assert stopped["post_entry_completed_bars"] == 5
+    assert stopped["post_entry_3bar_close_return_r"] == features["post_entry_3bar_close_return_r"]
+    assert stopped["post_entry_6bar_close_return_r"] is None
+
+
 def test_signal_diagnostics_reject_non_next_bar_entry():
     rows, index, trade = _fixture("long")
     rows[-1].ts += H1_MS
@@ -100,6 +132,7 @@ if __name__ == "__main__":
         test_short_signal_features_are_directionally_symmetric,
         test_signal_diagnostics_fail_closed_without_exact_entry_bar,
         test_signal_diagnostics_reject_non_next_bar_entry,
+        test_post_entry_followthrough_is_causal_and_exit_bar_is_excluded,
     ]
     for test in tests:
         test()

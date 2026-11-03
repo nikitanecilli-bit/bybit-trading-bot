@@ -99,7 +99,7 @@ Promote only if the frozen H-C result is net profitable after all modeled costs,
 ## 8. Current blockers
 
 - Bybit-native historical market and point-in-time universe archives are not yet complete/verified in the repository.
-- The current H-A trade ledger does not retain every TP1 partial-state field needed for post-hoc counterfactual attribution; H-C must be implemented inside the engine lifecycle and tested, not estimated from final trade rows.
+- The current H-A artifacts predate the latest trade-journal extension and therefore still lack TP1 partial-state fields. The research branch now retains initial stop geometry, TP1 hit/time/realized gross, remaining fraction and final stop in TradeRecord, and the H-A runner exports them on future runs. H-C must still be implemented inside the engine lifecycle so event priority and partial quantities are exact; do not infer counterfactual PnL from old final trade rows.
 - Existing H-A folds are development data only.
 
 **No market PnL run has been launched for H-C.**

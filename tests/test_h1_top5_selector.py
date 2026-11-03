@@ -117,6 +117,8 @@ if __name__ == "__main__":
         test_common_training_overlap_requires_every_symbol_to_share_timestamps,
         test_common_training_window_uses_exact_shared_h1_intersection,
         test_insufficient_positive_candidates_are_not_promoted,
+        test_non_finite_candidate_metrics_fail_closed,
+        test_negative_candidate_trade_count_is_rejected,
     ]
     for test in tests:
         test()

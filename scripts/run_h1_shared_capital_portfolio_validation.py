@@ -33,6 +33,53 @@ WAIT_BARS = 3
 STARTING_CAPITAL = 10_000.0
 MAX_CONCURRENT_POSITIONS = 5
 COST_MULTIPLIERS = [1.0, 1.5, 2.0]
+
+
+def resolve_validation_design(environ=None):
+    """Separate exploratory grid from the one-shot final holdout evaluation.
+
+    Explore mode may compare the predeclared grid only on folds 1-2.
+    Confirm mode runs fold 3 for exactly one frozen grid configuration.
+    Cost multipliers remain stress scenarios, not selectable strategy parameters.
+    """
+    env = os.environ if environ is None else environ
+    mode = str(env.get("H1_VALIDATION_MODE", "explore")).strip().lower()
+    if mode == "explore":
+        return {
+            "mode": mode,
+            "folds": FOLDS[:2],
+            "volume_thresholds": list(VOL_THRESHOLDS),
+            "breakout_atr_thresholds": list(BREAKOUT_ATR_THRESHOLDS),
+            "cost_multipliers": list(COST_MULTIPLIERS),
+            "frozen_config": None,
+        }
+    if mode != "confirm":
+        raise SystemExit("H1_VALIDATION_MODE must be 'explore' or 'confirm'")
+    try:
+        volume = float(env["H1_FROZEN_MIN_VOLUME_RATIO"])
+        breakout = float(env["H1_FROZEN_MIN_BREAKOUT_ATR"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise SystemExit(
+            "confirm mode requires H1_FROZEN_MIN_VOLUME_RATIO and "
+            "H1_FROZEN_MIN_BREAKOUT_ATR from the predeclared research grid"
+        ) from exc
+    if not math.isfinite(volume) or volume not in VOL_THRESHOLDS:
+        raise SystemExit(f"frozen volume threshold must be one of {VOL_THRESHOLDS}")
+    if not math.isfinite(breakout) or breakout not in BREAKOUT_ATR_THRESHOLDS:
+        raise SystemExit(f"frozen breakout ATR threshold must be one of {BREAKOUT_ATR_THRESHOLDS}")
+    return {
+        "mode": mode,
+        "folds": FOLDS[2:],
+        "volume_thresholds": [volume],
+        "breakout_atr_thresholds": [breakout],
+        "cost_multipliers": list(COST_MULTIPLIERS),
+        "frozen_config": {
+            "min_volume_ratio": volume,
+            "min_breakout_atr": breakout,
+        },
+    }
+
+
 BASE_TAKER_FEE = em.TAKER_FEE
 BASE_MAKER_FEE = em.MAKER_FEE
 BASE_TAKER_SLIP = em.TAKER_SLIP
@@ -585,6 +632,7 @@ def build_validation_manifest(
     risk_tiers_dir,
     result_rows,
     output_csv_path,
+    validation_design=None,
 ):
     """Build an immutable input/code/config manifest for the H1 portfolio report."""
     selected_symbols = sorted(str(symbol).upper() for symbol in symbols)
@@ -597,8 +645,9 @@ def build_validation_manifest(
     if not timestamps or timestamps != sorted(set(timestamps)):
         raise ValueError("common H1 timestamps must be non-empty, unique and sorted")
 
+    design = validation_design or resolve_validation_design({})
     folds = []
-    for fold, start_fraction, end_fraction in FOLDS:
+    for fold, start_fraction, end_fraction in design["folds"]:
         start_index = int(len(timestamps) * start_fraction)
         end_index = int(len(timestamps) * end_fraction)
         if end_index <= start_index:
@@ -707,9 +756,11 @@ def build_validation_manifest(
         "strategy_and_execution": {
             "direction": "long_only",
             "strategy": "H1-momentum-breakout",
-            "volume_thresholds": VOL_THRESHOLDS,
-            "breakout_atr_thresholds": BREAKOUT_ATR_THRESHOLDS,
-            "cost_multipliers": COST_MULTIPLIERS,
+            "validation_mode": design["mode"],
+            "frozen_config": design["frozen_config"],
+            "volume_thresholds": design["volume_thresholds"],
+            "breakout_atr_thresholds": design["breakout_atr_thresholds"],
+            "cost_multipliers": design["cost_multipliers"],
             "entry_offset_bps": ENTRY_OFFSET_BPS,
             "entry_penetration_bps": ENTRY_PENETRATION_BPS,
             "limit_wait_bars": WAIT_BARS,
@@ -762,11 +813,15 @@ def main():
     symbols = sorted(datasets)
     print(f"Aligned H1 portfolio: {len(symbols)} symbols, {len(timestamps)} common bars")
     print(f"Archive sources: {len(set(archives.values()))}; starting capital={STARTING_CAPITAL:.0f} USDT")
+    design = resolve_validation_design()
+    print(f"Validation mode={design['mode']}; folds={[item[0] for item in design['folds']]}; "
+          f"volume={design['volume_thresholds']}; breakoutATR={design['breakout_atr_thresholds']}; "
+          f"cost stress={design['cost_multipliers']}")
     rows = []
-    for fold, start_frac, end_frac in FOLDS:
-        for min_vol in VOL_THRESHOLDS:
-            for min_breakout in BREAKOUT_ATR_THRESHOLDS:
-                for cost_multiplier in COST_MULTIPLIERS:
+    for fold, start_frac, end_frac in design["folds"]:
+        for min_vol in design["volume_thresholds"]:
+            for min_breakout in design["breakout_atr_thresholds"]:
+                for cost_multiplier in design["cost_multipliers"]:
                     result = run_portfolio_variant(
                         datasets, symbols, timestamps, fold, start_frac, end_frac,
                         min_vol, min_breakout, cost_multiplier,
@@ -794,6 +849,7 @@ def main():
         risk_tiers_dir=risk_tiers_dir,
         result_rows=rows,
         output_csv_path=path,
+        validation_design=design,
     )
     manifest_path = write_validation_manifest(
         manifest, "h1_shared_capital_portfolio_validation_manifest.json"

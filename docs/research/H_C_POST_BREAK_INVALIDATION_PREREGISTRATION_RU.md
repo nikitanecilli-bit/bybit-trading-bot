@@ -113,6 +113,13 @@ Synthetic CI coverage: Research CI [41676357873](https://github.com/nikitanecill
 
 This is implementation correctness only. The flag remains false by default; no market PnL run has been launched and the feature must not be enabled live.
 
+
+### 8.1. TP liquidity and cost-accounting hardening (2026-11-04)
+
+The engine now records TP1 and final TP2 liquidity per execution leg. A target limit gapped through at candle open is classified taker; a non-gap intrabar touch remains a maker proxy. H-C close-based invalidation is always taker. Mark-to-market consumes the actual TP1 classification while the remaining open leg is conservatively marked with taker exit cost. The H-A trade ledger exports these fields for future audit.
+
+Synthetic coverage: Research CI [#41720355038](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41720355038) SUCCESS, 52/52; H-C semantics 10/10. No PnL replay. Maker queue, spread and adverse selection remain unmodeled; do not treat OHLC touch as confirmed maker fill.
+
 ## 9. Current blockers
 
 - Bybit-native historical market and point-in-time universe archives are not yet complete/verified in the repository.

@@ -247,3 +247,6 @@ Do not manually set `settlement_schedule_verified=true`. The collector leaves it
 
 
 The schedule gate was strengthened after implementation: H1 now requires a separately hashed schedule-evidence file and checks its identity, interval coverage, raw Bybit instrument snapshot hashes/metadata, and exact expected-vs-observed funding timestamps in the scored fold. A boolean override is not accepted. A trustworthy schedule builder and sufficient dated historical snapshots remain outstanding; no market PnL replay until those exist.
+
+
+Incremental Funding archive updates also verify the existing CSV hash and row count against the previous sidecar before downloading/appending. Any drift fails closed; a later download cannot silently bless a modified historical archive.

@@ -26,7 +26,15 @@ TIMEFRAME_MS = {"15m": 900_000, "1h": 3_600_000}
 
 
 def trade_signal_regime(trade, labels_by_candle_ts, timeframe_ms):
-    """Use the last completed signal candle, never the entry candle's future OHLC."""
+    """Attribute a trade to its exact signal candle; infer only for legacy records."""
+    signal_ts_ms = getattr(trade, "signal_ts_ms", None)
+    if signal_ts_ms is not None:
+        if isinstance(signal_ts_ms, bool) or not isinstance(signal_ts_ms, int) or signal_ts_ms <= 0:
+            return "unknown"
+        return labels_by_candle_ts.get(signal_ts_ms, "unknown")
+
+    # Older journal rows predate signal_ts_ms. This fallback is valid only for
+    # the legacy next-bar market-entry convention; delayed fills need provenance.
     entry_dt = datetime.strptime(trade.entry_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
     entry_ts = int(entry_dt.timestamp() * 1000)
     signal_candle_ts = entry_ts - timeframe_ms

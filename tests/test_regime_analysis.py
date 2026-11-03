@@ -8,10 +8,11 @@ from types import SimpleNamespace
 from scripts.run_regime_analysis import summarize_trades, trade_signal_regime
 
 
-def trade(entry_date, pnl, r=0.0, fees=1.0, slip=0.5):
+def trade(entry_date, pnl, r=0.0, fees=1.0, slip=0.5, signal_ts_ms=None):
     return SimpleNamespace(
         entry_date=entry_date, pnl_usdt=pnl, r_multiple=r,
         exchange_fees_usdt=fees, slippage_cost_usdt=slip,
+        signal_ts_ms=signal_ts_ms,
     )
 
 
@@ -20,6 +21,22 @@ def test_signal_regime_uses_previous_completed_candle():
     t = trade("2026-01-01T01:00:00Z", 10)
     labels = {1_767_225_600_000: "trend_up"}  # 2026-01-01T00:00:00Z
     assert trade_signal_regime(t, labels, 3_600_000) == "trend_up"
+
+
+def test_exact_original_signal_timestamp_overrides_entry_time_fallback():
+    # The fill is delayed: the original signal candle is at 00:00, not 03:00.
+    t = trade("2026-01-01T04:00:00Z", 10, signal_ts_ms=1_767_225_600_000)
+    labels = {
+        1_767_225_600_000: "trend_up",  # 2026-01-01T00:00:00Z
+        1_767_236_400_000: "range",     # 2026-01-01T03:00:00Z
+    }
+    assert trade_signal_regime(t, labels, 3_600_000) == "trend_up"
+
+
+def test_invalid_exact_signal_timestamp_fails_closed():
+    t = trade("2026-01-01T04:00:00Z", 10, signal_ts_ms="not-a-timestamp")
+    labels = {1_767_236_400_000: "range"}
+    assert trade_signal_regime(t, labels, 3_600_000) == "unknown"
 
 
 def test_missing_signal_candle_is_unknown():

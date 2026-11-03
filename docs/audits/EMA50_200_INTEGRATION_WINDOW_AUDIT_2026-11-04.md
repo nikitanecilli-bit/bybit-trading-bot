@@ -98,3 +98,10 @@ The paired integration is now wired into the H1 runner and manual workflow:
 - CI [#41728994842](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41728994842) completed **SUCCESS, 55/55 steps**, including paired-row matching and missing-pair rejection tests.
 
 No EMA-gated market PnL replay has been run. The opt-in comparison is infrastructure, not evidence of an edge. The default baseline path is unchanged. Since replay-critical code hashes changed, any existing H1 selector manifest must be regenerated before future validation; the provenance gate intentionally rejects stale code hashes.
+
+
+### Paired replay invariants and explicit leverage — 2026-11-04
+
+- Paired comparison now verifies both variants use the exact same timeframe, symbol list/count, common H1 bar count, fold start/end, starting capital and maximum concurrent positions. Any mismatch fails closed before a comparison delta is emitted.
+- The H1 runner explicitly sets `leverage_mode=ISOLATED_5X` and `leverage_val=5.0`; the manifest uses the same constants rather than relying on engine defaults.
+- Research CI [#41730087544](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41730087544) passed **54/54** steps. This is deterministic validation, not PnL evidence.

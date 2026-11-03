@@ -84,6 +84,63 @@ def h1_variant_modes(ema_comparison_enabled):
 
 
 
+
+def build_paired_ema_comparison(result_rows, comparison_enabled):
+    """Pair baseline and EMA-gated rows on identical fold/config/cost keys."""
+    rows = list(result_rows)
+    if not comparison_enabled:
+        if any(bool(row.get("ema50_200_gate")) for row in rows):
+            raise ValueError("baseline-only manifest contains EMA-gated result rows")
+        return {"mode": "baseline_only", "pair_count": 0, "pairs": []}
+
+    baseline = {}
+    gated = {}
+    for row in rows:
+        key = (
+            int(row["fold"]),
+            float(row["min_volume_ratio"]),
+            float(row["min_breakout_atr"]),
+            float(row["cost_multiplier"]),
+        )
+        target = gated if bool(row.get("ema50_200_gate")) else baseline
+        if key in target:
+            raise ValueError(f"duplicate EMA comparison row for key {key}")
+        target[key] = row
+    if not baseline or set(baseline) != set(gated):
+        raise ValueError("EMA comparison requires exactly paired baseline and gated rows")
+
+    pairs = []
+    for key in sorted(baseline):
+        base, candidate = baseline[key], gated[key]
+        pairs.append({
+            "fold": key[0],
+            "min_volume_ratio": key[1],
+            "min_breakout_atr": key[2],
+            "cost_multiplier": key[3],
+            "baseline_net_pnl": float(base["net_pnl"]),
+            "ema_gated_net_pnl": float(candidate["net_pnl"]),
+            "delta_net_pnl_ema_minus_baseline": round(
+                float(candidate["net_pnl"]) - float(base["net_pnl"]), 6
+            ),
+            "baseline_trades": int(base["trades"]),
+            "ema_gated_trades": int(candidate["trades"]),
+            "delta_trades_ema_minus_baseline": (
+                int(candidate["trades"]) - int(base["trades"])
+            ),
+            "baseline_costs": float(base["costs"]),
+            "ema_gated_costs": float(candidate["costs"]),
+            "delta_costs_ema_minus_baseline": round(
+                float(candidate["costs"]) - float(base["costs"]), 6
+            ),
+            "baseline_profit_factor": float(base["profit_factor"]),
+            "ema_gated_profit_factor": float(candidate["profit_factor"]),
+            "baseline_expectancy_r": float(base["expectancy_r"]),
+            "ema_gated_expectancy_r": float(candidate["expectancy_r"]),
+        })
+    return {"mode": "paired_baseline_vs_ema50_200_up", "pair_count": len(pairs), "pairs": pairs}
+
+
+
 def build_ema50_200_label_maps(base_candles, symbols, end_idx, first_scored_ts):
     """Precompute causal same-bar EMA50/200 labels with a 1,000-H1-bar burn-in."""
     labels_by_symbol = {}
@@ -1077,7 +1134,7 @@ def build_validation_manifest(
             ),
             "duration_days": "inclusive H1 fold duration from first candle open through last candle close",
         },
-        "result_rows": result_rows,
+        "paired_ema_comparison": build_paired_ema_comparison(\n            result_rows, bool(design.get("ema50_200_gate_enabled", False))\n        ),\n        "result_rows": result_rows,
     }
 
 

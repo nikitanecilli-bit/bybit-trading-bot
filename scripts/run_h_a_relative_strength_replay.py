@@ -214,6 +214,7 @@ def run_variant(
             "realized_tp1_gross_usdt": trade.realized_tp1_gross_usdt,
             "remaining_fraction_at_exit": trade.remaining_fraction_at_exit,
             "final_stop_price": trade.final_stop_price,
+            "breakout_level": trade.breakout_level,
         }
         trades.append(row)
         symbol = by_symbol[trade.token]

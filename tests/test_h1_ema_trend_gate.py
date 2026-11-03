@@ -65,6 +65,14 @@ def test_paired_ema_comparison_matches_identical_configs_and_costs():
             "min_breakout_atr": 0.1,
             "cost_multiplier": 2.0,
             "ema50_200_gate": gated,
+            "timeframe": "1h",
+            "symbol_list": "BTCUSDT;ETHUSDT;SOLUSDT;XRPUSDT;BNBUSDT",
+            "symbols": 5,
+            "common_h1_bars": 4000,
+            "test_start_ts": 1_000_000,
+            "test_end_ts": 2_000_000,
+            "shared_starting_capital": 10_000.0,
+            "max_concurrent_positions": 5,
             "net_pnl": net,
             "trades": trades,
             "costs": costs,
@@ -82,6 +90,30 @@ def test_paired_ema_comparison_matches_identical_configs_and_costs():
     assert pair["delta_net_pnl_ema_minus_baseline"] == 40.0
     assert pair["delta_trades_ema_minus_baseline"] == -15
     assert pair["delta_costs_ema_minus_baseline"] == -20.0
+
+
+
+def test_paired_ema_comparison_rejects_different_baskets_or_windows():
+    baseline = {
+        "fold": 1, "min_volume_ratio": 1.6, "min_breakout_atr": 0.1,
+        "cost_multiplier": 2.0, "ema50_200_gate": False,
+        "timeframe": "1h", "symbol_list": "BTCUSDT;ETHUSDT",
+        "symbols": 2, "common_h1_bars": 4000,
+        "test_start_ts": 1_000_000, "test_end_ts": 2_000_000,
+        "shared_starting_capital": 10_000.0, "max_concurrent_positions": 5,
+        "net_pnl": -100.0, "trades": 40, "costs": 50.0,
+        "profit_factor": 0.8, "expectancy_r": -0.05,
+    }
+    candidate = dict(baseline)
+    candidate["ema50_200_gate"] = True
+    candidate["symbol_list"] = "BTCUSDT;SOLUSDT"
+    try:
+        build_paired_ema_comparison([baseline, candidate], comparison_enabled=True)
+    except ValueError as exc:
+        assert "symbol_list" in str(exc)
+    else:
+        raise AssertionError("paired variants must use the identical selected basket")
+
 
 
 def test_paired_ema_comparison_fails_closed_for_unpaired_rows():
@@ -164,6 +196,7 @@ if __name__ == "__main__":
     tests = [
         test_ema50_200_gate_is_explicitly_opt_in_and_rejects_invalid_values,
         test_paired_ema_comparison_matches_identical_configs_and_costs,
+        test_paired_ema_comparison_rejects_different_baskets_or_windows,
         test_paired_ema_comparison_fails_closed_for_unpaired_rows,
         test_ema_gate_precomputes_full_history_and_uses_exact_scored_timestamp,
         test_ema_gate_fails_closed_without_1000_pre_roll_bars,

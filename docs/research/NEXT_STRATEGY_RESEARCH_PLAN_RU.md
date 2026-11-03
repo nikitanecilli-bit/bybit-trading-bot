@@ -152,3 +152,31 @@ H-A теперь preregistered до любых рыночных PnL прогон
 3. Параллельно завершить статический аудит причин stop-loss: сигнал → цена следующего открытия → gap/chase → stop distance → adverse/favourable excursion → exit reason → per-leg costs. MAE после стопа трактовать как execution-bounded, не как полный внутрисвечной диапазон.
 4. Только после диагностики сформулировать отдельную preregistered гипотезу с меньшим turnover. H-B mean reversion и H-C continuation quality остаются отдельными кандидатами; не смешивать их.
 5. Не использовать эти folds как holdout и не переходить к API/self-hosted runner/live до появления обоснованного кандидата.
+
+## 9. Диагностический ledger H-A получен — 2026-11-03
+
+Этот раздел supersedes в разделе 8 прежнее утверждение, что диагностический повтор не подтверждён.
+
+- Повторный frozen replay завершён: [Actions #41670116033](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41670116033), SUCCESS.
+- Artifact содержит `mae_r`, `mfe_r`, `risk_usdt`, `risk_pct`, `gross_r_multiple`, `session`, `order_type`.
+- Финансовые метрики совпали с предыдущим H-A artifact на опубликованной точности. Это диагностический повтор без изменения торговой логики, а не новый кандидат и не OOS.
+- Отдельный regression для TradeRecord diagnostic fields прошёл в [Research CI #41670688299](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41670688299), SUCCESS.
+
+### Подтверждённые наблюдения
+
+- H-A: 528 stop-loss из 1,033 сделок (51.1%); суммарный stop-loss net PnL -20,294.80 USDT; средний -38.44 USDT на сделку.
+- Stop-loss MFE: среднее 0.447R, медиана 0.31R; 37.7% сделок достигли MFE >=0.5R, 13.8% — >=1R, 3.2% — >=1.5R.
+- По folds средний stop-loss MFE устойчив: 0.463R / 0.430R / 0.448R; доля MFE >=0.5R: 38.6% / 38.3% / 36.5%.
+- Frozen baseline: 523 stop-loss из 1,022 сделок (51.2%), средний stop-loss MFE 0.449R. H-A не улучшила частоту стопов или измеряемый MFE этой когорты.
+- Time-stop cohort: 325 сделок, +5,805.54 USDT net, средний MFE 1.509R. Trailing-stop: 148 сделок, +6,821.00 USDT, средний MFE 2.779R. Take-profit: 18 сделок, +1,617.69 USDT, средний MFE 5.687R.
+- MAE stop-loss cohort ограничен модельным stop fill; MFE stop-bar также консервативен. Это execution-bounded excursions, не полная внутрисвечная траектория. Последовательность достижения MFE/MAE неизвестна.
+
+Подробности и все оговорки — в `H_A_RELATIVE_STRENGTH_BREAKOUT_PREREGISTRATION_RU.md`, раздел 11.
+
+### Следующая работа
+
+1. Не оптимизировать H-A и не вводить breakeven-at-0.5R, stop widening или глобальный direction/session filter на этих же folds.
+2. Провести read-only attribution по сигналу: body/range к ATR, close location, upper/lower wick, volume ratio, breakout distance за предыдущий Donchian и pre-break compression.
+3. Привязывать признаки только к закрытой signal candle перед фактическим next-bar entry; никаких будущих баров и будущих universe members.
+4. Сравнить распределения признаков для stop-loss, time-stop и trailing-stop когорт без PnL parameter sweep.
+5. Лишь если обнаружится устойчивое и экономически правдоподобное разделение, preregister отдельную H-C continuation-quality гипотезу. Текущие folds уже использованы и не являются holdout.

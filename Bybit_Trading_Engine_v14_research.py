@@ -1508,6 +1508,13 @@ class UnifiedQuantEngine:
         """Pre-mark all positions with Mark Price for MTM and Last Price for stop execution."""
         if not bar_candles:
             return
+        # Support deterministic __new__ fixtures and legacy state objects.
+        if not hasattr(self, "_intrabar_risk_marks"):
+            self._intrabar_risk_marks = {}
+        if not hasattr(self, "_intrabar_mtm_marks"):
+            self._intrabar_mtm_marks = {}
+        if not hasattr(self, "_intrabar_liquidation_exits"):
+            self._intrabar_liquidation_exits = {}
         timeframe_ms = {
             "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
             "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,

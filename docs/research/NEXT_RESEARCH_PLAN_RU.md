@@ -571,3 +571,14 @@ H1 validation runner дополнен отдельным JSON manifest рядо�
 
 
 **Plan B writer/reader parity завершена:** serialized candidate теперь проверяется строгим reader до atomic replace. Невалидный position/pending/risk payload не может заменить предыдущий backup; temp удаляется. CI #41689536499 SUCCESS; state persistence suite 73 tests passed. Повреждённые-backup tests отделены от writer tests и мутируют уже валидный envelope после сохранения.
+
+
+## Обновление 2026-11-03 — collector workflow dispatch доступен из main
+
+- Три Bybit collector workflow выборочно опубликованы в default branch через PR #8: merge commit `a0ceb66d9b2cf818b3a24d723130d1125c8ca382`. В main добавлены только YAML-файлы instrument snapshots, risk-limit snapshots и market-history archive; Python scripts и торговый движок не переносились.
+- Все три workflow checkout-ят `research/market-regime-v1-main`, запускают уже существующие collector scripts и коммитят только полученные snapshots/archives обратно в research branch.
+- PR #8 CI run `41691250317` — SUCCESS: compile, secret scan, gap-execution tests и time-model tests.
+- YAML-файлы остаются manual-only: `schedule/cron` отсутствует. Автоматическую периодичность не считать настроенной.
+- Наличие зарегистрированного self-hosted runner с label `self-hosted` и egress вне US/CN пока не подтверждено. Через текущую GitHub-интеграцию список runners недоступен. Это единственный непосредственный внешний gate для первого запуска collectors.
+- H1 validation workflow по-прежнему отсутствует в main; не запускать market PnL, пока не будет официального Bybit архива, датированных specs/risk snapshots и выборочно опубликованного H1 validation workflow.
+- Runbook исправлен: `docs/research/BYBIT_DATA_ARCHIVE_RUNBOOK_RU.md`.

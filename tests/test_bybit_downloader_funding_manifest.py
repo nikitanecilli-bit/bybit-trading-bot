@@ -43,7 +43,7 @@ def test_funding_download_writes_page_provenance_and_hash_manifest():
         assert run["pages"][1]["request_end_ms"] == 1999
         assert manifest["csv_data_rows"] == 2
         assert len(manifest["csv_sha256"]) == 64
-        assert manifest["settlement_schedule_verified"] is False
+        assert manifest["settlement_schedule_evidence"] is None
 
 
 def test_funding_download_preserves_prior_collection_runs():
@@ -74,6 +74,37 @@ def test_funding_download_preserves_prior_collection_runs():
         )
         assert len(manifest["runs"]) == 2
         assert manifest["csv_data_rows"] == 2
+
+
+def test_incremental_download_refuses_to_rebless_modified_existing_csv():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+
+        def first_page(session, base_url, endpoint, params):
+            return {"list": [
+                {"fundingRateTimestamp": "1000", "fundingRate": "0.001"}
+            ]}
+
+        with patch.object(downloader, "api_get", side_effect=first_page), \\
+             patch.object(downloader, "now_ms", return_value=3000):
+            csv_path = downloader.download_dataset(
+                object(), "https://api.bybit.com", "funding", "linear",
+                "BTCUSDT", None, "1h", 1000, 1000, root, delay=0,
+            )
+        csv_path.write_text(
+            "timestamp,datetime,funding_rate\\n999,1970-01-01,0.001\\n",
+            encoding="utf-8",
+        )
+        try:
+            with patch.object(downloader, "api_get", side_effect=AssertionError("API must not be called")):
+                downloader.download_dataset(
+                    object(), "https://api.bybit.com", "funding", "linear",
+                    "BTCUSDT", None, "1h", 2000, 2000, root, delay=0,
+                )
+        except ValueError as exc:
+            assert "hash differs from its manifest" in str(exc)
+        else:
+            raise AssertionError("modified CSV must not be re-attested by incremental download")
 
 
 if __name__ == "__main__":

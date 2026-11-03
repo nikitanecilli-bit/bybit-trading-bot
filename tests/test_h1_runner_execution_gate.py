@@ -27,7 +27,7 @@ def _selection_env(tmpdir):
     manifest = Path(tmpdir) / "selection.json"
     manifest.write_text(json.dumps({
         "schema_version": 1,
-        "selection_protocol": "h1-top5-train-only-v1",
+        "selection_protocol": "h1-top5-train-only-v2",
         "selection_status": "ok",
         "generated_at_utc": "2026-11-03T00:00:00Z",
         "training_window": {"cutoff_timestamp_ms": 1000},
@@ -86,7 +86,7 @@ def test_selection_manifest_must_be_valid_and_successful():
     with tempfile.TemporaryDirectory() as tmp:
         env = _selection_env(tmp)
         Path(env["H1_SELECTION_MANIFEST"]).write_text(
-            '{"schema_version":1,"selection_protocol":"h1-top5-train-only-v1","selection_status":"insufficient_candidates"}',
+            '{"schema_version":1,"selection_protocol":"h1-top5-train-only-v2","selection_status":"insufficient_candidates"}',
             encoding="utf-8",
         )
         try:

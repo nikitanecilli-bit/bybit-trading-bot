@@ -378,6 +378,7 @@ class StatePersistenceTests(unittest.TestCase):
             path = Path(tmp) / "exchange-sized-state.json"
             position = sample_position()
             position.exchange_sized = True
+            position.leverage = 5.0
             position.contract_qty = "1.0"
             position.tp1_contract_qty = "0.5"
             position.remaining_contract_qty = "0.5"

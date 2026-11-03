@@ -915,3 +915,11 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Tests cover +20% over one average month, +44% compounded over two months (=20% geometric monthly), reversed timestamps and total loss.
 - Runner commit `4e481fcadba5a7692b619c3b219da73241e8c7d3`; tests commit `381aacadcd2965757b8d3907fd8bdebb8b8b3d59`.
 - CI [#41708149842](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41708149842) and [#41708141158](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41708141158) SUCCESS, 50/50 steps each.
+
+
+## ENG-REPORT-002 — H-A monthly return evidence against 20% hurdle (2026-11-04)
+
+- Re-read the monthly equity path from the frozen H-A artifact (run 41670116033); no replay or parameter change.
+- All three fully covered calendar months inside the separate folds were negative for both variants: May baseline -17.75% / H-A -12.38%; July -11.40% / -12.04%; September -7.90% / -14.16%.
+- Partial boundary months are separately labelled and must not be stitched into one continuous equity curve because each fold resets capital to 10,000 USDT. Fold 3's partial August was +1.07% / +1.62%, not +20%.
+- Conclusion: no evidence of the required 20% net monthly return; H-A remains rejected. Funding is omitted and CryptoFetch is not Bybit-native. Source artifact: h-a-preregistered-ohlcv-results, artifact ID 13247672222, workflow run 41670116033.

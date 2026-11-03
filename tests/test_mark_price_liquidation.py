@@ -6,6 +6,7 @@ from bybit_risk_tiers import RiskTier
 from mark_price_liquidation import (
     calculate_isolated_usdt_liquidation_price,
     calculate_mark_price_maintenance_margin,
+    mark_candle_crosses_liquidation,
 )
 
 
@@ -95,6 +96,24 @@ class IsolatedLiquidationTests(unittest.TestCase):
         self.assertEqual(short.estimated_close_fee, Decimal("24.20"))
         self.assertEqual(long.maintenance_margin, Decimal("214.80"))
         self.assertEqual(short.maintenance_margin, Decimal("229.20"))
+
+    def test_mark_candle_detects_long_and_short_liquidation_crossings(self):
+        self.assertTrue(mark_candle_crosses_liquidation(
+            direction="long", liquidation_price="95000",
+            mark_low="94000", mark_high="98000",
+        ))
+        self.assertTrue(mark_candle_crosses_liquidation(
+            direction="short", liquidation_price="105000",
+            mark_low="102000", mark_high="106000",
+        ))
+        self.assertFalse(mark_candle_crosses_liquidation(
+            direction="long", liquidation_price="95000",
+            mark_low="96000", mark_high="98000",
+        ))
+        self.assertFalse(mark_candle_crosses_liquidation(
+            direction="short", liquidation_price="105000",
+            mark_low="102000", mark_high="104000",
+        ))
 
     def test_rejects_entry_over_highest_risk_limit(self):
         with self.assertRaisesRegex(ValueError, "exceeds highest"):

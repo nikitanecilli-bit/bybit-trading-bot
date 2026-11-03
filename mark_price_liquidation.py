@@ -151,7 +151,8 @@ def calculate_mark_price_maintenance_margin(
     Uses Bybit's current USDT-linear isolated MM components:
     mark notional * MMR - mmDeduction + estimated close fee. The estimated
     close fee is based on entry price and leverage. This function does not
-    aggregate other positions or active orders into the risk tier.
+    aggregate other positions or active orders into the risk tier, and does not
+    compare MM with position margin balance to decide whether liquidation fires.
     """
     side = str(direction).strip().lower()
     if side not in {"long", "short"}:
@@ -191,8 +192,10 @@ def mark_candle_crosses_liquidation(
 ) -> bool:
     """Return whether a Mark-Price candle crossed the fixed isolated LP.
 
-    This detects a trigger only. It does not infer intrabar ordering against a
-    trade-price stop, nor does it model bankruptcy-price settlement.
+    This detects only a crossing of the fixed LP. A dynamic Mark-Price tier
+    upgrade may raise MM and cause liquidation before this LP is touched; that
+    separate margin-balance condition is not evaluated here. It also does not
+    infer intrabar ordering against a trade-price stop or model settlement.
     """
     side = str(direction).strip().lower()
     if side not in {"long", "short"}:

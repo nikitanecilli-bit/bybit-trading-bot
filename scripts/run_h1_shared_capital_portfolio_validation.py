@@ -35,6 +35,12 @@ BASE_MAKER_FEE = em.MAKER_FEE
 BASE_TAKER_SLIP = em.TAKER_SLIP
 
 
+def round_limit_quote_to_bybit_tick(instrument_spec, price, direction):
+    """Round a simulated limit quote to the dated Bybit tick without crossing it."""
+    side = "buy" if str(direction).strip().lower() == "long" else "sell"
+    return float(instrument_spec.round_price(price, side=side))
+
+
 def resolve_execution_snapshot_dirs(environ=None):
     """Require archived point-in-time Bybit instrument and risk-tier snapshots."""
     env = os.environ if environ is None else environ
@@ -384,7 +390,24 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         sig = engine.pending[sym]
         meta = order_age.get(sym)
         if meta is None:
-            sig["entry_price"] = float(sig["entry_price"]) * (1.0 - ENTRY_OFFSET_BPS / 10000.0)
+            raw_limit_price = float(sig["entry_price"]) * (
+                1.0 - ENTRY_OFFSET_BPS / 10000.0
+                if str(sig.get("direction", "long")).lower() == "long"
+                else 1.0 + ENTRY_OFFSET_BPS / 10000.0
+            )
+            spec_history = getattr(engine, "instrument_spec_history", None)
+            if spec_history is None:
+                raise RuntimeError("multi-bar Bybit limit wait requires dated instrument specs")
+            spec = spec_history.get_spec(
+                sym, int(candle.ts),
+                max_age_ms=getattr(
+                    engine, "max_instrument_spec_age_ms",
+                    30 * 24 * 60 * 60 * 1000,
+                ),
+            )
+            sig["entry_price"] = round_limit_quote_to_bybit_tick(
+                spec, raw_limit_price, str(sig.get("direction", "long"))
+            )
             sig["order_type"] = "limit"
             meta = {"age": 0}
             order_age[sym] = meta

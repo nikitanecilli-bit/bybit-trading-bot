@@ -1531,7 +1531,7 @@ class UnifiedQuantEngine:
             trade_risk_mark = self._risk_mark_for_position(pos, candle) if pos is not None else candle.close
             self._intrabar_risk_marks[sym] = trade_risk_mark
             mark_candle = self._mark_candle_for_symbol(
-                sym, candle.ts, required=bool(pos is not None and self.liquidation_model_enabled)
+                sym, candle.ts, required=bool(pos is not None and getattr(self, "liquidation_model_enabled", False))
             )
             if mark_candle is None:
                 self._last_mark_prices[sym] = candle.close
@@ -1672,7 +1672,7 @@ class UnifiedQuantEngine:
         bar_close_ts = curr.ts + timeframe_ms[timeframe]
         pos_for_risk = self.open_positions.get(symbol)
         mark_candle = self._mark_candle_for_symbol(
-            symbol, curr.ts, required=bool(pos_for_risk is not None and self.liquidation_model_enabled)
+            symbol, curr.ts, required=bool(pos_for_risk is not None and getattr(self, "liquidation_model_enabled", False))
         )
         self._last_mark_prices[symbol] = float(mark_candle.close) if mark_candle is not None else curr.close
         # Last Price continues to drive stop execution; Mark Price drives MTM and liquidation.
@@ -1716,7 +1716,7 @@ class UnifiedQuantEngine:
                 new_pos = self.open_positions[symbol]
                 self._intrabar_risk_marks[symbol] = self._risk_mark_for_position(new_pos, curr)
                 mark_candle = self._mark_candle_for_symbol(
-                    symbol, curr.ts, required=self.liquidation_model_enabled
+                    symbol, curr.ts, required=getattr(self, "liquidation_model_enabled", False)
                 )
                 if mark_candle is None:
                     self._intrabar_mtm_marks[symbol] = self._intrabar_risk_marks[symbol]

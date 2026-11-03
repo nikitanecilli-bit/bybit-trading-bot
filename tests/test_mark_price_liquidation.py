@@ -196,17 +196,17 @@ class IsolatedLiquidationTests(unittest.TestCase):
                 tiers=[tier(1, "500000", "0.005", "100")],
             )
 
-    def test_rejects_leverage_above_entry_or_dynamic_mark_tier_limit(self):
+    def test_rejects_entry_leverage_but_still_calculates_mm_after_mark_tier_change(self):
         with self.assertRaisesRegex(ValueError, "entry tier maxLeverage"):
             calculate_isolated_usdt_liquidation_price(
                 symbol="BTCUSDT", direction="long", entry_price="120000",
                 quantity="1", leverage="60", tiers=self.tiers,
             )
-        with self.assertRaisesRegex(ValueError, "Mark-Price tier maxLeverage"):
-            calculate_mark_price_maintenance_margin(
-                symbol="BTCUSDT", direction="short", entry_price="95000",
-                mark_price="105000", quantity="1", leverage="60", tiers=self.tiers,
-            )
+        mark_mm = calculate_mark_price_maintenance_margin(
+            symbol="BTCUSDT", direction="short", entry_price="95000",
+            mark_price="105000", quantity="1", leverage="60", tiers=self.tiers,
+        )
+        self.assertEqual(mark_mm.tier_id, 2)
 
     def test_rejects_invalid_inputs_duplicate_tiers_and_wrong_symbol(self):
         one_tier = [tier(1, "1000000", "0.005", "100")]

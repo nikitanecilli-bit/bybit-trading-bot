@@ -125,7 +125,7 @@ class MarkPriceEngineIntegrationTests(unittest.TestCase):
 
     def test_liquidation_margin_uses_only_remaining_share_of_pre_tp1_funding(self):
         engine = make_engine()
-        pos = make_position()
+        pos = make_position(direction="long", stop=98_000.0)
         ts = pos.entry_ts
         close_ts = ts + 3_600_000
         pos.tp1_hit = True

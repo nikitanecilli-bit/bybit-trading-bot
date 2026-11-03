@@ -980,9 +980,11 @@ class StatePersistenceTests(unittest.TestCase):
                 }
             }
             risk = engine.AdaptiveRiskManager(cfg)
-            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
-                cfg, risk, {}, pending, 42, last_mark_prices={},
-            )
+            persistence = engine.PlanBStatePersistence(str(path), enabled=True)
+            persistence.save_state(cfg, risk, {}, {}, 42, last_mark_prices={})
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["pending_orders"] = pending
+            path.write_text(json.dumps(payload), encoding="utf-8")
             with self.assertRaises(RuntimeError):
                 engine.PlanBStatePersistence(str(path)).load_state(
                     engine.AdaptiveRiskManager(cfg)
@@ -1021,9 +1023,11 @@ class StatePersistenceTests(unittest.TestCase):
                 }
             }
             risk = engine.AdaptiveRiskManager(cfg)
-            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
-                cfg, risk, {}, pending, 42, last_mark_prices={},
-            )
+            persistence = engine.PlanBStatePersistence(str(path), enabled=True)
+            persistence.save_state(cfg, risk, {}, {}, 42, last_mark_prices={})
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["pending_orders"] = pending
+            path.write_text(json.dumps(payload), encoding="utf-8")
             with self.assertRaises(RuntimeError):
                 engine.PlanBStatePersistence(str(path)).load_state(
                     engine.AdaptiveRiskManager(cfg)

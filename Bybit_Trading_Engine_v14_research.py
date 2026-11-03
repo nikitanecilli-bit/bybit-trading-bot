@@ -90,10 +90,10 @@ def _as_bool(v: Any, default: bool = False) -> bool:
 # 1. КОНФИГУРАЦИЯ И МОСТ С ДАШБОРДОМ
 # =====================================================================
 
-@dataclass
 POST_BREAK_INVALIDATION_BARS = 3  # frozen H-C horizon; not a tunable config parameter
 
 
+@dataclass
 class BotConfig:
     bot_version: str = "v6.1"
     maintenance_gate_status: str = "ACTIVE_MONITORING"

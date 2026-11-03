@@ -1317,6 +1317,9 @@ class UnifiedQuantEngine:
         self._last_mark_prices: Dict[str, float] = {}
         self._intrabar_risk_marks: Dict[str, float] = {}
         self._intrabar_risk_marks_ts: Optional[int] = None
+        self._intrabar_mtm_marks: Dict[str, float] = {}
+        self._intrabar_mtm_marks_ts: Optional[int] = None
+        self._intrabar_liquidation_exits: Dict[str, float] = {}
         self._bar_entry_risk_budgets: Dict[str, float] = {}
         self._bar_entry_equity: Optional[float] = None
         self._state_restored = False
@@ -1418,6 +1421,9 @@ class UnifiedQuantEngine:
         self._last_mark_prices.clear()
         self._intrabar_risk_marks.clear()
         self._intrabar_risk_marks_ts = None
+        self._intrabar_mtm_marks.clear()
+        self._intrabar_mtm_marks_ts = None
+        self._intrabar_liquidation_exits.clear()
         self._bar_entry_risk_budgets.clear()
         self._bar_entry_equity = None
         self._state_restored = False
@@ -1430,6 +1436,55 @@ class UnifiedQuantEngine:
         if stop_crossed:
             return min(pos.stop_price, candle.open) if is_long else max(pos.stop_price, candle.open)
         return candle.low if is_long else candle.high
+
+    def _mark_candle_for_symbol(self, symbol: str, candle_ts: int, *, required: bool = False):
+        mark = getattr(self, "_mark_price_candles", {}).get(symbol, {}).get(int(candle_ts))
+        if mark is None and required:
+            raise RuntimeError(
+                f"{symbol}: missing exact-timestamp Mark OHLC candle at {candle_ts}; "
+                "refusing liquidation-aware replay"
+            )
+        return mark
+
+    def _liquidation_exit_price(self, pos: OpenPositionState, trade_candle: Candle,
+                                as_of_ts: int) -> Optional[float]:
+        """Conservative full-takeover estimate; ignores Bybit's partial-liquidation ladder."""
+        if not getattr(self, "liquidation_model_enabled", False):
+            return None
+        mark_candle = self._mark_candle_for_symbol(pos.symbol, trade_candle.ts, required=True)
+        tiers = self.risk_tier_history.get_tiers(
+            pos.symbol, as_of_ts,
+            max_age_ms=getattr(self, "max_risk_tier_age_ms", 30 * 24 * 60 * 60 * 1000),
+        )
+        quantity = (
+            Decimal(str(pos.remaining_contract_qty)) if pos.exchange_sized
+            else Decimal(str(pos.size_usdt)) / Decimal(str(pos.entry_price))
+                 * Decimal(str(pos.remaining_fraction))
+        )
+        funding_cost = Decimal("0")
+        if getattr(self, "funding_dir", None):
+            if pos.symbol not in self.funding_by_symbol:
+                raise RuntimeError(f"Funding enabled but no CSV for liquidation position {pos.symbol}")
+            funding_cost = accrued_funding_cost_for_remaining_margin(
+                pos, self.funding_by_symbol[pos.symbol],
+                self._funding_mark_prices.get(pos.symbol, {}), as_of_ts,
+                defer_boundary_receipts=True,
+            )
+        adverse_mark = mark_candle.low if pos.direction == "long" else mark_candle.high
+        health = evaluate_isolated_margin_health(
+            symbol=pos.symbol, direction=pos.direction,
+            entry_price=pos.entry_price, mark_price=adverse_mark,
+            quantity=quantity, leverage=self.cfg.leverage_val, tiers=tiers,
+            taker_fee_rate=TAKER_FEE, funding_net_cost=funding_cost,
+        )
+        if not health.liquidation_triggered:
+            return None
+        bankruptcy = calculate_isolated_usdt_bankruptcy_price(
+            direction=pos.direction, entry_price=pos.entry_price,
+            leverage=self.cfg.leverage_val, quantity=quantity,
+            funding_net_cost=funding_cost,
+        )
+        return float(bankruptcy)
 
     def _prepare_portfolio_intrabar_marks(self, bar_candles: Dict[str, Candle]) -> None:
         """Pre-mark all currently open symbols before evaluating portfolio risk for this bar."""

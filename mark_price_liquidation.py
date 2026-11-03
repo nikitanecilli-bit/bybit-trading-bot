@@ -184,3 +184,22 @@ def calculate_mark_price_maintenance_margin(
         maintenance_margin_rate=tier.maintenance_margin_rate,
         mm_deduction=tier.mm_deduction,
     )
+
+
+def mark_candle_crosses_liquidation(
+    *, direction: str, liquidation_price, mark_low, mark_high
+) -> bool:
+    """Return whether a Mark-Price candle crossed the fixed isolated LP.
+
+    This detects a trigger only. It does not infer intrabar ordering against a
+    trade-price stop, nor does it model bankruptcy-price settlement.
+    """
+    side = str(direction).strip().lower()
+    if side not in {"long", "short"}:
+        raise ValueError("direction must be 'long' or 'short'")
+    lp = _d(liquidation_price, "liquidation_price")
+    low = _d(mark_low, "mark_low")
+    high = _d(mark_high, "mark_high")
+    if min(lp, low, high) <= 0 or high < low:
+        raise ValueError("liquidation price and Mark-Price OHLC bounds must be positive and ordered")
+    return low <= lp if side == "long" else high >= lp

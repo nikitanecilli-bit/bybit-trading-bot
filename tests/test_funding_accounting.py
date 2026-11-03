@@ -39,10 +39,34 @@ class AccruedFundingTests(unittest.TestCase):
         self.assertEqual(accrued_funding_cost(position(), EVENTS, MARKS, SETTLE_1 - 1),
                          Decimal("0.00"))
 
-    def test_entry_timestamp_is_excluded_and_as_of_timestamp_included(self):
-        events = [{"ts": ENTRY, "rate": "0.1"}, {"ts": SETTLE_1, "rate": "0.01"}]
-        self.assertEqual(accrued_funding_cost(position(), events, MARKS, SETTLE_1),
-                         Decimal("10.00"))
+    def test_entry_timestamp_payment_is_charged_but_receipt_is_not(self):
+        marks = {**MARKS, ENTRY: "100"}
+        payment_and_later = [
+            {"ts": ENTRY, "rate": "0.01"},
+            {"ts": SETTLE_1, "rate": "0.01"},
+        ]
+        self.assertEqual(
+            accrued_funding_cost(position(), payment_and_later, marks, SETTLE_1),
+            Decimal("20.00"),
+        )
+        self.assertEqual(
+            accrued_funding_cost(
+                position(), [{"ts": ENTRY, "rate": "-0.01"}], marks, ENTRY
+            ),
+            Decimal("0.00"),
+        )
+        self.assertEqual(
+            accrued_funding_cost_for_remaining_margin(
+                position(), payment_and_later, marks, SETTLE_1
+            ),
+            Decimal("20.00"),
+        )
+        self.assertEqual(
+            accrued_funding_cost_for_remaining_margin(
+                position(), [{"ts": ENTRY, "rate": "-0.01"}], marks, ENTRY
+            ),
+            Decimal("0.00"),
+        )
 
     def test_partial_tp1_applies_only_after_tp1_close_boundary(self):
         pos = position(tp1=True, tp1_ts=SETTLE_1, remaining="0.5")

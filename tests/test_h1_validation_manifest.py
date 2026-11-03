@@ -95,6 +95,11 @@ class H1ValidationManifestTests(unittest.TestCase):
             self.assertEqual(manifest["common_h1_grid"]["bar_count"], 100)
             self.assertEqual(manifest["folds"][0]["start_timestamp_ms"], timestamps[50])
             self.assertEqual(manifest["folds"][0]["end_timestamp_ms"], timestamps[64])
+            strategy = manifest["strategy_and_execution"]
+            self.assertEqual(strategy["leverage_val"], 5.0)
+            self.assertEqual(strategy["donchian_period"], 20)
+            self.assertEqual(strategy["stop_atr_mult"], 2.5)
+            self.assertEqual(strategy["max_hold_bars"], 32)
             self.assertEqual(
                 manifest["outputs"]["portfolio_results_csv"]["sha256"],
                 hashlib.sha256(output_csv.read_bytes()).hexdigest(),

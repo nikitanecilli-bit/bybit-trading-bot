@@ -1487,7 +1487,7 @@ class UnifiedQuantEngine:
         return float(bankruptcy)
 
     def _prepare_portfolio_intrabar_marks(self, bar_candles: Dict[str, Candle]) -> None:
-        """Pre-mark all currently open symbols before evaluating portfolio risk for this bar."""
+        """Pre-mark all positions with Mark Price for MTM and Last Price for stop execution."""
         if not bar_candles:
             return
         timeframe_ms = {
@@ -1498,24 +1498,53 @@ class UnifiedQuantEngine:
         }
         timeframe = str(self.cfg.timeframe).strip().lower()
         if timeframe not in timeframe_ms:
-            raise ValueError(f"Неподдерживаемый timeframe для intrabar marks: {self.cfg.timeframe!r}")
+            raise ValueError(f"Unsupported timeframe for intrabar marks: {self.cfg.timeframe!r}")
         first_candle = next(iter(bar_candles.values()))
         bar_close_ts = first_candle.ts + timeframe_ms[timeframe]
         if any(c.ts != first_candle.ts for c in bar_candles.values()):
-            raise ValueError("Нельзя агрегировать portfolio risk marks: свечи не синхронизированы")
+            raise ValueError("Cannot aggregate portfolio marks: trade candles are not synchronized")
         self._intrabar_risk_marks.clear()
+        self._intrabar_mtm_marks.clear()
+        self._intrabar_liquidation_exits.clear()
         self._intrabar_risk_marks_ts = bar_close_ts
+        self._intrabar_mtm_marks_ts = bar_close_ts
         for sym, candle in bar_candles.items():
-            self._last_mark_prices[sym] = candle.close
             pos = self.open_positions.get(sym)
-            if pos is not None:
-                self._intrabar_risk_marks[sym] = self._risk_mark_for_position(pos, candle)
+            trade_risk_mark = self._risk_mark_for_position(pos, candle) if pos is not None else candle.close
+            self._intrabar_risk_marks[sym] = trade_risk_mark
+            mark_candle = self._mark_candle_for_symbol(
+                sym, candle.ts, required=bool(pos is not None and self.liquidation_model_enabled)
+            )
+            if mark_candle is None:
+                self._last_mark_prices[sym] = candle.close
+                self._intrabar_mtm_marks[sym] = trade_risk_mark
+                continue
+            self._last_mark_prices[sym] = float(mark_candle.close)
+            if pos is None:
+                self._intrabar_mtm_marks[sym] = float(mark_candle.close)
+                continue
+            liquidation_exit = self._liquidation_exit_price(pos, candle, bar_close_ts)
+            if liquidation_exit is not None:
+                self._intrabar_liquidation_exits[sym] = liquidation_exit
+                self._intrabar_mtm_marks[sym] = liquidation_exit
+            else:
+                stop_crossed = (
+                    candle.low <= pos.stop_price if pos.direction == "long"
+                    else candle.high >= pos.stop_price
+                )
+                if stop_crossed:
+                    # Once a Last Price stop is touched, later Mark wicks in the
+                    # same OHLC candle cannot be charged to a position already exited.
+                    self._intrabar_mtm_marks[sym] = trade_risk_mark
+                else:
+                    adverse_mark = mark_candle.low if pos.direction == "long" else mark_candle.high
+                    self._intrabar_mtm_marks[sym] = float(adverse_mark)
 
     def _unrealized_pnl_at_marks(self, as_of_ts: Optional[int] = None) -> float:
         """Conservative unrealized PnL, including cumulative funding through as_of_ts."""
         total = 0.0
         for sym, pos in self.open_positions.items():
-            mark = self._intrabar_risk_marks.get(sym, self._last_mark_prices.get(sym, pos.entry_price))
+            mark = self._intrabar_mtm_marks.get(sym, self._last_mark_prices.get(sym, pos.entry_price))
             sign = 1.0 if pos.direction == "long" else -1.0
             position_qty = (Decimal(str(pos.contract_qty)) if pos.exchange_sized
                             else Decimal(str(pos.size_usdt)) / Decimal(str(pos.entry_price)))

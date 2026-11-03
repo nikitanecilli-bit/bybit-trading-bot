@@ -397,6 +397,7 @@ class OpenPositionState:
     risk_usdt: float
     order_type: str
     maker_exits: Optional[bool] = None
+    breakout_level: Optional[float] = None  # signal-time Donchian boundary
     tp1_hit: bool = False
     tp1_ts_ms: Optional[int] = None  # conservative TP1 candle-close boundary
     realized_tp1_gross_usdt: float = 0.0
@@ -477,6 +478,7 @@ class TradeRecord:
     realized_tp1_gross_usdt: float = 0.0
     remaining_fraction_at_exit: float = 1.0
     final_stop_price: Optional[float] = None
+    breakout_level: Optional[float] = None
 
 
 # =====================================================================
@@ -575,6 +577,7 @@ class QuantStrategyCore:
             "signal_ts": curr.ts, "entry_price": curr.close,
             "stop_price": stop_price, "tp1_price": tp1_price, "tp2_price": tp2_price,
             "stop_dist": stop_dist, "atr": atr, "vol_ratio": round(vol_ratio, 2),
+            "breakout_level": hi_ch if direction == "long" else lo_ch,
             "session": session,
             "order_type": "limit" if cfg.maker_entry_and_tp1 else "market",
         }
@@ -913,6 +916,10 @@ class PlanBStatePersistence:
                     raise ValueError(f"позиция {sym}: direction должен быть long/short")
                 if pos_dict["order_type"] not in {"market", "limit"}:
                     raise ValueError(f"позиция {sym}: order_type должен быть market/limit")
+                if pos_dict.get("breakout_level") is not None:
+                    value = pos_dict["breakout_level"]
+                    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                        raise ValueError(f"позиция {sym}: breakout_level должен быть конечным числом > 0 или None")
                 entry_ts = pos_dict["entry_ts"]
                 if isinstance(entry_ts, bool) or not isinstance(entry_ts, int) or entry_ts <= 0:
                     raise ValueError(f"позиция {sym}: entry_ts должен быть положительным целым числом")
@@ -1052,7 +1059,7 @@ class PlanBStatePersistence:
             allowed_pending = {
                 "symbol", "direction", "strategy", "signal_ts", "entry_price",
                 "stop_price", "tp1_price", "tp2_price", "stop_dist", "atr",
-                "vol_ratio", "session", "order_type",
+                "vol_ratio", "session", "order_type", "breakout_level",
             }
             for sym, signal in pending.items():
                 if not isinstance(sym, str) or not sym or not isinstance(signal, dict):
@@ -1063,6 +1070,10 @@ class PlanBStatePersistence:
                 missing = required_pending.difference(signal)
                 if missing:
                     raise ValueError(f"pending signal {sym}: отсутствуют поля {sorted(missing)}")
+                if signal.get("breakout_level") is not None:
+                    value = signal["breakout_level"]
+                    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                        raise ValueError(f"pending signal {sym}: breakout_level должен быть конечным числом > 0 или None")
                 signal_ts = signal["signal_ts"]
                 if isinstance(signal_ts, bool) or not isinstance(signal_ts, int) or signal_ts <= 0:
                     raise ValueError(f"pending signal {sym}: signal_ts должен быть положительным целым числом")
@@ -1965,6 +1976,7 @@ class UnifiedQuantEngine:
             stop_price=stop_price, tp1_price=tp1, tp2_price=tp2,
             initial_stop_dist=sig["stop_dist"], size_usdt=size_usdt, risk_usdt=risk_usdt,
             order_type=effective_order_type,
+            breakout_level=sig.get("breakout_level"),
             maker_exits=(self.cfg.maker_entry_and_tp1 if self.cfg.maker_tp1_and_target is None else self.cfg.maker_tp1_and_target),
             max_favorable_px=fill, max_adverse_px=fill,
             equity_at_entry=sizing_equity,
@@ -2240,6 +2252,7 @@ class UnifiedQuantEngine:
             realized_tp1_gross_usdt=round(pos.realized_tp1_gross_usdt, 8),
             remaining_fraction_at_exit=round(pos.remaining_fraction, 8),
             final_stop_price=round(pos.stop_price, 8),
+            breakout_level=round(pos.breakout_level, 8) if pos.breakout_level is not None else None,
         )
         self.closed_trades.append(record)
         del self.open_positions[pos.symbol]

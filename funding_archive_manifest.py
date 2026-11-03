@@ -183,7 +183,7 @@ def validate_funding_manifest(
                         errors.append("schedule_source_snapshots_missing")
                     else:
                         snapshot_times = []
-                    snapshot_intervals = []
+                        snapshot_intervals = []
                         for snapshot in source_snapshots:
                             if not isinstance(snapshot, dict):
                                 errors.append("invalid_schedule_source_snapshot")

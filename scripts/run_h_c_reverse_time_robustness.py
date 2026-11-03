@@ -67,6 +67,25 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def frozen_strategy_config(enable_h_c: bool) -> dict:
+    """Return the exact shared config for baseline or H-C, with valid Python values."""
+    return {
+        "timeframe": "1h",
+        "donchian_period": 20,
+        "atr_period": 14,
+        "min_volume_ratio": 1.6,
+        "stop_atr_mult": 2.5,
+        "tp1_r_multiple": 2.0,
+        "tp2_r_multiple": 5.0,
+        "atr_trail_mult": 3.0,
+        "max_hold_bars": 32,
+        "maker_entry_and_tp1": False,
+        "maker_tp1_and_target": False,
+        "enable_post_break_invalidation": bool(enable_h_c),
+        "post_break_invalidation_bars": em.POST_BREAK_INVALIDATION_BARS,
+    }
+
+
 def run_reverse_time(data, start_ts: int, end_ts: int):
     original_costs = (em.TAKER_FEE, em.MAKER_FEE, em.TAKER_SLIP)
     em.TAKER_FEE *= COST_MULTIPLIER
@@ -163,20 +182,8 @@ def main() -> int:
         "daily_stop_loss_pct": 5.0,
         "emergency_kill_switch_pct": 30.0,
         "max_chase_limit_pct": 1.5,
-        "strategy_config": {
-            "timeframe": "1h",
-            "donchian_period": 20,
-            "atr_period": 14,
-            "min_volume_ratio": 1.6,
-            "stop_atr_mult": 2.5,
-            "tp1_r_multiple": 2.0,
-            "tp2_r_multiple": 5.0,
-            "atr_trail_mult": 3.0,
-            "max_hold_bars": 32,
-            "maker_entry_and_tp1": false,
-            "maker_tp1_and_target": false,
-            "enable_post_break_invalidation_bars": 3,
-        },
+        "baseline_strategy_config": frozen_strategy_config(False),
+        "strategy_config": frozen_strategy_config(True),
         "entry_and_exit_model": "market; no maker credit",
         "cost_multiplier": COST_MULTIPLIER,
         "funding_note": "funding is omitted, not assumed economically zero",

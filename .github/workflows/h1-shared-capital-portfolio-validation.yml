@@ -46,6 +46,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: research/market-regime-v1-main
+      - name: Record checked-out research commit
+        run: echo "H1_RESEARCH_CHECKOUT_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

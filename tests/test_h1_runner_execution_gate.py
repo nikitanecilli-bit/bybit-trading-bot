@@ -11,6 +11,7 @@ from run_h1_shared_capital_portfolio_validation import (
     resolve_execution_snapshot_dirs, validate_snapshot_history_coverage,
     resolve_funding_dirs, validate_funding_mark_coverage,
     resolve_bybit_kline_dir, load_bybit_h1_datasets,
+    round_limit_quote_to_bybit_tick,
 )
 
 
@@ -222,6 +223,35 @@ def test_load_bybit_h1_datasets_rejects_gaps_and_loads_exchange_candles():
             raise AssertionError("gapped/duplicate Bybit H1 series must fail")
 
 
+
+def test_delayed_limit_quotes_are_tick_aligned_without_crossing():
+    from bybit_instrument_specs import InstrumentSpec
+
+    snapshot = {
+        "instrument": {
+            "symbol": "TESTUSDT", "category": "linear", "status": "Trading",
+            "priceFilter": {
+                "minPrice": "0.05", "maxPrice": "1000000", "tickSize": "0.05"
+            },
+            "lotSizeFilter": {
+                "qtyStep": "0.001", "minOrderQty": "0.01",
+                "maxOrderQty": "1000", "maxMktOrderQty": "800",
+                "minNotionalValue": "5",
+            },
+            "leverageFilter": {
+                "minLeverage": "1", "maxLeverage": "50", "leverageStep": "0.01"
+            },
+        }
+    }
+    spec = InstrumentSpec.from_snapshot(snapshot)
+    long_quote = round_limit_quote_to_bybit_tick(spec, 100.079, "long")
+    short_quote = round_limit_quote_to_bybit_tick(spec, 100.051, "short")
+    assert long_quote == 100.05
+    assert short_quote == 100.10
+    assert long_quote <= 100.079
+    assert short_quote >= 100.051
+
+
 if __name__ == "__main__":
     for test in (
         test_missing_snapshot_directories_reject_legacy_replay,
@@ -235,6 +265,7 @@ if __name__ == "__main__":
         test_funding_mark_coverage_rejects_no_settlement_in_fold,
         test_bybit_kline_dir_is_mandatory,
         test_load_bybit_h1_datasets_rejects_gaps_and_loads_exchange_candles,
+        test_delayed_limit_quotes_are_tick_aligned_without_crossing,
     ):
         test()
         print(f"PASS {test.__name__}")

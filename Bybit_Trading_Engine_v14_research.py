@@ -1561,8 +1561,11 @@ class UnifiedQuantEngine:
     def _unrealized_pnl_at_marks(self, as_of_ts: Optional[int] = None) -> float:
         """Conservative unrealized PnL, including cumulative funding through as_of_ts."""
         total = 0.0
+        # __new__-based deterministic fixtures and legacy restored objects may
+        # predate the intrabar Mark-to-Market cache; fall back to last Mark/entry.
+        intrabar_mtm_marks = getattr(self, "_intrabar_mtm_marks", {})
         for sym, pos in self.open_positions.items():
-            mark = self._intrabar_mtm_marks.get(sym, self._last_mark_prices.get(sym, pos.entry_price))
+            mark = intrabar_mtm_marks.get(sym, self._last_mark_prices.get(sym, pos.entry_price))
             sign = 1.0 if pos.direction == "long" else -1.0
             position_qty = (Decimal(str(pos.contract_qty)) if pos.exchange_sized
                             else Decimal(str(pos.size_usdt)) / Decimal(str(pos.entry_price)))

@@ -13,7 +13,8 @@ from test_gap_execution import make_engine, make_position
 H1_MS = 3_600_000
 
 
-def _history(current, start=1_800_000_000_000):
+def _history(current):
+    start = current.ts - 20 * H1_MS
     rows = [
         engine.Candle(start + i * H1_MS, 100.0, 101.0, 99.0, 100.0, 10.0)
         for i in range(20)

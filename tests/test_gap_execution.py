@@ -727,7 +727,7 @@ def test_portfolio_kill_switch_flattens_all_positions_and_blocks_pending_entries
     assert e.risk_mgr.kill_switch_triggered is True
 
     closed = []
-    def capture_close(pos, price, reason, exit_ts, mae_r, mfe_r):
+    def capture_close(pos, price, reason, exit_ts, mae_r, mfe_r, final_exit_maker=None):
         closed.append((pos.symbol, price, reason, exit_ts))
         e.open_positions.pop(pos.symbol)
 

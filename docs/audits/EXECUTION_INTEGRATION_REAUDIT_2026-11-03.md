@@ -153,3 +153,10 @@ This supersedes the earlier simplified note in the fee section that any configur
 
 
 **Scope clarification for the current H1 portfolio runner:** scripts/run_h1_shared_capital_portfolio_validation.py explicitly sets maker_entry_and_tp1=True and maker_tp1_and_target=False (both in the engine setup and frozen-config manifest). Thus H1 uses maker entry with taker TP1/TP2 exits; the gap-aware maker-target correction does not alter that H1 execution configuration or its baseline. It protects other engine configurations and any future maker-target ablation from undercharging marketable TP gaps.
+
+
+### Current H1 maker-entry fill proxy — scope and limitation
+
+The current Bybit-native H1 shared-capital runner sets a 20 bps limit-entry offset, requires a further 5 bps candle penetration, and waits up to 3 H1 bars before expiring the pending order. A non-marketable intrabar touch is treated as a maker fill by the base engine; a limit that is marketable at the candle open is reclassified as taker. The simulated fill price remains the limit quote, with no queue position or price improvement.
+
+This is an explicit OHLC execution proxy, not a demonstrated exchange fill rate. The separate scripts/run_h1_limit_fill_stress.py workflow uses CryptoFetch/Binance OHLCV, independent $10k per-symbol capital and aggregate (not shared-capital) summaries. It is not evidence for the current Bybit-native H1 portfolio execution model. A Bybit-native shared-capital limit-fill sensitivity remains an open validation task after Funding archive completeness is closed.

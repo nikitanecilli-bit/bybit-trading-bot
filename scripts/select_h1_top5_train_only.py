@@ -324,7 +324,7 @@ def select_train_only(
     kline_files = _directory_file_manifest(kline_dir, {".csv"})
     input_files = {
         "kline": kline_files,
-        "funding": _directory_file_manifest(funding_dir, {".csv"}),
+        "funding": _directory_file_manifest(funding_dir, {".csv", ".json"}),
         "mark_price": _directory_file_manifest(mark_price_dir, {".csv"}),
         "instrument_specs": _directory_file_manifest(instrument_specs_dir, {".json"}),
         "risk_tiers": _directory_file_manifest(risk_tiers_dir, {".json"}),

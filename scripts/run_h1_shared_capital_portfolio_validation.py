@@ -49,7 +49,7 @@ H1_REPLAY_CODE_PATHS = [
     "market_structure.py",
     "scripts/validate_funding_coverage.py",
 ]
-SELECTION_INPUT_KEYS = ("kline", "funding", "mark_price", "instrument_specs", "risk_tiers")
+SELECTION_INPUT_KEYS = ("kline", "funding", "mark_price", "instrument_specs", "risk_tiers", "universe_snapshot")
 
 
 def validate_selection_provenance(selection, current_input_files, current_code_files):

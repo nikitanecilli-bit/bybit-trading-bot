@@ -52,6 +52,8 @@
 - [E11 — shared-capital портфель, 47 инструментов](reports/E11_H1_SHARED_CAPITAL_PORTFOLIO_RU.md): единый капитал и конкуренция за позиции.
 - [E12 — broad-market context diagnostics](reports/E12_BROAD_MARKET_CONTEXT_DIAGNOSTICS_RU.md): breadth, momentum, ATR и cross-sectional dispersion.
 - [E13 — causal compression gate](reports/E13_CAUSAL_COMPRESSION_GATE_RU.md): один фиксированный фильтр на shared capital.
+- [H-A — relative-strength breakout](research/H_A_RELATIVE_STRENGTH_BREAKOUT_PREREGISTRATION_RU.md): rejected hypothesis; includes final stop-loss, signal-candle and post-break attribution.
+- [H-C — post-break invalidation](research/H_C_POST_BREAK_INVALIDATION_PREREGISTRATION_RU.md): preregistered design only; not implemented or run.
 
 - [Point-in-time universe и архив данных](audits/POINT_IN_TIME_UNIVERSE_AND_ARCHIVE_AUDIT_2026-11-03.md) — покрытие CryptoFetch, ограничения survivorship/selection bias и отсутствие фактических Bybit snapshots.
 

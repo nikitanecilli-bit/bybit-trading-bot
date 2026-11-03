@@ -52,11 +52,11 @@ class AccruedFundingTests(unittest.TestCase):
         self.assertEqual(accrued_funding_cost(before_tp1, EVENTS, MARKS, SETTLE_2),
                          Decimal("22.00"))
 
-    def test_margin_funding_allocates_pre_tp1_cost_to_remaining_quantity(self):
+    def test_margin_funding_preserves_pre_tp1_full_exposure_and_scales_later_events(self):
         pos = position(tp1=True, tp1_ts=SETTLE_1, remaining="0.5")
         self.assertEqual(
             accrued_funding_cost_for_remaining_margin(pos, EVENTS, MARKS, SETTLE_2),
-            Decimal("11.00"),
+            Decimal("16.00"),
         )
 
     def test_margin_funding_without_tp1_matches_actual_cashflow(self):

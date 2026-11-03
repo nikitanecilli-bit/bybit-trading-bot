@@ -757,3 +757,35 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 **Проверка:** Research CI [#41689536499 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41689536499); state persistence suite **73 tests passed**, полный Research workflow завершился успешно.
 
 **Эффект:** не меняет торговые сигналы или PnL; усиливает recovery-point integrity и предотвращает атомарную замену валидного backup на payload, который не пройдёт restore.
+
+
+## 2026-11-04 — сверка статусов исторических audit findings с текущей веткой
+
+Этот блок supersedes устаревшие статусы в первоначальном срезе разделов 1, 7 и 9 выше. Исторические наблюдения сохранены, но не должны повторно считаться открытыми дефектами без новой регрессии.
+
+### 1. Candle timeframe validation — CLOSED
+- Первоначальный дефект «CSV interval не сравнивается с cfg.timeframe» исправлен в текущем engine: `validate_candle_timeframe()` проверяет каждую соседнюю дельту и вызывается до replay.
+- Отдельный CI step `Test configured candle timeframe validation` прошёл в Research CI [#41738201800](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41738201800).
+- Старый P1 в разделе 1 и приоритетном списке раздела 10 — исторический, не текущий.
+
+### 7. Symbol-order invariance — CLOSED для проверенных replay paths
+- Full dense replay и sparse replay имеют permutation regressions; sparse/dense equivalence и portfolio kill-switch order invariance также проверены.
+- Portfolio accounting suite прошёл **49/49** в CI [#41737866200](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41737866200); sparse replay tests прошли в том же workflow.
+- Остался documented conservative design caveat: если top-ranked pending limit не исполняется, слот/бюджет не перераспределяется на следующий сигнал в том же баре. Это не symbol-order defect и не менялось без отдельного обоснования.
+
+### 8. Сквозная бухгалтерия — локальная модель покрыта лучше, биржевая точность не доказана
+- Добавлена end-to-end synthetic regression TP1 → Funding до/на/после TP1 boundary → trailing stop → net PnL/equity reconciliation; 49/49 portfolio accounting tests passed в CI #41737866200.
+- Это закрывает конкретный пробел совместного lifecycle тестирования. Оно не доказывает exact exchange settlement Mark, реальные fills, Bybit account-wide margin или полноту Funding history.
+
+### 9. Research CI — историческое смешение PnL/research runs больше не соответствует текущему workflow
+- Текущий `.github/workflows/research-checks.yml` запускает compile, deterministic tests, CryptoFetch archive integrity audit и H-A archive-manifest preparation с явной пометкой `no PnL`.
+- Он не запускает `run_uploaded_dataset_backtests.py`, regime holdout PnL или H1 shared-capital market replay. H1 runner только компилируется/тестируется; сам рыночный replay требует отдельного dispatch workflow и валидных данных.
+- Latest Research CI [#41738201800](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41738201800) завершился SUCCESS; ни один market PnL replay в нём не выполнялся.
+
+### Остающиеся P1 blockers
+- Maker OHLC fill proxy не учитывает очередь, L2, partial fills, latency и adverse selection.
+- Bybit-native Funding/Mark/instrument/risk-tier archives и независимое доказательство Funding interval completeness отсутствуют.
+- H1 Top-5 selector/runner имеют явно задокументированный long-only scope; directional ablation остаётся отложенной до data gate.
+- Position-level isolated liquidation не является account-wide Cross/Portfolio Margin моделью.
+
+Никаких новых market PnL runs, внешних загрузок, Bybit API, paper или live orders в этой сверке не было.

@@ -491,3 +491,13 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 - Commit `8e73e05f8bc97163d44527001c302d35a8b84a62`; Research CI [#41738201800](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41738201800) SUCCESS.
 - Исправление диагностическое; новых PnL runs не было. Полный data/Funding gate остаётся CLOSED.
 - Подробности: `docs/audits/REGIME_TRADE_ATTRIBUTION_AUDIT_2026-11-04.md`.
+
+
+## 2026-11-04 — reconciled status of historical engine audit findings
+
+- The original candle-timeframe validation P1 is closed in the active branch; the configured-timeframe CI step passed in #41738201800.
+- Symbol-order invariance is covered for tested dense/sparse replay paths; the portfolio accounting suite passed 49/49 in #41737866200. The no-same-bar-reallocation policy for unfilled top-ranked limits remains a conservative documented caveat.
+- End-to-end synthetic TP1/Funding/MTM/final-close accounting regression is now present; this does not establish exchange settlement-mark accuracy or Funding archive completeness.
+- The current Research CI no longer executes historical market backtests/holdouts; it runs deterministic tests, CryptoFetch structural audit and H-A archive preparation marked no PnL.
+- Remaining P1 blockers: maker fill realism, Bybit-native data/Funding schedule completeness, directional scope and account-wide margin model.
+- Detailed status reconciliation: `docs/audits/ENGINE_AUDIT_FINDINGS_RU.md`.

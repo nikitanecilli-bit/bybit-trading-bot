@@ -15,56 +15,110 @@ from run_h1_shared_capital_portfolio_validation import (
     resolve_bybit_kline_dir, load_bybit_h1_datasets,
     round_limit_quote_to_bybit_tick, engine_cost_stress,
     BASE_TAKER_FEE, BASE_MAKER_FEE, BASE_TAKER_SLIP,
-    resolve_validation_design,
+    resolve_validation_design, load_frozen_selection_manifest,
+    validate_selection_cutoff,
 )
 
 
 
 
-def test_explore_mode_never_scores_final_holdout():
-    design = resolve_validation_design({"H1_VALIDATION_MODE": "explore"})
+def _selection_env(tmpdir):
+    manifest = Path(tmpdir) / "selection.json"
+    manifest.write_text(json.dumps({
+        "schema_version": 1,
+        "selection_protocol": "h1-top5-train-only-v1",
+        "selection_status": "ok",
+        "generated_at_utc": "2026-11-03T00:00:00Z",
+        "training_window": {"cutoff_timestamp_ms": 1000},
+        "primary": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT"],
+    }), encoding="utf-8")
+    return {
+        "H1_SELECTION_MANIFEST": str(manifest),
+        "H1_SYMBOL_ALLOWLIST": "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT",
+    }
+
+
+def test_explore_mode_uses_only_frozen_train_selected_top_five():
+    with tempfile.TemporaryDirectory() as tmp:
+        env = _selection_env(tmp)
+        env["H1_VALIDATION_MODE"] = "explore"
+        design = resolve_validation_design(env)
     assert [fold[0] for fold in design["folds"]] == [1, 2]
     assert design["volume_thresholds"] == [1.2, 1.6, 2.0, 2.5]
     assert design["breakout_atr_thresholds"] == [0.0, 0.10, 0.25]
     assert design["cost_multipliers"] == [1.0, 1.5, 2.0]
-    assert design["frozen_config"] is None
+    assert design["selection"]["symbols"] == ["BNBUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
 
 
-def test_confirm_mode_requires_one_frozen_predeclared_config():
-    design = resolve_validation_design({
-        "H1_VALIDATION_MODE": "confirm",
-        "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
-        "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10",
-        "H1_SYMBOL_ALLOWLIST": "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT",
-    })
+def test_confirm_mode_requires_one_frozen_predeclared_config_and_selection_manifest():
+    with tempfile.TemporaryDirectory() as tmp:
+        env = _selection_env(tmp)
+        env.update({
+            "H1_VALIDATION_MODE": "confirm",
+            "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
+            "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10",
+        })
+        design = resolve_validation_design(env)
     assert [fold[0] for fold in design["folds"]] == [3]
     assert design["volume_thresholds"] == [1.6]
     assert design["breakout_atr_thresholds"] == [0.10]
     assert design["cost_multipliers"] == [1.0, 1.5, 2.0]
-    assert design["frozen_config"] == {
-        "min_volume_ratio": 1.6, "min_breakout_atr": 0.10,
-        "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "BNBUSDT"],
-    }
+    assert design["frozen_config"]["symbols"] == ["BNBUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
+    assert design["frozen_config"]["selection_manifest_sha256"] == design["selection"]["sha256"]
+
+
+def test_selection_manifest_and_allowlist_must_match_exactly():
+    with tempfile.TemporaryDirectory() as tmp:
+        env = _selection_env(tmp)
+        env["H1_SYMBOL_ALLOWLIST"] = "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT"
+        try:
+            resolve_validation_design(env)
+        except SystemExit as exc:
+            assert "exactly match" in str(exc)
+        else:
+            raise AssertionError("mismatched frozen allowlist must fail")
+
+
+def test_selection_manifest_must_be_valid_and_successful():
+    with tempfile.TemporaryDirectory() as tmp:
+        env = _selection_env(tmp)
+        Path(env["H1_SELECTION_MANIFEST"]).write_text(
+            '{"schema_version":1,"selection_protocol":"h1-top5-train-only-v1","selection_status":"insufficient_candidates"}',
+            encoding="utf-8",
+        )
+        try:
+            resolve_validation_design(env)
+        except SystemExit as exc:
+            assert "no valid top-five" in str(exc)
+        else:
+            raise AssertionError("failed selector manifest must fail closed")
+
+
+def test_selection_cutoff_must_precede_validation():
+    selection = {"training_cutoff_timestamp_ms": 1000}
+    validate_selection_cutoff(selection, 1001)
+    try:
+        validate_selection_cutoff(selection, 1000)
+    except SystemExit as exc:
+        assert "selection leakage" in str(exc)
+    else:
+        raise AssertionError("validation window overlapping selector train period must fail")
 
 
 def test_confirm_mode_rejects_missing_or_unregistered_config():
-    for env in (
-        {"H1_VALIDATION_MODE": "confirm"},
-        {"H1_VALIDATION_MODE": "confirm", "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
-         "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10", "H1_SYMBOL_ALLOWLIST": "BTCUSDT,ETHUSDT"},
-        {"H1_VALIDATION_MODE": "confirm", "H1_FROZEN_MIN_VOLUME_RATIO": "1.7",
-         "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10",
-         "H1_SYMBOL_ALLOWLIST": "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT"},
-        {"H1_VALIDATION_MODE": "confirm", "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
-         "H1_FROZEN_MIN_BREAKOUT_ATR": "0.20",
-         "H1_SYMBOL_ALLOWLIST": "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,BNBUSDT"},
-        {"H1_VALIDATION_MODE": "other"},
-    ):
-        try:
-            resolve_validation_design(env)
-        except SystemExit:
-            continue
-        raise AssertionError(f"invalid validation design accepted: {env!r}")
+    for volume, breakout in ((None, None), ("1.7", "0.10"), ("1.6", "0.20")):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = _selection_env(tmp)
+            env["H1_VALIDATION_MODE"] = "confirm"
+            if volume is not None:
+                env["H1_FROZEN_MIN_VOLUME_RATIO"] = volume
+            if breakout is not None:
+                env["H1_FROZEN_MIN_BREAKOUT_ATR"] = breakout
+            try:
+                resolve_validation_design(env)
+            except SystemExit:
+                continue
+            raise AssertionError("invalid frozen configuration accepted")
 
 
 def test_cost_stress_restores_engine_globals_after_success_and_exception():
@@ -367,8 +421,11 @@ def test_delayed_limit_quotes_are_tick_aligned_without_crossing():
 
 if __name__ == "__main__":
     for test in (
-        test_explore_mode_never_scores_final_holdout,
-        test_confirm_mode_requires_one_frozen_predeclared_config,
+        test_explore_mode_uses_only_frozen_train_selected_top_five,
+        test_confirm_mode_requires_one_frozen_predeclared_config_and_selection_manifest,
+        test_selection_manifest_and_allowlist_must_match_exactly,
+        test_selection_manifest_must_be_valid_and_successful,
+        test_selection_cutoff_must_precede_validation,
         test_confirm_mode_rejects_missing_or_unregistered_config,
         test_cost_stress_restores_engine_globals_after_success_and_exception,
         test_missing_snapshot_directories_reject_legacy_replay,

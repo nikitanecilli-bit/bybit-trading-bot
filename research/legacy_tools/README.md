@@ -34,7 +34,7 @@
 
 ### `Institutional V16 Bridge & Enriched Runner.py`
 
-<badge>BLOCKED — DO NOT RUN</badge>
+**BLOCKED — DO NOT RUN**
 
 Неисполняемый и логически небезопасный prototype:
 - синтаксическая ошибка: `classQuantV16SignalGate:` без ключевого слова `class`;

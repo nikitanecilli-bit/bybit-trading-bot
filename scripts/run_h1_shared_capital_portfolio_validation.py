@@ -89,7 +89,7 @@ def load_frozen_selection_manifest(environ=None):
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise SystemExit(f"Invalid H1 selection manifest: {exc}") from exc
-    if payload.get("schema_version") != 1 or payload.get("selection_protocol") != "h1-top5-train-only-v1":
+    if payload.get("schema_version") != 1 or payload.get("selection_protocol") != "h1-top5-train-only-v2":
         raise SystemExit("Unsupported H1 selection manifest schema/protocol")
     if payload.get("selection_status") != "ok":
         raise SystemExit("H1 selection manifest has no valid top-five set; refusing validation")

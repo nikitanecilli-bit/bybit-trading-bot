@@ -149,6 +149,14 @@ def common_training_window(histories):
     }
 
 
+def first_validation_timestamp(histories):
+    """Return the first timestamp in the runner's first 50% scoring fold."""
+    window = common_training_window(histories)
+    if not window["bar_count"]:
+        return None
+    return window["start_timestamp_ms"] + (window["bar_count"] // 2) * 3_600_000
+
+
 def select_train_only(
     *,
     kline_dir,
@@ -264,9 +272,26 @@ def select_train_only(
     reserve_common_bars = common_training_bar_count(
         reserve_candidates, training_candles_by_symbol
     )
+    primary_full_window = common_training_window({
+        symbol: raw[symbol][1] for symbol in primary
+    }) if len(primary) == 5 else {
+        "start_timestamp_ms": None, "end_timestamp_ms": None, "bar_count": 0,
+    }
+    primary_first_validation_ts = first_validation_timestamp({
+        symbol: raw[symbol][1] for symbol in primary
+    }) if len(primary) == 5 else None
+    reserve_first_validation_ts = first_validation_timestamp({
+        symbol: raw[symbol][1] for symbol in reserve_candidates
+    }) if len(reserve_candidates) == 5 else None
     reserve = (
         reserve_candidates
-        if len(reserve_candidates) == 5 and reserve_common_bars >= MIN_TRAIN_BARS
+        if (
+            len(reserve_candidates) == 5
+            and reserve_common_bars >= MIN_TRAIN_BARS
+            and common_end is not None
+            and reserve_first_validation_ts is not None
+            and common_end < reserve_first_validation_ts
+        )
         else []
     )
     if common_bars < MIN_TRAIN_BARS:
@@ -275,6 +300,8 @@ def select_train_only(
         status = "insufficient_candidates"
     elif primary_common_bars < MIN_TRAIN_BARS:
         status = "insufficient_common_training_overlap"
+    elif primary_first_validation_ts is None or common_end >= primary_first_validation_ts:
+        status = "selection_cutoff_overlaps_validation"
     else:
         status = "ok"
 
@@ -316,6 +343,8 @@ def select_train_only(
             "common_training_bars": common_bars,
             "common_primary_training_bars": primary_common_bars,
             "common_reserve_training_bars": reserve_common_bars,
+            "selected_primary_full_common_bars": primary_full_window["bar_count"],
+            "first_validation_timestamp_ms": primary_first_validation_ts,
         },
         "strategy_config": {
             "direction": "long_only",
@@ -367,8 +396,9 @@ def select_train_only(
         "selection_note": (
             "The selected top five are frozen using a common training timestamp window. "
             "Explore and confirm must use the exact primary list and this unchanged manifest. "
-            "If fewer than five candidates pass, the selection is invalid; do not fill slots "
-            "with negative or weak candidates."
+            "If fewer than five candidates pass, the common window is too short, or the "
+            "training cutoff overlaps the first scored fold, the selection is invalid; do not "
+            "fill slots with negative or weak candidates."
         ),
     }
     return manifest

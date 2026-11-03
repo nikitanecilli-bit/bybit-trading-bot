@@ -488,3 +488,36 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 **Итог:** в проверенных путях не найдено подтверждённого дефекта превышения risk budget из-за порядка символов или двойного учёта/потери PnL при TP1 и закрытиях. Существующие тесты покрывают ключевые batch/order/accounting сценарии. Не следует называть portfolio cap гарантированным максимальным убытком или непрерывным процентным ограничителем уже открытых позиций.
 
 **CI evidence:** Research checks run [41634060290](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41634060290), commit `cf74d8afcd65d4da7e04f80aab8e858a65fb0142`, job `tests` — success; шаг `Test portfolio accounting and risk budget` завершён успешно. Сравнение `cf74d8a...d334f6f` показывает только четыре документационных коммита и изменения двух Markdown-файлов; engine и tests не менялись. Поэтому новый CI и тем более PnL replay для этого статического аудита не запускались.
+
+
+### 2026-11-03 — аудит lifecycle kill-switch / daily stop / pending и восстановления
+
+Проверены `AdaptiveRiskManager._evaluate_drawdown_stops()`, `UnifiedQuantEngine._update_mark_to_market()`, `_try_fill_pending()`, `_manage_position()`, `_close_position()`, `_prepare_portfolio_intrabar_marks()`, `run_simulation_pass()`, `run_sparse_simulation_pass()`, `PlanBStatePersistence.save_state()/load_state()`, конструктор движка и CLI `main()`; сопоставлены с `tests/test_portfolio_accounting.py` и `tests/test_state_persistence.py`.
+
+**Kill-switch: подтверждённый lifecycle в backtest/replay**
+- MTM по всем синхронным adverse marks считается до обработки отдельных символов. При достижении порога latch `kill_switch_triggered` фиксируется и состояние сохраняется.
+- `_manage_position()` проверяет latch до обычных stop/TP/time-stop. При активном kill-switch позиция закрывается с `exit_reason="kill_switch"`; для цены используется сохранённый adverse intrabar mark, а не благоприятный close/TP. После закрытия PnL/fees/slippage/funding проходят через общую бухгалтерию `_close_position()`.
+- При синхронном replay все активные символы проходят portfolio pre-mark и затем обработку; все открытые позиции должны быть принудительно закрыты в этом баровом цикле. Порядок символов не должен менять выбранные adverse marks.
+- Pending entry не может исполниться после latch: `_try_fill_pending()` сначала извлекает pending signal, затем вызывает `can_open_new_trade()`; при kill-switch сигнал удаляется и вход отклоняется. Это предотвращает исполнение уже ожидавшего входа после защитного события.
+- В sparse replay отсутствие свечи для любой открытой позиции или pending symbol приводит к немедленному `ValueError` до продолжения бара. Это fail-closed поведение: движок не притворяется, что способен безопасно закрыть позицию без свежей свечи.
+- Ранее возникшее подозрение, что kill-switch только блокирует новые входы, было неполным: принудительное закрытие находится в `_manage_position()`, а не в самом risk manager.
+
+**Daily stop — другая политика, не дефект**
+- Daily stop latch блокирует новые входы до следующей UTC-даты; `on_new_timestamp()` сбрасывает только дневной флаг и переустанавливает `day_start_equity` на текущую equity.
+- Уже открытые позиции продолжают обычное управление по стопам/целям/тайм-ауту. Это явно отражено в уведомлении daily stop и отличается от emergency kill-switch, который принудительно flatten-ит открытые позиции.
+- Kill-switch latch не сбрасывается при смене дня. Это корректно для аварийной остановки, требующей отдельного ручного вмешательства/новой сессии.
+
+**Persistence и восстановление**
+- При переходе daily-stop/kill-switch в true `_update_mark_to_market()` сохраняет latch даже без закрытия сделки. Сами flags включены в сериализуемый risk state.
+- `test_mtm_daily_stop_transition_is_persisted_without_trade_close` и `test_mtm_kill_switch_transition_is_persisted_without_trade_close` проверяют именно сохранение флага при отсутствии trade close на момент MTM transition.
+- `tests/test_state_persistence.py` проверяет round-trip одновременно открытой позиции, pending сигналов, equity и обоих защитных flags; восстановленный kill-switch остаётся true. Также проверяются persisted last marks, fail-closed на испорченном/неполном state и отказ от свежего backtest поверх restored state.
+- При crash сразу после сохранения latch, но до обработки всех символов, в backup могут оставаться открытые позиции и pending signals. Это не позволяет pending сигналу пройти следующий `_try_fill_pending()` при сохранённом latch. Однако автоматический recovery execution loop в текущем CLI отсутствует.
+
+**Критическое ограничение готовности к live**
+- Наличие `restore_plan_b=True` и валидатора backup не означает, что реализован безопасный live resume. `run_simulation_pass()` и sparse replay явно запрещают запуск поверх restored state; отдельного цикла reconciliation/исполнения открытых ордеров в этом файле нет.
+- CLI не предоставляет флаг восстановления; `--persist-state` только включает запись backup. Режим `watch` после первичного запуска ожидает изменения config и повторно запускает backtest, а не ведёт live market/order loop.
+- Следовательно, подтверждён только lifecycle защитных механизмов в OHLCV simulation/replay и сериализация recovery state. Нельзя считать это доказательством, что при реальном подключении к Bybit аварийное закрытие ордеров/позиций будет исполнено. Для этого потребуются отдельный live loop, exchange reconciliation, reduce-only close workflow, проверка частичных fills/ошибок сети и подтверждённые тесты исполнения. Это остаётся вне текущей стратегии-only фазы.
+
+**Модельное ограничение цены kill-switch:** OHLC не содержит точного момента срабатывания внутри свечи. Движок использует adverse mark (low для long / high для short, либо modeled stop/gap fill при пересечении stop) как цену forced exit. Это консервативная replay-модель, а не подтверждённая цена реального рыночного исполнения; её нельзя смешивать с фактическим market fill.
+
+**Итог:** в просмотренном replay lifecycle не обнаружено подтверждённого пути, где pending ордер исполняется после активного kill-switch, или где синхронно доступная открытая позиция игнорирует forced flatten. Daily stop намеренно не закрывает позиции. Главный незакрытый вопрос — не арифметика replay, а отсутствие live execution/reconciliation loop: backup сам по себе не делает восстановленную сессию торгуемой или безопасной.

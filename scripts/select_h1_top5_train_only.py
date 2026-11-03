@@ -75,6 +75,24 @@ def rank_candidates(rows, min_trades=MIN_TRADES):
     return evaluated, eligible
 
 
+def common_training_bar_count(symbols, histories):
+    """Count timestamps shared by every symbol in a proposed frozen basket."""
+    if not symbols:
+        return 0
+    first = histories.get(symbols[0])
+    if not first:
+        return 0
+    common = {candle.ts for candle in first}
+    for symbol in symbols[1:]:
+        rows = histories.get(symbol)
+        if not rows:
+            return 0
+        common.intersection_update(candle.ts for candle in rows)
+        if not common:
+            return 0
+    return len(common)
+
+
 def _read_universe_snapshot(path):
     try:
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -180,17 +198,16 @@ def select_train_only(
     primary = [row["symbol"] for row in eligible[:5]]
     reserve = [row["symbol"] for row in eligible[5:10]]
     status = "ok" if len(primary) == 5 else "insufficient_candidates"
-    common_primary_timestamps = set()
-    if len(primary) == 5:
-        common_primary_timestamps = {
-            candle.ts for candle in training_candles_by_symbol[primary[0]]
-        }
-        for symbol in primary[1:]:
-            common_primary_timestamps.intersection_update(
-                candle.ts for candle in training_candles_by_symbol[symbol]
-            )
-        if len(common_primary_timestamps) < MIN_TRAIN_BARS:
-            status = "insufficient_common_training_overlap"
+    primary_common_bars = common_training_bar_count(primary, training_candles_by_symbol)
+    if len(primary) == 5 and primary_common_bars < MIN_TRAIN_BARS:
+        status = "insufficient_common_training_overlap"
+    reserve_candidates = [row["symbol"] for row in eligible[5:10]]
+    reserve_common_bars = common_training_bar_count(reserve_candidates, training_candles_by_symbol)
+    reserve = (
+        reserve_candidates
+        if len(reserve_candidates) == 5 and reserve_common_bars >= MIN_TRAIN_BARS
+        else []
+    )
     kline_files = _directory_file_manifest(kline_dir, {".csv"})
     input_files = {
         "kline": kline_files,
@@ -219,7 +236,8 @@ def select_train_only(
             "cutoff_utc": _utc(cutoff),
             "train_fraction": TRAIN_FRACTION,
             "one_bar_embargo_before_validation": True,
-            "common_primary_training_bars": len(common_primary_timestamps),
+            "common_primary_training_bars": primary_common_bars,
+            "common_reserve_training_bars": reserve_common_bars,
         },
         "strategy_config": {
             "direction": "long_only",

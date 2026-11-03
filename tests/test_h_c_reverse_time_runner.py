@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from scripts.run_h_c_reverse_time_robustness import (
-    H1_MS, prepare_fold, run_reverse_time,
+    H1_MS, frozen_strategy_config, prepare_fold, run_reverse_time,
 )
 from scripts.run_h_a_relative_strength_replay import configure_engine, run_variant, em
 
@@ -21,6 +21,18 @@ def _rows(start_ts, end_ts, *, gap_at=None):
             rows.append(em.Candle(ts, 100, 101, 99, 100, 10))
         ts += H1_MS
     return rows
+
+
+def test_frozen_strategy_configs_use_python_booleans_and_separate_hc_flag():
+    baseline = frozen_strategy_config(False)
+    candidate = frozen_strategy_config(True)
+    assert baseline["maker_entry_and_tp1"] is False
+    assert baseline["maker_tp1_and_target"] is False
+    assert baseline["enable_post_break_invalidation"] is False
+    assert candidate["enable_post_break_invalidation"] is True
+    assert candidate["post_break_invalidation_bars"] == 3
+    assert type(candidate["maker_entry_and_tp1"]) is bool
+    assert type(candidate["maker_tp1_and_target"]) is bool
 
 
 def test_prepare_fold_accepts_exact_72h_warmup_and_common_terminal_bar():
@@ -92,6 +104,7 @@ def test_h_a_and_h_c_variants_cannot_be_combined():
 
 if __name__ == "__main__":
     tests = [
+        test_frozen_strategy_configs_use_python_booleans_and_separate_hc_flag,
         test_prepare_fold_accepts_exact_72h_warmup_and_common_terminal_bar,
         test_prepare_fold_fails_closed_for_missing_symbol_or_terminal_bar,
         test_prepare_fold_rejects_insufficient_warmup_and_non_contiguous_history,

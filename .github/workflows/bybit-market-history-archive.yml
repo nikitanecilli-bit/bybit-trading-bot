@@ -1,0 +1,102 @@
+name: Archive Bybit OHLCV, funding and mark-price history
+
+on:
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: Comma-separated linear symbols (e.g. BTCUSDT,ETHUSDT)
+        required: true
+        type: string
+      start_ms:
+        description: UTC start timestamp in milliseconds, aligned to H1
+        required: true
+        type: string
+      end_ms:
+        description: Exclusive UTC end timestamp in milliseconds, aligned to H1
+        required: true
+        type: string
+      interval:
+        description: Mark-price candle interval
+        required: true
+        default: "60"
+        type: choice
+        options:
+          - "60"
+      runner:
+        description: "Use self-hosted runner outside US/Mainland China; hosted US runners are blocked by Bybit"
+        required: true
+        type: choice
+        default: self-hosted
+        options:
+          - self-hosted
+          - ubuntu-latest
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bybit-market-history-archive
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ${{ inputs.runner || 'self-hosted' }}
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/market-regime-v1-main
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Refuse blocked runner egress geography
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          request = urllib.request.Request(
+              "https://ipinfo.io/json",
+              headers={"User-Agent": "bybit-research-network-diagnostic/1.0"},
+          )
+          with urllib.request.urlopen(request, timeout=10) as response:
+              data = json.loads(response.read().decode("utf-8"))
+          country = data.get("country", "unknown")
+          print("Runner egress country:", country)
+          print("Runner egress region:", data.get("region", "unknown"))
+          print("Runner egress organization:", data.get("org", "unknown"))
+          if country in {"US", "CN"}:
+              raise SystemExit(
+                  "Bybit public API blocks US/Mainland China IPs (HTTP 403). "
+                  "Use a self-hosted GitHub Actions runner outside those regions."
+              )
+          if country == "unknown":
+              raise SystemExit("Cannot verify runner egress country; refusing Bybit archive request.")
+          PY
+      - name: Download official Bybit history
+        env:
+          SYMBOLS: ${{ inputs.symbols }}
+          START_MS: ${{ inputs.start_ms }}
+          END_MS: ${{ inputs.end_ms }}
+          INTERVAL: ${{ inputs.interval }}
+          BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}
+        run: |
+          echo "Using configured official Bybit API base URL: $BYBIT_API_BASE_URL"
+          python scripts/archive_bybit_market_history.py --symbols "$SYMBOLS" --start-ms "$START_MS" --end-ms "$END_MS" --interval "$INTERVAL" --base-url "$BYBIT_API_BASE_URL" --output-root "data/archives/bybit/${START_MS}_${END_MS}_${GITHUB_RUN_ID}"
+      - name: Require exact funding-settlement mark coverage
+        env:
+          SYMBOLS: ${{ inputs.symbols }}
+        run: |
+          python scripts/validate_funding_coverage.py --funding-dir "data/archives/bybit/${{ inputs.start_ms }}_${{ inputs.end_ms }}_${GITHUB_RUN_ID}/funding" --mark-dir "data/archives/bybit/${{ inputs.start_ms }}_${{ inputs.end_ms }}_${GITHUB_RUN_ID}/mark_price" --trade-kline-dir "data/archives/bybit/${{ inputs.start_ms }}_${{ inputs.end_ms }}_${GITHUB_RUN_ID}/kline" --symbols "$SYMBOLS"
+      - name: Commit verified archive
+        run: |
+          if [[ -n "$(git status --porcelain data/archives/bybit)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/archives/bybit
+            git commit -m "data: archive Bybit OHLCV, funding and mark-price history"
+            git push
+          else
+            echo "Archive unchanged; no commit needed."
+          fi

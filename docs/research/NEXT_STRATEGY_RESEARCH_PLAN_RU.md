@@ -352,3 +352,6 @@ Keep the existing runner unchanged as a reproducible long-only variant. After Fu
 ### EMA50/EMA200 integration constraint
 
 A separate static audit found that the engine's `CALC_WINDOW=200` is shorter than the 206 candles required for the first directional EMA50/200 label (slow=200 plus slope lookback=5, zero-based index 205). Calling the helper directly inside `evaluate_signal()` would therefore return `neutral` on every H1 bar. The filter is not currently integrated. Any future variant must precompute causal labels once over the full available per-symbol history and look them up by the exact current completed-candle timestamp; do not blindly enlarge the engine window or recalculate full-history EMAs per signal. See `docs/audits/EMA50_200_INTEGRATION_WINDOW_AUDIT_2026-11-04.md`. This is a design gate, not PnL evidence.
+
+
+EMA200 initialization also needs a frozen burn-in policy: the helper seeds from the first close, so 206 candles are only the minimum for a directional label, not convergence. The seed retains about 13.53% weight after 200 updates; a conservative pre-roll candidate is 1,000 bars (5× EMA200) before the first scored signal. This is a research-design constraint, not a tuned parameter. Non-finite EMA inputs are now rejected; Research CI #41727040877 passed 53/53.

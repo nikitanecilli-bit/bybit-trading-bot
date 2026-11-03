@@ -82,6 +82,33 @@ def test_hc_flag_defaults_off_and_is_h1_only():
         raise AssertionError("H-C must reject non-H1 timeframes")
 
 
+def test_hc_disabled_by_default_does_not_change_baseline_exit_path():
+    e = make_engine()
+    e.cfg.timeframe = "1h"
+    assert e.cfg.enable_post_break_invalidation is False
+    pos = _position("long")
+    bar = engine.Candle(pos.entry_ts, 102.0, 103.0, 100.0, 100.5, 10.0)
+    assert _manage(e, pos, bar, fill_bar=True) == []
+
+
+def test_hc_pending_without_boundary_is_cancelled_fail_closed():
+    e = _configured_engine()
+    pending = {
+        "symbol": "BTCUSDT", "direction": "long",
+        "strategy": "H1-momentum-breakout",
+        "signal_ts": 1_800_000_000_000 - H1_MS,
+        "entry_price": 102.0, "stop_price": 90.0,
+        "tp1_price": 130.0, "tp2_price": 140.0,
+        "stop_dist": 12.0, "order_type": "market",
+    }
+    e.pending["BTCUSDT"] = pending
+    bar = engine.Candle(1_800_000_000_000, 102.0, 103.0, 100.0, 102.0, 10.0)
+    opened = e._try_fill_pending("BTCUSDT", bar)
+    assert opened is False
+    assert e.pending == {}
+    assert e.open_positions == {}
+
+
 def test_hc_long_and_short_retest_close_symmetrically():
     e = _configured_engine()
     long_pos = _position("long")
@@ -212,6 +239,8 @@ def test_hc_applies_only_to_breakout_strategies_and_does_not_reenter_same_bar():
 if __name__ == "__main__":
     tests = [
         test_hc_flag_defaults_off_and_is_h1_only,
+        test_hc_disabled_by_default_does_not_change_baseline_exit_path,
+        test_hc_pending_without_boundary_is_cancelled_fail_closed,
         test_hc_long_and_short_retest_close_symmetrically,
         test_hc_rejects_pending_breakout_without_signal_time_boundary,
         test_hc_wick_only_retest_does_not_close,

@@ -1198,7 +1198,8 @@ def build_validation_manifest(
             "max_chase_limit_pct": MAX_CHASE_LIMIT_PCT,
             "accelerated_atr_trail_after_1_5r": ACCELERATED_ATR_TRAIL_AFTER_1_5R,
             "enable_post_break_invalidation": ENABLE_POST_BREAK_INVALIDATION,
-            "donchian_period_modes": design.get(
+            "donchian_period": int(design.get("primary_donchian_period", 20)),
+            "donchian_variant_modes": design.get(
                 "donchian_variant_modes", [{"donchian_period": 20, "ema50_200_gate": False}]
             ),
             "atr_period": 14,

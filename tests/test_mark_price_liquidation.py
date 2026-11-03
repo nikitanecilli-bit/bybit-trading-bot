@@ -73,6 +73,14 @@ class IsolatedLiquidationTests(unittest.TestCase):
                 ],
             )
 
+    def test_rejects_tier_for_different_symbol(self):
+        with self.assertRaisesRegex(ValueError, "belong to the requested symbol"):
+            calculate_isolated_usdt_liquidation_price(
+                symbol="ETHUSDT", direction="long", entry_price="100",
+                quantity="1", leverage="10",
+                tiers=[tier(1, "1000000", "0.005", "100")],
+            )
+
     def test_rejects_invalid_inputs_and_duplicate_tier_limits(self):
         tiers = [tier(1, "1000000", "0.005", "100")]
         with self.assertRaisesRegex(ValueError, "direction"):

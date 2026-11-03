@@ -968,6 +968,8 @@ def _run_full_replay_symbol_order(order):
         "daily_stop": e.risk_mgr.daily_stop_triggered,
         "kill_switch": e.risk_mgr.kill_switch_triggered,
         "net_pnl": round(audit["net_pnl"], 6),
+        "realized_equity": round(e.risk_mgr.realized_equity, 6),
+        "current_equity": round(e.risk_mgr.current_equity, 6),
         "max_dd": round(audit["max_dd_pct"], 6),
     }
 
@@ -990,6 +992,21 @@ def test_full_run_simulation_pass_is_invariant_to_symbol_order():
 
 
 
+
+
+def test_full_shared_capital_replay_reconciles_ledger_to_final_equity():
+    result = _run_full_replay_symbol_order(["BTCUSDT", "ETHUSDT", "SOLUSDT"])
+    trades = result["ledger"]
+    gross = sum(row[6] for row in trades)
+    fees = sum(row[7] for row in trades)
+    slippage = sum(row[8] for row in trades)
+    funding = sum(row[9] for row in trades)
+    net = sum(row[10] for row in trades)
+
+    assert abs(net - (gross - fees - slippage - funding)) < 0.02
+    assert abs(result["net_pnl"] - net) < 0.02
+    assert abs(result["realized_equity"] - (10_000.0 + net)) < 0.02
+    assert abs(result["current_equity"] - result["realized_equity"]) < 0.001
 
 
 def _run_sparse_replay_symbol_order(order):

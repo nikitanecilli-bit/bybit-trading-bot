@@ -35,6 +35,7 @@ on:
       - 'scripts/diagnose_h_a_signal_candles.py'
       - 'scripts/validate_funding_coverage.py'
       - 'tests/**'
+      - '.github/workflows/bybit-market-history-archive.yml'
       - '.github/workflows/bybit-linear-universe-history.yml'
       - '.github/workflows/h1-top5-train-selection.yml'
       - '.github/workflows/h1-shared-capital-portfolio-validation.yml'

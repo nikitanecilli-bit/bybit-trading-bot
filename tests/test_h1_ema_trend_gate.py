@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from scripts.run_h1_shared_capital_portfolio_validation import (
-    build_ema50_200_label_maps,
+    build_ema50_200_label_maps, resolve_ema50_200_gate,
 )
 from market_structure import lookup_trend_label
 
@@ -27,6 +27,20 @@ def make_rows(count):
             volume=100.0,
         ))
     return rows
+
+
+def test_ema50_200_gate_is_explicitly_opt_in_and_rejects_invalid_values():
+    assert resolve_ema50_200_gate({}) is False
+    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "0"}) is False
+    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "off"}) is False
+    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "1"}) is True
+    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "true"}) is True
+    try:
+        resolve_ema50_200_gate({"H1_EMA50_200_GATE": "maybe"})
+    except SystemExit as exc:
+        assert "H1_EMA50_200_GATE" in str(exc)
+    else:
+        raise AssertionError("invalid EMA gate configuration must fail closed")
 
 
 def test_ema_gate_precomputes_full_history_and_uses_exact_scored_timestamp():
@@ -91,6 +105,7 @@ def test_ema_gate_rejects_non_contiguous_h1_history():
 
 if __name__ == "__main__":
     tests = [
+        test_ema50_200_gate_is_explicitly_opt_in_and_rejects_invalid_values,
         test_ema_gate_precomputes_full_history_and_uses_exact_scored_timestamp,
         test_ema_gate_fails_closed_without_1000_pre_roll_bars,
         test_ema_gate_fails_closed_for_missing_symbol_or_history,

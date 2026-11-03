@@ -76,3 +76,17 @@
 Это повторно исследованные E11/E13 окна, не holdout. Если архив заканчивается раньше requested end, используется фактический общий последний H1 бар и это явно отражается в отчёте.
 
 Реализация: `scripts/run_h_a_relative_strength_replay.py`. По умолчанию скрипт выполняет только archive audit/prepare; для PnL требуется явный `--execute`. Он сравнивает baseline и H-A на одинаковом dynamic universe, сохраняет архивный manifest, fold summary, trade ledger, monthly equity и portfolio equity path. Это CryptoFetch/Binance-style OHLCV proxy: funding не загружен, поэтому funding в отчёте равен нулю и итог не является полным Bybit net PnL.
+
+### 7. Фактическая подготовка архива — CI run 41632126319
+
+Режим prepare-only успешно обработал все существующие ZIP без рыночного replay:
+- 50 из 50 непустых H1 символов включены в sparse universe;
+- 6 дублирующихся symbol/timeframe групп, 6 pairwise comparisons;
+- 0 конфликтующих OHLCV overlap bars;
+- 0 случаев, когда выбранный longest archive не покрывает timestamps другого дубликата;
+- все 50 символов имеют общий terminal H1 bar `2026-10-26T00:00:00Z`;
+- распределение первого доступного бара: 25 символов с `2025-10-27`, 22 с `2026-04-29`, 1 с `2026-07-02`, 1 с `2026-07-17`, 1 с `2026-09-24`.
+
+Следствие: fold 3 физически заканчивается `2026-10-26T00:00:00Z`, а не requested `2026-10-27T00:00:00Z`; runner обязан показывать фактическую границу. Поздние символы допускаются в cross-section только после своего фактического старта и 72h warm-up. Архивный manifest с SHA-256 сохранён в artifact `h-a-archive-preparation` run 41632126319.
+
+Это подтверждает пригодность существующих файлов для динамического OHLCV replay, но не доказывает Bybit listing history, не устраняет survivorship bias в исходном наборе символов и не добавляет funding/mark-price.

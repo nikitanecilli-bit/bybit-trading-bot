@@ -219,11 +219,18 @@ class BybitMarketHistoryTests(unittest.TestCase):
         snapshot = {
             "category": "linear",
             "fetched_at": "2026-11-03T00:00:00Z",
-            "instruments": [{
-                "symbol": "FUTUREUSDT", "contractType": "LinearPerpetual",
-                "quoteCoin": "USDT", "settleCoin": "USDT",
-                "launchTime": "9999999999999", "deliveryTime": "0", "status": "PendingOpen",
-            }],
+            "instruments": [
+                {
+                    "symbol": "BTCUSDT", "contractType": "LinearPerpetual",
+                    "quoteCoin": "USDT", "settleCoin": "USDT",
+                    "launchTime": "3600000", "deliveryTime": "0", "status": "Trading",
+                },
+                {
+                    "symbol": "FUTUREUSDT", "contractType": "LinearPerpetual",
+                    "quoteCoin": "USDT", "settleCoin": "USDT",
+                    "launchTime": "9999999999999", "deliveryTime": "0", "status": "PendingOpen",
+                },
+            ],
         }
         original_cwd = Path.cwd()
         with tempfile.TemporaryDirectory() as tmp:
@@ -231,6 +238,7 @@ class BybitMarketHistoryTests(unittest.TestCase):
                 os.chdir(tmp)
                 Path("universe.json").write_text(json.dumps(snapshot), encoding="utf-8")
                 lifecycle, _, _ = load_universe_lifecycle("universe.json")
+                self.assertIn("BTCUSDT", lifecycle)
                 self.assertNotIn("FUTUREUSDT", lifecycle)
             finally:
                 os.chdir(original_cwd)

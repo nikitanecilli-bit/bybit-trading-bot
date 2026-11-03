@@ -985,6 +985,7 @@ def test_full_run_simulation_pass_is_invariant_to_symbol_order():
     assert forward["equity_path"] == reverse["equity_path"]
     assert forward["daily_stop"] == reverse["daily_stop"]
     assert forward["kill_switch"] == reverse["kill_switch"]
+    assert forward["bar_snapshots"] == reverse["bar_snapshots"]
     assert forward["net_pnl"] == reverse["net_pnl"]
     assert forward["max_dd"] == reverse["max_dd"]
 
@@ -1016,6 +1017,7 @@ def _run_sparse_replay_symbol_order(order):
     original_evaluate = engine_mod.QuantStrategyCore.evaluate_signal
     original_step = e.step_candle
     equity_path = []
+    bar_snapshots = []
 
     def deterministic_signal(symbol, history, _cfg):
         first_seen.setdefault(symbol, history[-1].ts)
@@ -1058,6 +1060,12 @@ def _run_sparse_replay_symbol_order(order):
         audit = engine_mod.run_simulation_pass(
             e, candles, list(order), data_label="SPARSE_SYMBOL_ORDER_REGRESSION",
             allow_sparse_data=True,
+            bar_complete_callback=lambda ts, engine: bar_snapshots.append((
+                ts, round(engine.risk_mgr.current_equity, 6),
+                round(engine.risk_mgr.realized_equity, 6),
+                round(engine.risk_mgr.unrealized_pnl, 6),
+                len(engine.open_positions), len(engine.pending),
+            )),
         )
     finally:
         engine_mod.QuantStrategyCore.evaluate_signal = staticmethod(original_evaluate)
@@ -1073,6 +1081,7 @@ def _run_sparse_replay_symbol_order(order):
         "first_seen": first_seen,
         "ledger": ledger,
         "equity_path": equity_path,
+        "bar_snapshots": bar_snapshots,
         "daily_stop": e.risk_mgr.daily_stop_triggered,
         "kill_switch": e.risk_mgr.kill_switch_triggered,
         "net_pnl": round(audit["net_pnl"], 6),

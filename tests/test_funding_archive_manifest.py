@@ -4,6 +4,9 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from funding_archive_manifest import (
     record_funding_collection, validate_funding_manifest, sha256_file,

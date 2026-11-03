@@ -903,3 +903,4 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Full Research CI [#41705849389](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41705849389) SUCCESS; новая regression и portfolio accounting suite прошли.
 - Влияние на текущий H1 preset: конкретно этот None fallback там не используется, поскольку maker_tp1_and_target=False. Это прежде всего legacy/restored-position accounting consistency defect; никаких market PnL runs не было.
 
+- Follow-up test hardening: added numeric MTM regression for legacy `maker_exits=None` and explicit `maker_exits=False`; [CI #41707011122](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41707011122) SUCCESS (50/50 steps; funding MTM tests 8/8). No PnL replay.

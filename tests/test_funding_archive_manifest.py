@@ -76,6 +76,8 @@ class FundingArchiveManifestTests(unittest.TestCase):
                     "request_start_ms": 3_600_000,
                     "request_end_ms": 7_200_000,
                     "response_rows": 1,
+                    "complete": True,
+                    "saturated": False,
                     "first_ts": 7_200_000,
                     "last_ts": 7_200_000,
                 },
@@ -156,6 +158,8 @@ class FundingArchiveManifestTests(unittest.TestCase):
             "request_start_ms": 3_600_000,
             "request_end_ms": 5_399_999,
             "response_rows": 1,
+            "complete": True,
+            "saturated": False,
         }]
         self.manifest.write_text(json.dumps(payload), encoding="utf-8")
         report = validate_funding_manifest(

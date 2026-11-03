@@ -55,6 +55,15 @@ def resolve_validation_design(environ=None):
         }
     if mode != "confirm":
         raise SystemExit("H1_VALIDATION_MODE must be 'explore' or 'confirm'")
+    frozen_symbols = [
+        item.strip().upper()
+        for item in str(env.get("H1_SYMBOL_ALLOWLIST", "")).split(",")
+        if item.strip()
+    ]
+    if len(frozen_symbols) != 5 or len(set(frozen_symbols)) != 5:
+        raise SystemExit(
+            "confirm mode requires exactly five unique preselected symbols in H1_SYMBOL_ALLOWLIST"
+        )
     try:
         volume = float(env["H1_FROZEN_MIN_VOLUME_RATIO"])
         breakout = float(env["H1_FROZEN_MIN_BREAKOUT_ATR"])
@@ -76,6 +85,7 @@ def resolve_validation_design(environ=None):
         "frozen_config": {
             "min_volume_ratio": volume,
             "min_breakout_atr": breakout,
+            "symbols": frozen_symbols,
         },
     }
 

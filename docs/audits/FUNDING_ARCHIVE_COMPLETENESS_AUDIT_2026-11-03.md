@@ -92,3 +92,17 @@ The Funding downloader now verifies an existing sidecar's CSV SHA-256 and data-r
 Research CI run [#41712039475](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41712039475) completed successfully: 50 workflow steps succeeded, including the H1 selector, H1 runner execution gate, validation-manifest provenance, portfolio accounting/risk-budget, and sparse shared-capital replay tests. The incremental-download tamper regression is included in that successful run.
 
 This validates the code-level guardrails and synthetic/offline fixtures. It does **not** validate a real Bybit historical funding archive, produce a profitable strategy result, or authorize market PnL replay. The current production archive cannot pass until actual dated instrument snapshots and a matching generated schedule evidence file cover each scored interval.
+
+
+### Active workflow collector integration — 2026-11-03
+
+The first implementation touched the legacy root-level `bybit_downloader.py`. Repository workflow inspection then showed that the manual Bybit archive workflow actually executes `scripts/archive_bybit_market_history.py`. The active collector is now integrated too:
+
+- Each Funding API page is recorded with its inclusive query bounds, response count, first/last timestamp, and `complete`/`saturated` status.
+- A page returning the 200-row limit is explicitly marked incomplete; the collector recursively subdivides the requested time window. The manifest validator counts only complete leaf windows toward query coverage.
+- After writing each symbol's Funding CSV, the active collector writes the matching `SYMBOL.csv.audit.json` sidecar with SHA-256, row count and all page metadata.
+- The archive-level manifest now includes the active collector script SHA-256 and per-symbol Funding sidecar/hash references.
+- The H1 replay code provenance list now includes `scripts/archive_bybit_market_history.py`, not only the legacy downloader.
+- An integration regression test calls `archive_symbol()` with mocked market responses and verifies the sidecar is produced.
+
+The sidecar still intentionally has no settlement schedule evidence. The archive workflow receives one point-in-time universe snapshot; it cannot be treated as a historical funding-interval schedule for an arbitrary multi-month archive. H1 market PnL remains blocked until dated schedule evidence spans the scored interval.

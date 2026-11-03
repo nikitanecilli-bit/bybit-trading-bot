@@ -144,24 +144,35 @@ def _utc(ts_ms):
 
 
 def common_training_window(histories):
-    """Return the exact timestamp intersection shared by every candidate history."""
+    """Return the exact contiguous H1 timestamp intersection across all histories."""
     if not histories:
         return {"start_timestamp_ms": None, "end_timestamp_ms": None, "bar_count": 0}
-    starts = [int(rows[0].ts) for rows in histories.values() if rows]
-    ends = [int(rows[-1].ts) for rows in histories.values() if rows]
-    if len(starts) != len(histories) or len(ends) != len(histories):
-        return {"start_timestamp_ms": None, "end_timestamp_ms": None, "bar_count": 0}
-    start = max(starts)
-    end = min(ends)
-    if end < start:
-        return {"start_timestamp_ms": start, "end_timestamp_ms": end, "bar_count": 0}
+
     interval_ms = 3_600_000
-    if start % interval_ms or end % interval_ms or (end - start) % interval_ms:
-        raise ValueError("candidate histories do not share an aligned H1 timestamp grid")
+    common_timestamps = None
+    for symbol, rows in sorted(histories.items()):
+        if not rows:
+            return {"start_timestamp_ms": None, "end_timestamp_ms": None, "bar_count": 0}
+        timestamps = [int(candle.ts) for candle in rows]
+        if any(ts % interval_ms for ts in timestamps):
+            raise ValueError(f"{symbol}: candidate history has an unaligned H1 timestamp")
+        if any(right <= left for left, right in zip(timestamps, timestamps[1:])):
+            raise ValueError(f"{symbol}: candidate history has duplicate or out-of-order timestamps")
+        if any(right - left != interval_ms for left, right in zip(timestamps, timestamps[1:])):
+            raise ValueError(f"{symbol}: candidate history is not contiguous on the H1 grid")
+
+        current = set(timestamps)
+        common_timestamps = current if common_timestamps is None else common_timestamps & current
+        if not common_timestamps:
+            return {"start_timestamp_ms": None, "end_timestamp_ms": None, "bar_count": 0}
+
+    ordered = sorted(common_timestamps)
+    if any(right - left != interval_ms for left, right in zip(ordered, ordered[1:])):
+        raise ValueError("shared candidate timestamp intersection is not contiguous on the H1 grid")
     return {
-        "start_timestamp_ms": start,
-        "end_timestamp_ms": end,
-        "bar_count": (end - start) // interval_ms + 1,
+        "start_timestamp_ms": ordered[0],
+        "end_timestamp_ms": ordered[-1],
+        "bar_count": len(ordered),
     }
 
 

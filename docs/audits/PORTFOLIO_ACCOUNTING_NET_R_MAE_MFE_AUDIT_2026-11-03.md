@@ -147,3 +147,14 @@ A direct read of the archived trade CSVs confirms all 1,452 E11 trade rows and a
 - any future two-sided strategy validation must treat short-side testing as a separate experiment, not infer it from these long-only results.
 
 This is a scope limitation, not a newly discovered defect in the portfolio engine.
+
+
+## Superseding update — UTC risk boundary and journal price precision (2026-11-03)
+
+После исходного статического аудита найдены и исправлены два дополнительных дефекта, не завышавших PnL, но влиявших на риск-контроль и воспроизводимость журнала:
+1. **UTC daily baseline timing (P1):** новый дневной baseline фиксировался до обновления mark equity на границе UTC-даты. Исправлено; first-mark initialization сохранена. Регрессии daily rollover и independent daily/kill latches: Research CI #41682730056 SUCCESS; portfolio accounting 45/45.
+2. **TradeRecord price precision (P1 reporting):** entry/exit prices округлялись до 6 знаков, price levels/distances — до 8; для low-priced assets это теряло точность, хотя PnL считался по исходным значениям. Все price/distance fields переведены на 12 знаков; regression подтверждает восстановление gross PnL и stop distance. Research CI #41685190246 SUCCESS; portfolio accounting 47/47.
+
+Также добавлены отдельные проверки same-bar slot reservation, simultaneous daily-stop/kill-switch latches и funding-adjusted bankruptcy reconciliation. Ни один из этих тестов не запускает рыночный PnL replay.
+
+**Текущий вывод:** confirmed profit-inflating accounting defect в проверенном lifecycle не найден. Исправленные UTC/journal defects закрыты регрессиями. Консервативная taker-MTM vs maker-TP asymmetry остаётся намеренной и протестированной. Liquidation остаётся isolated position-level approximation; account-wide cross-margin/UTA не моделируется. Bybit-native archive отсутствует, поэтому PnL validity/exchange execution остаются data-gated.

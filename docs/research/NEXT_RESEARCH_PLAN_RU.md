@@ -517,3 +517,12 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 3. До появления архива продолжить только инженерный аудит: journal serialization/metrics, H1 runner/data manifests, старые audit-note supersession и PR #4 file classification.
 4. Разобрать PR #4 (210 changed files, 1,268 commits ahead / 15 behind current main; +17,657 / −162) по пакетам; не merge/rebase/force-push whole branch. Любая интеграция — отдельная чистая ветка от актуального main с небольшими проверяемыми патчами.
 5. После закрытия data/account-mode gates — один frozen shared-capital Bybit-native validation. Никаких новых параметрических сеток на proxy данных.
+
+## Main repository organization — completed 2026-11-03
+
+- PR #6 `chore(repo): organize main branch root artifacts` merged by squash into `main`.
+- Main merge commit: `74bca15de1de0d33a7e019116acad856160bfc5e`.
+- Two root HTML dashboards moved to `dashboards/quant_analytics/`; the cognitive protocol moved to `docs/operations/`; the obsolete validator prototype moved to `research/legacy_tools/` with a clear missing-dependencies warning.
+- Engine, downloader, active scripts, tests, workflows and data archives were not moved or modified. Source blobs for moved artifacts were preserved.
+- PR CI passed: [run 41674873356](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41674873356). Main tree paths were re-checked after merge.
+- PR #4 remains Draft and must not be merged wholesale; current compare is 1,268 commits ahead / 15 behind, 210 files, mergeable=false.

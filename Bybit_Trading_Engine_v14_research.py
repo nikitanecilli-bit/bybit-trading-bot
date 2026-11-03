@@ -2316,7 +2316,7 @@ def run_sparse_simulation_pass(
         engine.cfg.bot_version, data_label, audit["total_trades"], audit["net_pnl"], audit["ret_pct"],
         audit["pf"], audit["expectancy_r"], audit["max_dd_pct"], audit["passed_count"]
     )
-    prefix = f"🧪 [БЭКТЕСТ, данные: {data_label}]\\n"
+    prefix = f"🧪 [БЭКТЕСТ, данные: {data_label}]\n"
     if audit["all_ok"]:
         engine.tg.send_message(prefix + CarDashboardTelegramNotifier.format_daily_odometer_report(
             engine.cfg, engine.risk_mgr, audit))

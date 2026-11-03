@@ -26,13 +26,26 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile audited engine and H-A runner
-        run: python -m py_compile Bybit_Trading_Engine_v14_research.py relative_strength_breakout.py scripts/audit_cryptofetch_archives.py scripts/cryptofetch_sparse_loader.py scripts/run_h_a_relative_strength_replay.py
+        run: python -m py_compile Bybit_Trading_Engine_v14_research.py relative_strength_breakout.py scripts/audit_cryptofetch_archives.py scripts/cryptofetch_sparse_loader.py scripts/run_h_a_relative_strength_replay.py scripts/diagnose_h_a_signal_candles.py
       - name: Run frozen baseline and H-A across preregistered folds
         run: python -u scripts/run_h_a_relative_strength_replay.py --execute --output-dir /tmp/h_a_relative_strength
+      - name: Reconstruct causal signal-candle features
+        run: |
+          python -u scripts/diagnose_h_a_signal_candles.py \
+            --results-dir /tmp/h_a_relative_strength \
+            --archive-dir data/archives/cryptofetch \
+            --output-dir /tmp/h_a_signal_diagnostics
       - name: Upload H-A portfolio results and manifests
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: h-a-preregistered-ohlcv-results
           path: /tmp/h_a_relative_strength/
+          if-no-files-found: warn
+      - name: Upload H-A signal-candle attribution
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: h-a-signal-candle-diagnostics
+          path: /tmp/h_a_signal_diagnostics/
           if-no-files-found: warn

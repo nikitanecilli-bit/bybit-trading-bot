@@ -910,6 +910,10 @@ class PlanBStatePersistence:
                     raise ValueError(f"позиция {sym}: entry_ts не может быть позже saved_at_utc")
                 for field_name in numeric_position_fields.intersection(pos_dict):
                     value = pos_dict[field_name]
+                    # Leverage was added after legacy Plan B backups already existed.
+                    # Preserve those positions; liquidation-aware paths separately fail closed without it.
+                    if field_name == "leverage" and value is None:
+                        continue
                     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
                         raise ValueError(f"позиция {sym}: {field_name} должен быть конечным числом")
                     if field_name in positive_position_fields and value <= 0:
@@ -969,6 +973,8 @@ class PlanBStatePersistence:
                             raise ValueError(f"позиция {sym}: {field_name} должен быть конечным числом > 0")
                         parsed_qty[field_name] = value
                 if pos_dict.get("exchange_sized", False):
+                    if pos_dict.get("leverage") is None:
+                        raise ValueError(f"позиция {sym}: exchange_sized требует подтверждённое leverage")
                     required_qty = ("contract_qty", "remaining_contract_qty", "qty_step",
                                     "min_order_qty", "min_notional_value")
                     missing_qty = [name for name in required_qty if name not in parsed_qty]

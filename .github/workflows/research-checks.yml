@@ -17,6 +17,8 @@ on:
       - 'instrument_spec_history.py'
       - 'exchange_order_sizing.py'
       - 'funding_accounting.py'
+      - 'funding_archive_manifest.py'
+      - 'bybit_downloader.py'
       - 'bybit_reconciliation.py'
       - 'scripts/bybit_reconciliation_snapshot.py'
       - 'tests/test_bybit_reconciliation_snapshot.py'

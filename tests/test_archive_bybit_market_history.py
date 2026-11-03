@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.archive_bybit_market_history import (
     FUNDING_WINDOW_MS, fetch_funding_history, fetch_mark_klines, fetch_trade_klines,
     normalize_symbol, parse_funding_rows, parse_mark_rows, parse_trade_rows, validate_base_url,
-    clip_range_to_lifecycle, load_universe_lifecycle,
+    clip_range_to_lifecycle, load_universe_lifecycle, validate_archive_range,
 )
 
 
@@ -136,6 +136,16 @@ class BybitMarketHistoryTests(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         self.assertLess(calls[0][2], 1000)
 
+
+    def test_requested_archive_range_is_validated_before_network(self):
+        hour = 3_600_000
+        validate_archive_range(hour, hour * 3, hour)
+        with self.assertRaisesRegex(ValueError, "boundaries must align"):
+            validate_archive_range(hour + 1, hour * 3, hour)
+        with self.assertRaisesRegex(ValueError, "boundaries must align"):
+            validate_archive_range(hour, hour * 3 + 1, hour)
+        with self.assertRaisesRegex(ValueError, "valid archive range"):
+            validate_archive_range(hour * 3, hour, hour)
 
     def test_lifecycle_clips_to_complete_candle_boundaries(self):
         hour = 3_600_000

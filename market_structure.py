@@ -26,13 +26,7 @@ def ema(values, period):
     return ema_series(values, period)[-1]
 
 
-def trend_direction(candles, fast=10, slow=30, slope=5):
-    """Classify up/down/neutral using full-history EMAs of closed candles only.
-
-    Unlike a rolling-window EMA approximation, the EMA state is carried from the
-    beginning of the supplied chronological history. Trend direction requires
-    fast/slow alignment, slow-EMA slope, and close relative to the slow EMA.
-    """
+def _validate_trend_periods(fast, slow, slope):
     if (
         isinstance(fast, bool) or not isinstance(fast, int) or fast < 1
         or isinstance(slow, bool) or not isinstance(slow, int) or slow < 2
@@ -40,19 +34,36 @@ def trend_direction(candles, fast=10, slow=30, slope=5):
         or fast >= slow
     ):
         raise ValueError("require 1 <= fast < slow and slope >= 1")
+
+
+def trend_direction_series(candles, fast=10, slow=30, slope=5):
+    """Return causal up/down/neutral labels for every completed candle.
+
+    Full-history EMA states are computed once in O(N); use this function rather
+    than calling trend_direction repeatedly inside a per-bar replay.
+    """
+    _validate_trend_periods(fast, slow, slope)
     closes = [float(c.close) for c in candles]
-    if len(closes) < slow + slope + 1:
-        return "neutral"
+    if not closes:
+        return []
     fast_values = ema_series(closes, fast)
     slow_values = ema_series(closes, slow)
-    fast_ema = fast_values[-1]
-    slow_ema = slow_values[-1]
-    prior_slow = slow_values[-slope - 1]
-    if fast_ema > slow_ema and slow_ema > prior_slow and closes[-1] > slow_ema:
-        return "up"
-    if fast_ema < slow_ema and slow_ema < prior_slow and closes[-1] < slow_ema:
-        return "down"
-    return "neutral"
+    output = ["neutral"] * len(closes)
+    for i in range(slow + slope, len(closes)):
+        fast_ema = fast_values[i]
+        slow_ema = slow_values[i]
+        prior_slow = slow_values[i - slope]
+        if fast_ema > slow_ema and slow_ema > prior_slow and closes[i] > slow_ema:
+            output[i] = "up"
+        elif fast_ema < slow_ema and slow_ema < prior_slow and closes[i] < slow_ema:
+            output[i] = "down"
+    return output
+
+
+def trend_direction(candles, fast=10, slow=30, slope=5):
+    """Return the latest causal trend label using full-history EMAs."""
+    labels = trend_direction_series(candles, fast=fast, slow=slow, slope=slope)
+    return labels[-1] if labels else "neutral"
 
 
 def _atr(candles, period=14):

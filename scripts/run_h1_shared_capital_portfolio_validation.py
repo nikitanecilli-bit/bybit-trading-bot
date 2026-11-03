@@ -48,6 +48,8 @@ H1_REPLAY_CODE_PATHS = [
     "market_regime.py",
     "market_structure.py",
     "scripts/validate_funding_coverage.py",
+    "funding_archive_manifest.py",
+    "bybit_downloader.py",
 ]
 SELECTION_INPUT_KEYS = ("kline", "funding", "mark_price", "instrument_specs", "risk_tiers", "universe_snapshot")
 
@@ -320,6 +322,7 @@ def validate_funding_mark_coverage(
 ):
     """Require funding events and Bybit mark candles aligned to every scored H1 bar."""
     from scripts.validate_funding_coverage import validate_coverage
+    from funding_archive_manifest import validate_funding_manifest
 
     report = validate_coverage(
         funding_dir, mark_price_dir, symbols, trade_kline_dir=trade_kline_dir
@@ -330,6 +333,16 @@ def validate_funding_mark_coverage(
     expected = {int(ts) for ts in h1_timestamps if start_ts <= int(ts) <= end_ts}
     for symbol in symbols:
         funding_path = Path(funding_dir) / f"{symbol}.csv"
+        funding_manifest_path = funding_path.with_suffix(funding_path.suffix + ".audit.json")
+        manifest_report = validate_funding_manifest(
+            funding_path, funding_manifest_path, symbol=symbol,
+            required_start_ms=start_ts, required_end_ms=end_ts,
+        )
+        if not manifest_report.get("ok"):
+            raise SystemExit(
+                f"Unverified Bybit funding archive for {symbol}: "
+                f"{manifest_report.get('errors', manifest_report.get('status'))}"
+            )
         mark_path = Path(mark_price_dir) / f"{symbol}.csv"
         with funding_path.open("r", encoding="utf-8-sig", newline="") as handle:
             funding_rows = list(csv.DictReader(handle))
@@ -847,7 +860,7 @@ def build_validation_manifest(
         },
         "funding": {
             "directory": _manifest_path(funding_dir),
-            "files": _directory_file_manifest(funding_dir, {".csv"}),
+            "files": _directory_file_manifest(funding_dir, {".csv", ".json"}),
         },
         "mark_price": {
             "directory": _manifest_path(mark_price_dir),

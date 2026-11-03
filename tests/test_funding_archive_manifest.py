@@ -19,8 +19,18 @@ class FundingArchiveManifestTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def attach_schedule(self, payload, expected_events):
-        snapshot_path = self.root / "instrument_snapshot.json"
-        snapshot_path.write_text('{"source":"Bybit V5 instruments-info"}', encoding="utf-8")
+        source_snapshots = []
+        for ts in (1000, 2000):
+            snapshot_path = self.root / f"instrument_snapshot_{ts}.json"
+            fetched_at = "1970-01-01T00:00:01Z" if ts == 1000 else "1970-01-01T00:00:02Z"
+            snapshot_path.write_text(json.dumps({
+                "schema_version": 1, "category": "linear", "fetched_at": fetched_at,
+                "count": 1, "instruments": [{"symbol": "BTCUSDT", "fundingInterval": "480"}],
+            }), encoding="utf-8")
+            source_snapshots.append({
+                "path": snapshot_path.name, "sha256": sha256_file(snapshot_path),
+                "fetched_at_ms": ts, "funding_interval_minutes": 480,
+            })
         schedule_path = self.root / "BTCUSDT.schedule.json"
         schedule = {
             "schema_version": 1,
@@ -29,12 +39,7 @@ class FundingArchiveManifestTests(unittest.TestCase):
             "category": "linear",
             "coverage_start_ms": 1000,
             "coverage_end_ms": 2000,
-            "source_snapshots": [{
-                "path": snapshot_path.name,
-                "sha256": sha256_file(snapshot_path),
-                "fetched_at_ms": 1000,
-                "funding_interval_minutes": 480,
-            }],
+            "source_snapshots": source_snapshots,
             "expected_settlement_timestamps_ms": expected_events,
         }
         schedule_path.write_text(json.dumps(schedule), encoding="utf-8")

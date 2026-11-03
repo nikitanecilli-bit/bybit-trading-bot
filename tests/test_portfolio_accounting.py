@@ -919,7 +919,7 @@ def _run_full_replay_symbol_order(order):
         }
 
     def capture_after_symbol(symbol, history, *, evaluate_new_signal=True):
-        original_step(symbol, history, evaluate_new_signal=evaluate_new_signal)
+        eligible = original_step(symbol, history, evaluate_new_signal=evaluate_new_signal)
         if symbol == order[-1]:
             risk = e.risk_mgr
             equity_path.append((
@@ -930,6 +930,7 @@ def _run_full_replay_symbol_order(order):
                 bool(risk.daily_stop_triggered),
                 bool(risk.kill_switch_triggered),
             ))
+        return eligible
 
     candles = {}
     for symbol in order:

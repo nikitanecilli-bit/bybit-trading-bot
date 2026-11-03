@@ -125,6 +125,13 @@ def load_frozen_selection_manifest(environ=None):
     }
 
 
+def selection_validation_boundary(timestamps):
+    """Selection must end before the first explore fold, even in confirm-only mode."""
+    if not timestamps:
+        raise SystemExit("Cannot validate selection cutoff against an empty H1 timeline")
+    return timestamps[int(len(timestamps) * 0.5)]
+
+
 def validate_selection_cutoff(selection, first_scored_timestamp_ms):
     """Prove the selector's last training candle precedes every validation fold."""
     cutoff = int(selection["training_cutoff_timestamp_ms"])
@@ -928,7 +935,7 @@ def main():
     print(f"Aligned H1 portfolio: {len(symbols)} symbols, {len(timestamps)} common bars")
     print(f"Archive sources: {len(set(archives.values()))}; starting capital={STARTING_CAPITAL:.0f} USDT")
     design = resolve_validation_design()
-    first_scored_timestamp = timestamps[int(len(timestamps) * design["folds"][0][1])]
+    first_scored_timestamp = selection_validation_boundary(timestamps)
     validate_selection_cutoff(design["selection"], first_scored_timestamp)
     if set(design["selection"]["symbols"]) != set(symbols):
         raise SystemExit("Aligned Bybit universe does not exactly match frozen top-five selection manifest")

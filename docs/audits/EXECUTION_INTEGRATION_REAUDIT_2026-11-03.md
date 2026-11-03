@@ -105,3 +105,15 @@ The final run passed the complete configured Research CI job, including instrume
 - `docs/audits/EXECUTION_REALISM_READINESS_RU.md`
 
 Their historical findings remain useful for chronology, but implementation-status statements preceding this re-audit must be read as superseded where they conflict with the current source described above.
+## 2026-11-03 — H1 archive ingestion and cost-stress hardening
+
+The strict H1 runner now rejects two malformed-but-regular archive cases before alignment or replay:
+
+- Every Bybit H1 `timestamp_ms` must lie exactly on the UTC hour grid (`timestamp_ms % 3_600_000 == 0`), in addition to requiring a continuous one-hour interval. A uniformly shifted series can no longer pass merely because adjacent deltas are correct.
+- Every CSV must contain a `symbol` column, and each row's symbol must match the uppercase filename stem. A mislabeled or cross-contaminated file cannot silently be replayed under another instrument's specs.
+
+The runner's cost multiplier is also scoped to the replay with a context manager. Taker fee, maker fee and taker slippage globals are restored in a `finally` path after both successful and failed runs; invalid non-finite or non-positive multipliers are rejected. This prevents a prior stress variant from contaminating later baseline/variant runs in the same process.
+
+Regression evidence: Research CI [#41678760487](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41678760487), commit `64efe9dae73b34be06f00fc108964811b260ee04`, SUCCESS. The H1 runner gate suite passed **15/15**, including off-hour timestamps, filename/row symbol mismatch, and cost-global restoration after success/exception. The complete configured Research CI job also passed.
+
+Scope: input validation and research-run isolation only. No strategy parameters, signal rules, position sizing formulas, market PnL results, or live execution behavior were changed. The H1 runner still requires actual dated Bybit instrument/risk-tier snapshots, Bybit H1 trade candles, funding and Mark OHLC archives; the green CI does not create or validate the existence of those real archives.

@@ -1501,9 +1501,17 @@ class UnifiedQuantEngine:
         return True
 
     # ---------------- Основной шаг ----------------
-    def step_candle(self, symbol: str, candles_history: List[Candle]) -> None:
+    def step_candle(
+        self, symbol: str, candles_history: List[Candle], *,
+        evaluate_new_signal: bool = True,
+    ) -> bool:
+        """Process this symbol's existing position/order.
+
+        When evaluate_new_signal=False, return True only when this symbol is
+        eligible for the later portfolio-wide signal-discovery phase.
+        """
         if not candles_history:
-            return
+            return False
         curr = candles_history[-1]
         # Candle.ts is the bar OPEN timestamp in the Bybit OHLCV CSV format.
         # Since curr.close is only known at the end of the bar, all equity/risk
@@ -1538,7 +1546,7 @@ class UnifiedQuantEngine:
 
         if symbol in self.open_positions:
             self._manage_position(symbol, candles_history, fill_bar=False, exit_ts=bar_close_ts)
-            return
+            return False
 
         if symbol in self.pending:
             if self._try_fill_pending(symbol, curr):
@@ -1550,22 +1558,25 @@ class UnifiedQuantEngine:
                 )
                 self._update_mark_to_market(bar_close_ts)
                 self._manage_position(symbol, candles_history, fill_bar=True, exit_ts=bar_close_ts)
-                return
+                return False
             # A multi-bar execution policy may retain an unfilled order in
             # self.pending. Do not evaluate a fresh signal for this symbol and
-            # overwrite that order on the same candle. The default one-bar
-            # policy removes the pending order on failure, so its behavior is unchanged.
+            # overwrite that order on the same candle.
             if symbol in self.pending:
-                return
+                return False
+
+        if not evaluate_new_signal:
+            return True
 
         can_open, _ = self.risk_mgr.can_open_new_trade(len(self.open_positions) + len(self.pending))
         if not can_open:
-            return
+            return False
         sig = QuantStrategyCore.evaluate_signal(symbol, candles_history, self.cfg)
         if not sig:
-            return
+            return False
         self.pending[symbol] = sig        # исполнение — на СЛЕДУЮЩЕЙ свече
         self._persist()
+        return False
 
     def _open_portfolio_risk_usdt(self) -> float:
         """Conservative sum of estimated stop risk on remaining open position sizes."""
@@ -2211,9 +2222,27 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
         bar_close_ts = candles[symbols[0]][bar].ts + timeframe_ms
         engine._update_mark_to_market(bar_close_ts)
         engine._prepare_pending_entry_risk_budgets()
+        signal_candidates = []
         for sym in symbols:
-            engine.step_candle(sym, candles[sym][lo:bar + 1])
+            if engine.step_candle(
+                sym, candles[sym][lo:bar + 1], evaluate_new_signal=False,
+            ):
+                signal_candidates.append(sym)
         engine._bar_entry_risk_budgets.clear()
+
+        # Discover every eligible signal from the same post-execution portfolio
+        # state. Position-slot priority is applied to the complete pending batch
+        # on the next bar, never to whichever symbols happen to be iterated first.
+        for sym in signal_candidates:
+            can_open, _ = engine.risk_mgr.can_open_new_trade(len(engine.open_positions))
+            if not can_open:
+                break
+            sig = QuantStrategyCore.evaluate_signal(
+                sym, candles[sym][lo:bar + 1], engine.cfg,
+            )
+            if sig:
+                engine.pending[sym] = sig
+                engine._persist()
 
     # Не оставляем открытые позиции вне статистики: закрываем их по последнему close.
     engine.finalize_open_positions({sym: candles[sym][-1] for sym in symbols}, exit_reason="end_of_test")

@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from scripts.run_h1_shared_capital_portfolio_validation import (
-    build_ema50_200_label_maps, h1_variant_modes, h1_variant_name,
+    build_ema50_200_label_maps, build_paired_ema_comparison, h1_variant_modes, h1_variant_name,
     resolve_ema50_200_gate,
 )
 from market_structure import lookup_trend_label
@@ -53,26 +53,48 @@ def test_ema50_200_gate_is_explicitly_opt_in_and_rejects_invalid_values():
 
 
 
-def test_ema_gate_is_explicit_opt_in_and_variant_output_is_unambiguous():
-    assert resolve_ema50_200_gate({}) is False
-    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "0"}) is False
-    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "false"}) is False
-    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "1"}) is True
-    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "true"}) is True
-    try:
-        resolve_ema50_200_gate({"H1_EMA50_200_GATE": "maybe"})
-    except SystemExit:
-        pass
-    else:
-        raise AssertionError("invalid EMA gate setting must fail closed")
 
-    baseline = h1_variant_name(1.6, 0.1, 2.0, False)
-    gated = h1_variant_name(1.6, 0.1, 2.0, True)
-    assert baseline == "vol1.6_breakATR0.1_cost2"
-    assert gated == "vol1.6_breakATR0.1_cost2_ema50_200_up"
-    assert baseline != gated
-    assert h1_variant_modes(False) == (False,)
-    assert h1_variant_modes(True) == (False, True)
+def test_paired_ema_comparison_matches_identical_configs_and_costs():
+    def row(gated, net, trades, costs):
+        return {
+            "fold": 1,
+            "min_volume_ratio": 1.6,
+            "min_breakout_atr": 0.1,
+            "cost_multiplier": 2.0,
+            "ema50_200_gate": gated,
+            "net_pnl": net,
+            "trades": trades,
+            "costs": costs,
+            "profit_factor": 0.9 if gated else 0.8,
+            "expectancy_r": -0.02 if gated else -0.05,
+        }
+
+    result = build_paired_ema_comparison(
+        [row(False, -100.0, 40, 50.0), row(True, -60.0, 25, 30.0)],
+        comparison_enabled=True,
+    )
+    assert result["mode"] == "paired_baseline_vs_ema50_200_up"
+    assert result["pair_count"] == 1
+    pair = result["pairs"][0]
+    assert pair["delta_net_pnl_ema_minus_baseline"] == 40.0
+    assert pair["delta_trades_ema_minus_baseline"] == -15
+    assert pair["delta_costs_ema_minus_baseline"] == -20.0
+
+
+def test_paired_ema_comparison_fails_closed_for_unpaired_rows():
+    baseline = {
+        "fold": 1, "min_volume_ratio": 1.6, "min_breakout_atr": 0.1,
+        "cost_multiplier": 2.0, "ema50_200_gate": False,
+        "net_pnl": -100.0, "trades": 40, "costs": 50.0,
+        "profit_factor": 0.8, "expectancy_r": -0.05,
+    }
+    try:
+        build_paired_ema_comparison([baseline], comparison_enabled=True)
+    except ValueError as exc:
+        assert "exactly paired" in str(exc)
+    else:
+        raise AssertionError("missing EMA comparison leg must fail closed")
+
 
 
 def test_ema_gate_precomputes_full_history_and_uses_exact_scored_timestamp():
@@ -138,7 +160,8 @@ def test_ema_gate_rejects_non_contiguous_h1_history():
 if __name__ == "__main__":
     tests = [
         test_ema50_200_gate_is_explicitly_opt_in_and_rejects_invalid_values,
-        test_ema_gate_is_explicit_opt_in_and_variant_output_is_unambiguous,
+        test_paired_ema_comparison_matches_identical_configs_and_costs,
+        test_paired_ema_comparison_fails_closed_for_unpaired_rows,
         test_ema_gate_precomputes_full_history_and_uses_exact_scored_timestamp,
         test_ema_gate_fails_closed_without_1000_pre_roll_bars,
         test_ema_gate_fails_closed_for_missing_symbol_or_history,

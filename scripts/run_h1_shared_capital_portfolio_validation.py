@@ -34,6 +34,9 @@ WAIT_BARS = 3
 STARTING_CAPITAL = 10_000.0
 LEVERAGE_MODE = "ISOLATED_5X"
 LEVERAGE_VAL = 5.0
+MAX_CHASE_LIMIT_PCT = 1.5
+ACCELERATED_ATR_TRAIL_AFTER_1_5R = False
+ENABLE_POST_BREAK_INVALIDATION = False
 MAX_CONCURRENT_POSITIONS = 5
 COST_MULTIPLIERS = [1.0, 1.5, 2.0]
 H1_REPLAY_CODE_PATHS = [
@@ -712,6 +715,9 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
     cfg.max_risk_trade_pct = 1.0
     cfg.max_portfolio_risk_pct = 2.0
     cfg.max_concurrent_positions = MAX_CONCURRENT_POSITIONS
+    cfg.max_chase_limit_pct = MAX_CHASE_LIMIT_PCT
+    cfg.accelerated_atr_trail_after_1_5r = ACCELERATED_ATR_TRAIL_AFTER_1_5R
+    cfg.enable_post_break_invalidation = ENABLE_POST_BREAK_INVALIDATION
     cfg.daily_stop_loss_pct = 5.0
     cfg.emergency_kill_switch_pct = 30.0
     cfg.donchian_period = 20
@@ -1121,7 +1127,9 @@ def build_validation_manifest(
             "max_portfolio_risk_pct": 2.0,
             "daily_stop_loss_pct": 5.0,
             "emergency_kill_switch_pct": 30.0,
-            "max_chase_limit_pct": 1.5,
+            "max_chase_limit_pct": MAX_CHASE_LIMIT_PCT,
+            "accelerated_atr_trail_after_1_5r": ACCELERATED_ATR_TRAIL_AFTER_1_5R,
+            "enable_post_break_invalidation": ENABLE_POST_BREAK_INVALIDATION,
             "donchian_period": 20,
             "atr_period": 14,
             "stop_atr_mult": 2.5,

@@ -41,18 +41,17 @@ class IsolatedLiquidationTests(unittest.TestCase):
         self.assertLess(long.liquidation_price, Decimal("40000"))
         self.assertGreater(short.liquidation_price, Decimal("40000"))
 
-    def test_candidate_liquidation_notional_selects_its_own_tier(self):
+    def test_long_liquidation_can_fall_into_a_lower_risk_tier(self):
         tiers = [
             tier(1, "100000", "0.005", "100"),
             tier(2, "500000", "0.01", "50", "500"),
         ]
         result = calculate_isolated_usdt_liquidation_price(
             symbol="BTCUSDT", direction="long", entry_price="120000",
-            quantity="1", leverage="10", tiers=tiers,
+            quantity="1", leverage="5", tiers=tiers,
         )
-        self.assertEqual(result.tier_id, 2)
-        self.assertGreater(result.liquidation_position_value, Decimal("100000"))
-        self.assertLessEqual(result.liquidation_position_value, Decimal("500000"))
+        self.assertEqual(result.tier_id, 1)
+        self.assertLessEqual(result.liquidation_position_value, Decimal("100000"))
 
     def test_rejects_entry_over_highest_risk_limit(self):
         with self.assertRaisesRegex(ValueError, "entry notional exceeds"):

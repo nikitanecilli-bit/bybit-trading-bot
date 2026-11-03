@@ -2160,6 +2160,8 @@ class UnifiedQuantEngine:
 
         exit_price: Optional[float] = None
         exit_reason: Optional[str] = None
+        maker_exits = (pos.order_type == "limit") if pos.maker_exits is None else pos.maker_exits
+        final_exit_maker = False
         liquidation_exit = getattr(self, "_intrabar_liquidation_exits", {}).get(symbol)
         if liquidation_exit is None:
             liquidation_exit = self._liquidation_exit_price(pos, curr, exit_ts)
@@ -2225,13 +2227,30 @@ class UnifiedQuantEngine:
             tp2_hit = (curr.high >= pos.tp2_price) if is_long else (curr.low <= pos.tp2_price)
             if tp2_hit:
                 if not pos.tp1_hit:
-                    self._apply_tp1(pos, exit_ts)  # TP1 lies between entry and TP2; both are filled
+                    tp1_applied = self._apply_tp1(pos, exit_ts)  # TP1 lies between entry and TP2; both are filled
+                    if tp1_applied:
+                        tp1_marketable_at_open = (
+                            curr.open > pos.tp1_price if is_long
+                            else curr.open < pos.tp1_price
+                        )
+                        pos.tp1_maker = bool(maker_exits and not tp1_marketable_at_open)
+                tp2_marketable_at_open = (
+                    curr.open > pos.tp2_price if is_long
+                    else curr.open < pos.tp2_price
+                )
+                final_exit_maker = bool(maker_exits and not tp2_marketable_at_open)
                 exit_price, exit_reason = pos.tp2_price, "take_profit"
             else:
                 if not pos.tp1_hit:
                     tp1_hit = (curr.high >= pos.tp1_price) if is_long else (curr.low <= pos.tp1_price)
                     if tp1_hit:
-                        self._apply_tp1(pos, exit_ts)
+                        tp1_applied = self._apply_tp1(pos, exit_ts)
+                        if tp1_applied:
+                            tp1_marketable_at_open = (
+                                curr.open > pos.tp1_price if is_long
+                                else curr.open < pos.tp1_price
+                            )
+                            pos.tp1_maker = bool(maker_exits and not tp1_marketable_at_open)
 
                 if pos.tp1_hit:
                     trail_mult = (1.15 if (cfg.accelerated_atr_trail_after_1_5r and mfe_r >= 1.5)
@@ -2280,7 +2299,10 @@ class UnifiedQuantEngine:
                 self._persist()
 
         if exit_price is not None and exit_reason is not None:
-            self._close_position(pos, exit_price, exit_reason, exit_ts, mae_r, mfe_r)
+            self._close_position(
+                pos, exit_price, exit_reason, exit_ts, mae_r, mfe_r,
+                final_exit_maker if exit_reason == "take_profit" else False,
+            )
 
     @staticmethod
     def _leg_cost(notional: float, maker: bool) -> Tuple[float, float]:

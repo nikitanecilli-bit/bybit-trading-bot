@@ -490,6 +490,43 @@ def aligned_h1_datasets(kline_dir):
     ))
     return aligned, archives, timestamps
 
+AVERAGE_MONTH_MS = 365.2425 / 12.0 * 24.0 * 60.0 * 60.0 * 1000.0
+
+
+def geometric_monthly_return_pct(net_pnl, starting_capital, start_ts, end_ts,
+                                  bar_interval_ms=3_600_000):
+    """Geometric monthly-equivalent return from a cumulative fold result.
+
+    This is a normalized rate, not evidence that every calendar month was
+    profitable. The final H1 candle is treated as complete through its close.
+    """
+    values = (net_pnl, starting_capital)
+    if any(not math.isfinite(float(value)) for value in values):
+        raise ValueError("net_pnl and starting_capital must be finite")
+    if starting_capital <= 0:
+        raise ValueError("starting_capital must be positive")
+    if (
+        isinstance(start_ts, bool) or not isinstance(start_ts, int)
+        or isinstance(end_ts, bool) or not isinstance(end_ts, int)
+        or isinstance(bar_interval_ms, bool) or not isinstance(bar_interval_ms, int)
+        or bar_interval_ms <= 0 or end_ts < start_ts
+    ):
+        raise ValueError("invalid fold timestamps or bar interval")
+    duration_ms = end_ts - start_ts + bar_interval_ms
+    duration_months = duration_ms / AVERAGE_MONTH_MS
+    final_equity = float(starting_capital) + float(net_pnl)
+    if final_equity <= 0:
+        monthly_pct = -100.0
+    else:
+        monthly_pct = (math.pow(final_equity / float(starting_capital),
+                                1.0 / duration_months) - 1.0) * 100.0
+    return {
+        "duration_days": duration_ms / 86_400_000.0,
+        "duration_months": duration_months,
+        "geometric_monthly_return_pct": monthly_pct,
+    }
+
+
 def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, end_frac,
                           min_vol, min_breakout_atr, cost_multiplier,
                           instrument_specs_dir, risk_tiers_dir,
@@ -637,9 +674,13 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         t.exchange_fees_usdt + t.slippage_cost_usdt + t.funding_cost_usdt
         for t in trades
     )
+    monthly_metrics = geometric_monthly_return_pct(
+        audit["net_pnl"], STARTING_CAPITAL, start_ts, end_ts,
+    )
     return {
         "timeframe": "1h",
         "fold": fold,
+        **{key: round(value, 4) for key, value in monthly_metrics.items()},
         "variant": f"vol{min_vol:g}_breakATR{min_breakout_atr:g}_cost{cost_multiplier:g}",
         "cost_multiplier": cost_multiplier,
         "min_volume_ratio": min_vol,
@@ -911,6 +952,14 @@ def build_validation_manifest(
         "code_files": code_files,
         "outputs": {
             "portfolio_results_csv": output_record,
+        },
+        "result_metric_definitions": {
+            "return_pct": "cumulative net fold return relative to shared starting capital",
+            "geometric_monthly_return_pct": (
+                "geometric monthly-equivalent rate derived from cumulative fold net return "
+                "and exact fold duration; not a claim of positive returns in every calendar month"
+            ),
+            "duration_days": "inclusive H1 fold duration from first candle open through last candle close",
         },
         "result_rows": result_rows,
     }

@@ -11,7 +11,7 @@ import argparse
 import csv
 import json
 import sys
-from collections import defaultdict
+from statistics import median
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -108,11 +108,21 @@ def run_variant(
 ) -> dict[str, Any]:
     engine = configure_engine(list(data), label)
     equity_path: list[dict[str, Any]] = []
+    active_by_close_ts = {
+        candle.ts + 3_600_000: sum(
+            1 for rows in data.values()
+            if rows[0].ts <= candle.ts <= rows[-1].ts
+        )
+        for candles in data.values() for candle in candles
+    }
+    active_counts: list[int] = []
+    eligible_counts: list[int] = []
 
     def capture_bar(ts_ms, current_engine):
         if ts_ms < start_ts:
             return
         risk = current_engine.risk_mgr
+        active_counts.append(active_by_close_ts.get(ts_ms, 0))
         equity_path.append({
             "timestamp_ms": ts_ms,
             "equity": round(risk.current_equity, 6),
@@ -125,11 +135,16 @@ def run_variant(
         })
 
     if use_h_a:
+        def context_provider(ts_ms, histories, cfg):
+            context = build_strength_context(ts_ms, histories, cfg)
+            if ts_ms >= start_ts + 3_600_000:
+                eligible_counts.append(context["cross_section_size"])
+            return context
+
         def evaluator(symbol, history, cfg, context):
             if not history or not (start_ts <= history[-1].ts <= end_ts):
                 return None
             return evaluate_relative_strength_breakout(symbol, history, cfg, context)
-        context_provider = build_strength_context
     else:
         baseline_evaluator = em.QuantStrategyCore.evaluate_signal
 
@@ -159,10 +174,13 @@ def run_variant(
     })
 
     trades = []
-    by_symbol = defaultdict(lambda: {
-        "trades": 0, "gross_pnl": 0.0, "fees": 0.0,
-        "slippage": 0.0, "funding": 0.0, "net_pnl": 0.0,
-    })
+    by_symbol = {
+        symbol: {
+            "trades": 0, "gross_pnl": 0.0, "fees": 0.0,
+            "slippage": 0.0, "funding": 0.0, "net_pnl": 0.0,
+        }
+        for symbol in data
+    }
     for trade in engine.closed_trades:
         row = {
             "symbol": trade.token,
@@ -194,6 +212,15 @@ def run_variant(
             symbol[key] += float(value)
 
     peak_exposure = max((row["open_positions"] for row in equity_path), default=0)
+
+    def distribution(values):
+        if not values:
+            return {"samples": 0, "min": None, "median": None, "max": None}
+        return {
+            "samples": len(values), "min": min(values),
+            "median": median(values), "max": max(values),
+        }
+
     result = {
         "variant": "H-A_relative_strength_breakout" if use_h_a else "baseline_H1_Donchian_volume",
         "fold_start_utc": iso(start_ts),
@@ -213,6 +240,8 @@ def run_variant(
             "peak_concurrent_positions": peak_exposure,
         },
         "monthly_returns": monthly_returns(equity_path),
+        "active_universe_size_by_bar": distribution(active_counts),
+        "eligible_cross_section_size_by_bar": distribution(eligible_counts),
         "symbol_attribution": {
             symbol: {key: round(value, 6) if isinstance(value, float) else value
                      for key, value in values.items()}

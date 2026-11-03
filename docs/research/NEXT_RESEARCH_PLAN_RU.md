@@ -526,3 +526,21 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 - Engine, downloader, active scripts, tests, workflows and data archives were not moved or modified. Source blobs for moved artifacts were preserved.
 - PR CI passed: [run 41674873356](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41674873356). Main tree paths were re-checked after merge.
 - PR #4 remains Draft and must not be merged wholesale; current compare is 1,268 commits ahead / 15 behind, 210 files, mergeable=false.
+
+
+## Обновление 2026-11-03 — shared-capital protective accounting audit
+
+Завершён следующий блок проверки портфельного lifecycle без рыночных PnL прогонов:
+- Исправлен UTC midnight baseline: mark на границе даты теперь сначала обновляет equity, затем задаёт baseline нового дня; первый mark после старта по-прежнему сравнивается со стартовым/restored equity.
+- Проверено независимое срабатывание daily stop и emergency kill-switch; смена UTC-даты сбрасывает только daily latch, kill-switch остаётся latched.
+- Добавлена регрессия, доказывающая, что pending entry не использует слот, освобождённый закрытием другой позиции позднее в том же баре. Предварительное распределение risk/slots уже блокировало этот путь; исправление движка для него не потребовалось.
+- Проверено, что TP1 partial transition повторно маркирует portfolio MTM; существующие reconciliation и permutation tests покрывают одновременные TP1/stop и multiple closes.
+- Funding-adjusted bankruptcy formula сверена с final net loss: funding сдвигает bankruptcy price, а отдельное вычитание funding cashflow приводит к одному учёту allocated margin loss, не к двойному списанию.
+
+**CI evidence:** [#41682730056 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41682730056), portfolio accounting 45/45; [#41683684185 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41683684185), gap execution 31/31 и portfolio accounting 45/45; [#41684012791 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41684012791), isolated liquidation 16/16. Полные Research workflows завершились успешно.
+
+**Не закрыто:** account-wide cross-margin/UTA liquidation, реальные exchange fills/queue, персональные fee tiers и историческая settlement mark price. Это остаётся явно ограниченной областью модели, не доказанной биржевой симуляцией.
+
+**Data gate перепроверен по текущему Git tree:** `data/archives/` содержит только `cryptofetch/`; `data/archives/bybit/` и `data/instrument_specs/` отсутствуют. Архивный workflow уже реализован, но требует self-hosted GitHub runner вне США и материкового Китая; workflow dispatch из подключённых инструментов этой сессии недоступен. Не запускать Bybit PnL replay на proxy и не подменять исторические snapshots текущими.
+
+**Следующий автономный шаг без пользователя:** продолжить аудит journal serialization/metrics, H1 runner manifest и file/workflow provenance; проверить отсутствие новых дублирующих экспериментов. Для Bybit-native market validation остаётся один внешний blocker: владелец репозитория должен один раз настроить разрешённый self-hosted runner и запустить уже готовые snapshot/archive workflows. После появления данных — только один frozen shared-capital validation, без параметрического sweep.

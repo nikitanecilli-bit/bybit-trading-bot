@@ -292,3 +292,19 @@ Current branch HEAD: `87e7e7bd5af2df339849459d463e8a9dc93cf83e`. Current engine 
 
 ### Decision
 Do not integrate current instrument specifications retrospectively and do not claim exchange-executable performance. Next valid step is to obtain a dated, complete instrument-spec snapshot and historical funding/mark datasets through a permitted data-access route; then wire as-of validation and margin/liquidation tiers with regression tests. Until then, backtest PnL remains a strategy-research estimate under simplified notional sizing, not a faithful Bybit account simulation. No engine code change was justified by this re-verification.
+
+## 2026-11-03 — re-check: same-timestamp symbol processing remains OPEN
+
+Повторно проверен текущий `run_simulation_pass()` на HEAD ветки после изменений 2026-11-03.
+
+Подтверждённый порядок в коде:
+1. На каждом общем баре вызывается `_prepare_portfolio_intrabar_marks()` для всех символов.
+2. Затем один раз вызывается общий `_update_mark_to_market(bar_close_ts)`.
+3. Рассчитываются пакетные `_prepare_pending_entry_risk_budgets()`.
+4. После этого `step_candle()` вызывается последовательно в порядке входного списка `symbols`; внутри каждого шага повторно выполняется MTM, а затем обрабатывается позиция, pending fill или новый сигнал.
+
+Пакетное распределение risk budget уже ранжирует eligible pending signals по `vol_ratio` с symbol tie-break, что снижает зависимость от порядка при распределении слотов. Однако последовательные закрытия позиций, повторные MTM/risk-latch updates и новые входы происходят внутри одного прохода по символам. По статическому чтению нельзя утверждать, что итоговый equity path и forced-exit decisions полностью инвариантны к перестановке списка символов.
+
+**Классификация:** OPEN / модельный риск, не доказанный дефект. Не менял код и не запускал PnL replay.
+
+**Обязательный детерминированный тест перед следующим рыночным экспериментом:** взять один и тот же синхронизированный synthetic fixture и выполнить replay с несколькими перестановками `symbols`; сравнить trade ledger (symbol, entry/exit timestamps, fill/exit reason, qty/notional, gross, fees, slippage, funding), realized/unrealized equity по каждому bar-close timestamp, daily-stop/kill-switch latches и final equity. Если есть различия, определить явную фазовую обработку бара (manage all existing positions → resolve pending entries as a batch → evaluate new signals) и закрепить её тестами до любых PnL claims.

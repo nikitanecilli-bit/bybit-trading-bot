@@ -1,5 +1,8 @@
 # Аудит интеграции exchange sizing и официальных Bybit V5 спецификаций
 
+> **Актуальный статус на 2026-11-03:** этот документ фиксирует более ранний этап до ENG-EXEC-009–014. Exchange-valid sizing и dated risk-tier lookup теперь подключены в `UnifiedQuantEngine._try_fill_pending()`; H1 runner требует Bybit-native candles, funding/Mark OHLC и исторически покрывающие instrument/risk-tier snapshots. Поэтому утверждения ниже о том, что sizing не подключён к engine, следует читать как исторические и superseded. Текущая реализация и оставшиеся ограничения описаны в [Execution integration re-audit](EXECUTION_INTEGRATION_REAUDIT_2026-11-03.md). Снимки и полноценные Bybit market archives пока отсутствуют; это не снимает P0 data gate.
+
+
 Дата: 2026-11-03
 Статус: CONFIRMED INTEGRATION GAP; instrument field parser matches current Linear schema.
 Ветка: `research/market-regime-v1-main`.

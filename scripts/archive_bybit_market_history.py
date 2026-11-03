@@ -427,6 +427,19 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
     validate_base_url(base_url)
     if pause < 0:
         raise ValueError("pause cannot be negative")
+    root = Path(output_root)
+    funding_path = root / "funding" / f"{symbol.upper()}.csv"
+    funding_manifest_path = funding_path.with_suffix(funding_path.suffix + ".audit.json")
+    kline_path = root / "kline" / f"{symbol.upper()}.csv"
+    mark_path = root / "mark_price" / f"{symbol.upper()}.csv"
+    existing_outputs = [
+        funding_path, funding_manifest_path, kline_path, mark_path,
+    ]
+    if any(path.exists() for path in existing_outputs):
+        raise FileExistsError(
+            f"Bybit archive output already exists for {symbol} in {root}; "
+            "use a fresh output root rather than overwriting provenance."
+        )
     funding_pages: list[dict[str, Any]] = []
     funding = fetch_funding_history(
         symbol, start_ms, end_ms, base_url=base_url, pause=pause,
@@ -434,13 +447,8 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
     )
     klines = fetch_trade_klines(symbol, start_ms, end_ms, interval, base_url=base_url, pause=pause)
     marks = fetch_mark_klines(symbol, start_ms, end_ms, interval, base_url=base_url, pause=pause)
-    root = Path(output_root)
-    funding_path = root / "funding" / f"{symbol.upper()}.csv"
-    kline_path = root / "kline" / f"{symbol.upper()}.csv"
-    mark_path = root / "mark_price" / f"{symbol.upper()}.csv"
     _atomic_csv(funding_path, ["symbol", "funding_timestamp_ms", "funding_rate"], funding)
     from funding_archive_manifest import record_funding_collection
-    funding_manifest_path = funding_path.with_suffix(funding_path.suffix + ".audit.json")
     funding_manifest = record_funding_collection(
         funding_path, funding_manifest_path, symbol=symbol, category="linear",
         api_base=base_url, requested_start_ms=start_ms,

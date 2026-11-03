@@ -18,6 +18,7 @@ from run_h1_shared_capital_portfolio_validation import (
     BASE_TAKER_FEE, BASE_MAKER_FEE, BASE_TAKER_SLIP,
     resolve_validation_design, load_frozen_selection_manifest,
     validate_selection_cutoff, validate_selection_provenance, runtime_provenance,
+    selection_validation_boundary,
 )
 
 
@@ -180,6 +181,21 @@ def test_runtime_provenance_separates_research_checkout_from_workflow_ref():
                 os.environ.pop(name, None)
             else:
                 os.environ[name] = value
+
+
+
+def test_selection_boundary_remains_first_explore_fold_in_confirm_mode():
+    timestamps = [1_700_000_000_000 + i * 3_600_000 for i in range(10)]
+    boundary = selection_validation_boundary(timestamps)
+    assert boundary == timestamps[5]
+    validate_selection_cutoff({"training_cutoff_timestamp_ms": timestamps[4]}, boundary)
+    try:
+        # A cutoff at 60% would pass a confirm-only 80% check, but must fail the 50% gate.
+        validate_selection_cutoff({"training_cutoff_timestamp_ms": timestamps[6]}, boundary)
+    except SystemExit as exc:
+        assert "selection leakage" in str(exc)
+    else:
+        raise AssertionError("selection must not consume data from explore folds")
 
 
 def test_selection_cutoff_must_precede_validation():
@@ -516,6 +532,7 @@ if __name__ == "__main__":
         test_selection_provenance_rejects_changed_data_and_code,
         test_selection_provenance_rejects_changed_universe_snapshot,
         test_runtime_provenance_separates_research_checkout_from_workflow_ref,
+        test_selection_boundary_remains_first_explore_fold_in_confirm_mode,
         test_selection_cutoff_must_precede_validation,
         test_confirm_mode_rejects_missing_or_unregistered_config,
         test_cost_stress_restores_engine_globals_after_success_and_exception,

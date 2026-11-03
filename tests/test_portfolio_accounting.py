@@ -303,6 +303,7 @@ def test_conservative_maker_mtm_can_trip_daily_stop_before_modeled_maker_close()
 
     close_engine = make_engine()
     close_pos = make_position(size=1_000.0, order_type="limit", maker_exits=True)
+    close_engine.open_positions["BTCUSDT"] = close_pos
     close_engine._close_position(
         close_pos, exit_price=110.0, exit_reason="take_profit",
         exit_ts=exit_ts, mae_r=0.0, mfe_r=2.0,

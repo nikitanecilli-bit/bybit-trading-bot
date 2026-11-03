@@ -340,6 +340,15 @@ def run_diagnostics(results_dir: Path, archive_dir: Path, output_dir: Path) -> d
                     "mae_r": trade["mae_r"],
                     "mfe_r": trade["mfe_r"],
                     "order_type": trade["order_type"],
+                    "initial_stop_dist": trade.get("initial_stop_dist"),
+                    "initial_stop_price": trade.get("initial_stop_price"),
+                    "tp1_price": trade.get("tp1_price"),
+                    "tp2_price": trade.get("tp2_price"),
+                    "tp1_hit": trade.get("tp1_hit"),
+                    "tp1_ts_ms": trade.get("tp1_ts_ms"),
+                    "realized_tp1_gross_usdt": trade.get("realized_tp1_gross_usdt"),
+                    "remaining_fraction_at_exit": trade.get("remaining_fraction_at_exit"),
+                    "final_stop_price": trade.get("final_stop_price"),
                     **features,
                 }
                 enriched.append(row)

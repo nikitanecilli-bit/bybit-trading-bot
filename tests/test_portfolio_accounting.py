@@ -290,11 +290,45 @@ def test_close_trade_reconciles_net_pnl_fees_slippage_and_realized_equity():
     assert trade.risk_pct == 0.5
     assert trade.gross_r_multiple == 2.0
     assert trade.r_multiple == trade.pnl_usdt / trade.risk_usdt
+    assert trade.initial_stop_dist == 5.0
+    assert trade.initial_stop_price == 95.0
+    assert trade.tp1_price == 106.0
+    assert trade.tp2_price == 112.0
+    assert trade.tp1_hit is False
+    assert trade.tp1_ts_ms is None
+    assert trade.realized_tp1_gross_usdt == 0.0
+    assert trade.remaining_fraction_at_exit == 1.0
+    assert trade.final_stop_price == 95.0
     assert e.risk_mgr.realized_equity == round(10_000.0 + trade.pnl_usdt, 4)
     assert e.risk_mgr.current_equity == round(
         e.risk_mgr.realized_equity + e.risk_mgr.unrealized_pnl, 4
     )
     assert "BTCUSDT" not in e.open_positions
+
+
+def test_trade_record_retains_tp1_partial_state_and_remaining_quantity():
+    e = make_engine()
+    pos = make_position(
+        size=1_000.0, remaining=0.4, tp1_hit=True,
+        tp1_gross=23.5, order_type="market",
+    )
+    pos.tp1_ts_ms = pos.entry_ts + 3_600_000
+    pos.stop_price = 103.0
+    e.open_positions["BTCUSDT"] = pos
+
+    e._close_position(
+        pos, exit_price=105.0, exit_reason="trailing_stop",
+        exit_ts=pos.entry_ts + 3 * 3_600_000, mae_r=0.35, mfe_r=2.4,
+    )
+
+    trade = e.closed_trades[-1]
+    assert trade.tp1_hit is True
+    assert trade.tp1_ts_ms == pos.entry_ts + 3_600_000
+    assert trade.realized_tp1_gross_usdt == 23.5
+    assert trade.remaining_fraction_at_exit == 0.4
+    assert trade.initial_stop_dist == 5.0
+    assert trade.initial_stop_price == 95.0
+    assert trade.final_stop_price == 103.0
 
 
 def run_simultaneous_entries(order):

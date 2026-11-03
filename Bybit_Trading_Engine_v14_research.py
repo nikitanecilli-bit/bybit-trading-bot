@@ -46,7 +46,8 @@ from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
 from typing import List, Dict, Optional, Tuple, Any, Callable
 
-from funding_accounting import accrued_funding_cost
+from funding_accounting import accrued_funding_cost, accrued_funding_cost_for_remaining_margin
+from mark_price_liquidation import evaluate_isolated_margin_health, calculate_isolated_usdt_bankruptcy_price
 from instrument_spec_history import InstrumentSpecHistory
 from bybit_risk_tiers import RiskTierHistory
 from exchange_order_sizing import size_to_exchange_constraints
@@ -369,6 +370,15 @@ class Candle:
     low: float
     close: float
     volume: float
+
+
+@dataclass(frozen=True)
+class MarkPriceCandle:
+    ts: int
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
 
 
 @dataclass
@@ -1283,6 +1293,8 @@ class UnifiedQuantEngine:
         if max_risk_tier_age_ms is not None and max_risk_tier_age_ms < 0:
             raise ValueError("max_risk_tier_age_ms cannot be negative")
         self.max_risk_tier_age_ms = max_risk_tier_age_ms
+        self.liquidation_model_enabled = bool(self.risk_tier_history is not None and mark_price_dir)
+        self._mark_price_candles: Dict[str, Dict[int, MarkPriceCandle]] = {}
         if bool(funding_dir) != bool(mark_price_dir):
             raise ValueError("--funding-dir and --mark-price-dir must be provided together")
         self.funding_by_symbol: Dict[str, List[Dict[str, Any]]] = {}
@@ -1347,33 +1359,55 @@ class UnifiedQuantEngine:
             raise ValueError(f"No funding CSV files found in {directory}")
 
     def _load_mark_price_history(self, directory: str) -> None:
-        """Load mark-price candles; use exact timestamp_ms candle open as settlement proxy."""
+        """Load exact-timestamp Mark OHLC; retain open-only legacy files for funding."""
         if not os.path.isdir(directory):
             raise ValueError(f"Mark-price directory does not exist: {directory}")
         for path in glob.glob(os.path.join(directory, "*.csv")):
             symbol = os.path.splitext(os.path.basename(path))[0].upper()
             marks: Dict[int, Decimal] = {}
+            candles: Dict[int, MarkPriceCandle] = {}
             with open(path, "r", encoding="utf-8-sig", newline="") as handle:
                 reader = csv.DictReader(handle)
-                if not reader.fieldnames or not {"timestamp_ms", "open"}.issubset(reader.fieldnames):
+                required = {"timestamp_ms", "open"}
+                full_ohlc = {"high", "low", "close"}.issubset(set(reader.fieldnames or []))
+                if not reader.fieldnames or not required.issubset(reader.fieldnames):
                     raise ValueError(f"{path}: required columns timestamp_ms,open")
+                if self.liquidation_model_enabled and not full_ohlc:
+                    raise ValueError(f"{path}: liquidation model requires timestamp_ms,open,high,low,close")
                 for line_no, row in enumerate(reader, start=2):
                     try:
                         row_symbol = str(row.get("symbol") or symbol).upper()
                         ts = int(row["timestamp_ms"])
-                        mark = Decimal(str(row["open"]))
+                        mark_open = Decimal(str(row["open"]))
+                        if full_ohlc:
+                            mark_high = Decimal(str(row["high"]))
+                            mark_low = Decimal(str(row["low"]))
+                            mark_close = Decimal(str(row["close"]))
                     except (TypeError, ValueError, KeyError, InvalidOperation) as exc:
                         raise ValueError(f"{path}:{line_no}: invalid mark-price row") from exc
-                    if row_symbol != symbol or ts <= 0 or not mark.is_finite() or mark <= 0:
+                    if row_symbol != symbol or ts <= 0 or not mark_open.is_finite() or mark_open <= 0:
                         raise ValueError(f"{path}:{line_no}: invalid symbol/timestamp/mark price")
                     if ts in marks:
                         raise ValueError(f"{path}:{line_no}: duplicate mark-price timestamp {ts}")
-                    marks[ts] = mark
+                    marks[ts] = mark_open
+                    if full_ohlc:
+                        values = (mark_open, mark_high, mark_low, mark_close)
+                        if any(not value.is_finite() or value <= 0 for value in values):
+                            raise ValueError(f"{path}:{line_no}: Mark OHLC values must be finite and positive")
+                        if mark_high < max(mark_open, mark_low, mark_close) or mark_low > min(mark_open, mark_high, mark_close):
+                            raise ValueError(f"{path}:{line_no}: invalid Mark OHLC ordering")
+                        candles[ts] = MarkPriceCandle(ts, mark_open, mark_high, mark_low, mark_close)
             if not marks:
                 raise ValueError(f"{path}: no mark-price rows found")
             self._funding_mark_prices[symbol] = marks
+            if candles:
+                self._mark_price_candles[symbol] = candles
         if not self._funding_mark_prices:
             raise ValueError(f"No mark-price CSV files found in {directory}")
+        if self.liquidation_model_enabled:
+            missing = sorted(set(self.funding_by_symbol) - set(self._mark_price_candles))
+            if missing:
+                raise ValueError(f"Liquidation model requires full Mark OHLC for symbols: {missing}")
 
     def reset_state_for_new_run(self) -> None:
         self.risk_mgr.reset_for_backtest(self.cfg)

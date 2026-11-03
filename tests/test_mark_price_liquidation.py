@@ -187,6 +187,27 @@ class IsolatedLiquidationTests(unittest.TestCase):
             Decimal("40800.0"),
         )
 
+    def test_bankruptcy_price_shifts_with_allocated_extra_margin_and_funding(self):
+        base = calculate_isolated_usdt_bankruptcy_price(
+            direction="long", entry_price="40000", leverage="10", quantity="1",
+        )
+        added = calculate_isolated_usdt_bankruptcy_price(
+            direction="long", entry_price="40000", leverage="10", quantity="1",
+            extra_margin="100",
+        )
+        paid = calculate_isolated_usdt_bankruptcy_price(
+            direction="long", entry_price="40000", leverage="10", quantity="1",
+            funding_net_cost="50",
+        )
+        received = calculate_isolated_usdt_bankruptcy_price(
+            direction="short", entry_price="40000", leverage="10", quantity="1",
+            funding_net_cost="-50",
+        )
+        self.assertEqual(base, Decimal("36000"))
+        self.assertEqual(added, Decimal("35900"))
+        self.assertEqual(paid, Decimal("36050"))
+        self.assertEqual(received, Decimal("43950"))
+
     def test_mark_candle_detects_long_and_short_liquidation_crossings(self):
         self.assertTrue(mark_candle_crosses_liquidation(
             direction="long", liquidation_price="95000",

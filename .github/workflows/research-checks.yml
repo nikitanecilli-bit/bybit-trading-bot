@@ -29,6 +29,7 @@ on:
       - 'scripts/bybit_private_api_check.py'
       - '.github/workflows/bybit-private-api-check.yml'
       - 'scripts/run_h1_shared_capital_portfolio_validation.py'
+      - 'scripts/run_h_a_relative_strength_replay.py'
       - 'scripts/validate_funding_coverage.py'
       - 'tests/**'
       - '.github/workflows/research-checks.yml'

@@ -90,4 +90,11 @@ The architectural integration path is now implemented without changing the basel
 
 Deterministic tests cover exact lookup, full 1,000-bar burn-in, H1 continuity, missing symbol/timestamp, and prefix invariance. Research CI [#41727906187](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41727906187) completed **SUCCESS, 54/54 steps** at commit `8ab840b7a127518411b01fd9828008dd479aef18`.
 
-Important boundary: the current H1 main grid does not pass this optional map, and no EMA-gated market PnL replay has been run. Existing baseline behavior is unchanged. This is integration infrastructure and deterministic validation only; no strategy edge is established.
+The paired integration is now wired into the H1 runner and manual workflow:
+- Default `ema50_200_comparison=off` keeps baseline-only behavior.
+- `ema50_200_comparison=paired` maps to `H1_EMA50_200_GATE=1` and runs both baseline and EMA50/200-up candidate for every identical fold/volume/breakout/cost configuration.
+- Each leg is a separate shared-capital replay with the same starting capital and settings; capital is not shared between the baseline and candidate portfolios.
+- Result labels carry the `_ema50_200_up` suffix. The validation manifest includes exact paired deltas for net PnL, trade count, costs, PF and expectancy. Duplicate or missing comparison legs fail closed.
+- CI [#41728994842](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41728994842) completed **SUCCESS, 55/55 steps**, including paired-row matching and missing-pair rejection tests.
+
+No EMA-gated market PnL replay has been run. The opt-in comparison is infrastructure, not evidence of an edge. The default baseline path is unchanged. Since replay-critical code hashes changed, any existing H1 selector manifest must be regenerated before future validation; the provenance gate intentionally rejects stale code hashes.

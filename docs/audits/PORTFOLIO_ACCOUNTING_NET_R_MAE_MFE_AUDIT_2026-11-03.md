@@ -38,7 +38,7 @@ Risk manager ведёт `current_equity = realized_equity + unrealized_pnl`. Н�
 В `_unrealized_pnl_at_marks()` оставшаяся позиция всегда получает оценку будущего выхода как taker:
 `remaining_notional * (TAKER_FEE + TAKER_SLIP)`.
 
-В `_close_position()` финальная нога при `exit_reason == "take_profit"` и `maker_exits == True` оценивается как maker без taker slippage.
+В `_close_position()` финальная TP2-нога теперь получает отдельный liquidity flag: если свеча открылась за лимитной целью, исполнение классифицируется как taker с taker slippage; если цель достигнута обычным внутрисвечным касанием, сохраняется настроенный maker proxy. TP1 имеет отдельный сохранённый per-leg flag, одинаковый в MTM и final close. См. `EXECUTION_INTEGRATION_REAUDIT_2026-11-03.md`.
 
 Текущие константы:
 - taker fee = 0.055%;
@@ -195,3 +195,10 @@ Bybit's Funding Fee documentation states that opening or closing within five sec
 **Correction:** exact entry-boundary payments are charged; exact entry-boundary receipts are not credited. This is a conservative event-order convention, not a claim that every real fill at that instant is charged. Events strictly before entry remain excluded. Both full trade PnL and remaining-margin funding use the same entry-boundary policy; Mark-price proxy is still required at that timestamp.
 
 Regression tests cover payment vs receipt, both funding helpers, strict pre-entry exclusion, and the realized close ledger. Research CI [#41716240400](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41716240400) completed SUCCESS: **50/50 workflow steps**, including cumulative Funding accounting, realized Funding PnL, and Mark OHLC liquidation integration. No market PnL replay was run.
+
+
+## Marketable TP gap liquidity classification — 2026-11-03
+
+The execution model now mirrors its existing entry-gap treatment for take-profit limit legs. A TP1/TP2 limit crossed by the candle open is classified as taker rather than maker; ordinary intrabar target touches retain the configured maker proxy. TP1 classification is persisted and used identically in MTM and closed PnL; final TP2 liquidity is recorded in TradeRecord. The model keeps the target limit price on a gap (no price-improvement credit), so this correction affects fees/slippage, not gross fill price.
+
+Research CI [#41720537099](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41720537099) passed 52/52 steps. Non-gap maker fills remain optimistic without L2/queue/partial-fill evidence. No market PnL replay was run.

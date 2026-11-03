@@ -170,6 +170,13 @@ def main() -> int:
     payload = {
         "schema_version": 1,
         "run_protocol_id": "H-C-RT-CRYPTOFETCH-2026-11-04-v1",
+        "prior_attempts": [{
+            "workflow_run_id": 41722181706,
+            "outcome": "pre-execution import failure",
+            "reason": "ModuleNotFoundError: No module named 'scripts'",
+            "archive_loading_started": False,
+            "pnl_replay_started": False,
+        }],
         "hypothesis": "H-C post-break invalidation versus frozen H1 Donchian-volume baseline",
         "test_type": "reverse_time_robustness_proxy_not_forward_oos",
         "data_source": "existing CryptoFetch Binance-style H1 OHLCV archive",

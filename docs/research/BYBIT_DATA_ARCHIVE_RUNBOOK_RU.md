@@ -17,13 +17,15 @@ GitHub-hosted runner в США уже дал HTTP 403 от Bybit. Для заг�
 
 В репозитории: Settings → Actions → Runners → New self-hosted runner. Установить runner на постоянно доступном компьютере/VPS в разрешённом регионе и выполнить выданные GitHub команды. Не добавлять API keys: перечисленные market-data endpoints публичные.
 
+**Текущее ограничение публикации workflow (проверено 2026-11-03):** три collector workflow и H1 validation workflow существуют в `research/market-regime-v1-main`, но отсутствуют в default branch `main`. Поэтому их нельзя считать доступными для штатного `workflow_dispatch` в репозитории до выборочной интеграции самих workflow и всех требуемых зависимостей в default branch. PR #4 целиком для этого не использовать: он сильно diverged. Нужна отдельная узкая интеграционная ветка от актуального `main` после dependency audit.
+
 Если аккаунт зарегистрирован на казахстанском сайте Bybit, задать repository variable BYBIT_API_BASE_URL=https://api.bybit.kz; в любом случае hostname должен соответствовать сайту регистрации аккаунта.
 
 ## 3. Сбор
 
-1. Запустить вручную workflow Archive Bybit instrument specifications с runner=self-hosted. Он сохраняет полную линейную спецификацию и дальше работает по расписанию 3-го и 17-го числа.
-2. Запустить Archive Bybit risk-limit tiers с runner=self-hosted. Он сохраняет risk tiers и дальше работает еженедельно.
-3. Запустить Archive Bybit OHLCV, funding and mark-price history с runner=self-hosted. Указать symbols, start_ms и end_ms (end exclusive, границы H1), interval=60. Результат сохраняется в data/archives/bybit/<start_ms>_<end_ms>_<run_id>/{kline,funding,mark_price}.
+1. После публикации workflow в default branch запустить Archive Bybit instrument specifications с runner=self-hosted. Текущий YAML содержит только `workflow_dispatch`; расписание не настроено.
+2. После публикации workflow в default branch запустить Archive Bybit risk-limit tiers с runner=self-hosted. Текущий YAML содержит только `workflow_dispatch`; расписание не настроено.
+3. После публикации workflow в default branch запустить Archive Bybit OHLCV, funding and mark-price history с runner=self-hosted. Указать symbols, start_ms и end_ms (end exclusive, границы H1), interval=60. Результат сохраняется в data/archives/bybit/<start_ms>_<end_ms>_<run_id>/{kline,funding,mark_price}. Текущий YAML также только ручной, без cron.
 
 ## 4. Запуск H1 validation
 
@@ -53,3 +55,12 @@ Workflow публикует два артефакта: итоговый `h1_shar
 ## 6. Ограничения после сбора
 
 Даже при полном покрытии данных остаются приближениями: OHLC penetration вместо реальной очереди лимитной заявки, отсутствие исторического bid/ask spread и partial-fill adverse selection, mark-candle open как proxy funding settlement mark, базовые maker/taker fee rates вместо персонального fee tier, отсутствие account-mode-specific liquidation model. Эти ограничения должны быть отражены в отчёте каждого теста.
+
+
+## 7. Что требуется до первого запуска
+
+- [ ] Выборочно перенести collector workflows и их Python-модули/зависимости в отдельную ветку от актуального `main`; не переносить весь PR #4.
+- [ ] Добавить workflow-файлы в default branch, иначе `workflow_dispatch` не будет доступен как обычный запуск.
+- [ ] Отдельно решить и реализовать расписание snapshots после успешного первого ручного сбора; сейчас `schedule`/cron отсутствует.
+- [ ] Проверить, что self-hosted runner зарегистрирован и имеет label `self-hosted`, а egress country не US/CN.
+- [ ] Запустить сначала snapshots, затем ограниченный архив H1 и проверить coverage/artifacts до любого PnL.

@@ -15,6 +15,8 @@ engine_mod = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = engine_mod
 spec.loader.exec_module(engine_mod)
 
+from multibar_limit_wait import prepare_signal_for_next_bar_fill
+
 
 def make_position(symbol="BTCUSDT", direction="long", entry=100.0, size=1000.0,
                   remaining=1.0, tp1_hit=False, tp1_gross=0.0, order_type="market",
@@ -63,18 +65,20 @@ def test_original_signal_timestamp_survives_delayed_fill_and_journal_export():
     e = make_engine()
     fill_ts = 1_800_000_000_000
     original_signal_ts = fill_ts - 2 * 3_600_000
-    e.pending["BTCUSDT"] = {
+    delayed_signal = {
         "symbol": "BTCUSDT",
         "direction": "long",
         "strategy": "H1-momentum-breakout",
-        # The H1 wrapper adapts this field only as a strict next-bar freshness guard.
-        "signal_ts": fill_ts - 3_600_000,
-        "signal_origin_ts": original_signal_ts,
+        "signal_ts": original_signal_ts,
         "entry_price": 100.0,
         "stop_dist": 5.0,
         "order_type": "market",
         "breakout_level": 99.0,
     }
+    prepare_signal_for_next_bar_fill(delayed_signal, fill_ts, 3_600_000)
+    assert delayed_signal["signal_ts"] == fill_ts - 3_600_000
+    assert delayed_signal["signal_origin_ts"] == original_signal_ts
+    e.pending["BTCUSDT"] = delayed_signal
     candle = engine_mod.Candle(fill_ts, 100.0, 101.0, 99.0, 100.5, 10.0)
 
     assert e._try_fill_pending("BTCUSDT", candle) is True

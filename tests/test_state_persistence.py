@@ -49,6 +49,10 @@ class StatePersistenceTests(unittest.TestCase):
             risk.kill_switch_triggered = True
             risk.daily_stop_triggered = True
             position = sample_position()
+            position.risk_tier_id = 2
+            position.risk_limit_value = "500000"
+            position.maintenance_margin_rate = "0.01"
+            position.maintenance_margin_deduction = "500"
             pending = {
                 "ETHUSDT": {
                     "symbol": "ETHUSDT", "direction": "short",
@@ -71,6 +75,10 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertEqual(seq, 42)
             self.assertEqual(restored_pending, pending)
             self.assertEqual(positions["BTCUSDT"], position)
+            self.assertEqual(positions["BTCUSDT"].risk_tier_id, 2)
+            self.assertEqual(positions["BTCUSDT"].risk_limit_value, "500000")
+            self.assertEqual(positions["BTCUSDT"].maintenance_margin_rate, "0.01")
+            self.assertEqual(positions["BTCUSDT"].maintenance_margin_deduction, "500")
             self.assertEqual(restored_risk.realized_equity, 9_500.0)
             self.assertEqual(restored_risk.unrealized_pnl, -125.0)
             self.assertEqual(restored_risk.current_equity, 9_375.0)

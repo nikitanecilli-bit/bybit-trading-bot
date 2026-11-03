@@ -255,7 +255,10 @@ class FundingArchiveManifestTests(unittest.TestCase):
             self.csv, self.manifest, symbol="BTCUSDT",
             required_start_ms=3_600_000, required_end_ms=7_200_000,
         )
-        self.assertIn("funding_events_do_not_match_dated_schedule", report["errors"])
+        self.assertIn(
+            "expected_settlement_schedule_not_reconstructed_from_interval",
+            report["errors"],
+        )
 
 
 if __name__ == "__main__":

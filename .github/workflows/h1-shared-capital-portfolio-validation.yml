@@ -19,6 +19,20 @@ on:
         description: "Optional comma-separated frozen Bybit universe (e.g. BTCUSDT,ETHUSDT); blank uses coverage filtering"
         required: false
         type: string
+      validation_mode:
+        description: "Explore = grid on folds 1-2 only; confirm = one frozen configuration on final fold 3 only"
+        required: true
+        type: choice
+        options: [explore, confirm]
+        default: explore
+      frozen_min_volume_ratio:
+        description: "Required in confirm mode; select one predeclared grid value"
+        required: false
+        type: string
+      frozen_min_breakout_atr:
+        description: "Required in confirm mode; select one predeclared grid value"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -73,6 +87,9 @@ jobs:
           BYBIT_MARK_PRICE_DIR: ${{ inputs.mark_price_dir }}
           BYBIT_KLINE_DIR: ${{ inputs.kline_dir }}
           H1_SYMBOL_ALLOWLIST: ${{ inputs.symbols }}
+          H1_VALIDATION_MODE: ${{ inputs.validation_mode }}
+          H1_FROZEN_MIN_VOLUME_RATIO: ${{ inputs.frozen_min_volume_ratio }}
+          H1_FROZEN_MIN_BREAKOUT_ATR: ${{ inputs.frozen_min_breakout_atr }}
           BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}
         run: python scripts/run_h1_shared_capital_portfolio_validation.py
       - name: Upload report

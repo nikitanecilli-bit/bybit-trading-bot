@@ -330,6 +330,11 @@ def load_universe_lifecycle(path: str | Path) -> tuple[dict[str, dict[str, Any]]
             raise ValueError(f"duplicate symbol in universe snapshot: {symbol}")
         if row.get("contractType") != "LinearPerpetual" or row.get("quoteCoin") != "USDT" or row.get("settleCoin") != "USDT":
             continue
+        status = row.get("status")
+        if status in {"PreLaunch", "PendingOpen"}:
+            continue
+        if status not in {"Trading", "Settling", "Delivering", "Closed"}:
+            raise ValueError(f"unsupported lifecycle status for {symbol}: {status!r}")
         try:
             launch_ms = int(str(row.get("launchTime")))
             delivery_ms = int(str(row.get("deliveryTime", "0")))
@@ -337,7 +342,9 @@ def load_universe_lifecycle(path: str | Path) -> tuple[dict[str, dict[str, Any]]
             raise ValueError(f"invalid lifecycle timestamps for {symbol}") from exc
         if launch_ms <= 0 or delivery_ms < 0 or (delivery_ms and delivery_ms < launch_ms):
             raise ValueError(f"invalid lifecycle bounds for {symbol}")
-        by_symbol[symbol] = {"launch_ms": launch_ms, "delivery_ms": delivery_ms, "status": row.get("status")}
+        if status in {"Settling", "Delivering", "Closed"} and delivery_ms == 0:
+            raise ValueError(f"{status} instrument {symbol} has no deliveryTime; lifecycle end is unknown")
+        by_symbol[symbol] = {"launch_ms": launch_ms, "delivery_ms": delivery_ms, "status": status}
     if not by_symbol:
         raise ValueError("universe snapshot contains no USDT linear perpetual instruments")
     return by_symbol, hashlib.sha256(raw_bytes).hexdigest(), fetched_at

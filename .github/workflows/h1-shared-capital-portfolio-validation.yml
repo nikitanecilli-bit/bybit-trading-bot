@@ -16,8 +16,12 @@ on:
         required: true
         type: string
       symbols:
-        description: "Comma-separated frozen universe; confirm mode requires exactly five preselected symbols"
-        required: false
+        description: "Exactly five symbols selected by the train-only selector"
+        required: true
+        type: string
+      selection_manifest:
+        description: "Committed JSON output from the H1 top-five train-only selector"
+        required: true
         type: string
       validation_mode:
         description: "Explore = grid on folds 1-2 only; confirm = one frozen configuration on final fold 3 only"
@@ -87,6 +91,7 @@ jobs:
           BYBIT_MARK_PRICE_DIR: ${{ inputs.mark_price_dir }}
           BYBIT_KLINE_DIR: ${{ inputs.kline_dir }}
           H1_SYMBOL_ALLOWLIST: ${{ inputs.symbols }}
+          H1_SELECTION_MANIFEST: ${{ inputs.selection_manifest }}
           H1_VALIDATION_MODE: ${{ inputs.validation_mode }}
           H1_FROZEN_MIN_VOLUME_RATIO: ${{ inputs.frozen_min_volume_ratio }}
           H1_FROZEN_MIN_BREAKOUT_ATR: ${{ inputs.frozen_min_breakout_atr }}

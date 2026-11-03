@@ -918,8 +918,8 @@ def _run_full_replay_symbol_order(order):
             "signal_ts": signal_ts, "vol_ratio": vol_ratio[symbol],
         }
 
-    def capture_after_symbol(symbol, history):
-        original_step(symbol, history)
+    def capture_after_symbol(symbol, history, *, evaluate_new_signal=True):
+        original_step(symbol, history, evaluate_new_signal=evaluate_new_signal)
         if symbol == order[-1]:
             risk = e.risk_mgr
             equity_path.append((
@@ -977,6 +977,7 @@ def test_full_run_simulation_pass_is_invariant_to_symbol_order():
     assert forward["open_symbols"] == reverse["open_symbols"] == set()
     assert forward["pending_symbols"] == reverse["pending_symbols"] == set()
     assert len(forward["ledger"]) == len(reverse["ledger"]) == 2
+    assert {row[0] for row in forward["ledger"]} == {"ETHUSDT", "SOLUSDT"}
     assert {row[0] for row in forward["ledger"]} == {row[0] for row in reverse["ledger"]}
     assert forward["ledger"] == reverse["ledger"]
     assert forward["equity_path"] == reverse["equity_path"]

@@ -495,8 +495,11 @@ def main() -> None:
             "lifecycle_clipped": effective_start != args.start_ms or effective_end != args.end_ms,
         })
         results.append(result)
+    collector_path = Path(__file__).resolve()
     report = {
         "source": "Bybit V5 trade kline + funding history + mark price kline",
+        "collector_script": collector_path.name,
+        "collector_script_sha256": hashlib.sha256(collector_path.read_bytes()).hexdigest(),
         "universe_snapshot": args.universe_snapshot,
         "universe_snapshot_sha256": universe_sha256,
         "universe_snapshot_fetched_at": universe_fetched_at,

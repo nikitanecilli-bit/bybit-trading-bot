@@ -120,6 +120,51 @@ class FundingArchiveManifestTests(unittest.TestCase):
         self.assertTrue(report["ok"], report["errors"])
         self.assertTrue(report["settlement_schedule_verified"])
 
+    def test_validator_rejects_matching_csv_and_schedule_that_both_omit_a_settlement(self):
+        payload = self.record()
+        self.csv.write_text(
+            "timestamp,datetime,funding_rate\\n"
+            "3600000,1970-01-01,0.001\\n",
+            encoding="utf-8",
+        )
+        payload["csv_sha256"] = sha256_file(self.csv)
+        payload["csv_data_rows"] = 1
+        self.attach_schedule(payload, [3_600_000])
+        report = validate_funding_manifest(
+            self.csv, self.manifest, symbol="BTCUSDT",
+            required_start_ms=3_600_000, required_end_ms=7_200_000,
+        )
+        self.assertFalse(report["ok"])
+        self.assertIn(
+            "expected_settlement_schedule_not_reconstructed_from_interval",
+            report["errors"],
+        )
+        self.assertFalse(report["settlement_schedule_verified"])
+
+    def test_validator_fails_closed_when_dated_interval_changes_without_effective_boundary(self):
+        payload = self.record()
+        self.attach_schedule(payload, [3_600_000, 7_200_000])
+        schedule_path = self.root / "BTCUSDT.schedule.json"
+        schedule = json.loads(schedule_path.read_text(encoding="utf-8"))
+        first_snapshot = self.root / schedule["source_snapshots"][0]["path"]
+        raw_snapshot = json.loads(first_snapshot.read_text(encoding="utf-8"))
+        raw_snapshot["instruments"][0]["fundingInterval"] = "120"
+        first_snapshot.write_text(json.dumps(raw_snapshot), encoding="utf-8")
+        schedule["source_snapshots"][0]["sha256"] = sha256_file(first_snapshot)
+        schedule["source_snapshots"][0]["funding_interval_minutes"] = 120
+        schedule_path.write_text(json.dumps(schedule), encoding="utf-8")
+        payload["settlement_schedule_evidence"]["sha256"] = sha256_file(schedule_path)
+        self.manifest.write_text(json.dumps(payload), encoding="utf-8")
+        report = validate_funding_manifest(
+            self.csv, self.manifest, symbol="BTCUSDT",
+            required_start_ms=3_600_000, required_end_ms=7_200_000,
+        )
+        self.assertIn(
+            "funding_interval_changed_without_effective_boundary_evidence",
+            report["errors"],
+        )
+        self.assertFalse(report["settlement_schedule_verified"])
+
     def test_validator_detects_csv_mutation_after_collection(self):
         payload = self.record()
         self.attach_schedule(payload, [3_600_000, 7_200_000])

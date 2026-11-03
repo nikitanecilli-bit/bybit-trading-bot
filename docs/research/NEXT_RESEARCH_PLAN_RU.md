@@ -516,7 +516,7 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 1. Не делать H-A threshold sweep и не переиспользовать старые fold для оценки H-C.
 2. Проверить, настроен ли non-US/non-CN self-hosted runner; после его появления выполнить ручные dated instrument/risk-tier captures и Bybit H1/funding/Mark archive с проверкой coverage.
 3. До появления архива продолжить только инженерный аудит: remaining journal metrics (Net R denominator, MAE/MFE, drawdown aggregation), H1 runner/data manifests, старые audit-note supersession и PR #4 file classification. Signal→fill timestamp provenance уже закрыт и regression-tested.
-4. Разобрать PR #4 (211 changed files, 1,326 commits ahead / 18 behind current main; +17,451 / −164) по пакетам; не merge/rebase/force-push whole branch. Любая интеграция — отдельная чистая ветка от актуального main с небольшими проверяемыми патчами.
+4. Разобрать PR #4 (211 changed files, 1,327 commits ahead / 18 behind current main; +17,460 / −164) по пакетам; не merge/rebase/force-push whole branch. Любая интеграция — отдельная чистая ветка от актуального main с небольшими проверяемыми патчами.
 5. После закрытия data/account-mode gates — один frozen shared-capital Bybit-native validation. Никаких новых параметрических сеток на proxy данных.
 
 ## v15 dashboard safety disclosure — completed in main 2026-11-03

@@ -404,6 +404,7 @@ class OpenPositionState:
     risk_usdt: float
     order_type: str
     maker_exits: Optional[bool] = None
+    tp1_maker: Optional[bool] = None  # actual TP1 liquidity classification after gap handling
     breakout_level: Optional[float] = None  # signal-time Donchian boundary
     signal_ts_ms: Optional[int] = None  # original signal close; may precede delayed limit fill
     tp1_hit: bool = False
@@ -488,6 +489,8 @@ class TradeRecord:
     remaining_fraction_at_exit: float = 1.0
     final_stop_price: Optional[float] = None
     breakout_level: Optional[float] = None
+    tp1_maker: Optional[bool] = None
+    final_exit_maker: Optional[bool] = None
 
 
 # =====================================================================
@@ -1040,6 +1043,8 @@ class PlanBStatePersistence:
                         raise ValueError(f"позиция {sym}: {field_name} должен быть bool")
                 if "maker_exits" in pos_dict and pos_dict["maker_exits"] is not None and not isinstance(pos_dict["maker_exits"], bool):
                     raise ValueError(f"позиция {sym}: maker_exits должен быть bool или null")
+                if "tp1_maker" in pos_dict and pos_dict["tp1_maker"] is not None and not isinstance(pos_dict["tp1_maker"], bool):
+                    raise ValueError(f"позиция {sym}: tp1_maker должен быть bool или null")
                 if "risk_tier_id" in pos_dict and pos_dict["risk_tier_id"] is not None:
                     value = pos_dict["risk_tier_id"]
                     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:

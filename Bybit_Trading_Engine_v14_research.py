@@ -2281,7 +2281,7 @@ class UnifiedQuantEngine:
             id=pos.trade_id, token=pos.symbol, direction=pos.direction,
             entry_date=datetime.fromtimestamp(pos.entry_ts / 1000.0, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             exit_date=datetime.fromtimestamp(exit_ts / 1000.0, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            entry_price=round(pos.entry_price, 6), exit_price=round(exit_price, 6),
+            entry_price=round(pos.entry_price, 12), exit_price=round(exit_price, 12),
             size_usdt=pos.size_usdt, strategy=pos.strategy,
             pnl_usdt=net_pnl, gross_pnl=gross_pnl,
             r_multiple=net_pnl / risk,
@@ -2307,19 +2307,19 @@ class UnifiedQuantEngine:
             maintenance_margin_deduction=pos.maintenance_margin_deduction,
             initial_margin_usdt=pos.initial_margin_usdt,
             maintenance_margin_usdt=pos.maintenance_margin_usdt,
-            initial_stop_dist=round(pos.initial_stop_dist, 8),
+            initial_stop_dist=round(pos.initial_stop_dist, 12),
             initial_stop_price=round(
                 pos.entry_price - pos.initial_stop_dist if pos.direction == "long"
-                else pos.entry_price + pos.initial_stop_dist, 8,
+                else pos.entry_price + pos.initial_stop_dist, 12,
             ),
-            tp1_price=round(pos.tp1_price, 8),
-            tp2_price=round(pos.tp2_price, 8),
+            tp1_price=round(pos.tp1_price, 12),
+            tp2_price=round(pos.tp2_price, 12),
             tp1_hit=bool(pos.tp1_hit),
             tp1_ts_ms=pos.tp1_ts_ms,
             realized_tp1_gross_usdt=round(pos.realized_tp1_gross_usdt, 8),
             remaining_fraction_at_exit=round(pos.remaining_fraction, 8),
-            final_stop_price=round(pos.stop_price, 8),
-            breakout_level=round(pos.breakout_level, 8) if pos.breakout_level is not None else None,
+            final_stop_price=round(pos.stop_price, 12),
+            breakout_level=round(pos.breakout_level, 12) if pos.breakout_level is not None else None,
         )
         self.closed_trades.append(record)
         del self.open_positions[pos.symbol]

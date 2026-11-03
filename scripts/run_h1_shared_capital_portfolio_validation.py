@@ -8,6 +8,7 @@ partial fills, and adverse selection are not modelled.
 """
 from __future__ import annotations
 import csv
+import json
 import os
 import sys
 from pathlib import Path
@@ -57,6 +58,60 @@ def resolve_execution_snapshot_dirs(environ=None):
                 "Refusing legacy notional-proxy market PnL replay."
             )
     return str(instrument_dir), str(risk_tier_dir)
+
+
+def _snapshot_timestamp_ms(path):
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        fetched_at = payload.get("fetched_at") if isinstance(payload, dict) else None
+        parsed = datetime.fromisoformat(str(fetched_at).replace("Z", "+00:00"))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        raise SystemExit(f"Invalid dated Bybit snapshot metadata in {path}: {exc}") from exc
+    if parsed.tzinfo is None:
+        raise SystemExit(f"Bybit snapshot timestamp must include timezone: {path}")
+    return int(parsed.timestamp() * 1000)
+
+
+def validate_snapshot_history_coverage(
+    instrument_specs_dir, risk_tiers_dir, start_ts, end_ts,
+    max_age_ms=30 * 24 * 60 * 60 * 1000,
+):
+    """Require point-in-time snapshots to cover every tested timestamp within max age."""
+    if end_ts < start_ts or max_age_ms < 0:
+        raise ValueError("invalid snapshot coverage interval or max_age_ms")
+    for label, directory in (
+        ("instrument specs", Path(instrument_specs_dir)),
+        ("risk tiers", Path(risk_tiers_dir)),
+    ):
+        files = sorted(directory.glob("*.json"))
+        stamps = sorted(_snapshot_timestamp_ms(path) for path in files)
+        eligible = [stamp for stamp in stamps if stamp <= start_ts]
+        if not eligible:
+            raise SystemExit(
+                f"No dated Bybit {label} snapshot at or before test start "
+                f"({start_ts}); a current snapshot cannot validate historical candles."
+            )
+        covered_stamps = [eligible[-1]] + [
+            stamp for stamp in stamps if eligible[-1] < stamp <= end_ts
+        ]
+        previous = covered_stamps[0]
+        if start_ts - previous > max_age_ms:
+            raise SystemExit(
+                f"Bybit {label} history starts stale: age_ms={start_ts - previous}, "
+                f"max_age_ms={max_age_ms}."
+            )
+        for stamp in covered_stamps[1:]:
+            if stamp - previous > max_age_ms:
+                raise SystemExit(
+                    f"Gap in Bybit {label} snapshots exceeds max_age_ms: "
+                    f"gap_ms={stamp - previous}, max_age_ms={max_age_ms}."
+                )
+            previous = stamp
+        if end_ts - previous > max_age_ms:
+            raise SystemExit(
+                f"Bybit {label} history ends stale: age_ms={end_ts - previous}, "
+                f"max_age_ms={max_age_ms}."
+            )
 
 
 def aligned_h1_datasets():
@@ -139,6 +194,11 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
     n = len(timestamps)
     start_idx, end_idx = int(n * start_frac), int(n * end_frac)
     start_ts, end_ts = timestamps[start_idx], timestamps[end_idx - 1]
+    # Require as-of exchange metadata throughout the actual scored fold. A
+    # present-day snapshot must never be silently applied to older candles.
+    validate_snapshot_history_coverage(
+        instrument_specs_dir, risk_tiers_dir, start_ts, end_ts
+    )
     # Truncate at fold end, while allowing pre-fold candles for indicator warm-up.
     fold_data = {sym: candles[:end_idx] for sym, candles in base_candles.items()}
 

@@ -112,6 +112,20 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertIsNone(restored["BTCUSDT"].signal_ts_ms)
 
 
+    def test_position_signal_timestamp_cannot_follow_entry_timestamp(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "future-signal-ts.json"
+            cfg = engine.BotConfig()
+            risk = engine.AdaptiveRiskManager(cfg)
+            position = sample_position()
+            position.signal_ts_ms = position.entry_ts + 1
+            with self.assertRaisesRegex(ValueError, "signal_ts_ms"):
+                engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                    cfg, risk, {"BTCUSDT": position}, {}, 42,
+                    last_mark_prices={"BTCUSDT": position.entry_price},
+                )
+
+
     def test_restored_engine_uses_persisted_mark_before_first_new_candle(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "marked-state.json"

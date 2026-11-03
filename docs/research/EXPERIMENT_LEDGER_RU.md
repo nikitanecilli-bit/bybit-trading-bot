@@ -935,3 +935,5 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Research CI [#41720355038](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41720355038) SUCCESS, 52/52 steps; H-C semantics 10/10; gap execution suite and MTM suite passed.
 - Historical E08/E09 maker/limit results must be treated as provisional until replayed with this corrected accounting. The frozen H-A run used market exits (maker flags disabled), so this specific gap-liquidity fix does not explain or improve its negative result.
 - Reporting/engineering only: no market PnL replay, no Bybit download, no API connection, no orders.
+
+- Follow-up persistence regression: explicit tp1_maker=False survives Plan-B save/restore without collapsing to the maker_exits=True fallback. Research CI [#41720499938](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41720499938) SUCCESS, 52/52 steps. No market PnL replay.

@@ -30,22 +30,32 @@ def _write_funding_manifest(
         collected_at_ms=max(end_ms, start_ms) + 1,
     )
     if include_schedule:
-        snapshot_path = funding_path.parent / "instrument_snapshot.json"
-        snapshot_path.write_text('{"source":"Bybit V5 instruments-info"}', encoding="utf-8")
+        source_snapshots = []
+        schedule_start = schedule_start_ms if schedule_start_ms is not None else start_ms
+        for ts in sorted(set((schedule_start, end_ms))):
+            snapshot_path = funding_path.parent / f"instrument_snapshot_{ts}.json"
+            fetched_at = (
+                "1970-01-01T00:00:01Z" if ts == 1000
+                else "1970-01-01T00:00:02Z" if ts == 2000
+                else datetime.fromtimestamp(ts / 1000, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+            )
+            snapshot_path.write_text(json.dumps({
+                "schema_version": 1, "category": "linear", "fetched_at": fetched_at,
+                "count": 1, "instruments": [{"symbol": funding_path.stem, "fundingInterval": "480"}],
+            }), encoding="utf-8")
+            source_snapshots.append({
+                "path": snapshot_path.name, "sha256": sha256_file(snapshot_path),
+                "fetched_at_ms": ts, "funding_interval_minutes": 480,
+            })
         schedule_path = funding_path.parent / f"{funding_path.stem}.schedule.json"
         schedule = {
             "schema_version": 1,
             "source": "bybit_dated_instrument_snapshots",
             "symbol": funding_path.stem,
             "category": "linear",
-            "coverage_start_ms": schedule_start_ms if schedule_start_ms is not None else start_ms,
+            "coverage_start_ms": schedule_start,
             "coverage_end_ms": end_ms,
-            "source_snapshots": [{
-                "path": snapshot_path.name,
-                "sha256": sha256_file(snapshot_path),
-                "fetched_at_ms": schedule_start_ms if schedule_start_ms is not None else start_ms,
-                "funding_interval_minutes": 480,
-            }],
+            "source_snapshots": source_snapshots,
             "expected_settlement_timestamps_ms": (
                 expected_events if expected_events is not None else [start_ms]
             ),

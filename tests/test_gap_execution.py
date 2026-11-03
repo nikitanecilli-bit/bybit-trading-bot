@@ -718,6 +718,8 @@ def test_portfolio_kill_switch_flattens_all_positions_and_blocks_pending_entries
 
 if __name__ == "__main__":
     tests = [
+        test_baseline_long_signal_records_prior_donchian_boundary,
+        test_baseline_short_signal_records_prior_donchian_boundary,
         test_market_long_gap_above_chase_limit_is_cancelled,
         test_market_long_gap_within_limit_fills_at_next_open,
         test_limit_buy_gapped_below_limit_fills_at_open_not_worse_limit,

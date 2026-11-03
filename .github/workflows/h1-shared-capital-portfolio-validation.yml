@@ -15,10 +15,6 @@ on:
         description: "Repository path to official Bybit H1 trade-kline CSVs (one <SYMBOL>.csv per symbol)"
         required: true
         type: string
-      symbols:
-        description: "Exactly five symbols selected by the train-only selector"
-        required: true
-        type: string
       selection_manifest:
         description: "Committed JSON output from the H1 top-five train-only selector"
         required: true
@@ -83,6 +79,21 @@ jobs:
             echo "Missing dated Bybit risk tiers; refusing legacy notional-proxy PnL replay."
             exit 1
           }
+      - name: Derive the exact frozen allowlist from the selection manifest
+        env:
+          SELECTION_MANIFEST: ${{ inputs.selection_manifest }}
+        run: |
+          python - <<'PY'
+          import json, os
+          with open(os.environ["SELECTION_MANIFEST"], encoding="utf-8") as handle:
+              payload = json.load(handle)
+          symbols = payload.get("primary")
+          if payload.get("selection_status") != "ok" or not isinstance(symbols, list) or len(symbols) != 5 or len(set(symbols)) != 5:
+              raise SystemExit("Selection manifest must contain exactly five unique approved primary symbols")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+              env.write("H1_SYMBOL_ALLOWLIST=" + ",".join(symbols) + "\\n")
+          print("Frozen top-five: " + ",".join(symbols))
+          PY
       - name: Run strict shared-capital portfolio validation
         env:
           BYBIT_INSTRUMENT_SPECS_DIR: data/instrument_specs/linear
@@ -90,7 +101,6 @@ jobs:
           BYBIT_FUNDING_DIR: ${{ inputs.funding_dir }}
           BYBIT_MARK_PRICE_DIR: ${{ inputs.mark_price_dir }}
           BYBIT_KLINE_DIR: ${{ inputs.kline_dir }}
-          H1_SYMBOL_ALLOWLIST: ${{ inputs.symbols }}
           H1_SELECTION_MANIFEST: ${{ inputs.selection_manifest }}
           H1_VALIDATION_MODE: ${{ inputs.validation_mode }}
           H1_FROZEN_MIN_VOLUME_RATIO: ${{ inputs.frozen_min_volume_ratio }}

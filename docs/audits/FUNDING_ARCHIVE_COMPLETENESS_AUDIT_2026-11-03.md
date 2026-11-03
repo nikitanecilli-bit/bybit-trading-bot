@@ -202,3 +202,28 @@ Sources:
 - https://bybit-exchange.github.io/docs/v5/market/instrument
 
 Therefore, a present-day interval value cannot be back-projected across an old Funding archive. The new collector deliberately requires dated snapshots that bracket the archive range. If no snapshot exists before the requested start or after the requested end, it must reject the archive rather than silently assume the current interval applied historically. Even daily point-in-time snapshots cannot prove that an interval did not change and revert between observations; that residual uncertainty stays explicit.
+
+
+### Второй аудит Funding validator — 2026-11-04
+
+**Подтверждённый дефект (закрыт кодом): дубли timestamp в CSV могли схлопываться в set.**
+
+В validate_funding_manifest() при сравнении Funding CSV с расписанием timestamp добавлялись в set. Если CSV содержал повтор одной и той же выплаты, дубликат терялся при преобразовании в множество; список уникальных timestamps мог совпасть с ожидаемым schedule. Основной collector уже запрещает дубликаты, а отдельный validate_funding_coverage.py тоже их отвергает, но manifest validator сам по себе не обеспечивал fail-closed поведение.
+
+Исправление:
+- повторный funding_timestamp_ms теперь добавляет ошибку duplicate_funding_timestamp_in_csv;
+- добавлен регрессионный тест: CSV содержит две ожидаемые выплаты плюс повтор первой, CSV hash и row count согласованы с manifest, schedule корректен; validator обязан отклонить архив;
+- изменение не трогает funding arithmetic, engine execution или стратегию.
+
+CI для исправления запущен отдельно на двух последовательных коммитах из-за push-trigger:
+- [41735002481](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41735002481) — кодовый фикс;
+- [41735022125](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41735022125) — регрессионный тест.
+Окончательный статус будет зафиксирован после завершения обоих runs.
+
+**Повторно подтверждённые границы доказательств:**
+- Funding arithmetic учитывает направление позиции, знак ставки, частичное закрытие TP1, final-close boundary и отложенное начисление receipt на текущей MTM-границе. Это проверяемая модель, но funding mark в движке — Mark candle open proxy на timestamp settlement, а не независимо подтверждённая точная биржевая settlement mark.
+- Архивный validator доказывает соответствие CSV хешу, query-page coverage, supplied dated snapshot evidence и реконструированной UTC-сетке при условии стабильного интервала между выбранными snapshots.
+- Максимальный интервал между snapshot observations пока не ограничен. Даже ежедневные snapshots не исключают смену fundingInterval и возврат к прежнему значению между наблюдениями. Нельзя повышать это условное доказательство до полной исторической гарантии.
+- Bybit instruments-info в текущем публичном API не предоставляет документированный исторический effective-time журнал fundingInterval. Point-in-time snapshots не являются историческим журналом изменений.
+
+**Итог:** исправление дубликатов усиливает fail-closed validator, но не закрывает главный внешний trust boundary. H1 market-PnL gate остаётся CLOSED до появления реальных Bybit архивов и независимо подтверждаемого исторического расписания/эффективных границ Funding interval, а также достаточной точности settlement Mark.

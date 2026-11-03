@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import Bybit_Trading_Engine_v14_research as em
-from scripts.diagnose_h_a_signal_candles import H1_MS, extract_signal_features
+from scripts.diagnose_h_a_signal_candles import H1_MS, _summarize_group, extract_signal_features
 
 
 def _candle(ts, open_, high, low, close, volume=10.0):
@@ -113,6 +113,17 @@ def test_post_entry_followthrough_is_causal_and_exit_bar_is_excluded():
     assert stopped["post_entry_6bar_close_return_r"] is None
 
 
+def test_cohort_summary_reports_non_missing_feature_sample_counts():
+    rows = [
+        {"net_pnl": -10.0, "mfe_r": 0.4, "mae_r": 1.0, "post_entry_3bar_close_return_r": -0.2},
+        {"net_pnl": 5.0, "mfe_r": 1.2, "mae_r": 0.3, "post_entry_3bar_close_return_r": None},
+    ]
+    summary = _summarize_group(rows, "1", "H-A", "stop_loss")
+    assert summary["trades"] == 2
+    assert summary["n_post_entry_3bar_close_return_r"] == 1
+    assert summary["avg_post_entry_3bar_close_return_r"] == -0.2
+
+
 def test_signal_diagnostics_reject_non_next_bar_entry():
     rows, index, trade = _fixture("long")
     rows[-1].ts += H1_MS
@@ -133,6 +144,7 @@ if __name__ == "__main__":
         test_signal_diagnostics_fail_closed_without_exact_entry_bar,
         test_signal_diagnostics_reject_non_next_bar_entry,
         test_post_entry_followthrough_is_causal_and_exit_bar_is_excluded,
+        test_cohort_summary_reports_non_missing_feature_sample_counts,
     ]
     for test in tests:
         test()

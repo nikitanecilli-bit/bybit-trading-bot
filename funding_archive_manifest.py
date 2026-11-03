@@ -104,6 +104,152 @@ def record_funding_collection(
     return payload
 
 
+def attach_funding_settlement_schedule(
+    csv_path: str | Path,
+    manifest_path: str | Path,
+    *,
+    symbol: str,
+    category: str,
+    required_start_ms: int,
+    required_end_ms: int,
+    snapshot_paths: list[str | Path],
+    snapshot_copy_dir: str | Path,
+) -> dict:
+    """Attach a dated, hash-pinned UTC settlement grid to a collected archive.
+
+    Instrument snapshots are point-in-time observations. This helper only
+    accepts a stable funding interval across the selected bracketing snapshots;
+    it cannot prove that the exchange did not change and revert the interval
+    between observations.
+    """
+    csv_path, manifest_path = Path(csv_path), Path(manifest_path)
+    symbol = str(symbol).upper()
+    start_ms, end_ms = int(required_start_ms), int(required_end_ms)
+    if start_ms <= 0 or end_ms < start_ms:
+        raise ValueError("funding schedule range must be positive and ordered")
+    if not snapshot_paths:
+        raise ValueError("dated instrument snapshots are required for Funding schedule evidence")
+    if not csv_path.is_file() or not manifest_path.is_file():
+        raise FileNotFoundError("funding CSV and query-provenance manifest must exist")
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if (payload.get("schema_version") != SCHEMA_VERSION
+            or payload.get("symbol") != symbol
+            or payload.get("category") != category
+            or payload.get("csv_sha256") != sha256_file(csv_path)):
+        raise ValueError("funding archive identity/hash mismatch before schedule attachment")
+
+    observations = []
+    for raw_path in snapshot_paths:
+        source_path = Path(raw_path)
+        try:
+            source = json.loads(source_path.read_text(encoding="utf-8"))
+            fetched_at = datetime.fromisoformat(
+                str(source["fetched_at"]).replace("Z", "+00:00")
+            )
+            if fetched_at.tzinfo is None:
+                raise ValueError("snapshot fetched_at must include a timezone")
+            fetched_at_ms = int(fetched_at.timestamp() * 1000)
+            instruments = source.get("instruments")
+            matches = [
+                row for row in instruments or []
+                if isinstance(row, dict)
+                and str(row.get("symbol", "")).upper() == symbol
+            ]
+            interval = int(matches[0]["fundingInterval"]) if len(matches) == 1 else 0
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"invalid dated instrument snapshot: {source_path}") from exc
+        if (source.get("schema_version") != 1
+                or source.get("source") != "Bybit V5 GET /v5/market/instruments-info"
+                or source.get("category") != category
+                or len(matches) != 1
+                or interval not in {60, 120, 240, 480}):
+            raise ValueError(f"snapshot lacks one valid {symbol} fundingInterval: {source_path}")
+        observations.append({
+            "source_path": source_path,
+            "fetched_at_ms": fetched_at_ms,
+            "funding_interval_minutes": interval,
+            "source_bytes": source_path.read_bytes(),
+        })
+
+    observations.sort(key=lambda item: item["fetched_at_ms"])
+    times = [item["fetched_at_ms"] for item in observations]
+    if len(times) != len(set(times)):
+        raise ValueError("dated instrument snapshots must have unique fetched_at timestamps")
+    before = [item for item in observations if item["fetched_at_ms"] <= start_ms]
+    after = [item for item in observations if item["fetched_at_ms"] >= end_ms]
+    if not before or not after:
+        raise ValueError("dated instrument snapshots must bracket the full Funding interval")
+    first = before[-1]
+    last = after[0]
+    selected = [
+        item for item in observations
+        if first["fetched_at_ms"] <= item["fetched_at_ms"] <= last["fetched_at_ms"]
+    ]
+    intervals = {item["funding_interval_minutes"] for item in selected}
+    if len(intervals) != 1:
+        raise ValueError(
+            "fundingInterval changed inside the requested archive; exact effective boundary is unknown"
+        )
+    interval_minutes = next(iter(intervals))
+    interval_ms = interval_minutes * 60_000
+    first_expected = ((start_ms + interval_ms - 1) // interval_ms) * interval_ms
+    expected = list(range(first_expected, end_ms + 1, interval_ms))
+
+    copy_root = Path(snapshot_copy_dir)
+    copy_root.mkdir(parents=True, exist_ok=True)
+    schedule_path = csv_path.parent / f"{symbol}.schedule.json"
+    source_records = []
+    for item in selected:
+        digest = hashlib.sha256(item["source_bytes"]).hexdigest()
+        copied_name = f"{item['fetched_at_ms']}_{digest[:12]}.json"
+        copied_path = copy_root / copied_name
+        if copied_path.exists() and sha256_file(copied_path) != digest:
+            raise ValueError(f"snapshot copy path collision: {copied_path}")
+        if not copied_path.exists():
+            copied_path.write_bytes(item["source_bytes"])
+        relative_path = os.path.relpath(copied_path, schedule_path.parent).replace(os.sep, "/")
+        source_records.append({
+            "path": relative_path,
+            "sha256": digest,
+            "fetched_at_ms": item["fetched_at_ms"],
+            "funding_interval_minutes": interval_minutes,
+        })
+
+    schedule = {
+        "schema_version": 1,
+        "source": "bybit_dated_instrument_snapshots",
+        "symbol": symbol,
+        "category": category,
+        "coverage_start_ms": start_ms,
+        "coverage_end_ms": end_ms,
+        "source_snapshots": source_records,
+        "expected_settlement_timestamps_ms": expected,
+    }
+    schedule_path.parent.mkdir(parents=True, exist_ok=True)
+    schedule_tmp = schedule_path.with_suffix(schedule_path.suffix + ".tmp")
+    schedule_tmp.write_text(
+        json.dumps(schedule, ensure_ascii=False, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+    os.replace(schedule_tmp, schedule_path)
+    payload["settlement_schedule_evidence"] = {
+        "path": schedule_path.name,
+        "sha256": sha256_file(schedule_path),
+    }
+    payload["note"] = (
+        "Funding query provenance plus a hash-pinned UTC settlement grid reconstructed "
+        "from dated Bybit instrument snapshots. Point-in-time snapshots cannot rule out "
+        "an unobserved interval change and reversion between observations."
+    )
+    manifest_tmp = manifest_path.with_suffix(manifest_path.suffix + ".tmp")
+    manifest_tmp.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+    os.replace(manifest_tmp, manifest_path)
+    return schedule
+
+
 def validate_funding_manifest(
     csv_path: str | Path,
     manifest_path: str | Path,

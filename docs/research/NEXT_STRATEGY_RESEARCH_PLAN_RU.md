@@ -385,3 +385,12 @@ The Bybit-native market archive and dated instrument/risk snapshots are still ab
 - Funding schedule snapshots may omit a symbol outside its lifecycle window, but any dated snapshot inside the requested funding interval must contain it. Regression tests cover both cases.
 - Research CI [#41730087544](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41730087544) SUCCESS, 54/54.
 - No Bybit market PnL, no private API, no external downloads, no orders. The Bybit-native archive remains the only data blocker for the preregistered paired comparison.
+
+
+### 2026-11-04 — Funding archive path and paired H1 comparison gates verified
+
+- The official Bybit market-history archive workflow now requires dated instrument snapshots and the collector attaches hash-pinned Funding interval/schedule evidence to each symbol archive. The H1 preflight can consume the resulting manifest without manual sidecar editing.
+- Schedule attachment selects bracketing snapshots for the symbol's observed lifecycle, checks all observations between them, and rejects an observed interval transition whose effective boundary is unknown. It still cannot detect an interval change and reversion between snapshots.
+- The EMA paired ablation now checks identical fold, selected symbols, time window, starting capital and portfolio capacity before publishing baseline-vs-gated deltas. Leverage is explicitly frozen as isolated 5x in the H1 engine configuration and recorded in the research assumptions.
+- Research CI [#41730158593](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41730158593) passed **55/55 steps** at code commit `99a8a05d9c3218d849e38622192bedf2e17b3cd7`, including archive schedule attachment, funding completeness, EMA pairing and deterministic engine tests.
+- No actual Bybit market data were downloaded and no market PnL replay was run. Instrument/risk snapshots and Bybit-native H1/Funding/Mark archives remain absent; HTTP 403 still blocks public snapshot acquisition from the previously tested runners. The market-PnL gate remains CLOSED.

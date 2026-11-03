@@ -191,7 +191,8 @@ def accrued_funding_cost_for_remaining_margin(
         # Once TP1 has partially closed the position, only the
         # remaining share of all accumulated funding belongs to the open leg.
         # This includes settlements that happened before the TP1 timestamp.
-        fraction = ratio if tp1_ts is not None else Decimal("1")
+        tp1_effective_as_of = tp1_ts is not None and tp1_ts <= as_of_ts
+        fraction = ratio if tp1_effective_as_of else Decimal("1")
         if defer_boundary_receipts and ts == as_of_ts and full_cost < 0:
             # The current-boundary receipt is deferred until the next mark,
             # because MTM is evaluated before same-candle exit resolution.

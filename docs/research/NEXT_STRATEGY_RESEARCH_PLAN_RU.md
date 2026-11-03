@@ -347,3 +347,8 @@ Keep the existing runner unchanged as a reproducible long-only variant. After Fu
 - Two synthetic tests had encoded contradictory end states: one asserted EMA alignment before its synthetic fast EMA had actually crossed; another expected neutral while fast < slow, slow EMA was falling and close remained below slow EMA. Test data/expectations were corrected; strategy logic was not loosened to satisfy the tests.
 - Research CI [#41726204938](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41726204938) passed 53/53 steps at commit `2f7c590e70da47ab855db31d9f823d8134ac7cd5`.
 - This remains deterministic indicator validation only. The EMA50/200 filter is not integrated into the execution engine and has no PnL evidence. Do not treat it as an accepted strategy improvement or run market PnL until the Funding/Mark and Bybit-native data gates are actually satisfied.
+
+
+### EMA50/EMA200 integration constraint
+
+A separate static audit found that the engine's `CALC_WINDOW=200` is shorter than the 206 candles required for the first directional EMA50/200 label (slow=200 plus slope lookback=5, zero-based index 205). Calling the helper directly inside `evaluate_signal()` would therefore return `neutral` on every H1 bar. The filter is not currently integrated. Any future variant must precompute causal labels once over the full available per-symbol history and look them up by the exact current completed-candle timestamp; do not blindly enlarge the engine window or recalculate full-history EMAs per signal. See `docs/audits/EMA50_200_INTEGRATION_WINDOW_AUDIT_2026-11-04.md`. This is a design gate, not PnL evidence.

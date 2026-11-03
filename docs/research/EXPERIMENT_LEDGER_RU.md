@@ -957,3 +957,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Baseline and current H1 grid do not pass this optional input; default behavior is unchanged. No PnL replay was run.
 - Research CI [#41727906187](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41727906187) SUCCESS, 54/54, commit `8ab840b7a127518411b01fd9828008dd479aef18`.
 - Earlier intermediate CI attempts failed on test-import formatting and a test that accidentally queried a timestamp that was actually present; both test defects were corrected. The final full suite passed.
+
+
+## ENG-EMA-003 — paired baseline versus EMA50/200 H1 comparison (2026-11-04)
+
+- Added manual workflow input `ema50_200_comparison=off|paired`. Default `off` preserves baseline-only behavior; `paired` enables the EMA candidate and automatically runs both baseline and EMA-gated variants for each identical fold/config/cost setting.
+- Added distinct candidate labels (`_ema50_200_up`) and manifest-level `build_paired_ema_comparison`, which matches by fold, volume threshold, breakout ATR threshold and cost multiplier. Missing or duplicate comparison legs fail closed; output records net-PnL, trade-count, cost, PF and expectancy deltas.
+- Each baseline/candidate leg is an independent 10,000-USDT shared-capital portfolio replay with identical execution assumptions; they do not share capital with one another.
+- Research CI [#41728994842](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41728994842) SUCCESS, 55/55 at commit `8ed9a1688d51538e2c31adf68edcfd41a9a7792c`.
+- No market PnL replay. Bybit H1/funding/mark/spec/risk archives are still absent. Changes to replay-critical code invalidate selector provenance, so rerun train-only selection after the final code freeze and before any Bybit validation.

@@ -825,13 +825,7 @@ def test_finalize_rejects_missing_open_position_marks():
         raise AssertionError("finalization must reject missing marks for an open position")
 
 
-if __name__ == "__main__":
-    tests = [(name, value) for name, value in sorted(globals().items())
-             if name.startswith("test_") and callable(value)]
-    for name, test in tests:
-        test()
-        print("PASS", name)
-    print(f"{len(tests)}/{len(tests)} tests passed")
+
 
 
 
@@ -890,3 +884,112 @@ def test_exchange_sized_close_rejects_unquantized_final_leg():
         assert "qtyStep" in str(exc)
     else:
         raise AssertionError("strict close must reject non-quantized remaining qty")
+
+
+def _run_full_replay_symbol_order(order):
+    e = make_engine()
+    e._state_restored = False
+    e.journal_output_path = "/tmp/ignored_full_replay_symbol_order.json"
+    e.cfg.bot_version = "full-replay-symbol-order-regression"
+    e.cfg.timeframe = "1h"
+    e.cfg.active_trading_pool = list(order)
+    e.cfg.max_concurrent_positions = 2
+    e.cfg.max_risk_trade_pct = 1.0
+    e.cfg.max_portfolio_risk_pct = 2.0
+    e.cfg.daily_stop_loss_pct = 1.5
+    e.cfg.emergency_kill_switch_pct = 35.0
+    e.cfg.max_chase_limit_pct = 1.5
+    e.risk_mgr.cfg = e.cfg
+
+    hour = 3_600_000
+    start_ts = 1_800_000_000_000
+    signal_ts = start_ts + 25 * hour
+    vol_ratio = {"BTCUSDT": 1.8, "ETHUSDT": 2.4, "SOLUSDT": 2.1}
+    original_evaluate = engine_mod.QuantStrategyCore.evaluate_signal
+    original_step = e.step_candle
+    equity_path = []
+
+    def deterministic_signal(symbol, history, _cfg):
+        if history[-1].ts != signal_ts:
+            return None
+        return {
+            "direction": "long", "entry_price": 100.0, "order_type": "market",
+            "strategy": "symbol-order-fixture", "stop_dist": 5.0,
+            "signal_ts": signal_ts, "vol_ratio": vol_ratio[symbol],
+        }
+
+    def capture_after_symbol(symbol, history):
+        original_step(symbol, history)
+        if symbol == order[-1]:
+            risk = e.risk_mgr
+            equity_path.append((
+                history[-1].ts + hour,
+                round(risk.realized_equity, 6),
+                round(risk.unrealized_pnl, 6),
+                round(risk.current_equity, 6),
+                bool(risk.daily_stop_triggered),
+                bool(risk.kill_switch_triggered),
+            ))
+
+    candles = {}
+    for symbol in order:
+        rows = []
+        for index in range(29):
+            low = 90.0 if index == 27 else 99.0
+            rows.append(engine_mod.Candle(
+                ts=start_ts + index * hour,
+                open=100.0, high=101.0, low=low, close=100.0, volume=100.0,
+            ))
+        candles[symbol] = rows
+
+    engine_mod.QuantStrategyCore.evaluate_signal = staticmethod(deterministic_signal)
+    e.step_candle = capture_after_symbol
+    try:
+        audit = engine_mod.run_simulation_pass(
+            e, candles, list(order), data_label="SYNTHETIC_SYMBOL_ORDER_REGRESSION",
+        )
+    finally:
+        engine_mod.QuantStrategyCore.evaluate_signal = staticmethod(original_evaluate)
+
+    ledger = sorted((
+        trade.token, trade.direction, trade.entry_date, trade.exit_date,
+        round(trade.entry_price, 8), round(trade.exit_price, 8),
+        round(trade.gross_pnl, 6), round(trade.exchange_fees_usdt, 6),
+        round(trade.slippage_cost_usdt, 6), round(trade.funding_cost_usdt, 6),
+        round(trade.pnl_usdt, 6), trade.exit_reason,
+    ) for trade in e.closed_trades)
+    return {
+        "ledger": ledger,
+        "equity_path": equity_path,
+        "open_symbols": set(e.open_positions),
+        "pending_symbols": set(e.pending),
+        "daily_stop": e.risk_mgr.daily_stop_triggered,
+        "kill_switch": e.risk_mgr.kill_switch_triggered,
+        "net_pnl": round(audit["net_pnl"], 6),
+        "max_dd": round(audit["max_dd_pct"], 6),
+    }
+
+
+def test_full_run_simulation_pass_is_invariant_to_symbol_order():
+    forward = _run_full_replay_symbol_order(["BTCUSDT", "ETHUSDT", "SOLUSDT"])
+    reverse = _run_full_replay_symbol_order(["SOLUSDT", "ETHUSDT", "BTCUSDT"])
+
+    assert forward["open_symbols"] == reverse["open_symbols"] == set()
+    assert forward["pending_symbols"] == reverse["pending_symbols"] == set()
+    assert {row[0] for row in forward["ledger"]} == {"ETHUSDT", "SOLUSDT"}
+    assert forward["ledger"] == reverse["ledger"]
+    assert forward["equity_path"] == reverse["equity_path"]
+    assert forward["daily_stop"] is True
+    assert forward["daily_stop"] == reverse["daily_stop"]
+    assert forward["kill_switch"] == reverse["kill_switch"]
+    assert forward["net_pnl"] == reverse["net_pnl"]
+    assert forward["max_dd"] == reverse["max_dd"]
+
+
+if __name__ == "__main__":
+    tests = [(name, value) for name, value in sorted(globals().items())
+             if name.startswith("test_") and callable(value)]
+    for name, test in tests:
+        test()
+        print("PASS", name)
+    print(f"{len(tests)}/{len(tests)} tests passed")

@@ -90,8 +90,9 @@ def _series(start_index, end_index, base_ts):
     ]
 
 
-def test_sparse_replay_uses_union_grid_and_common_terminal_cutoff(monkeypatch):
-    monkeypatch.setattr(em, "CarDashboardTelegramNotifier", _Notifier)
+def test_sparse_replay_uses_union_grid_and_common_terminal_cutoff():
+    original_notifier = em.CarDashboardTelegramNotifier
+    em.CarDashboardTelegramNotifier = _Notifier
     base_ts = 1_700_002_800_000  # aligned UTC hour
     engine = _SparseEngine()
     context_calls = []
@@ -139,6 +140,7 @@ def test_sparse_replay_uses_union_grid_and_common_terminal_cutoff(monkeypatch):
         base_ts + 31 * 3_600_000, ("AAAUSDT", "BBBUSDT")
     )
     assert engine.final_marks == {}
+    em.CarDashboardTelegramNotifier = original_notifier
 
 
 def test_sparse_replay_rejects_empty_or_duplicate_symbol_universe():

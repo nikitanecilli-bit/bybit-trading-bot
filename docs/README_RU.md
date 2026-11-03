@@ -5,6 +5,8 @@
 - [Отчёты бэктестов и диагностики](reports/)
 - [Аудиты](audits/)
 - [Операционные инструкции](operations/)
+- [Исходные гипотезы пользователя](research/hypothesis_inputs/Гипотезы_пользователя_2026-11-03.md)
+- [Аудит Quant Lab и очередь проверки гипотез](research/QUANT_LAB_ASSETS_AND_HYPOTHESIS_QUEUE_2026-11-03_RU.md)
 - [Карта репозитория](REPOSITORY_MAP_RU.md)
 - [v15 Dashboard — аудит демо-прототипа](audits/V15_DASHBOARD_DEMO_AUDIT_2026-11-03.md) — synthetic planted edge, pseudo-portfolio и неподтверждённые KPI.
 

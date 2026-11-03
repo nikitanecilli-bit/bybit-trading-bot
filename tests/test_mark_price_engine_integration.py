@@ -5,6 +5,7 @@ import importlib.util
 import sys
 import tempfile
 from decimal import Decimal
+from unittest.mock import patch
 from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -121,6 +122,46 @@ class MarkPriceEngineIntegrationTests(unittest.TestCase):
             pos, em.Candle(ts, 99000, 100500, 98500, 100000, 1), close_ts,
         )
         self.assertEqual(exit_price, 100_980.0)
+
+    def test_liquidation_margin_uses_only_remaining_share_of_pre_tp1_funding(self):
+        engine = make_engine()
+        pos = make_position()
+        ts = pos.entry_ts
+        close_ts = ts + 3_600_000
+        pos.tp1_hit = True
+        pos.tp1_ts_ms = ts + 2_000_000
+        pos.remaining_fraction = 0.5
+        engine.liquidation_model_enabled = True
+        engine.risk_tier_history = make_risk_history(close_ts)
+        engine.funding_dir = "/funding"
+        engine.funding_by_symbol = {"BTCUSDT": [
+            {"ts": ts + 1_000_000, "rate": "0.01"},
+            {"ts": ts + 2_500_000, "rate": "0.01"},
+        ]}
+        engine._funding_mark_prices = {"BTCUSDT": {
+            ts + 1_000_000: Decimal("99000"),
+            ts + 2_500_000: Decimal("100000"),
+        }}
+        engine._mark_price_candles = {"BTCUSDT": {
+            ts: em.MarkPriceCandle(
+                ts, Decimal("99000"), Decimal("100450"),
+                Decimal("98500"), Decimal("100000"),
+            )
+        }}
+        observed = {}
+
+        def capture_health(**kwargs):
+            observed["funding_net_cost"] = kwargs["funding_net_cost"]
+            return SimpleNamespace(liquidation_triggered=False)
+
+        with patch.object(em, "evaluate_isolated_margin_health", side_effect=capture_health):
+            engine._liquidation_exit_price(
+                pos, em.Candle(ts, 99000, 100500, 98500, 100000, 1), close_ts,
+            )
+
+        # Pre-TP1 settlement is prorated to the 50% position still open;
+        # post-TP1 settlement is already on the remaining 50% quantity.
+        self.assertEqual(observed["funding_net_cost"], Decimal("995.00"))
 
     def test_dynamic_mark_tier_shortfall_triggers_before_fixed_lp(self):
         engine = make_engine()

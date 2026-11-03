@@ -110,3 +110,4 @@ def test_incremental_download_refuses_to_rebless_modified_existing_csv():
 if __name__ == "__main__":
     test_funding_download_writes_page_provenance_and_hash_manifest()
     test_funding_download_preserves_prior_collection_runs()
+    test_incremental_download_refuses_to_rebless_modified_existing_csv()

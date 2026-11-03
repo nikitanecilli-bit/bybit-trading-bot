@@ -180,3 +180,32 @@ H-A теперь preregistered до любых рыночных PnL прогон
 3. Привязывать признаки только к закрытой signal candle перед фактическим next-bar entry; никаких будущих баров и будущих universe members.
 4. Сравнить распределения признаков для stop-loss, time-stop и trailing-stop когорт без PnL parameter sweep.
 5. Лишь если обнаружится устойчивое и экономически правдоподобное разделение, preregister отдельную H-C continuation-quality гипотезу. Текущие folds уже использованы и не являются holdout.
+
+## 10. Post-break continuation is the next research target — 2026-11-03
+
+The artifact-only attribution is complete: workflow [41671977224](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41671977224), artifact ID 13248093501. It reconstructs the prior signal bar and only completed post-entry bars before the modeled exit. Archive SHA provenance matches the original H-A replay.
+
+### What did not work
+
+Pre-entry signal-candle shape/volume features have weak stop-vs-winner separation (AUC mostly 0.48–0.55). The best simple feature was prior-close distance to Donchian boundary at 0.55, which is too weak and not stable across folds. Do not add candle-size, wick, volume or pre-break compression filters from this sample.
+
+### What looks more promising
+
+For H-A:
+- 3 completed H1 bars after entry: directional close return averages -0.104R for stop-loss trades (451 eligible) vs +0.222R for profitable exits (486 eligible); lower-return rank AUC ≈0.70 for identifying stop-loss outcomes.
+- 6 completed bars: -0.118R (353 eligible) vs +0.313R (475 eligible); lower-return AUC ≈0.734.
+- Close back inside the prior Donchian boundary within 3 bars: 61.6% of eligible stop-loss trades vs 41.6% of profitable exit trades.
+- This retest association is stable in direction across all three folds, and a similar pattern exists in the frozen baseline.
+
+The realized net PnL of the H-A cohort with a 3-bar retest was negative in every fold (-1,206.64 / -2,540.07 / -2,917.66 USDT); the no-retest cohort was positive in every fold (+589.12 / +1,102.86 / +1,397.25 USDT). These are conditional eventual outcomes, not counterfactual exit PnL. Do not treat them as proof that closing on a retest is profitable.
+
+### Next step: preregister H-C, not optimize H-A
+
+The next candidate should be a post-entry continuation / early invalidation hypothesis:
+- Define the exact event using a completed H1 close back inside the breakout level.
+- Define a fixed confirmation window and exact event timing before any PnL run.
+- Model close-based exit price, taker fees, slippage and any partial TP1 state exactly; never use the close of an intrabar exit candle after the position was already stopped.
+- Compare with the frozen baseline under identical universe, capital, shared risk and costs.
+- Require a truly unseen time period or new point-in-time archive before judging it as a candidate. Existing three folds are development data only.
+
+The descriptive results justify writing a preregistration; they do not justify running a threshold sweep or claiming an edge.

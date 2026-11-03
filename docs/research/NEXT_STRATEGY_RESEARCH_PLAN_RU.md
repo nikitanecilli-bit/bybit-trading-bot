@@ -423,3 +423,19 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 - Текущий runner фиксирует Donchian=20; для будущего теста нужен отдельный явный параметр и manifest provenance, baseline default менять нельзя.
 - Все CryptoFetch folds уже использованы и не являются OOS. Никакого нового PnL replay до закрытия funding completeness и остальных data/accounting gates.
 - Это дизайн/пререгистрация, не PnL evidence и не доказательство edge.
+
+
+## 2026-11-04 — импортирован новый пакет гипотез MASTERPROMPT_breakout_bot.md
+
+Разбор и backlog: `hypotheses/MASTERPROMPT_BREAKOUT_HYPOTHESIS_REVIEW_RU.md`.
+
+- Исходник описывает старую v6.1 / 15m архитектуру; не переносить её параметры автоматически в актуальную H1 стратегию и не заменять текущие рабочие правила.
+- H2 breakout ATR buffer — новый кандидат после data/accounting gate.
+- H9 correlated directional exposure cap — новый risk-overlay кандидат, сначала точная спецификация без PnL.
+- H6 maker/retest execution — отдельное направление, но сначала консервативная модель очереди/spread/partial fill/adverse selection; OHLC touch не доказывает maker fill.
+- H5 MAE/MFE / exits — диагностика частично есть, оптимизацию выходов отложить.
+- H3 next-open gap 2% не сработал в E09; не повторять без новой экономической формулировки.
+- H4 возврат в канал пересекается с H-C invalidation, уже ухудшившей proxy net; повтор в исходном виде отклонён.
+- H8 BTC/broad context пересекается с E12/E13; E13 оставалась net-negative, поэтому прежние folds не использовать повторно.
+- H-A relative strength уже отклонена; не возвращать оптимизацией.
+- Никаких новых market PnL runs на использованных CryptoFetch folds. Текущий Bybit-native/Funding/Mark/accounting gate остаётся закрытым.

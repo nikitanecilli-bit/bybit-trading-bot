@@ -554,3 +554,14 @@ Do not infer exchange qty from `size_usdt / entry_price`.
 **Data gate перепроверен по текущему Git tree:** `data/archives/` содержит только `cryptofetch/`; `data/archives/bybit/` и `data/instrument_specs/` отсутствуют. Архивный workflow уже реализован, но требует self-hosted GitHub runner вне США и материкового Китая; workflow dispatch из подключённых инструментов этой сессии недоступен. Не запускать Bybit PnL replay на proxy и не подменять исторические snapshots текущими.
 
 **Следующий автономный шаг без пользователя:** продолжить аудит journal serialization/metrics, H1 runner manifest и file/workflow provenance; проверить отсутствие новых дублирующих экспериментов. Для Bybit-native market validation остаётся один внешний blocker: владелец репозитория должен один раз настроить разрешённый self-hosted runner и запустить уже готовые snapshot/archive workflows. После появления данных — только один frozen shared-capital validation, без параметрического sweep.
+
+
+## Обновление 2026-11-03 — provenance gate для следующего H1 прогона
+
+H1 validation runner дополнен отдельным JSON manifest рядом с CSV. Он фиксирует точный frozen symbol list, общий H1 timestamp grid, fold boundaries, все strategy/risk/execution параметры, hashes входных Bybit kline/funding/mark/spec/risk файлов и ключевых code/workflow files, Git commit, workflow run ID, result rows и SHA-256 выходного CSV. Добавлена проверка, что каждый выбранный kline-файл действительно находится в заявленной input directory. H1 workflow принимает optional comma-separated `symbols`, чтобы один и тот же top-5/reserve-5 universe можно было передавать без повторного dynamic selection; artifact upload очищен от stale filenames, которые runner не создаёт.
+
+**CI:** [#41687904323 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41687904323), manifest tests 4/4. Никаких рыночных PnL прогонов не запускалось.
+
+**Состояние веток:** `main` отдельно продвинулся с `2055cdd` до `fc2c161` коммитом `docs(dashboard): label v15 as unvalidated demo` (добавлены предупреждения и integrity CI для v15 dashboard). Этот коммит не является частью текущего research-изменения; merge не выполнялся. `docs/README_RU.md` менялся и на main, и в research branch — при будущем объединении нужно отдельно сверить этот файл. Все текущие изменения H1 manifest находятся в `research/market-regime-v1-main`.
+
+**Следующий шаг:** продолжать статический аудит provenance/serialization и runner gates. Market PnL replay остаётся заблокирован до появления Bybit-native kline/funding/mark archives и dated execution snapshots через разрешённый self-hosted runner.

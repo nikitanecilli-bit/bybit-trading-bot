@@ -650,3 +650,13 @@ H1 validation runner дополнен отдельным JSON manifest рядо�
 
 
 Проверка reserve basket: next-five резерв не публикуется как готовая группа, если у всех пяти нет минимум 3,000 общих training timestamps; для primary действует тот же порог. Это исключает ситуацию, когда по отдельности сильные монеты невозможно сравнить на общей истории. Последний Research CI [41697426608](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41697426608) — SUCCESS, 50/50 job steps; включая новый тест общего временного пересечения корзин.
+
+
+## 2026-11-03 — дополнительный аудит архивирования и provenance
+
+- Исправлен `.github/workflows/bybit-linear-universe-history.yml`: ранее он запускался на `ubuntu-latest` без проверки egress, хотя GitHub-hosted US runner уже давал Bybit HTTP 403. Теперь workflow требует self-hosted runner и до обращения к Bybit проверяет страну исходящего IP; US/Mainland China и неопределённая геолокация fail-closed. Workflow остаётся manual-only; ежедневный сбор не заявляется.
+- Lifecycle universe snapshot теперь включён в `SELECTION_INPUT_KEYS`. H1 validation повторно читает ровно тот snapshot-файл, на котором строился train-only shortlist, проверяет его SHA-256 и требует, чтобы файл находился внутри checkout. Изменение или отсутствие snapshot блокирует validation.
+- Selector workflow сериализует коммиты по branch, чтобы параллельные ручные запуски не перезаписывали manifest друг друга. Research checks теперь запускаются при изменениях universe/selector/validation workflow.
+- Research CI [41698606027](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41698606027) — SUCCESS, 50/50 steps. Также прошли provenance fixture tests [41698483025](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41698483025) и universe workflow path-trigger CI [41698136666](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41698136666).
+
+Оставшиеся ограничения data collection: universe snapshots по-прежнему manual-only и не восстанавливают временные приостановки торгов; Bybit market-history archiver принимает общий диапазон дат для списка символов, поэтому диапазон должен быть совместим с launch/delivery каждого инструмента. До расширения archiver per-symbol lifecycle clipping нельзя трактовать пропуски до листинга/после делистинга как обычные свечные gaps или автоматически объединять такие интервалы. Исторические параметры instrument specs/risk tiers также начинаются только с первого фактически сохранённого snapshot.

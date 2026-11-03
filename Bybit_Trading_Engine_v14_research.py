@@ -1364,6 +1364,8 @@ class UnifiedQuantEngine:
 
     def _load_mark_price_history(self, directory: str) -> None:
         """Load exact-timestamp Mark OHLC; retain open-only legacy files for funding."""
+        if not hasattr(self, "_mark_price_candles"):
+            self._mark_price_candles = {}
         if not os.path.isdir(directory):
             raise ValueError(f"Mark-price directory does not exist: {directory}")
         for path in glob.glob(os.path.join(directory, "*.csv")):

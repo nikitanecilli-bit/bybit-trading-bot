@@ -818,3 +818,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Research CI [#41615868813](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41615868813) — **SUCCESS**, commit `b784559f8ca224a893ca6fb074f8376bbeeb6837`; полный deterministic suite завершён, включая cleanup.
 - Важно: это только entry-time tier gate. Bybit пересчитывает tier по position value на Mark Price в реальном времени; движок пока не обновляет tier динамически и не моделирует MM/liquidation/IOC deleveraging. Источники: [официальный risk-limit API](https://bybit-exchange.github.io/docs/v5/market/risk-limit), [maintenance margin](https://www.bybit.com/en/help-center/article/Maintenance-Margin-USDT-Contract), [liquidation rules](https://www.bybit.com/en/help-center/article/UTA-Trading-Rules-Liquidation-Process).
 - Снимки Bybit пока не получены: GitHub Actions получает HTTP 403 от `api.bybit.com`. H1 runner не передаёт `instrument_specs_dir` или `risk_tiers_dir`; результаты E01–E13 не менялись, рыночные backtests не запускались, реальные ордера не размещались.
+
+
+## ENG-EXEC-009 — точное количество контрактов в lifecycle позиции (2026-11-03)
+
+- Для strict entry sizing сохраняются Decimal-строки contract_qty, qty_step, min_order_qty, min_notional_value; TP1 и остаток хранятся отдельными количествами контрактов.
+- TP1 округляется вниз по qtyStep. Если TP1 или остаточная нога не проходит сохранённые minQty/minNotional проверки, TP1 пропускается, позиция остаётся полной.
+- Финальное закрытие проверяет фактическое остаточное количество, шаг и минимум на цене закрытия; при нарушении строгий replay выдаёт ошибку вместо фиктивной сделки.
+- Gross PnL, fees/slippage и funding после TP1 используют фактическое количество, а не восстановление из USDT-notional и remaining_fraction.
+- State persistence проверяет сохранность, шаг, TP1+остаток=исходное количество и согласованность доли.
+- CI #41617395285 — SUCCESS, commit 916cbd036e3b397773682fcbce3e212f3b1e816c.
+- Ограничения: фактические reduce-only исключения Bybit для minNotional не подтверждены реальными ответами биржи; строгий replay применяет сохранённый минимум консервативно. H1 runner всё ещё legacy proxy, исторические market PnL бэктесты не запускались.

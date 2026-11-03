@@ -1,5 +1,7 @@
 """Offline tests for official Bybit funding and mark-price history collection."""
 from pathlib import Path
+import json
+import tempfile
 import sys
 import unittest
 
@@ -7,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.archive_bybit_market_history import (
     FUNDING_WINDOW_MS, fetch_funding_history, fetch_mark_klines, fetch_trade_klines,
     normalize_symbol, parse_funding_rows, parse_mark_rows, parse_trade_rows, validate_base_url,
+    clip_range_to_lifecycle, load_universe_lifecycle,
 )
 
 
@@ -130,6 +133,48 @@ class BybitMarketHistoryTests(unittest.TestCase):
         self.assertEqual(len(rows), 900)
         self.assertEqual(len(calls), 2)
         self.assertLess(calls[0][2], 1000)
+
+
+    def test_lifecycle_clips_to_complete_candle_boundaries(self):
+        hour = 3_600_000
+        lifecycle = {"NEWUSDT": {"launch_ms": hour + 1_000, "delivery_ms": hour * 5 + 2_000}}
+        self.assertEqual(
+            clip_range_to_lifecycle("NEWUSDT", hour, hour * 8, hour, lifecycle),
+            (hour * 2, hour * 5),
+        )
+
+    def test_lifecycle_preserves_requested_bounds_when_inside_lifecycle(self):
+        hour = 3_600_000
+        lifecycle = {"BTCUSDT": {"launch_ms": hour, "delivery_ms": 0}}
+        self.assertEqual(
+            clip_range_to_lifecycle("BTCUSDT", hour * 3, hour * 8, hour, lifecycle),
+            (hour * 3, hour * 8),
+        )
+
+    def test_lifecycle_rejects_missing_symbol_and_empty_overlap(self):
+        hour = 3_600_000
+        lifecycle = {"OLDUSDT": {"launch_ms": hour, "delivery_ms": hour * 4}}
+        with self.assertRaisesRegex(ValueError, "absent"):
+            clip_range_to_lifecycle("NEWUSDT", hour, hour * 8, hour, lifecycle)
+        with self.assertRaisesRegex(ValueError, "no complete"):
+            clip_range_to_lifecycle("OLDUSDT", hour * 5, hour * 8, hour, lifecycle)
+
+    def test_universe_snapshot_loader_hashes_and_validates_lifecycle(self):
+        snapshot = {
+            "category": "linear",
+            "fetched_at": "2026-11-03T00:00:00Z",
+            "instruments": [{
+                "symbol": "BTCUSDT", "contractType": "LinearPerpetual",
+                "quoteCoin": "USDT", "settleCoin": "USDT",
+                "launchTime": "3600000", "deliveryTime": "0", "status": "Trading",
+            }],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "universe.json"
+            path.write_text(json.dumps(snapshot), encoding="utf-8")
+            # The loader intentionally requires a repository-relative path.
+            with self.assertRaisesRegex(ValueError, "inside the repository"):
+                load_universe_lifecycle(path)
 
     def test_symbol_path_traversal_and_invalid_characters_rejected(self):
         self.assertEqual(normalize_symbol("btcusdt"), "BTCUSDT")

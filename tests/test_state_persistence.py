@@ -830,6 +830,57 @@ class StatePersistenceTests(unittest.TestCase):
                     engine.AdaptiveRiskManager(cfg)
                 )
 
+    def test_legacy_backup_without_breakout_level_remains_loadable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "legacy-state.json"
+            cfg = engine.BotConfig()
+            position = sample_position()
+            pending = {
+                "ETHUSDT": {
+                    "symbol": "ETHUSDT", "direction": "short",
+                    "strategy": "state-test", "signal_ts": 1_790_000_000_000,
+                    "entry_price": 2000.0, "stop_price": 2100.0,
+                    "tp1_price": 1900.0, "tp2_price": 1800.0,
+                    "stop_dist": 100.0, "order_type": "market",
+                }
+            }
+            risk = engine.AdaptiveRiskManager(cfg)
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {"BTCUSDT": position}, pending, 42,
+                last_mark_prices={"BTCUSDT": position.entry_price},
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["open_positions"]["BTCUSDT"].pop("breakout_level")
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            restored, restored_pending, _ = engine.PlanBStatePersistence(str(path)).load_state(
+                engine.AdaptiveRiskManager(cfg)
+            )
+            self.assertIsNone(restored["BTCUSDT"].breakout_level)
+            self.assertNotIn("breakout_level", restored_pending["ETHUSDT"])
+
+    def test_invalid_pending_breakout_level_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "invalid-pending-breakout-level.json"
+            cfg = engine.BotConfig()
+            pending = {
+                "ETHUSDT": {
+                    "symbol": "ETHUSDT", "direction": "short",
+                    "strategy": "state-test", "signal_ts": 1_790_000_000_000,
+                    "entry_price": 2000.0, "stop_price": 2100.0,
+                    "tp1_price": 1900.0, "tp2_price": 1800.0,
+                    "stop_dist": 100.0, "order_type": "market",
+                    "breakout_level": "invalid",
+                }
+            }
+            risk = engine.AdaptiveRiskManager(cfg)
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {}, pending, 42, last_mark_prices={},
+            )
+            with self.assertRaises(RuntimeError):
+                engine.PlanBStatePersistence(str(path)).load_state(
+                    engine.AdaptiveRiskManager(cfg)
+                )
+
     def test_invalid_trade_sequence_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "sequence.json"

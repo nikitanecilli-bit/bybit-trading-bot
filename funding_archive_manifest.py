@@ -201,11 +201,37 @@ def validate_funding_manifest(
                             if (not source_path.is_file() or not isinstance(source_hash, str)
                                     or sha256_file(source_path) != source_hash):
                                 errors.append("schedule_source_snapshot_hash_mismatch")
+                            else:
+                                try:
+                                    source_payload = json.loads(source_path.read_text(encoding="utf-8"))
+                                    source_fetched_at = datetime.fromisoformat(
+                                        str(source_payload["fetched_at"]).replace("Z", "+00:00")
+                                    )
+                                    source_fetched_ms = int(source_fetched_at.timestamp() * 1000)
+                                    source_rows = source_payload.get("instruments")
+                                    matches = [
+                                        row for row in source_rows or []
+                                        if str(row.get("symbol", "")).upper() == symbol.upper()
+                                    ]
+                                    source_interval = int(matches[0]["fundingInterval"]) if len(matches) == 1 else 0
+                                    if (source_payload.get("schema_version") != 1
+                                            or source_payload.get("category") != payload.get("category")
+                                            or source_fetched_at.tzinfo is None
+                                            or source_fetched_ms != fetched_at_ms
+                                            or source_interval != interval_minutes):
+                                        errors.append("schedule_source_snapshot_metadata_mismatch")
+                                except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+                                    errors.append("invalid_schedule_source_snapshot")
                             if interval_minutes <= 0:
                                 errors.append("invalid_funding_interval_minutes")
                             snapshot_times.append(fetched_at_ms)
                         if snapshot_times != sorted(set(snapshot_times)):
                             errors.append("schedule_source_snapshots_not_strictly_ordered")
+                        elif snapshot_times and (
+                            snapshot_times[0] > int(required_start_ms)
+                            or snapshot_times[-1] < int(required_end_ms)
+                        ):
+                            errors.append("schedule_source_snapshots_do_not_bracket_interval")
                     raw_expected = schedule.get("expected_settlement_timestamps_ms")
                     if not isinstance(raw_expected, list):
                         errors.append("expected_settlement_timestamps_missing")
@@ -227,6 +253,8 @@ def validate_funding_manifest(
                             "invalid_schedule_source_snapshot_metadata",
                             "schedule_source_snapshot_hash_mismatch",
                             "schedule_source_snapshots_not_strictly_ordered",
+                            "schedule_source_snapshots_do_not_bracket_interval",
+                            "schedule_source_snapshot_metadata_mismatch",
                             "invalid_funding_interval_minutes",
                             "expected_settlement_timestamps_missing",
                             "invalid_expected_settlement_timestamps",

@@ -32,7 +32,7 @@ class SnapshotCollectorTests(unittest.TestCase):
             ("Settling", None), ("Delivering", None), ("Closed", None),
         ])
         self.assertEqual([row["symbol"] for row in rows],
-                         ["BTCUSDT", "ETHUSDT", "SOLUSDT"])
+                         ["BIOUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT"])
 
     def test_identical_duplicate_from_overlapping_pages_is_deduplicated(self):
         row = {"symbol": "BTCUSDT", "status": "Trading"}

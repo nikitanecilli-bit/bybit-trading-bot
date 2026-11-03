@@ -85,3 +85,10 @@ The schedule validator also rejects unsupported interval values and requires eve
 ### Incremental-download integrity protection
 
 The Funding downloader now verifies an existing sidecar's CSV SHA-256 and data-row count **before** making an incremental API request or appending new rows. If the existing CSV has drifted from its last manifest, the downloader refuses to extend or re-attest it. This closes a provenance-reset loophole where a modified historical CSV could otherwise receive a fresh hash during a later append. Offline regression coverage was added.
+
+
+## Verification status
+
+Research CI run [#41712039475](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41712039475) completed successfully: 50 workflow steps succeeded, including the H1 selector, H1 runner execution gate, validation-manifest provenance, portfolio accounting/risk-budget, and sparse shared-capital replay tests. The incremental-download tamper regression is included in that successful run.
+
+This validates the code-level guardrails and synthetic/offline fixtures. It does **not** validate a real Bybit historical funding archive, produce a profitable strategy result, or authorize market PnL replay. The current production archive cannot pass until actual dated instrument snapshots and a matching generated schedule evidence file cover each scored interval.

@@ -208,6 +208,26 @@ class IsolatedLiquidationTests(unittest.TestCase):
         self.assertEqual(paid, Decimal("36050"))
         self.assertEqual(received, Decimal("44050"))
 
+    def test_funding_adjusted_bankruptcy_price_reconciles_net_loss_once(self):
+        # With 10x leverage, 10 contracts at 100 have 100 USDT initial
+        # margin. A 10 USDT funding payment moves long bankruptcy from 90
+        # to 91; the reduced gross loss (-90) plus funding (-10) still
+        # reconciles to the same -100 margin loss, not -110.
+        base = calculate_isolated_usdt_bankruptcy_price(
+            direction="long", entry_price="100", leverage="10", quantity="10",
+        )
+        funded = calculate_isolated_usdt_bankruptcy_price(
+            direction="long", entry_price="100", leverage="10", quantity="10",
+            funding_net_cost="10",
+        )
+        base_gross = (base - Decimal("100")) * Decimal("10")
+        funded_gross = (funded - Decimal("100")) * Decimal("10")
+        self.assertEqual(base, Decimal("90"))
+        self.assertEqual(funded, Decimal("91"))
+        self.assertEqual(base_gross, Decimal("-100"))
+        self.assertEqual(funded_gross - Decimal("10"), Decimal("-100"))
+        self.assertEqual(funded_gross - Decimal("10"), base_gross)
+
     def test_mark_candle_detects_long_and_short_liquidation_crossings(self):
         self.assertTrue(mark_candle_crosses_liquidation(
             direction="long", liquidation_price="95000",

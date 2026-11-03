@@ -565,3 +565,6 @@ H1 validation runner дополнен отдельным JSON manifest рядо�
 **Состояние веток:** `main` отдельно продвинулся с `2055cdd` до `fc2c161` коммитом `docs(dashboard): label v15 as unvalidated demo` (добавлены предупреждения и integrity CI для v15 dashboard). Этот коммит не является частью текущего research-изменения; merge не выполнялся. `docs/README_RU.md` менялся и на main, и в research branch — при будущем объединении нужно отдельно сверить этот файл. Все текущие изменения H1 manifest находятся в `research/market-regime-v1-main`.
 
 **Следующий шаг:** продолжать статический аудит provenance/serialization и runner gates. Market PnL replay остаётся заблокирован до появления Bybit-native kline/funding/mark archives и dated execution snapshots через разрешённый self-hosted runner.
+
+
+**Дополнительное закрытие state persistence gate:** writer теперь отклоняет `signal_ts_ms > entry_ts` до записи backup, симметрично строгому reader. Research CI #41687016004 SUCCESS; state persistence suite 69 tests passed. Это предотвращает создание заведомо невосстанавливаемого Plan B backup.

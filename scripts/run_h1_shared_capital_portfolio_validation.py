@@ -58,7 +58,7 @@ SELECTION_INPUT_KEYS = ("kline", "funding", "mark_price", "instrument_specs", "r
 
 
 def resolve_ema50_200_gate(environ=None):
-    """Opt-in only; baseline remains unchanged unless explicitly enabled."""
+    """Opt-in paired comparison; default run remains baseline-only."""
     env = os.environ if environ is None else environ
     raw = str(env.get("H1_EMA50_200_GATE", "0")).strip().lower()
     if raw in {"", "0", "false", "off", "no"}:
@@ -76,6 +76,11 @@ def h1_variant_name(min_vol, min_breakout_atr, cost_multiplier, ema_gate_enabled
         f"vol{min_vol:g}_breakATR{min_breakout_atr:g}_cost{cost_multiplier:g}"
         f"{suffix}"
     )
+
+
+def h1_variant_modes(ema_comparison_enabled):
+    """When opted in, run paired baseline and EMA variants on identical folds."""
+    return (False, True) if ema_comparison_enabled else (False,)
 
 
 
@@ -770,9 +775,9 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         "timeframe": "1h",
         "fold": fold,
         **{key: round(value, 4) for key, value in monthly_metrics.items()},
-        "variant": (
-            f"vol{min_vol:g}_breakATR{min_breakout_atr:g}_cost{cost_multiplier:g}"
-            f"_{'ema50_200' if ema_trend_labels_by_symbol is not None else 'baseline'}"
+        "variant": h1_variant_name(
+            min_vol, min_breakout_atr, cost_multiplier,
+            ema_gate_enabled=ema_trend_labels_by_symbol is not None,
         ),
         "ema50_200_gate": ema_trend_labels_by_symbol is not None,
         "cost_multiplier": cost_multiplier,
@@ -1140,18 +1145,21 @@ def main():
         for min_vol in design["volume_thresholds"]:
             for min_breakout in design["breakout_atr_thresholds"]:
                 for cost_multiplier in design["cost_multipliers"]:
-                    result = run_portfolio_variant(
-                        datasets, symbols, timestamps, fold, start_frac, end_frac,
-                        min_vol, min_breakout, cost_multiplier,
-                        instrument_specs_dir, risk_tiers_dir,
-                        funding_dir, mark_price_dir, kline_dir,
-                        ema_trend_labels_by_symbol=fold_ema_labels,
-                    )
-                    rows.append(result)
-                    print(f"fold={fold} {result['variant']} trades={result['trades']} "
-                          f"net={result['net_pnl']:+.2f} ({result['return_pct']:+.2f}%) "
-                          f"PF={result['profit_factor']:.3f} DD={result['max_drawdown_pct']:.2f}% "
-                          f"costs={result['costs']:.2f}")
+                    for use_ema_gate in h1_variant_modes(ema_gate_enabled):
+                        result = run_portfolio_variant(
+                            datasets, symbols, timestamps, fold, start_frac, end_frac,
+                            min_vol, min_breakout, cost_multiplier,
+                            instrument_specs_dir, risk_tiers_dir,
+                            funding_dir, mark_price_dir, kline_dir,
+                            ema_trend_labels_by_symbol=(
+                                fold_ema_labels if use_ema_gate else None
+                            ),
+                        )
+                        rows.append(result)
+                        print(f"fold={fold} {result['variant']} trades={result['trades']} "
+                              f"net={result['net_pnl']:+.2f} ({result['return_pct']:+.2f}%) "
+                              f"PF={result['profit_factor']:.3f} DD={result['max_drawdown_pct']:.2f}% "
+                              f"costs={result['costs']:.2f}")
     path = "h1_shared_capital_portfolio_validation.csv"
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))

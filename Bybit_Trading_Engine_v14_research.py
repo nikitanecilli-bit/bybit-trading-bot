@@ -1375,7 +1375,7 @@ class UnifiedQuantEngine:
                 full_ohlc = {"high", "low", "close"}.issubset(set(reader.fieldnames or []))
                 if not reader.fieldnames or not required.issubset(reader.fieldnames):
                     raise ValueError(f"{path}: required columns timestamp_ms,open")
-                if self.liquidation_model_enabled and not full_ohlc:
+                if getattr(self, "liquidation_model_enabled", False) and not full_ohlc:
                     raise ValueError(f"{path}: liquidation model requires timestamp_ms,open,high,low,close")
                 for line_no, row in enumerate(reader, start=2):
                     try:
@@ -1407,7 +1407,7 @@ class UnifiedQuantEngine:
                 self._mark_price_candles[symbol] = candles
         if not self._funding_mark_prices:
             raise ValueError(f"No mark-price CSV files found in {directory}")
-        if self.liquidation_model_enabled:
+        if getattr(self, "liquidation_model_enabled", False):
             missing = sorted(set(self.funding_by_symbol) - set(self._mark_price_candles))
             if missing:
                 raise ValueError(f"Liquidation model requires full Mark OHLC for symbols: {missing}")

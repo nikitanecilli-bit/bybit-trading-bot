@@ -520,10 +520,13 @@ def validate_funding_manifest(
                             else:
                                 for row in reader:
                                     try:
-                                        funding_timestamps.add(int(row[timestamp_column]))
+                                        funding_ts = int(row[timestamp_column])
                                     except (TypeError, ValueError, KeyError):
                                         errors.append("invalid_funding_timestamp_in_csv")
                                         break
+                                    if funding_ts in funding_timestamps:
+                                        errors.append("duplicate_funding_timestamp_in_csv")
+                                    funding_timestamps.add(funding_ts)
                         expected_in_interval = {
                             ts for ts in expected_events
                             if int(required_start_ms) <= ts <= int(required_end_ms)

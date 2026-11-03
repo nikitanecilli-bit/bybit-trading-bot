@@ -16,7 +16,7 @@ on:
         required: true
         type: string
       symbols:
-        description: "Optional comma-separated frozen Bybit universe (e.g. BTCUSDT,ETHUSDT); blank uses coverage filtering"
+        description: "Comma-separated frozen universe; confirm mode requires exactly five preselected symbols"
         required: false
         type: string
       validation_mode:

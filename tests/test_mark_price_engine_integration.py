@@ -66,7 +66,10 @@ def make_engine():
     return engine
 
 
-class MarkPriceEngineIntegrationTests:
+import unittest
+
+
+class MarkPriceEngineIntegrationTests(unittest.TestCase):
     def test_loader_preserves_full_mark_ohlc(self):
         engine = make_engine()
         engine.liquidation_model_enabled = True
@@ -157,5 +160,4 @@ class MarkPriceEngineIntegrationTests:
 
 
 if __name__ == "__main__":
-    import unittest
     unittest.main(verbosity=2)

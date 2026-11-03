@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 """Research-only causal market-structure filters. No production signal changes."""
 
 
@@ -9,11 +11,17 @@ def ema_series(values, period):
         raise ValueError("EMA period must be a positive integer")
     if not values:
         return []
+    try:
+        numeric_values = [float(item) for item in values]
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("EMA values must be numeric") from exc
+    if any(not math.isfinite(item) for item in numeric_values):
+        raise ValueError("EMA values must be finite")
     alpha = 2.0 / (period + 1.0)
-    current = float(values[0])
+    current = numeric_values[0]
     output = [current]
-    for item in values[1:]:
-        current += alpha * (float(item) - current)
+    for item in numeric_values[1:]:
+        current += alpha * (item - current)
         output.append(current)
     return output
 
@@ -43,7 +51,12 @@ def trend_direction_series(candles, fast=10, slow=30, slope=5):
     than calling trend_direction repeatedly inside a per-bar replay.
     """
     _validate_trend_periods(fast, slow, slope)
-    closes = [float(c.close) for c in candles]
+    try:
+        closes = [float(c.close) for c in candles]
+    except (AttributeError, TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("trend candles must expose numeric close values") from exc
+    if any(not math.isfinite(close) or close <= 0 for close in closes):
+        raise ValueError("trend candle closes must be finite and > 0")
     if not closes:
         return []
     fast_values = ema_series(closes, fast)

@@ -1002,3 +1002,17 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Не дублировать: H3 gap gate 2% (E09 не активировался); H4 post-break return-to-channel (пересекается с отклонённым H-C); H8 общий BTC/breadth gate (E12/E13 уже исследовали); H-A relative strength (отклонена).
 - Источник — legacy v6.1 / 15m описание. Текущий рабочий приоритет остаётся H1; старые параметры не перенесены.
 - Документальная регистрация בלבד: нет PnL run, parameter sweep, paper trading, API connection или live orders. Data/accounting gate остаётся закрытым.
+
+
+## ENG-H1-DONCHIAN-001 — параметризация preregistered Donchian48 arms (2026-11-04)
+
+- Спецификация: `docs/research/LOW_FREQUENCY_DONCHIAN48_EMA_H1_PREREGISTRATION_RU.md`.
+- Runner: `scripts/run_h1_shared_capital_portfolio_validation.py`; opt-in `H1_DONCHIAN48_EMA_ABLATION=1`.
+- Три фиксированных paired arms: Donchian20 без EMA (control A), Donchian48 без EMA (control B), Donchian48 + causal EMA50/EMA200-up (candidate C).
+- Все arms исполняются через тот же shared-capital replay и одинаковые fold/config/cost keys. Pairing fail-closed: отсутствие одной ноги или различия universe, временных границ, капитала и max positions приводят к ошибке.
+- Default режим не изменён: Donchian20; legacy EMA50/200 ablation остаётся отдельным opt-in режимом. Одновременное включение двух разных схем запрещено.
+- Workflow dispatch получил отдельный переключатель для трёхрукавной схемы. Manifest сохраняет period/EMA arms; CSV сохраняет фактический Donchian period.
+- CI: [41734540443](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41734540443), SUCCESS; компиляция и deterministic tests passed.
+- **Классификация:** инженерная реализация + unit/CI verification; не market experiment, не PnL evidence.
+- Изменённый runner hash означает, что ранее созданный Top-5 selection manifest нельзя повторно использовать: его code provenance должен быть заново сформирован на официальных данных после открытия data gate.
+- Никакого PnL replay, параметрического поиска, новых загрузок, API, paper trading или live orders не выполнялось.

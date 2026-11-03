@@ -2222,8 +2222,113 @@ def check_alignment(candles: Dict[str, List[Candle]]) -> None:
             raise ValueError(f"Свечи {sym} не синхронизированы с {ref_sym} (разные ts/длина)")
 
 
+def run_sparse_simulation_pass(
+    engine: UnifiedQuantEngine, candles: Dict[str, List[Candle]],
+    symbols: List[str], data_label: str = "СИНТЕТИКА",
+) -> Dict:
+    """Shared-capital replay over a dynamic universe with per-symbol availability.
+
+    Each symbol must have a continuous timeframe grid. Symbols may start at
+    different timestamps; the replay walks the union grid and processes only
+    symbols with a real candle at each timestamp. All selected series are
+    truncated to their earliest common terminal candle for safe finalization.
+    """
+    if engine._state_restored:
+        raise RuntimeError("Нельзя запускать backtest поверх восстановленного состояния.")
+    if not symbols or len(set(symbols)) != len(symbols):
+        raise ValueError("Sparse replay requires a non-empty unique symbol list")
+    missing = sorted(set(symbols) - set(candles))
+    if missing:
+        raise ValueError(f"Нет свечных данных для символов: {', '.join(missing)}")
+
+    selected = {sym: candles[sym] for sym in symbols}
+    validate_candle_timeframe(selected, engine.cfg.timeframe)
+    timeframe = str(engine.cfg.timeframe).strip().lower()
+    timeframe_ms = _TIMEFRAME_MS[timeframe]
+    for sym, rows in selected.items():
+        if any(c.ts <= 0 or c.ts % timeframe_ms for c in rows):
+            raise ValueError(f"{sym}: timestamps are not aligned to {timeframe} boundaries")
+
+    common_end_ts = min(rows[-1].ts for rows in selected.values())
+    trimmed = {}
+    events = {}
+    for sym, rows in selected.items():
+        kept = [c for c in rows if c.ts <= common_end_ts]
+        if len(kept) < 2 or kept[-1].ts != common_end_ts:
+            raise ValueError(
+                f"{sym}: no candle at common sparse replay end {common_end_ts}; "
+                "refusing inconsistent terminal coverage"
+            )
+        trimmed[sym] = kept
+        for index, candle in enumerate(kept):
+            events.setdefault(candle.ts, {})[sym] = (index, candle)
+
+    engine.reset_state_for_new_run()
+    for ts in sorted(events):
+        event = events[ts]
+        active_symbols = set(event)
+        missing_open = sorted(set(engine.open_positions) - active_symbols)
+        missing_pending = sorted(set(engine.pending) - active_symbols)
+        if missing_open or missing_pending:
+            raise ValueError(
+                f"Sparse replay has no candle at {ts} for open positions "
+                f"{missing_open} or pending entries {missing_pending}"
+            )
+        if not any(index >= 25 for index, _ in event.values()) and not engine.open_positions:
+            continue
+
+        active_candles = {sym: candle for sym, (_, candle) in event.items()}
+        engine._prepare_portfolio_intrabar_marks(active_candles)
+        bar_close_ts = ts + timeframe_ms
+        engine._update_mark_to_market(bar_close_ts)
+        engine._prepare_pending_entry_risk_budgets()
+
+        signal_candidates = []
+        histories = {}
+        for sym in symbols:
+            item = event.get(sym)
+            if item is None:
+                continue
+            index, _ = item
+            if index < 25:
+                continue
+            lo = max(0, index + 1 - CALC_WINDOW)
+            history = trimmed[sym][lo:index + 1]
+            histories[sym] = history
+            if engine.step_candle(sym, history, evaluate_new_signal=False):
+                signal_candidates.append(sym)
+        engine._bar_entry_risk_budgets.clear()
+
+        for sym in signal_candidates:
+            can_open, _ = engine.risk_mgr.can_open_new_trade(len(engine.open_positions))
+            if not can_open:
+                break
+            sig = QuantStrategyCore.evaluate_signal(sym, histories[sym], engine.cfg)
+            if sig:
+                engine.pending[sym] = sig
+                engine._persist()
+
+    final_marks = {sym: trimmed[sym][-1] for sym in engine.open_positions}
+    engine.finalize_open_positions(final_marks, exit_reason="end_of_test")
+    audit = engine.export_journal_for_dashboard()
+    logger.info(
+        "🎯 ПРОГОН [%s | данные: %s] | Сделок: %d | Итог: $%+.2f (%+.1f%%) | PF: %.2f | E: %+.2fR | DD: %.1f%% | Целей: %d/6",
+        engine.cfg.bot_version, data_label, audit["total_trades"], audit["net_pnl"], audit["ret_pct"],
+        audit["pf"], audit["expectancy_r"], audit["max_dd_pct"], audit["passed_count"]
+    )
+    prefix = f"🧪 [БЭКТЕСТ, данные: {data_label}]\\n"
+    if audit["all_ok"]:
+        engine.tg.send_message(prefix + CarDashboardTelegramNotifier.format_daily_odometer_report(
+            engine.cfg, engine.risk_mgr, audit))
+    else:
+        engine.tg.send_message(prefix + CarDashboardTelegramNotifier.format_check_engine_alert(
+            engine.cfg, audit, "Отклонение от целевых показателей План/Факт"))
+    return audit
+
+
 def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Candle]],
-                        symbols: List[str], data_label: str = "СИНТЕТИКА") -> Dict:
+                        symbols: List[str], data_label: str = "СИНТЕТИКА",
+                        allow_sparse_data: bool = False) -> Dict:
     # Это именно новый независимый бэктест, не восстановление live-сессии.
     if engine._state_restored:
         raise RuntimeError("Нельзя запускать backtest поверх восстановленного состояния. "
@@ -2233,8 +2338,13 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
     missing = sorted(set(symbols) - set(candles))
     if missing:
         raise ValueError(f"Нет свечных данных для символов: {', '.join(missing)}")
-    validate_candle_timeframe(candles, engine.cfg.timeframe)
-    check_alignment(candles)
+    selected_candles = {sym: candles[sym] for sym in symbols}
+    if allow_sparse_data:
+        return run_sparse_simulation_pass(
+            engine, selected_candles, symbols, data_label=data_label,
+        )
+    validate_candle_timeframe(selected_candles, engine.cfg.timeframe)
+    check_alignment(selected_candles)
     engine.reset_state_for_new_run()
     bars_total = len(candles[symbols[0]])
     for bar in range(25, bars_total):

@@ -239,6 +239,21 @@ class FundingArchiveManifestTests(unittest.TestCase):
         )
         self.assertFalse(report["settlement_schedule_verified"])
 
+    def test_validator_rejects_duplicate_funding_timestamp_even_when_manifest_is_rehashed(self):
+        payload = self.record()
+        with self.csv.open("a", encoding="utf-8") as handle:
+            handle.write("3600000,1970-01-01,0.001\\n")
+        payload["csv_sha256"] = sha256_file(self.csv)
+        payload["csv_data_rows"] = 3
+        self.attach_schedule(payload, [3_600_000, 7_200_000])
+        report = validate_funding_manifest(
+            self.csv, self.manifest, symbol="BTCUSDT",
+            required_start_ms=3_600_000, required_end_ms=7_200_000,
+        )
+        self.assertFalse(report["ok"])
+        self.assertIn("duplicate_funding_timestamp_in_csv", report["errors"])
+
+
     def test_validator_fails_closed_when_dated_interval_changes_without_effective_boundary(self):
         payload = self.record()
         self.attach_schedule(payload, [3_600_000, 7_200_000])

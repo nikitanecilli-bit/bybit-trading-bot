@@ -1656,6 +1656,18 @@ class UnifiedQuantEngine:
         """
         if not candles_history:
             return False
+        # Backward-compatible defaults for restored/fixture instances created
+        # without running __init__; normal engine construction already sets these.
+        if not hasattr(self, "_intrabar_risk_marks"):
+            self._intrabar_risk_marks = {}
+        if not hasattr(self, "_intrabar_risk_marks_ts"):
+            self._intrabar_risk_marks_ts = None
+        if not hasattr(self, "_intrabar_mtm_marks"):
+            self._intrabar_mtm_marks = {}
+        if not hasattr(self, "_intrabar_mtm_marks_ts"):
+            self._intrabar_mtm_marks_ts = None
+        if not hasattr(self, "_intrabar_liquidation_exits"):
+            self._intrabar_liquidation_exits = {}
         curr = candles_history[-1]
         # Candle.ts is the bar OPEN timestamp in the Bybit OHLCV CSV format.
         # Since curr.close is only known at the end of the bar, all equity/risk

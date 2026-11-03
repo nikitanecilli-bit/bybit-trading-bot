@@ -923,11 +923,25 @@ def main():
     validate_selection_cutoff(design["selection"], first_scored_timestamp)
     if set(design["selection"]["symbols"]) != set(symbols):
         raise SystemExit("Aligned Bybit universe does not exactly match frozen top-five selection manifest")
+    repo_root = Path(__file__).resolve().parents[1]
     selection_code_files = [
-        _file_manifest_record(Path(__file__).resolve().parents[1] / relative)
+        _file_manifest_record(repo_root / relative)
         for relative in H1_REPLAY_CODE_PATHS
-        if (Path(__file__).resolve().parents[1] / relative).is_file()
+        if (repo_root / relative).is_file()
     ]
+    recorded_universe = design["selection"]["input_files"].get("universe_snapshot")
+    if not isinstance(recorded_universe, list) or len(recorded_universe) != 1:
+        raise SystemExit("H1 selection manifest must identify exactly one lifecycle universe snapshot")
+    universe_path = Path(recorded_universe[0].get("path", ""))
+    if not universe_path.is_absolute():
+        universe_path = repo_root / universe_path
+    universe_path = universe_path.resolve()
+    if not universe_path.is_file():
+        raise SystemExit(f"H1 lifecycle universe snapshot is missing: {universe_path}")
+    try:
+        universe_path.relative_to(repo_root)
+    except ValueError as exc:
+        raise SystemExit("H1 lifecycle universe snapshot must be inside the checked-out repository") from exc
     validate_selection_provenance(
         design["selection"],
         {
@@ -936,6 +950,7 @@ def main():
             "mark_price": _directory_file_manifest(mark_price_dir, {".csv"}),
             "instrument_specs": _directory_file_manifest(instrument_specs_dir, {".json"}),
             "risk_tiers": _directory_file_manifest(risk_tiers_dir, {".json"}),
+            "universe_snapshot": [_file_manifest_record(universe_path)],
         },
         selection_code_files,
     )

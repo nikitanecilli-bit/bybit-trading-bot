@@ -5,7 +5,7 @@ _sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
 import unittest
 from types import SimpleNamespace
 
-from market_structure import breakout_quality, ema_series, trend_direction
+from market_structure import breakout_quality, ema_series, trend_direction, trend_direction_series
 
 
 def make_candles(closes, volumes=None, ranges=None):
@@ -60,6 +60,16 @@ class MarketStructureTests(unittest.TestCase):
             ema_series(full, 200)[len(prefix) - 1],
             places=12,
         )
+
+
+    def test_trend_direction_series_is_prefix_invariant(self):
+        closes = [100 + i * 0.3 for i in range(260)] + [178 - i * 0.2 for i in range(40)]
+        candles = make_candles(closes)
+        prefix_labels = trend_direction_series(candles[:250], fast=50, slow=200, slope=5)
+        full_labels = trend_direction_series(candles, fast=50, slow=200, slope=5)
+        self.assertEqual(prefix_labels, full_labels[:250])
+        self.assertEqual(len(full_labels), len(candles))
+
 
     def test_invalid_ema_trend_parameters_rejected(self):
         candles = make_candles([100 + i for i in range(60)])

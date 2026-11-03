@@ -355,3 +355,11 @@ A separate static audit found that the engine's `CALC_WINDOW=200` is shorter tha
 
 
 EMA200 initialization also needs a frozen burn-in policy: the helper seeds from the first close, so 206 candles are only the minimum for a directional label, not convergence. The seed retains about 13.53% weight after 200 updates; a conservative pre-roll candidate is 1,000 bars (5× EMA200) before the first scored signal. This is a research-design constraint, not a tuned parameter. Non-finite EMA inputs are now rejected; Research CI #41727040877 passed 53/53.
+
+
+## 2026-11-04 — EMA50/EMA200 H1 gate implementation status
+
+- Added an exact timestamp-to-label index with fixed 1,000 H1 bar EMA200 seed burn-in, strict chronological/contiguous H1 input, and fail-closed exact lookup.
+- Added an opt-in `ema_trend_labels_by_symbol` input to `run_portfolio_variant`; long-only H1 signals are allowed only when the same completed candle label is `up`. The default path remains unchanged.
+- Research CI [#41727906187](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41727906187) SUCCESS, 54/54.
+- This optional map is not yet passed by the H1 main grid and has no PnL evidence. Do not claim it improves results. Next implementation task is a separately identified fixed EMA-gated variant using the same frozen selected basket, execution assumptions and shared capital; only execute when Bybit-native data gates pass. No CryptoFetch PnL retest.

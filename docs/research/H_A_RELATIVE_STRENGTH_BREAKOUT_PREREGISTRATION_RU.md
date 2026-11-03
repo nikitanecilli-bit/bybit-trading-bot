@@ -57,3 +57,22 @@
 4. Verify the H-A runner loads the audited archive manifest and the corrected engine commit.
 5. Run corrected-engine frozen baseline, then one H-A replay. No Bybit API, runner, new exchange data, or live orders.
 
+## 6. Frozen replay parameters and chronology
+
+Для baseline и H-A одинаковы:
+- стартовый капитал 10,000 USDT; риск на сделку 0.5%; общий stop-risk cap портфеля 2%; максимум 5 одновременных позиций; leverage setting 5x;
+- daily stop 5%, emergency kill-switch 30%;
+- Donchian 20, ATR 14; stop 2.5 ATR; TP1 2R, TP2 5R; ATR trail 3.0; max hold 32 H1 bars;
+- market entry/exit; max-chase 1.5%; maker fills не засчитываются;
+- taker fee и slippage модели умножаются на 2.0 относительно текущих констант движка;
+- baseline — текущий H1 Donchian + volume gate (min volume ratio 1.6); H-A — только замена signal evaluator на правила раздела 2. Остальные execution/risk settings идентичны.
+- В каждом fold используется общий капитал 10,000 USDT с независимым reset; до начала signal window бары служат только для warm-up, сигналы до границы запрещены.
+
+Фиксированные исследовательские окна (UTC):
+1. 2026-04-27 12:00 — 2026-06-21 05:00
+2. 2026-06-21 06:00 — 2026-08-14 23:00
+3. 2026-08-15 00:00 — 2026-10-27 00:00
+
+Это повторно исследованные E11/E13 окна, не holdout. Если архив заканчивается раньше requested end, используется фактический общий последний H1 бар и это явно отражается в отчёте.
+
+Реализация: `scripts/run_h_a_relative_strength_replay.py`. По умолчанию скрипт выполняет только archive audit/prepare; для PnL требуется явный `--execute`. Он сравнивает baseline и H-A на одинаковом dynamic universe, сохраняет архивный manifest, fold summary, trade ledger, monthly equity и portfolio equity path. Это CryptoFetch/Binance-style OHLCV proxy: funding не загружен, поэтому funding в отчёте равен нулю и итог не является полным Bybit net PnL.

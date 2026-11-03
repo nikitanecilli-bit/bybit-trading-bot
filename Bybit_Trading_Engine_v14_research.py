@@ -619,6 +619,7 @@ class AdaptiveRiskManager:
     def calculate_position_size(
         self, entry_price: float, stop_price: float, order_type: str = "market",
         risk_budget_usdt: Optional[float] = None,
+        equity_override: Optional[float] = None,
     ) -> Tuple[float, float]:
         """Размер позиции с учётом ожидаемого убытка на стопе И базовых издержек.
 
@@ -627,7 +628,9 @@ class AdaptiveRiskManager:
         а не гарантия: гэпы, funding и фактическое исполнение могут увеличить убыток.
         """
         stop_dist = abs(entry_price - stop_price)
-        if entry_price <= 0 or stop_price <= 0 or stop_dist <= 0 or self.current_equity <= 0:
+        sizing_equity = self.current_equity if equity_override is None else equity_override
+        if (entry_price <= 0 or stop_price <= 0 or stop_dist <= 0
+                or not math.isfinite(sizing_equity) or sizing_equity <= 0):
             return 0.0, 0.0
 
         stop_pct = stop_dist / entry_price
@@ -645,13 +648,13 @@ class AdaptiveRiskManager:
         if not math.isfinite(estimated_loss_rate) or estimated_loss_rate <= 0:
             return 0.0, 0.0
 
-        per_trade_budget = self.current_equity * (self.cfg.max_risk_trade_pct / 100.0)
+        per_trade_budget = sizing_equity * (self.cfg.max_risk_trade_pct / 100.0)
         if risk_budget_usdt is not None:
             if not math.isfinite(risk_budget_usdt) or risk_budget_usdt <= 0:
                 return 0.0, 0.0
             per_trade_budget = min(per_trade_budget, risk_budget_usdt)
         raw_size_usdt = per_trade_budget / estimated_loss_rate
-        max_notional = (self.current_equity * self.cfg.leverage_val) / max(1, self.cfg.max_concurrent_positions)
+        max_notional = (sizing_equity * self.cfg.leverage_val) / max(1, self.cfg.max_concurrent_positions)
         capped_size = min(raw_size_usdt, max_notional * 0.95)
         # Round size DOWN to cents so rounding cannot exceed the risk budget.
         capped_size = math.floor(capped_size * 100.0) / 100.0
@@ -1303,6 +1306,7 @@ class UnifiedQuantEngine:
         self._intrabar_risk_marks: Dict[str, float] = {}
         self._intrabar_risk_marks_ts: Optional[int] = None
         self._bar_entry_risk_budgets: Dict[str, float] = {}
+        self._bar_entry_equity: Optional[float] = None
         self._state_restored = False
 
         if restore_plan_b:
@@ -1381,6 +1385,7 @@ class UnifiedQuantEngine:
         self._intrabar_risk_marks.clear()
         self._intrabar_risk_marks_ts = None
         self._bar_entry_risk_budgets.clear()
+        self._bar_entry_equity = None
         self._state_restored = False
 
     @staticmethod
@@ -1591,6 +1596,7 @@ class UnifiedQuantEngine:
         available portfolio risk equally, so iteration order cannot consume it.
         """
         self._bar_entry_risk_budgets = {}
+        self._bar_entry_equity = self.risk_mgr.current_equity
         pending_symbols = list(self.pending)
         if not pending_symbols:
             return self._bar_entry_risk_budgets
@@ -1664,14 +1670,26 @@ class UnifiedQuantEngine:
             fill = curr.open
 
         stop_price, tp1, tp2 = QuantStrategyCore.build_levels(direction, fill, sig["stop_dist"], self.cfg)
-        portfolio_risk_cap = self.risk_mgr.current_equity * (self.cfg.max_portfolio_risk_pct / 100.0)
-        remaining_portfolio_risk = max(0.0, portfolio_risk_cap - self._open_portfolio_risk_usdt())
         allocated_budget = getattr(self, "_bar_entry_risk_budgets", {}).pop(symbol, None)
-        if allocated_budget is not None:
-            remaining_portfolio_risk = min(remaining_portfolio_risk, allocated_budget)
+        if allocated_budget is None:
+            sizing_equity = self.risk_mgr.current_equity
+            portfolio_risk_cap = sizing_equity * (self.cfg.max_portfolio_risk_pct / 100.0)
+            remaining_portfolio_risk = max(
+                0.0, portfolio_risk_cap - self._open_portfolio_risk_usdt(),
+            )
+            equity_override = None
+        else:
+            # Every entry in this synchronized batch uses the same pre-fill equity
+            # and its preallocated risk share; earlier fills must not resize later ones.
+            sizing_equity = getattr(self, "_bar_entry_equity", None)
+            if sizing_equity is None:
+                sizing_equity = self.risk_mgr.current_equity
+            remaining_portfolio_risk = allocated_budget
+            equity_override = sizing_equity
         size_usdt, risk_usdt = self.risk_mgr.calculate_position_size(
             fill, stop_price, order_type=effective_order_type,
             risk_budget_usdt=remaining_portfolio_risk,
+            equity_override=equity_override,
         )
         if size_usdt <= 0 or risk_usdt <= 0:
             self._persist()
@@ -1736,7 +1754,7 @@ class UnifiedQuantEngine:
             order_type=effective_order_type,
             maker_exits=(self.cfg.maker_entry_and_tp1 if self.cfg.maker_tp1_and_target is None else self.cfg.maker_tp1_and_target),
             max_favorable_px=fill, max_adverse_px=fill,
-            equity_at_entry=self.risk_mgr.current_equity,
+            equity_at_entry=sizing_equity,
             risk_tier_id=risk_margin.tier_id if risk_margin else None,
             risk_limit_value=str(risk_margin.risk_limit_value) if risk_margin else None,
             maintenance_margin_rate=str(risk_margin.maintenance_margin_rate) if risk_margin else None,

@@ -358,7 +358,7 @@ def test_partial_tp1_then_stop_closes_only_remaining_fraction():
 
 
 
-def _close_with_real_accounting(pos, exit_price, exit_reason):
+def _close_with_real_accounting(pos, exit_price, exit_reason, final_exit_maker=None):
     e = make_engine()
     e.cfg.capital_usdt = 10_000.0
     e.open_positions[pos.symbol] = pos
@@ -371,6 +371,7 @@ def _close_with_real_accounting(pos, exit_price, exit_reason):
     exit_ts = 1_800_000_000_000
     engine_mod.UnifiedQuantEngine._close_position(
         e, pos, exit_price, exit_reason, exit_ts, mae_r=1.0, mfe_r=2.0,
+        final_exit_maker=final_exit_maker,
     )
     assert len(e.closed_trades) == 1
     assert not e.open_positions
@@ -759,6 +760,113 @@ def test_portfolio_kill_switch_flattens_all_positions_and_blocks_pending_entries
     assert "XRPUSDT" not in e.pending
 
 
+def test_long_tp1_gap_through_uses_taker_fee_and_slippage_for_tp1():
+    e = make_engine()
+    pos = make_position("long")
+    pos.maker_exits = True
+    e.open_positions["BTCUSDT"] = pos
+    history = [
+        candle(100, 101, 99, 100, ts=1_799_999_100_000),
+        candle(111, 115, 109, 113),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(
+        e, "BTCUSDT", history, False, history[-1].ts + 900_000,
+    )
+    assert pos.tp1_hit is True
+    assert pos.tp1_maker is False
+
+    record = _close_with_real_accounting(pos, 108.0, "trailing_stop")
+    expected_fees = (
+        1_000.0 * engine_mod.TAKER_FEE
+        + 550.0 * engine_mod.TAKER_FEE
+        + 540.0 * engine_mod.TAKER_FEE
+    )
+    expected_slippage = (
+        1_000.0 * engine_mod.TAKER_SLIP
+        + 550.0 * engine_mod.TAKER_SLIP
+        + 540.0 * engine_mod.TAKER_SLIP
+    )
+    assert record.tp1_maker is False
+    assert record.exchange_fees_usdt == round(expected_fees, 2)
+    assert record.slippage_cost_usdt == round(expected_slippage, 2)
+
+
+def test_long_tp1_intrabar_touch_keeps_configured_maker_proxy():
+    e = make_engine()
+    pos = make_position("long")
+    pos.maker_exits = True
+    e.open_positions["BTCUSDT"] = pos
+    history = [
+        candle(100, 101, 99, 100, ts=1_799_999_100_000),
+        candle(105, 111, 104, 110),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(
+        e, "BTCUSDT", history, False, history[-1].ts + 900_000,
+    )
+    assert pos.tp1_hit is True
+    assert pos.tp1_maker is True
+
+
+def test_long_tp2_gap_through_classifies_both_target_legs_as_taker():
+    e = make_engine()
+    pos = make_position("long")
+    pos.maker_exits = True
+    e.open_positions["BTCUSDT"] = pos
+    captured = []
+    e._close_position = lambda *args: captured.append(args)
+    history = [
+        candle(100, 101, 99, 100, ts=1_799_999_100_000),
+        candle(121, 125, 119, 123),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(
+        e, "BTCUSDT", history, False, history[-1].ts + 900_000,
+    )
+    assert pos.tp1_hit is True
+    assert pos.tp1_maker is False
+    assert len(captured) == 1
+    assert captured[0][2] == "take_profit"
+    assert captured[0][-1] is False
+
+    record = _close_with_real_accounting(
+        pos, 120.0, "take_profit", final_exit_maker=captured[0][-1],
+    )
+    expected_fees = (
+        1_000.0 * engine_mod.TAKER_FEE
+        + 550.0 * engine_mod.TAKER_FEE
+        + 600.0 * engine_mod.TAKER_FEE
+    )
+    expected_slippage = (
+        1_000.0 * engine_mod.TAKER_SLIP
+        + 550.0 * engine_mod.TAKER_SLIP
+        + 600.0 * engine_mod.TAKER_SLIP
+    )
+    assert record.tp1_maker is False
+    assert record.final_exit_maker is False
+    assert record.exchange_fees_usdt == round(expected_fees, 2)
+    assert record.slippage_cost_usdt == round(expected_slippage, 2)
+
+
+def test_short_tp2_gap_through_classifies_both_target_legs_as_taker():
+    e = make_engine()
+    pos = make_position("short")
+    pos.maker_exits = True
+    e.open_positions["BTCUSDT"] = pos
+    captured = []
+    e._close_position = lambda *args: captured.append(args)
+    history = [
+        candle(100, 101, 99, 100, ts=1_799_999_100_000),
+        candle(79, 81, 77, 78),
+    ]
+    engine_mod.UnifiedQuantEngine._manage_position(
+        e, "BTCUSDT", history, False, history[-1].ts + 900_000,
+    )
+    assert pos.tp1_hit is True
+    assert pos.tp1_maker is False
+    assert len(captured) == 1
+    assert captured[0][2] == "take_profit"
+    assert captured[0][-1] is False
+
+
 if __name__ == "__main__":
     tests = [
         test_baseline_long_signal_records_prior_donchian_boundary,
@@ -783,6 +891,10 @@ if __name__ == "__main__":
         test_limit_tp1_then_market_trailing_stop_charges_correct_exit_fee_types,
         test_market_short_stop_journal_matches_independent_fee_and_slippage_math,
         test_long_gap_stop_journal_uses_actual_gap_fill_price,
+        test_long_tp1_gap_through_uses_taker_fee_and_slippage_for_tp1,
+        test_long_tp1_intrabar_touch_keeps_configured_maker_proxy,
+        test_long_tp2_gap_through_classifies_both_target_legs_as_taker,
+        test_short_tp2_gap_through_classifies_both_target_legs_as_taker,
         test_financial_rounding_uses_half_up_at_half_cent,
         test_pending_signal_is_removed_when_risk_gate_rejects_entry,
         test_pending_original_signal_timestamp_cannot_follow_freshness_guard,

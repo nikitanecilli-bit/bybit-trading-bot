@@ -91,10 +91,10 @@ class IsolatedLiquidationTests(unittest.TestCase):
             tiers=[tier(1, "1000000", "0.005", "100")],
             taker_fee_rate="0.00055",
         )
-        self.assertEqual(long.estimated_close_fee, Decimal("1.98"))
-        self.assertEqual(short.estimated_close_fee, Decimal("2.42"))
-        self.assertEqual(long.maintenance_margin, Decimal("196.98"))
-        self.assertEqual(short.maintenance_margin, Decimal("207.42"))
+        self.assertEqual(long.estimated_close_fee, Decimal("19.80"))
+        self.assertEqual(short.estimated_close_fee, Decimal("22.00"))
+        self.assertEqual(long.maintenance_margin, Decimal("214.80"))
+        self.assertEqual(short.maintenance_margin, Decimal("227.00"))
 
     def test_rejects_entry_over_highest_risk_limit(self):
         with self.assertRaisesRegex(ValueError, "exceeds highest"):

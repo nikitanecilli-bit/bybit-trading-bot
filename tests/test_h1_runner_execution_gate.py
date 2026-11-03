@@ -17,7 +17,7 @@ from run_h1_shared_capital_portfolio_validation import (
     round_limit_quote_to_bybit_tick, engine_cost_stress,
     BASE_TAKER_FEE, BASE_MAKER_FEE, BASE_TAKER_SLIP,
     resolve_validation_design, load_frozen_selection_manifest,
-    validate_selection_cutoff, validate_selection_provenance,
+    validate_selection_cutoff, validate_selection_provenance, runtime_provenance,
 )
 
 
@@ -159,6 +159,27 @@ def test_selection_provenance_rejects_changed_universe_snapshot():
         assert "universe_snapshot" in str(exc)
     else:
         raise AssertionError("changed lifecycle snapshot must force a new selection")
+
+
+
+def test_runtime_provenance_separates_research_checkout_from_workflow_ref():
+    names = ("H1_RESEARCH_CHECKOUT_SHA", "GITHUB_SHA", "GITHUB_WORKFLOW_REF", "GITHUB_REF")
+    original = {name: os.environ.get(name) for name in names}
+    try:
+        os.environ["H1_RESEARCH_CHECKOUT_SHA"] = "research-sha"
+        os.environ["GITHUB_SHA"] = "workflow-sha"
+        os.environ["GITHUB_WORKFLOW_REF"] = "owner/repo/.github/workflows/validation.yml@refs/heads/main"
+        os.environ["GITHUB_REF"] = "refs/heads/main"
+        result = runtime_provenance()
+        assert result["git_commit"] == "research-sha"
+        assert result["workflow_definition_commit"] == "workflow-sha"
+        assert result["workflow_definition_ref"].endswith("@refs/heads/main")
+    finally:
+        for name, value in original.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
 
 def test_selection_cutoff_must_precede_validation():
@@ -494,6 +515,7 @@ if __name__ == "__main__":
         test_selection_manifest_must_be_valid_and_successful,
         test_selection_provenance_rejects_changed_data_and_code,
         test_selection_provenance_rejects_changed_universe_snapshot,
+        test_runtime_provenance_separates_research_checkout_from_workflow_ref,
         test_selection_cutoff_must_precede_validation,
         test_confirm_mode_rejects_missing_or_unregistered_config,
         test_cost_stress_restores_engine_globals_after_success_and_exception,

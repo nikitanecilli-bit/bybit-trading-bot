@@ -34,7 +34,7 @@ from scripts.run_h1_shared_capital_portfolio_validation import (
 from scripts.snapshot_bybit_linear_universe import is_linear_usdt_perpetual_within_lifecycle_at
 
 TRAIN_FRACTION = 0.50
-MIN_TRAIN_BARS = 500
+MIN_TRAIN_BARS = 3000
 MIN_TRADES = 30
 MIN_VOLUME_RATIO = 1.6
 MIN_BREAKOUT_ATR = 0.10
@@ -125,11 +125,12 @@ def select_train_only(
     )
     reference_start = reference_candles[0].ts
     reference_end = reference_candles[-1].ts
-    cutoff = reference_start + int((reference_end - reference_start) * TRAIN_FRACTION)
+    cutoff = reference_start + int((reference_end - reference_start) * TRAIN_FRACTION) - 3_600_000
     train_start = reference_start
 
     results = []
     exclusions = []
+    training_candles_by_symbol = {}
     for symbol, (source_path, candles) in sorted(raw.items()):
         instrument = universe.get(symbol)
         if instrument is None:
@@ -151,6 +152,7 @@ def select_train_only(
             raise SystemExit(f"{symbol}: Bybit H1 archive begins before recorded launchTime")
         if delivery_ms and train_candles[-1].ts >= delivery_ms:
             raise SystemExit(f"{symbol}: Bybit H1 archive extends to/after recorded deliveryTime")
+        training_candles_by_symbol[symbol] = train_candles
         train_ts = [c.ts for c in train_candles]
         result = run_portfolio_variant(
             {symbol: train_candles}, [symbol], train_ts,
@@ -177,6 +179,17 @@ def select_train_only(
     primary = [row["symbol"] for row in eligible[:5]]
     reserve = [row["symbol"] for row in eligible[5:10]]
     status = "ok" if len(primary) == 5 else "insufficient_candidates"
+    common_primary_timestamps = set()
+    if len(primary) == 5:
+        common_primary_timestamps = {
+            candle.ts for candle in training_candles_by_symbol[primary[0]]
+        }
+        for symbol in primary[1:]:
+            common_primary_timestamps.intersection_update(
+                candle.ts for candle in training_candles_by_symbol[symbol]
+            )
+        if len(common_primary_timestamps) < MIN_TRAIN_BARS:
+            status = "insufficient_common_training_overlap"
     kline_files = _directory_file_manifest(kline_dir, {".csv"})
     input_files = {
         "kline": kline_files,
@@ -208,6 +221,8 @@ def select_train_only(
             "start_utc": _utc(train_start),
             "cutoff_utc": _utc(cutoff),
             "train_fraction": TRAIN_FRACTION,
+            "one_bar_embargo_before_validation": True,
+            "common_primary_training_bars": len(common_primary_timestamps),
         },
         "strategy_config": {
             "direction": "long_only",
@@ -222,6 +237,8 @@ def select_train_only(
             "screening_mode": "one-symbol isolated portfolio per candidate; ranking metrics are not a shared-capital portfolio",
         },
         "eligibility_rule": {
+            "minimum_training_bars_per_symbol": MIN_TRAIN_BARS,
+            "minimum_common_training_bars_for_primary": MIN_TRAIN_BARS,
             "minimum_closed_trades": MIN_TRADES,
             "net_pnl_usdt": "strictly_positive",
             "profit_factor": "strictly_greater_than_1",
@@ -290,11 +307,18 @@ def main():
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     rows = manifest["candidate_results"]
     if rows:
-        fields = list(rows[0].keys())
+        csv_rows = []
+        for row in rows:
+            flat = dict(row)
+            source = flat.pop("source_kline", {})
+            flat["source_kline_path"] = source.get("path")
+            flat["source_kline_sha256"] = source.get("sha256")
+            csv_rows.append(flat)
+        fields = list(csv_rows[0].keys())
         with (output_dir / "h1_top5_candidate_ranking.csv").open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
             writer.writeheader()
-            writer.writerows(rows)
+            writer.writerows(csv_rows)
     print(f"Selection status={manifest['selection_status']}; eligible={manifest['eligible_candidate_count']}; primary={manifest['primary']}; reserve={manifest['reserve']}")
     print(f"Saved immutable selection manifest: {manifest_path}")
     if manifest["selection_status"] != "ok":

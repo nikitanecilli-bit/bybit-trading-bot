@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from scripts.run_h1_shared_capital_portfolio_validation import (
-    build_ema50_200_label_maps, resolve_ema50_200_gate,
+    build_ema50_200_label_maps, h1_variant_name, resolve_ema50_200_gate,
 )
 from market_structure import lookup_trend_label
 
@@ -41,21 +41,6 @@ def test_ema50_200_gate_is_explicitly_opt_in_and_rejects_invalid_values():
         assert "H1_EMA50_200_GATE" in str(exc)
     else:
         raise AssertionError("invalid EMA gate configuration must fail closed")
-
-
-
-def test_ema_gate_is_explicit_opt_in_and_variant_output_is_unambiguous():
-    assert resolve_ema50_200_gate({}) is False
-    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "0"}) is False
-    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "false"}) is False
-    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "1"}) is True
-    assert resolve_ema50_200_gate({"H1_EMA50_200_GATE": "true"}) is True
-    try:
-        resolve_ema50_200_gate({"H1_EMA50_200_GATE": "maybe"})
-    except SystemExit:
-        pass
-    else:
-        raise AssertionError("invalid EMA gate setting must fail closed")
 
     baseline = h1_variant_name(1.6, 0.1, 2.0, False)
     gated = h1_variant_name(1.6, 0.1, 2.0, True)

@@ -85,8 +85,8 @@ class BybitMarketHistoryTests(unittest.TestCase):
                 "symbol": "BTCUSDT", "timestamp_ms": hour,
                 "open": "100", "high": "102", "low": "99", "close": "101",
             }
-            with patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=fake_funding), \\
-                 patch("scripts.archive_bybit_market_history.fetch_trade_klines", return_value=[candle]), \\
+            with patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=fake_funding), \
+                 patch("scripts.archive_bybit_market_history.fetch_trade_klines", return_value=[candle]), \
                  patch("scripts.archive_bybit_market_history.fetch_mark_klines", return_value=[mark]):
                 result = archive_symbol("BTCUSDT", hour, hour * 2, tmp, "60", pause=0)
 

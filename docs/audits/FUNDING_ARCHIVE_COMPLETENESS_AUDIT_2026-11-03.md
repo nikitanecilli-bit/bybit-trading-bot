@@ -175,3 +175,19 @@ The reconstructed-grid regressions are now part of the active Research CI workfl
 Research CI [#41726204938](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41726204938) completed **SUCCESS, 53/53 steps**, at commit `2f7c590e70da47ab855db31d9f823d8134ac7cd5`. Funding-specific passing steps include cumulative Funding accounting, realized Funding PnL, Mark-to-market Funding risk, Funding/Mark preflight, Funding archive provenance and schedule completeness, and downloader manifest integrity.
 
 This verifies the new code paths against synthetic/offline fixtures. It does **not** remove the residual trust boundary described above: the currently available snapshots cannot rule out an interval change and reversion between observations, and no actual Bybit funding/Mark archive with historical schedule evidence exists. The market-PnL gate remains CLOSED.
+
+
+### Production archive attachment path — 2026-11-04
+
+A separate operational gap is now closed in code: the official archive workflow previously wrote Funding query provenance but left `settlement_schedule_evidence=null`, while the H1 runner requires a verified dated schedule. The archive produced by that workflow therefore could never pass the H1 Funding gate without manual sidecar construction.
+
+Implemented:
+- `funding_archive_manifest.attach_funding_settlement_schedule()` builds a UTC settlement grid from hash-pinned Bybit instruments-info snapshots, copies the exact source snapshots into the archive, and updates the Funding manifest atomically.
+- `scripts/archive_bybit_market_history.py` now requires `--instrument-snapshot-dir` and attaches schedule evidence for each symbol.
+- The official `bybit-market-history-archive.yml` workflow now fails before downloading if dated instrument snapshots are absent and passes `data/instrument_specs/linear` to the collector.
+- The helper chooses the nearest matching-symbol snapshot at/before the requested start and at/after the requested end, includes observations between them, ignores snapshots outside that symbol's observed lifecycle window, and fails closed if the symbol disappears inside the bracket or if an observed Funding interval changes.
+- Offline tests verify that the production collector emits a schedule sidecar accepted by the validator, and that an observed interval change with unknown effective boundary is rejected.
+
+Research CI [#41729833792](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41729833792) completed **SUCCESS, 55/55 steps**, including Bybit market-history archive collector tests and Funding archive provenance/schedule-completeness tests. Tested commit: `7653ae9991f10e137f32c51c7665ade421cec585`.
+
+Residual limitation is explicit: point-in-time snapshots cannot rule out an interval change and reversion between observations. The snapshot workflow has previously been blocked by Bybit HTTP 403 and no real dated Bybit instrument/risk, trade-kline, Funding or Mark archive is committed. This is an offline implementation result only; the H1 market-PnL gate remains CLOSED.

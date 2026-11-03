@@ -174,8 +174,8 @@ def test_hc_applies_only_to_breakout_strategies_and_does_not_reenter_same_bar():
     e._close_position = close_and_remove
     e.step_candle("BTCUSDT", _history(bar), evaluate_new_signal=True)
     assert len(closed) == 1
-    assert closed[0][1] == bar.close
-    assert closed[0][2] == "breakout_retest_invalidation"
+    assert closed[0][0] == bar.close
+    assert closed[0][1] == "breakout_retest_invalidation"
     assert "BTCUSDT" not in e.open_positions
     assert e.pending == {}
 

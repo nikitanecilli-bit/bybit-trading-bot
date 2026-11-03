@@ -282,6 +282,26 @@ def validate_funding_manifest(
                             or snapshot_times[-1] < int(required_end_ms)
                         ):
                             errors.append("schedule_source_snapshots_do_not_bracket_interval")
+                    # Do not trust the schedule's expected-timestamp list as
+                    # its own proof. Reconstruct the UTC settlement grid from
+                    # the dated instrument snapshots when the interval is
+                    # unchanged throughout the required window. If it changed,
+                    # snapshot timestamps alone do not establish the exact
+                    # effective boundary, so fail closed.
+                    distinct_intervals = {interval for _, interval in snapshot_intervals}
+                    if len(distinct_intervals) == 1 and snapshot_times:
+                        stable_interval_ms = next(iter(distinct_intervals)) * 60_000
+                        first_expected = (
+                            (int(required_start_ms) + stable_interval_ms - 1)
+                            // stable_interval_ms
+                        ) * stable_interval_ms
+                        reconstructed_grid = set(range(
+                            first_expected, int(required_end_ms) + 1, stable_interval_ms
+                        ))
+                    else:
+                        reconstructed_grid = None
+                        if len(distinct_intervals) > 1:
+                            errors.append("funding_interval_changed_without_effective_boundary_evidence")
                     raw_expected = schedule.get("expected_settlement_timestamps_ms")
                     if not isinstance(raw_expected, list):
                         errors.append("expected_settlement_timestamps_missing")
@@ -291,6 +311,8 @@ def validate_funding_manifest(
                             if values != sorted(set(values)):
                                 raise ValueError
                             expected_events = set(values)
+                            if reconstructed_grid is not None and expected_events != reconstructed_grid:
+                                errors.append("expected_settlement_schedule_not_reconstructed_from_interval")
                         except (TypeError, ValueError):
                             errors.append("invalid_expected_settlement_timestamps")
                     if not errors or all(

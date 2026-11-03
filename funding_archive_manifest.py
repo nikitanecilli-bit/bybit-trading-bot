@@ -330,6 +330,8 @@ def validate_funding_manifest(
                             "invalid_funding_interval_minutes",
                             "expected_settlement_timestamps_missing",
                             "invalid_expected_settlement_timestamps",
+                            "funding_interval_changed_without_effective_boundary_evidence",
+                            "expected_settlement_schedule_not_reconstructed_from_interval",
                         )
                     ):
                         funding_timestamps = set()

@@ -324,6 +324,9 @@ def select_train_only(
         "selection_protocol": PROTOCOL,
         "selection_status": status,
         "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "research_git_commit": os.getenv("H1_RESEARCH_CHECKOUT_SHA") or os.getenv("GITHUB_SHA"),
+        "workflow_definition_commit": os.getenv("GITHUB_SHA"),
+        "workflow_definition_ref": os.getenv("GITHUB_WORKFLOW_REF") or os.getenv("GITHUB_REF"),
         "training_window": {
             "definition": (
                 "exact timestamp intersection of every eligible candidate inside the first "

@@ -904,3 +904,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Влияние на текущий H1 preset: конкретно этот None fallback там не используется, поскольку maker_tp1_and_target=False. Это прежде всего legacy/restored-position accounting consistency defect; никаких market PnL runs не было.
 
 - Follow-up test hardening: added numeric MTM regression for legacy `maker_exits=None` and explicit `maker_exits=False`; [CI #41707011122](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41707011122) SUCCESS (50/50 steps; funding MTM tests 8/8). No PnL replay.
+
+ 
+## ENG-REPORT-001 — geometric monthly-equivalent net return for H1 folds (2026-11-03)
+
+- Gap: H1 output reported cumulative fold `return_pct` only. This is insufficient to compare folds of different durations against the user's stated 20% net monthly hurdle.
+- Added `duration_days`, `duration_months` and `geometric_monthly_return_pct` to each H1 result row and metric definitions to the validation manifest. Duration includes the final H1 candle through its close; net PnL already includes modeled fees, slippage and funding.
+- This is a geometric monthly-equivalent normalization, not an observed calendar-month return series and not proof of consistent monthly performance. Actual month-by-month returns and losing-month frequency remain required before any candidate can be called consistent.
+- Reporting-only change: no signal, ranking, execution, risk, or cost assumptions changed; no market PnL run.
+- Tests cover +20% over one average month, +44% compounded over two months (=20% geometric monthly), reversed timestamps and total loss.
+- Runner commit `4e481fcadba5a7692b619c3b219da73241e8c7d3`; tests commit `381aacadcd2965757b8d3907fd8bdebb8b8b3d59`.
+- CI [#41708149842](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41708149842) and [#41708141158](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41708141158) SUCCESS, 50/50 steps each.

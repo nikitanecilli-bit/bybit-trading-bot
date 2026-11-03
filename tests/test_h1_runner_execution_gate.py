@@ -212,8 +212,7 @@ def test_load_bybit_h1_datasets_rejects_gaps_and_loads_exchange_candles():
         loaded = load_bybit_h1_datasets(root)
         assert len(loaded["BTCUSDT"][1]) == 500
         assert loaded["BTCUSDT"][1][0].ts == 1_700_000_000_000
-        rows[200] = rows[200].replace(str(1_700_000_000_000 + 200 * 3_600_000),
-                                      str(1_700_000_000_000 + 201 * 3_600_000))
+        rows.pop(201)  # remove one H1 candle to create a real one-hour gap
         path.write_text("\n".join(rows) + "\n", encoding="utf-8")
         try:
             load_bybit_h1_datasets(root)

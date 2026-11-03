@@ -9,7 +9,7 @@ aggregation is outside this module.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_FLOOR
 from typing import Iterable
 
 from bybit_risk_tiers import RiskTier
@@ -203,3 +203,33 @@ def mark_candle_crosses_liquidation(
     if min(lp, low, high) <= 0 or high < low:
         raise ValueError("liquidation price and Mark-Price OHLC bounds must be positive and ordered")
     return low <= lp if side == "long" else high >= lp
+
+
+def calculate_isolated_usdt_bankruptcy_price(
+    *, direction: str, entry_price, leverage, tick_size=None
+) -> Decimal:
+    """Calculate isolated USDT bankruptcy price (no extra-margin adjustment).
+
+    Bybit documents long bankruptcy price as entry*(1 - 1/leverage) and short
+    as entry*(1 + 1/leverage). When tick_size is supplied, long rounds up and
+    short rounds down to the exchange tick. This helper assumes no extra margin
+    was manually added and does not model fees/funding altering effective IM.
+    """
+    side = str(direction).strip().lower()
+    if side not in {"long", "short"}:
+        raise ValueError("direction must be 'long' or 'short'")
+    entry = _d(entry_price, "entry_price")
+    lev = _d(leverage, "leverage")
+    if entry <= 0 or lev <= 0:
+        raise ValueError("entry_price and leverage must be positive")
+    price = entry * (Decimal("1") - Decimal("1") / lev if side == "long"
+                     else Decimal("1") + Decimal("1") / lev)
+    if price <= 0:
+        raise ValueError("bankruptcy price must be positive")
+    if tick_size is not None:
+        tick = _d(tick_size, "tick_size")
+        if tick <= 0:
+            raise ValueError("tick_size must be positive")
+        rounding = ROUND_CEILING if side == "long" else ROUND_FLOOR
+        price = (price / tick).to_integral_value(rounding=rounding) * tick
+    return price

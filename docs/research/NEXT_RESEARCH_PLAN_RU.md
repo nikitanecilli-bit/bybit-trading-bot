@@ -619,3 +619,6 @@ H1 validation runner дополнен отдельным JSON manifest рядо�
 - Это устраняет повторный подбор параметров на последнем fold, но не создаёт автоматически корректный top-5 universe. Top-5 должен быть отобран только по train-отрезку и зафиксирован до explore/confirm; список символов затем передаётся через H1_SYMBOL_ALLOWLIST.
 - Нельзя запускать confirm после просмотра fold 3 или менять frozen inputs после получения результата: в таком случае fold 3 становится использованным и следующий подтверждающий holdout должен быть более поздним.
 - Bybit data/execution gate всё ещё закрыт; PnL не запускался. CI подтверждает только код и deterministic tests.
+
+
+Дополнение к защите holdout (после CI #41693921708): confirm mode теперь дополнительно требует ровно пять уникальных заранее выбранных символов в H1_SYMBOL_ALLOWLIST. Автоматический coverage-filtered universe в confirm запрещён. Frozen symbol list сохраняется в manifest. Это не выполняет отбор top-5 за нас: top-5 сначала нужно определить на train-периоде, затем неизменно передать в explore и confirm. Research CI #41693921708 завершился SUCCESS; все 49 job steps успешны. Финальный workflow-only commit `4482bc95fea19d025ccb9c2456a26bbc1c62cfdf` содержит эти изменения в активной ветке.

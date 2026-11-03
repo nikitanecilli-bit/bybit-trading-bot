@@ -116,7 +116,7 @@ def test_ema_gate_rejects_non_contiguous_h1_history():
 if __name__ == "__main__":
     tests = [
         test_ema50_200_gate_is_explicitly_opt_in_and_rejects_invalid_values,
-        test_ema50_200_gate_is_explicitly_opt_in_and_rejects_invalid_values,
+        test_ema_gate_is_explicit_opt_in_and_variant_output_is_unambiguous,
         test_ema_gate_precomputes_full_history_and_uses_exact_scored_timestamp,
         test_ema_gate_fails_closed_without_1000_pre_roll_bars,
         test_ema_gate_fails_closed_for_missing_symbol_or_history,

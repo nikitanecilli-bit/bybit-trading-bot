@@ -79,6 +79,12 @@ MAE/MFE рассчитываются в ценовых R от initial_stop_dist,
 
 Это статическая проверка кода и перечня тестов. Последующая полная Research CI проверка #41542100415 завершилась SUCCESS на commit `0546f53a45bb4508d1f16ba06bbb310cdd69b1de`; compile и весь детерминированный suite, включая portfolio accounting, funding, exchange sizing и новые archive-audit tests, прошли. Этот CI не добавляет отдельного threshold-boundary теста для MTM maker-vs-taker asymmetry; этот конкретный пробел остаётся OPEN.
 
+## 4A. Regression for conservative maker MTM asymmetry — 2026-11-03
+
+Added `test_open_maker_take_profit_mtm_remains_conservative_vs_final_maker_close` to `tests/test_portfolio_accounting.py`. It pins the exact expected difference for a $1,000 limit-entry long whose modeled final TP exit is maker: open-position MTM stresses the remaining exit as taker fee + taker slippage, while the closed TP ledger uses maker fee. The test asserts the conservative MTM shortfall equals the modeled fee/slippage delta on the $1,100 exit notional.
+
+Research CI [41676899254](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41676899254) completed SUCCESS on the test commit; portfolio accounting **40/40** passed, including the new regression. This proves the asymmetry is explicit and numerically pinned; it does not test the exact daily-stop/kill-switch threshold crossing boundary, which remains open. No engine behavior or PnL replay was changed.
+
 ## 5. Открытые ограничения
 
 - Intrabar path и очередь лимиток неизвестны из OHLC.

@@ -2052,16 +2052,17 @@ class UnifiedQuantEngine:
         sign = 1.0 if pos.direction == "long" else -1.0
         if pos.exchange_sized:
             remaining_qty = Decimal(str(pos.remaining_contract_qty))
-            step = Decimal(str(pos.qty_step))
-            min_qty = Decimal(str(pos.min_order_qty))
-            min_notional = Decimal(str(pos.min_notional_value))
-            if remaining_qty <= 0 or remaining_qty % step != 0:
-                raise RuntimeError(f"{pos.symbol}: final reduce quantity is not positive/aligned to qtyStep")
-            if remaining_qty < min_qty or remaining_qty * Decimal(str(exit_price)) < min_notional:
-                raise RuntimeError(
-                    f"{pos.symbol}: final reduce quantity violates archived minOrderQty/minNotionalValue; "
-                    "cannot claim exchange-valid close"
-                )
+            if exit_reason != "liquidation":
+                step = Decimal(str(pos.qty_step))
+                min_qty = Decimal(str(pos.min_order_qty))
+                min_notional = Decimal(str(pos.min_notional_value))
+                if remaining_qty <= 0 or remaining_qty % step != 0:
+                    raise RuntimeError(f"{pos.symbol}: final reduce quantity is not positive/aligned to qtyStep")
+                if remaining_qty < min_qty or remaining_qty * Decimal(str(exit_price)) < min_notional:
+                    raise RuntimeError(
+                        f"{pos.symbol}: final reduce quantity violates archived minOrderQty/minNotionalValue; "
+                        "cannot claim exchange-valid close"
+                    )
             rem_gross = float(remaining_qty) * sign * (exit_price - pos.entry_price)
         else:
             remaining_qty = (Decimal(str(pos.size_usdt)) / Decimal(str(pos.entry_price))
@@ -2097,7 +2098,12 @@ class UnifiedQuantEngine:
             fees += f; slip += s
         final_maker = maker_exits and exit_reason == "take_profit"
         final_notional = float(remaining_qty * Decimal(str(exit_price)))
-        f, s = self._leg_cost(final_notional, final_maker)
+        if exit_reason == "liquidation":
+            # Bybit documents no liquidation fee for perpetual/futures; takeover
+            # settles at bankruptcy price outside the ordinary matching engine.
+            f, s = 0.0, 0.0
+        else:
+            f, s = self._leg_cost(final_notional, final_maker)
         fees += f; slip += s
         fees, slip = _money_round(fees), _money_round(slip)
 

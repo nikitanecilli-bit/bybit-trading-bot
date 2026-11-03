@@ -644,3 +644,6 @@ H1 validation runner дополнен отдельным JSON manifest рядо�
 
 
 Упрощён handoff между workflow: H1 selector теперь автоматически сохраняет manifest и ranking в `data/research/h1_top5_selection/` и коммитит их в выбранную research-ветку; артефакт также прикрепляется к workflow run. Validation workflow читает primary list непосредственно из manifest и сам формирует allowlist — ручное повторное копирование тикеров исключено. Если selector не найдёт пять кандидатов, он сохранит fail-closed manifest со статусом ошибки, который validation runner не примет.
+
+
+Дополнительная защита provenance (CI run [41696929040](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41696929040), SUCCESS 50/50): selection manifest теперь содержит SHA-256 всех Bybit H1/funding/mark/spec/risk файлов и всех replay-критичных исходников. Перед любым explore/confirm runner сверяет полный набор входных файлов и кодовые hashes с теми, на которых выбирался top-5. Любое изменение данных или replay-зависимости блокирует PnL и требует повторного train-only selection. Это предотвращает ситуацию, когда top-5 выбран на одном наборе данных, а validation незаметно выполняется на другом.

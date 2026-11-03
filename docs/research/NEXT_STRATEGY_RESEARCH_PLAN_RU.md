@@ -331,3 +331,11 @@ Keep the existing runner unchanged as a reproducible long-only variant. After Fu
 - Audit/engineering gates now cover per-leg TP liquidity, TP1 mark-to-market, H-C event priority, exact taker exit accounting, state persistence, shared-capital equity reconciliation and deterministic symbol-order invariance.
 - One reverse-time CryptoFetch proxy check is preregistered in H-C doc section 6.1: 2025-10-30 00:00 through 2026-04-26 23:00 UTC; fixed 25-symbol archive-available set; same frozen baseline vs baseline+H-C; no H-A, no top-five selection, no tuning; 2x fee/slippage; funding omitted.
 - This is not forward OOS and cannot prove Bybit net PnL or 20% net/month. The workflow will run once on already committed archive bytes only. No Bybit API, external download, account access or orders.
+
+
+## 2026-11-04 — H-C reverse-time result and next research boundary
+
+- The one preregistered H-C reverse-time CryptoFetch proxy replay completed [#41722545731](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41722545731), artifact 13272957989. Baseline proxy net before funding: -2,720.47 USDT; H-C: -2,880.12 USDT. H-C improved gross by +1,502.18 but added +1,661.83 fees/slippage and increased trades 94.9%; net was worse by -159.65 USDT. Both variants hit the 30% kill switch.
+- H-C is rejected for this window. No tuning/replay on this year of CryptoFetch data. The full archive is now development-only; no additional PnL sweep may be presented as an independent holdout.
+- The next strategy direction is lower-frequency entry quality: longer H1 Donchian structure plus a causal EMA50/EMA200 trend-regime gate, with a fixed cost-aware execution model. This is a new hypothesis, not a proven edge. First complete static design, code audit and deterministic tests; any future proxy experiment must be separately preregistered and clearly labelled development-only. A real 20% net/month claim still requires funding, mark-price and Bybit execution validation, which remains on hold.
+- No Bybit API connection, external exchange-data download, private account access, paper/live order submission.

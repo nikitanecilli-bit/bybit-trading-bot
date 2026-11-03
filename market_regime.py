@@ -160,12 +160,24 @@ def classify_candles(
 
         regime = "unknown"
         direction = "neutral"
+        ema_alignment = "unknown"
         if i >= warmup - 1 and er is not None and slope_atr is not None and vol_ratio is not None:
+            if fast[i] > slow[i]:
+                ema_alignment = "up"
+            elif fast[i] < slow[i]:
+                ema_alignment = "down"
+            else:
+                ema_alignment = "neutral"
             if vol_ratio >= cfg.high_vol_ratio and er < cfg.high_vol_er_max:
                 regime = "high_vol_chop"
-            elif er >= cfg.trend_er_min and abs(slope_atr) >= cfg.trend_slope_atr_min:
-                regime = "trend_up" if slope_atr > 0 else "trend_down"
-                direction = "up" if slope_atr > 0 else "down"
+            elif (
+                er >= cfg.trend_er_min
+                and abs(slope_atr) >= cfg.trend_slope_atr_min
+                and ((ema_alignment == "up" and slope_atr > 0)
+                     or (ema_alignment == "down" and slope_atr < 0))
+            ):
+                regime = "trend_up" if ema_alignment == "up" else "trend_down"
+                direction = ema_alignment
             elif er <= cfg.range_er_max and abs(slope_atr) <= cfg.range_slope_atr_max:
                 regime = "range"
             else:
@@ -175,6 +187,7 @@ def classify_candles(
         clean.update({
             "regime": regime,
             "regime_direction": direction,
+            "ema_alignment": ema_alignment,
             "efficiency_ratio": "" if er is None else round(er, 8),
             "atr": "" if atr is None else round(atr, 10),
             "atr_pct": "" if atr_pct[i] is None else round(float(atr_pct[i]), 10),

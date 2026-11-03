@@ -133,8 +133,8 @@ def test_funding_dirs_are_mandatory_and_non_empty():
             assert "funding as zero" in str(exc)
         else:
             raise AssertionError("missing funding env must fail")
-        (funding / "BTCUSDT.csv").write_text("symbol,funding_timestamp_ms,funding_rate\\nBTCUSDT,1000,0.001\\n", encoding="utf-8")
-        (marks / "BTCUSDT.csv").write_text("symbol,timestamp_ms,open\\nBTCUSDT,1000,100\\n", encoding="utf-8")
+        (funding / "BTCUSDT.csv").write_text("symbol,funding_timestamp_ms,funding_rate\nBTCUSDT,1000,0.001\n", encoding="utf-8")
+        (marks / "BTCUSDT.csv").write_text("symbol,timestamp_ms,open\nBTCUSDT,1000,100\n", encoding="utf-8")
         result = resolve_funding_dirs({
             "BYBIT_FUNDING_DIR": str(funding),
             "BYBIT_MARK_PRICE_DIR": str(marks),
@@ -148,11 +148,11 @@ def test_funding_mark_coverage_requires_every_symbol_and_h1_mark_bar():
         funding.mkdir()
         marks.mkdir()
         (funding / "BTCUSDT.csv").write_text(
-            "symbol,funding_timestamp_ms,funding_rate\\nBTCUSDT,1000,0.001\\n",
+            "symbol,funding_timestamp_ms,funding_rate\nBTCUSDT,1000,0.001\n",
             encoding="utf-8",
         )
         (marks / "BTCUSDT.csv").write_text(
-            "symbol,timestamp_ms,open\\nBTCUSDT,1000,100\\n",
+            "symbol,timestamp_ms,open\nBTCUSDT,1000,100\n",
             encoding="utf-8",
         )
         try:
@@ -171,11 +171,11 @@ def test_funding_mark_coverage_rejects_no_settlement_in_fold():
         funding.mkdir()
         marks.mkdir()
         (funding / "BTCUSDT.csv").write_text(
-            "symbol,funding_timestamp_ms,funding_rate\\nBTCUSDT,1000,0.001\\n",
+            "symbol,funding_timestamp_ms,funding_rate\nBTCUSDT,1000,0.001\n",
             encoding="utf-8",
         )
         (marks / "BTCUSDT.csv").write_text(
-            "symbol,timestamp_ms,open\\nBTCUSDT,1000,100\\n",
+            "symbol,timestamp_ms,open\nBTCUSDT,1000,100\n",
             encoding="utf-8",
         )
         try:

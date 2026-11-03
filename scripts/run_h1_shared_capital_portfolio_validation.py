@@ -721,6 +721,15 @@ def _selected_kline_manifest_record(symbol, path):
     return record
 
 
+def runtime_provenance():
+    """Distinguish the checked-out research code from the workflow-dispatch ref."""
+    return {
+        "git_commit": os.getenv("H1_RESEARCH_CHECKOUT_SHA") or os.getenv("GITHUB_SHA"),
+        "workflow_definition_commit": os.getenv("GITHUB_SHA"),
+        "workflow_definition_ref": os.getenv("GITHUB_WORKFLOW_REF") or os.getenv("GITHUB_REF"),
+    }
+
+
 def build_validation_manifest(
     *,
     symbols,
@@ -833,7 +842,7 @@ def build_validation_manifest(
         "schema_version": 1,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "run": {
-            "git_commit": os.getenv("GITHUB_SHA"),
+            **runtime_provenance(),
             "workflow_run_id": os.getenv("GITHUB_RUN_ID"),
             "workflow_run_attempt": os.getenv("GITHUB_RUN_ATTEMPT"),
             "python_version": sys.version,

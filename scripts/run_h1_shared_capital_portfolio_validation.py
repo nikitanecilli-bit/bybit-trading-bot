@@ -216,7 +216,7 @@ def resolve_bybit_kline_dir(environ=None):
 def load_bybit_h1_datasets(directory):
     """Load official Bybit V5 H1 trade candles, rejecting gaps and malformed rows."""
     root = Path(directory)
-    required = {"timestamp_ms", "open", "high", "low", "close", "volume", "turnover"}
+    required = {"symbol", "timestamp_ms", "open", "high", "low", "close", "volume", "turnover"}
     raw = {}
     for path in sorted(root.glob("*.csv")):
         symbol = path.stem.upper()
@@ -226,6 +226,12 @@ def load_bybit_h1_datasets(directory):
             if not reader.fieldnames or not required.issubset(reader.fieldnames):
                 raise SystemExit(f"{path}: missing Bybit trade-kline columns {sorted(required)}")
             for line_no, row in enumerate(reader, start=2):
+                row_symbol = str(row.get("symbol", "")).strip().upper()
+                if row_symbol != symbol:
+                    raise SystemExit(
+                        f"{path}:{line_no}: row symbol {row_symbol!r} does not match "
+                        f"filename symbol {symbol}"
+                    )
                 try:
                     ts = int(row["timestamp_ms"])
                     op, hi, low, close, volume, turnover = (

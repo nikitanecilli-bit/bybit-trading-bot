@@ -3,8 +3,10 @@ from pathlib import Path
 import sys
 import tempfile
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from scripts.run_h1_shared_capital_portfolio_validation import resolve_execution_snapshot_dirs
+repo_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(repo_root))
+sys.path.insert(0, str(repo_root / "scripts"))
+from run_h1_shared_capital_portfolio_validation import resolve_execution_snapshot_dirs
 
 
 def test_missing_snapshot_directories_reject_legacy_replay():

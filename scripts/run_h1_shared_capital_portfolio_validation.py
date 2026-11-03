@@ -33,6 +33,47 @@ WAIT_BARS = 3
 STARTING_CAPITAL = 10_000.0
 MAX_CONCURRENT_POSITIONS = 5
 COST_MULTIPLIERS = [1.0, 1.5, 2.0]
+H1_REPLAY_CODE_PATHS = [
+    "Bybit_Trading_Engine_v14_research.py",
+    "scripts/run_h1_shared_capital_portfolio_validation.py",
+    "scripts/select_h1_top5_train_only.py",
+    "scripts/snapshot_bybit_linear_universe.py",
+    "multibar_limit_wait.py",
+    "funding_accounting.py",
+    "mark_price_liquidation.py",
+    "bybit_risk_tiers.py",
+    "bybit_instrument_specs.py",
+    "instrument_spec_history.py",
+    "exchange_order_sizing.py",
+    "market_regime.py",
+    "market_structure.py",
+    "scripts/validate_funding_coverage.py",
+]
+SELECTION_INPUT_KEYS = ("kline", "funding", "mark_price", "instrument_specs", "risk_tiers")
+
+
+def validate_selection_provenance(selection, current_input_files, current_code_files):
+    """Reject validation if any selector input or replay dependency changed."""
+    recorded_inputs = selection.get("input_files")
+    if not isinstance(recorded_inputs, dict):
+        raise SystemExit("Selection manifest lacks input file hashes")
+    for key in SELECTION_INPUT_KEYS:
+        expected_rows = recorded_inputs.get(key)
+        actual_rows = current_input_files.get(key)
+        if not isinstance(expected_rows, list) or not isinstance(actual_rows, list):
+            raise SystemExit(f"Selection manifest lacks {key} provenance")
+        expected = {(row.get("path"), row.get("sha256"), row.get("size_bytes")) for row in expected_rows}
+        actual = {(row.get("path"), row.get("sha256"), row.get("size_bytes")) for row in actual_rows}
+        if expected != actual:
+            raise SystemExit(f"H1 selection provenance mismatch for {key}; rerun train-only selection")
+    recorded_code = selection.get("code_files")
+    if not isinstance(recorded_code, list):
+        raise SystemExit("Selection manifest lacks replay code hashes")
+    actual_code = {row.get("path"): row for row in current_code_files}
+    for expected_row in recorded_code:
+        actual_row = actual_code.get(expected_row.get("path"))
+        if actual_row is None or (actual_row.get("sha256"), actual_row.get("size_bytes")) != (expected_row.get("sha256"), expected_row.get("size_bytes")):
+            raise SystemExit(f"H1 replay code changed since selection: {expected_row.get('path')}; rerun train-only selection")
 
 
 def load_frozen_selection_manifest(environ=None):
@@ -52,6 +93,8 @@ def load_frozen_selection_manifest(environ=None):
         raise SystemExit("Unsupported H1 selection manifest schema/protocol")
     if payload.get("selection_status") != "ok":
         raise SystemExit("H1 selection manifest has no valid top-five set; refusing validation")
+    if not isinstance(payload.get("input_files"), dict) or not isinstance(payload.get("code_files"), list):
+        raise SystemExit("H1 selection manifest lacks immutable data/code provenance")
     primary = payload.get("primary")
     if not isinstance(primary, list) or len(primary) != 5:
         raise SystemExit("H1 selection manifest must contain exactly five primary symbols")
@@ -77,6 +120,8 @@ def load_frozen_selection_manifest(environ=None):
         "symbols": sorted(symbols),
         "training_cutoff_timestamp_ms": cutoff,
         "generated_at_utc": payload.get("generated_at_utc"),
+        "input_files": payload["input_files"],
+        "code_files": payload["code_files"],
     }
 
 
@@ -762,21 +807,8 @@ def build_validation_manifest(
     }
 
     repo_root = Path(__file__).resolve().parents[1]
-    code_paths = [
-        "Bybit_Trading_Engine_v14_research.py",
-        "scripts/run_h1_shared_capital_portfolio_validation.py",
-        "scripts/select_h1_top5_train_only.py",
+    code_paths = list(H1_REPLAY_CODE_PATHS) + [
         ".github/workflows/h1-shared-capital-portfolio-validation.yml",
-        "multibar_limit_wait.py",
-        "funding_accounting.py",
-        "mark_price_liquidation.py",
-        "bybit_risk_tiers.py",
-        "bybit_instrument_specs.py",
-        "instrument_spec_history.py",
-        "exchange_order_sizing.py",
-        "market_regime.py",
-        "market_structure.py",
-        "scripts/validate_funding_coverage.py",
     ]
     code_files = [
         _file_manifest_record(repo_root / relative)
@@ -891,6 +923,22 @@ def main():
     validate_selection_cutoff(design["selection"], first_scored_timestamp)
     if set(design["selection"]["symbols"]) != set(symbols):
         raise SystemExit("Aligned Bybit universe does not exactly match frozen top-five selection manifest")
+    selection_code_files = [
+        _file_manifest_record(Path(__file__).resolve().parents[1] / relative)
+        for relative in H1_REPLAY_CODE_PATHS
+        if (Path(__file__).resolve().parents[1] / relative).is_file()
+    ]
+    validate_selection_provenance(
+        design["selection"],
+        {
+            "kline": _directory_file_manifest(kline_dir, {".csv"}),
+            "funding": _directory_file_manifest(funding_dir, {".csv"}),
+            "mark_price": _directory_file_manifest(mark_price_dir, {".csv"}),
+            "instrument_specs": _directory_file_manifest(instrument_specs_dir, {".json"}),
+            "risk_tiers": _directory_file_manifest(risk_tiers_dir, {".json"}),
+        },
+        selection_code_files,
+    )
     print(f"Train-only selection manifest={design['selection']['path']} sha256={design['selection']['sha256']}")
     print(f"Validation mode={design['mode']}; folds={[item[0] for item in design['folds']]}; "
           f"volume={design['volume_thresholds']}; breakoutATR={design['breakout_atr_thresholds']}; "

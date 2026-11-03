@@ -5,7 +5,10 @@ _sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
 import unittest
 from types import SimpleNamespace
 
-from market_structure import (breakout_quality, ema_series, trend_direction,\n                              trend_direction_series, trend_label_index,\n                              lookup_trend_label)
+from market_structure import (
+    breakout_quality, ema_series, trend_direction, trend_direction_series,
+    trend_label_index, lookup_trend_label,
+)
 
 
 def make_candles(closes, volumes=None, ranges=None):

@@ -42,6 +42,18 @@ class RiskTier:
 
 
 @dataclass(frozen=True)
+class RiskMarginRequirement:
+    position_value: Decimal
+    leverage: Decimal
+    initial_margin: Decimal
+    maintenance_margin: Decimal
+    tier_id: int
+    risk_limit_value: Decimal
+    maintenance_margin_rate: Decimal
+    mm_deduction: Decimal
+
+
+@dataclass(frozen=True)
 class RiskTierSnapshot:
     fetched_at: str
     fetched_at_ms: int
@@ -166,3 +178,35 @@ class RiskTierHistory:
                 f"{symbol} leverage {lev} exceeds tier {tier.tier_id} maxLeverage {tier.max_leverage}"
             )
         return tier
+
+    def calculate_margin_requirements(
+        self, symbol: str, as_of_ts: int, position_value: Decimal | str | float,
+        *, leverage: Decimal | str | float, max_age_ms: int | None = None,
+    ) -> RiskMarginRequirement:
+        """Calculate position-level USDT IM/MM from the selected dated risk tier.
+
+        IM is position value / configured leverage. MM follows Bybit's published
+        linear formula: position value * MMR - mmDeduction. This is not an
+        account-level solvency or liquidation-price calculation.
+        """
+        value = _d(position_value, "position_value")
+        lev = _d(leverage, "leverage")
+        tier = self.get_tier(
+            symbol, as_of_ts, value, leverage=lev, max_age_ms=max_age_ms
+        )
+        initial_margin = value / lev
+        maintenance_margin = value * tier.maintenance_margin_rate - tier.mm_deduction
+        if initial_margin <= 0 or maintenance_margin < 0:
+            raise ValueError(
+                f"{symbol} tier {tier.tier_id} produced invalid IM/MM requirement"
+            )
+        return RiskMarginRequirement(
+            position_value=value,
+            leverage=lev,
+            initial_margin=initial_margin,
+            maintenance_margin=maintenance_margin,
+            tier_id=tier.tier_id,
+            risk_limit_value=tier.risk_limit_value,
+            maintenance_margin_rate=tier.maintenance_margin_rate,
+            mm_deduction=tier.mm_deduction,
+        )

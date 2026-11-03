@@ -4,6 +4,7 @@ import json
 import sys
 import tempfile
 import unittest
+from decimal import Decimal
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from bybit_risk_tiers import RiskTierHistory
 
@@ -29,6 +30,28 @@ class RiskTierHistoryTests(unittest.TestCase):
             self.assertEqual(tier.mm_deduction, 500)
             with self.assertRaisesRegex(ValueError, "exceeds tier 2 maxLeverage"):
                 history.get_tier("BTCUSDT", 1793606400000, "250000", leverage="60")
+
+    def test_calculates_position_level_initial_and_maintenance_margin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")
+            history = RiskTierHistory.from_directory(tmp)
+            result = history.calculate_margin_requirements(
+                "BTCUSDT", 1793606400000, "250000", leverage="10"
+            )
+            self.assertEqual(result.tier_id, 2)
+            self.assertEqual(result.initial_margin, 25000)
+            self.assertEqual(result.maintenance_margin, 2000)
+            self.assertEqual(result.maintenance_margin_rate, Decimal("0.01"))
+            self.assertEqual(result.mm_deduction, 500)
+
+    def test_margin_requirement_rejects_uncovered_position_and_invalid_tier(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")
+            history = RiskTierHistory.from_directory(tmp)
+            with self.assertRaisesRegex(ValueError, "exceeds highest"):
+                history.calculate_margin_requirements(
+                    "BTCUSDT", 1793606400000, "500001", leverage="10"
+                )
 
     def test_boundary_uses_lower_tier_until_risk_limit_exceeded(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -25,6 +25,7 @@ from scripts.run_h1_shared_capital_portfolio_validation import (
     _directory_file_manifest,
     _file_manifest_record,
     _manifest_path,
+    H1_REPLAY_CODE_PATHS,
     load_bybit_h1_datasets,
     resolve_bybit_kline_dir,
     resolve_execution_snapshot_dirs,
@@ -201,12 +202,8 @@ def select_train_only(
     }
     code_files = [
         _file_manifest_record(ROOT / path)
-        for path in (
-            "Bybit_Trading_Engine_v14_research.py",
-            "scripts/run_h1_shared_capital_portfolio_validation.py",
-            "scripts/select_h1_top5_train_only.py",
-            "scripts/snapshot_bybit_linear_universe.py",
-        )
+        for path in H1_REPLAY_CODE_PATHS
+        if (ROOT / path).is_file()
     ]
     manifest = {
         "schema_version": 1,

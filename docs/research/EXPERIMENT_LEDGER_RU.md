@@ -981,3 +981,15 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - H1 runner now explicitly assigns `ISOLATED_5X` and `leverage_val=5.0` instead of relying on the BotConfig default; the same constants are written to the validation manifest.
 - CI [#41730087544](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41730087544) SUCCESS, 54/54.
 - No Bybit market PnL replay; all these changes are deterministic integrity hardening only.
+
+
+## ENG-SEL-001 — per-symbol train/validation leakage in H1 Top-5 selector (2026-11-04)
+
+- **Confirmed defect:** `scripts/select_h1_top5_train_only.py::select_train_only` applied the longest-history calendar cutoff to every symbol. Shorter histories could cross their own 50% validation boundary and influence ranking with validation-period data.
+- Concrete reproduced case: 10,000-bar reference cutoff at index 4,998; 4,000-bar candidate's own validation begins at index 2,000. Old slicing included candidate bars through index 3,999.
+- Fix: `candidate_training_slice()` calculates each candidate's own first-validation timestamp and excludes any candidate whose training slice reaches or crosses that timestamp. Manifest now records per-candidate validation boundaries.
+- Regression: `tests/test_h1_top5_selector.py::test_candidate_training_slice_rejects_short_symbol_validation_leakage`; also verifies the reference series retains the one-bar embargo.
+- Research CI [#41732028220](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41732028220) SUCCESS, 54/54 steps. Selector fix commit `d927703771ee66e818556dbae65d69c7e7763018`; test commit `d628eb42922898b672f975d15b7341f8dfe4ab5a`.
+- Impact: future selector integrity only. No frozen Bybit selection manifest existed; no strategy PnL, Bybit API, download, paper trading or live orders.
+- Remaining limitation: this does not reconstruct historical delisted/temporarily unavailable contracts and does not remove survivorship bias from incomplete historical universe evidence.
+- Decision: selector must be rerun from scratch after final code/data freeze; no earlier manifest may be reused.

@@ -391,11 +391,17 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
         mm_deduction = Decimal("500")
 
     class TierHistory:
-        def get_tier(self, symbol, as_of_ts, position_value, *, leverage, max_age_ms):
+        def calculate_margin_requirements(self, symbol, as_of_ts, position_value, *, leverage, max_age_ms):
             assert symbol == "BTCUSDT"
             assert position_value <= Decimal("500000")
             assert leverage == Decimal("5")
-            return Tier()
+            return type("Margin", (), {
+                "tier_id": 2, "risk_limit_value": Decimal("500000"),
+                "maintenance_margin_rate": Decimal("0.01"),
+                "mm_deduction": Decimal("500"), "leverage": leverage,
+                "initial_margin": position_value / leverage,
+                "maintenance_margin": position_value * Decimal("0.01") - Decimal("500"),
+            })()
 
     e = make_engine()
     e.instrument_spec_history = InstrumentHistory()
@@ -416,6 +422,9 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
     assert position.risk_limit_value == "500000"
     assert position.maintenance_margin_rate == "0.01"
     assert position.maintenance_margin_deduction == "500"
+    assert position.risk_tier_max_leverage == "5"
+    assert Decimal(position.initial_margin_usdt) == Decimal(str(position.size_usdt)) / Decimal("5")
+    assert Decimal(position.maintenance_margin_usdt) == Decimal(str(position.size_usdt)) * Decimal("0.01") - Decimal("500")
 
 
 def test_engine_fails_closed_when_dated_risk_tier_is_missing_or_leverage_exceeded():

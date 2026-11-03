@@ -399,6 +399,9 @@ class OpenPositionState:
     risk_limit_value: Optional[str] = None
     maintenance_margin_rate: Optional[str] = None
     maintenance_margin_deduction: Optional[str] = None
+    risk_tier_max_leverage: Optional[str] = None
+    initial_margin_usdt: Optional[str] = None
+    maintenance_margin_usdt: Optional[str] = None
     contract_qty: Optional[str] = None
     tp1_contract_qty: Optional[str] = None
     remaining_contract_qty: Optional[str] = None
@@ -912,7 +915,8 @@ class PlanBStatePersistence:
                     value = pos_dict["risk_tier_id"]
                     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                         raise ValueError(f"позиция {sym}: risk_tier_id должен быть положительным целым числом")
-                for field_name in ("risk_limit_value", "maintenance_margin_rate", "maintenance_margin_deduction"):
+                for field_name in ("risk_limit_value", "maintenance_margin_rate", "maintenance_margin_deduction",
+                                   "risk_tier_max_leverage", "initial_margin_usdt", "maintenance_margin_usdt"):
                     if field_name in pos_dict and pos_dict[field_name] is not None:
                         try:
                             value = Decimal(str(pos_dict[field_name]))
@@ -1694,12 +1698,12 @@ class UnifiedQuantEngine:
             size_usdt = float(exchange_order.notional_usdt)
             risk_usdt = float(exchange_order.risk_usdt)
 
-        risk_tier = None
+        risk_margin = None
         risk_tier_history = getattr(self, "risk_tier_history", None)
         if risk_tier_history is not None:
             try:
                 position_value = Decimal(str(size_usdt))
-                risk_tier = risk_tier_history.get_tier(
+                risk_margin = risk_tier_history.calculate_margin_requirements(
                     symbol, curr.ts, position_value,
                     leverage=Decimal(str(self.cfg.leverage_val)),
                     max_age_ms=getattr(self, "max_risk_tier_age_ms", 30 * 24 * 60 * 60 * 1000),
@@ -1722,10 +1726,13 @@ class UnifiedQuantEngine:
             maker_exits=(self.cfg.maker_entry_and_tp1 if self.cfg.maker_tp1_and_target is None else self.cfg.maker_tp1_and_target),
             max_favorable_px=fill, max_adverse_px=fill,
             equity_at_entry=self.risk_mgr.current_equity,
-            risk_tier_id=risk_tier.tier_id if risk_tier else None,
-            risk_limit_value=str(risk_tier.risk_limit_value) if risk_tier else None,
-            maintenance_margin_rate=str(risk_tier.maintenance_margin_rate) if risk_tier else None,
-            maintenance_margin_deduction=str(risk_tier.mm_deduction) if risk_tier else None,
+            risk_tier_id=risk_margin.tier_id if risk_margin else None,
+            risk_limit_value=str(risk_margin.risk_limit_value) if risk_margin else None,
+            maintenance_margin_rate=str(risk_margin.maintenance_margin_rate) if risk_margin else None,
+            maintenance_margin_deduction=str(risk_margin.mm_deduction) if risk_margin else None,
+            risk_tier_max_leverage=str(risk_margin.leverage) if risk_margin else None,
+            initial_margin_usdt=str(risk_margin.initial_margin) if risk_margin else None,
+            maintenance_margin_usdt=str(risk_margin.maintenance_margin) if risk_margin else None,
             contract_qty=str(exchange_order.qty) if exchange_order else None,
             remaining_contract_qty=str(exchange_order.qty) if exchange_order else None,
             qty_step=str(instrument_spec.qty_step) if instrument_spec else None,

@@ -384,6 +384,9 @@ class StatePersistenceTests(unittest.TestCase):
             position.qty_step = "0.1"
             position.min_order_qty = "0.1"
             position.min_notional_value = "5"
+            position.risk_tier_max_leverage = "5"
+            position.initial_margin_usdt = "20"
+            position.maintenance_margin_usdt = "0.5"
             position.tp1_hit = True
             position.remaining_fraction = 0.5
             position.realized_tp1_gross_usdt = 30.0

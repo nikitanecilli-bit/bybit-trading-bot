@@ -1098,7 +1098,7 @@ def test_sparse_replay_admits_late_symbols_after_warmup_and_is_order_invariant()
     assert forward["ledger"] == reverse["ledger"]
     # Compare only timestamps after the latest symbol has entered the universe.
     forward_path = [row for row in forward["equity_path"] if row[0] >= start_ts + 36 * hour]
-    reverse_path = [row for row in reverse["equity_path"] if row[0] >= start_ts + 35 * hour]
+    reverse_path = [row for row in reverse["equity_path"] if row[0] >= start_ts + 36 * hour]
     assert len(forward_path) == len(reverse_path), (len(forward_path), len(reverse_path))
     path_differences = [
         (left, right) for left, right in zip(forward_path, reverse_path)

@@ -477,25 +477,26 @@ def test_funding_mark_coverage_requires_every_symbol_and_h1_mark_bar():
         funding.mkdir()
         marks.mkdir()
         (funding / "BTCUSDT.csv").write_text(
-            "symbol,funding_timestamp_ms,funding_rate\n"
-            "BTCUSDT,1000,0.001\n"
-            "BTCUSDT,28801000,0.001\n",
+            "symbol,funding_timestamp_ms,funding_rate\\n"
+            "BTCUSDT,28800000,0.001\\n"
+            "BTCUSDT,57600000,0.001\\n",
             encoding="utf-8",
         )
         (marks / "BTCUSDT.csv").write_text(
-            "symbol,timestamp_ms,open\n"
-            "BTCUSDT,1000,100\n"
-            "BTCUSDT,3601000,100\n"
-            "BTCUSDT,28801000,100\n",
+            "symbol,timestamp_ms,open\\n"
+            "BTCUSDT,28800000,100\\n"
+            "BTCUSDT,32400000,100\\n"
+            "BTCUSDT,57600000,100\\n",
             encoding="utf-8",
         )
         _write_funding_manifest(
-            funding / "BTCUSDT.csv", 1000, 28801000,
-            expected_events=[1000, 28801000], funding_interval_minutes=480,
+            funding / "BTCUSDT.csv", 28800000, 57600000,
+            expected_events=[28800000, 57600000], funding_interval_minutes=480,
         )
         try:
             validate_funding_mark_coverage(
-                funding, marks, ["BTCUSDT"], [1000, 3601000, 7201000], 1000, 7201000
+                funding, marks, ["BTCUSDT"],
+                [28800000, 32400000, 36000000], 28800000, 36000000,
             )
         except SystemExit as exc:
             assert "missing 1 candles" in str(exc)
@@ -509,31 +510,30 @@ def test_funding_mark_coverage_rejects_no_settlement_in_fold():
         funding.mkdir()
         marks.mkdir()
         (funding / "BTCUSDT.csv").write_text(
-            "symbol,funding_timestamp_ms,funding_rate\n"
-            "BTCUSDT,0,0.001\n"
-            "BTCUSDT,28800000,0.001\n",
+            "symbol,funding_timestamp_ms,funding_rate\\n"
+            "BTCUSDT,28800000,0.001\\n"
+            "BTCUSDT,57600000,0.001\\n",
             encoding="utf-8",
         )
         (marks / "BTCUSDT.csv").write_text(
-            "symbol,timestamp_ms,open\n"
-            "BTCUSDT,0,100\n"
-            "BTCUSDT,28800000,100\n",
+            "symbol,timestamp_ms,open\\n"
+            "BTCUSDT,28800000,100\\n"
+            "BTCUSDT,57600000,100\\n",
             encoding="utf-8",
         )
         _write_funding_manifest(
-            funding / "BTCUSDT.csv", 0, 28800000,
-            expected_events=[0, 28800000], funding_interval_minutes=480,
+            funding / "BTCUSDT.csv", 28800000, 57600000,
+            expected_events=[28800000, 57600000], funding_interval_minutes=480,
         )
         try:
             validate_funding_mark_coverage(
-                funding, marks, ["BTCUSDT"], [3600000, 7200000], 3600000, 7200000
+                funding, marks, ["BTCUSDT"], [32400000, 36000000],
+                32400000, 36000000,
             )
         except SystemExit as exc:
             assert "No Bybit funding settlements" in str(exc)
         else:
             raise AssertionError("no settlement in fold must fail")
-
-
 
 
 def test_funding_mark_coverage_rejects_missing_or_unverified_archive_manifest():

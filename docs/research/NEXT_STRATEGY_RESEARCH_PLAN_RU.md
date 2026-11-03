@@ -30,9 +30,9 @@
 
 ## 3. Приоритетные семейства гипотез после закрытия gate
 
-### H-A — Relative-strength breakout (первый приоритет)
+### H-A — Relative-strength breakout (ОТКЛОНЕНА по результатам E14)
 
-Мотивация: E12 показывает, что broad-market direction сам по себе не является универсальным фильтром. В слабом рынке отдельные локальные победители всё же встречались. Поэтому проверять не «рынок растёт/падает», а силу конкретного инструмента относительно доступного universe.
+Историческая мотивация эксперимента: E12 показывал, что broad-market direction сам по себе не является универсальным фильтром. H-A была preregistered и проверена в E14, но отклонена: net PnL отрицателен во всех трёх folds, PF ниже 1, expectancy отрицательна; H-A хуже frozen baseline на 499.28 USDT. Не оптимизировать ранги/пороги и не переиспользовать эти folds для новой гипотезы.
 
 Предварительная конструкция для будущего preregistered test:
 - На каждом закрытом H1 баре вычислять causal relative strength инструмента относительно cross-sectional median за 24h и 72h.
@@ -78,7 +78,7 @@
 
 ## 6. Следующий технический шаг
 
-Продолжить static audit и deterministic tests, начиная с same-timestamp order invariance в `run_simulation_pass()`, accounting reconciliation и stop/TP execution semantics. Результаты аудита записывать отдельно от рыночных PnL. После закрытия audit gate выбрать H-A как первую проверяемую гипотезу; H-B/H-C оставить отдельными экспериментальными ветками, не объединять в одну большую оптимизацию.
+Продолжить static audit и deterministic tests по lifecycle, TP1-aware PnL/cost reconciliation, sparse/shared-capital event ordering и stop/TP execution semantics. Symbol-order invariance и ledger-to-equity reconciliation уже имеют регрессионные тесты в `tests/test_portfolio_accounting.py`; не дублировать их без выявленного пробела. Результаты аудита записывать отдельно от рыночных PnL. H-A отклонена; не оптимизировать её на использованных folds. H-C реализована только как default-OFF механика базовой H1 breakout-стратегии, но PnL не тестировалась. Новые рыночные прогоны запрещены до закрытия audit/data gates и появления действительно независимых валидных данных.
 
 ## 7. Фактический archive audit — 2026-11-03
 

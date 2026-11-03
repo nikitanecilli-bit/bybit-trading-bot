@@ -44,6 +44,7 @@ def make_engine(max_chase_pct=1.5):
     e._last_mark_prices = {}
     e._intrabar_risk_marks = {}
     e._intrabar_mtm_marks = {}
+    e._intrabar_liquidation_exits = {}
     e._intrabar_risk_marks_ts = None
     e._intrabar_mtm_marks_ts = None
     e.risk_mgr = RiskSpy()

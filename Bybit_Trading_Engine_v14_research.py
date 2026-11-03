@@ -811,18 +811,7 @@ class PlanBStatePersistence:
                 json.dump(payload, f, indent=2, ensure_ascii=False, allow_nan=False)
                 f.flush()
                 os.fsync(f.fileno())
-            os.replace(tmp_path, self.backup_filepath)
-            if os.name == "posix":
-                parent_dir = os.path.dirname(os.path.abspath(self.backup_filepath)) or "."
-                dir_fd = os.open(parent_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-                try:
-                    os.fsync(dir_fd)
-                finally:
-                    os.close(dir_fd)
         except Exception as e:
-            # Persistence is explicitly enabled: a failed backup must be visible
-            # to the caller so the trading loop can stop rather than continue
-            # with a stale recovery point.
             try:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
@@ -833,7 +822,45 @@ class PlanBStatePersistence:
                 f"Не удалось сохранить резервное состояние в {self.backup_filepath!r}"
             ) from e
 
-    def load_state(self, risk_mgr: AdaptiveRiskManager) -> Tuple[Dict[str, "OpenPositionState"], Dict[str, Dict], int]:
+        # Validate the exact serialized candidate with the same strict reader
+        # before replacing the last known-good recovery point.
+        try:
+            PlanBStatePersistence(tmp_path, enabled=False).load_state(
+                AdaptiveRiskManager(cfg), log_restore=False,
+            )
+        except RuntimeError as e:
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except OSError:
+                logger.exception("Не удалось удалить невалидный временный backup %s", tmp_path)
+            raise ValueError(
+                "Сериализованный backup не проходит строгую проверку восстановления"
+            ) from e
+
+        try:
+            os.replace(tmp_path, self.backup_filepath)
+            if os.name == "posix":
+                parent_dir = os.path.dirname(os.path.abspath(self.backup_filepath)) or "."
+                dir_fd = os.open(parent_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
+        except Exception as e:
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except OSError:
+                logger.exception("Не удалось удалить временный файл состояния %s", tmp_path)
+            logger.critical("Критическая ошибка сохранения состояния План Б: %s", e)
+            raise RuntimeError(
+                f"Не удалось сохранить резервное состояние в {self.backup_filepath!r}"
+            ) from e
+
+    def load_state(
+        self, risk_mgr: AdaptiveRiskManager, *, log_restore: bool = True,
+    ) -> Tuple[Dict[str, "OpenPositionState"], Dict[str, Dict], int]:
         if not os.path.exists(self.backup_filepath):
             return {}, {}, 0
         try:
@@ -1184,7 +1211,7 @@ class PlanBStatePersistence:
             # Commit the validated risk state only after all backup components parsed.
             risk_mgr.from_dict(candidate_risk.to_dict())
             self.last_mark_prices = candidate_marks
-            if restored:
+            if restored and log_restore:
                 logger.info("🛡️ План Б: восстановлено %d позиций, kill_switch=%s, daily_stop=%s",
                             len(restored), risk_mgr.kill_switch_triggered, risk_mgr.daily_stop_triggered)
             return restored, pending, seq

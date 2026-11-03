@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 from datetime import datetime, timezone
 from collections import defaultdict
+from contextlib import contextmanager
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import Bybit_Trading_Engine_v14_research as em
@@ -33,6 +34,22 @@ COST_MULTIPLIERS = [1.0, 1.5, 2.0]
 BASE_TAKER_FEE = em.TAKER_FEE
 BASE_MAKER_FEE = em.MAKER_FEE
 BASE_TAKER_SLIP = em.TAKER_SLIP
+
+
+@contextmanager
+def engine_cost_stress(multiplier):
+    """Apply a cost stress only inside one replay; always restore module globals."""
+    value = float(multiplier)
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError("cost multiplier must be finite and positive")
+    original = (em.TAKER_FEE, em.MAKER_FEE, em.TAKER_SLIP)
+    em.TAKER_FEE = BASE_TAKER_FEE * value
+    em.MAKER_FEE = BASE_MAKER_FEE * value
+    em.TAKER_SLIP = BASE_TAKER_SLIP * value
+    try:
+        yield
+    finally:
+        em.TAKER_FEE, em.MAKER_FEE, em.TAKER_SLIP = original
 
 
 def round_limit_quote_to_bybit_tick(instrument_spec, price, direction):
@@ -314,10 +331,6 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
                           min_vol, min_breakout_atr, cost_multiplier,
                           instrument_specs_dir, risk_tiers_dir,
                           funding_dir, mark_price_dir, kline_dir):
-    # Explicit cost stress: scale fees and taker slippage from engine defaults.
-    em.TAKER_FEE = BASE_TAKER_FEE * cost_multiplier
-    em.MAKER_FEE = BASE_MAKER_FEE * cost_multiplier
-    em.TAKER_SLIP = BASE_TAKER_SLIP * cost_multiplier
     n = len(timestamps)
     start_idx, end_idx = int(n * start_frac), int(n * end_frac)
     start_ts, end_ts = timestamps[start_idx], timestamps[end_idx - 1]
@@ -446,11 +459,12 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
 
     engine._try_fill_pending = wrapped_fill
     try:
-        em.check_alignment(fold_data)
-        audit = em.run_simulation_pass(
-            engine, fold_data, list(symbols),
-            data_label=f"BYBIT_V5 H1 portfolio fold={fold} vol>={min_vol} breakoutATR>={min_breakout_atr}",
-        )
+        with engine_cost_stress(cost_multiplier):
+            em.check_alignment(fold_data)
+            audit = em.run_simulation_pass(
+                engine, fold_data, list(symbols),
+                data_label=f"BYBIT_V5 H1 portfolio fold={fold} vol>={min_vol} breakoutATR>={min_breakout_atr}",
+            )
     finally:
         core.evaluate_signal = staticmethod(original_eval)
 

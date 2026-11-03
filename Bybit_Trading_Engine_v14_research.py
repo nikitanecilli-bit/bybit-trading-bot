@@ -766,17 +766,38 @@ class PlanBStatePersistence:
                     f"Не удалось сохранить резервное состояние: last mark {symbol} должен быть конечным числом > 0"
                 )
             validated_marks[symbol] = float(value)
+        saved_at = datetime.now(timezone.utc)
+        saved_at_ms = int(saved_at.timestamp() * 1000)
         for symbol, position in open_positions.items():
+            entry_ts = position.entry_ts
+            if (isinstance(entry_ts, bool) or not isinstance(entry_ts, int)
+                    or entry_ts <= 0 or entry_ts > saved_at_ms):
+                raise ValueError(
+                    f"позиция {symbol}: entry_ts должен быть положительным целым числом "
+                    "не позже saved_at_utc"
+                )
             signal_ts_ms = position.signal_ts_ms
             if signal_ts_ms is not None:
                 if (isinstance(signal_ts_ms, bool) or not isinstance(signal_ts_ms, int)
-                        or signal_ts_ms <= 0 or signal_ts_ms > position.entry_ts):
+                        or signal_ts_ms <= 0 or signal_ts_ms > entry_ts):
                     raise ValueError(
                         f"позиция {symbol}: signal_ts_ms должен быть положительным целым числом "
                         "не позже entry_ts"
                     )
+            tp1_ts_ms = position.tp1_ts_ms
+            if tp1_ts_ms is not None:
+                if (isinstance(tp1_ts_ms, bool) or not isinstance(tp1_ts_ms, int)
+                        or tp1_ts_ms < entry_ts or tp1_ts_ms > saved_at_ms):
+                    raise ValueError(
+                        f"позиция {symbol}: tp1_ts_ms должен быть целым timestamp "
+                        "между entry_ts и saved_at_utc"
+                    )
+            if position.tp1_hit and tp1_ts_ms is None:
+                raise ValueError(f"позиция {symbol}: tp1_hit требует tp1_ts_ms")
+            if not position.tp1_hit and tp1_ts_ms is not None:
+                raise ValueError(f"позиция {symbol}: tp1_ts_ms задан при tp1_hit=false")
         payload = {
-            "saved_at_utc": datetime.now(timezone.utc).isoformat(),
+            "saved_at_utc": saved_at.isoformat(),
             "bot_version": cfg.bot_version,
             "risk": risk_mgr.to_dict(),
             "trade_seq": trade_seq,

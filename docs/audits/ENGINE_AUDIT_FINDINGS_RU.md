@@ -308,3 +308,20 @@ Do not integrate current instrument specifications retrospectively and do not cl
 **Классификация:** OPEN / модельный риск, не доказанный дефект. Не менял код и не запускал PnL replay.
 
 **Обязательный детерминированный тест перед следующим рыночным экспериментом:** взять один и тот же синхронизированный synthetic fixture и выполнить replay с несколькими перестановками `symbols`; сравнить trade ledger (symbol, entry/exit timestamps, fill/exit reason, qty/notional, gross, fees, slippage, funding), realized/unrealized equity по каждому bar-close timestamp, daily-stop/kill-switch latches и final equity. Если есть различия, определить явную фазовую обработку бара (manage all existing positions → resolve pending entries as a batch → evaluate new signals) и закрепить её тестами до любых PnL claims.
+
+### 2026-11-03 — уточнение same-timestamp audit после сверки тестового покрытия
+
+Повторно проверены текущие `tests/test_portfolio_accounting.py` и `run_simulation_pass()`. Предыдущая заметка выше описывала риск слишком широко; она не должна читаться как обнаруженный дефект.
+
+Уже существующие регрессии покрывают важные сценарии перестановки порядка:
+- `test_simultaneous_entries_share_risk_budget_independent_of_symbol_order` — одинаковый общий risk budget при обратном порядке прямого fill вызова;
+- `test_position_slot_priority_uses_signal_strength_not_iteration_order` — детерминированный выбор при дефиците слотов;
+- `test_same_bar_tp1_on_one_symbol_and_stop_on_another_is_order_independent` — TP1 на одном инструменте и stop на другом;
+- `test_two_positions_stopped_on_same_bar_reconcile_once_independent_of_order` — два стопа на одной временной границе;
+- `test_drawdown_is_order_independent_for_simultaneous_trade_closes` и `test_drawdown_uses_exit_chronology_not_input_list_order` — порядок закрытий и расчёт DD.
+
+Текущая реализация также предварительно размечает все открытые символы на общем баре, выполняет общий MTM и batch-распределение бюджета до последовательного `step_candle()`. Это снижает риск влияния порядка; перечисленные тесты проверяют ключевые компоненты.
+
+**Остаточный пробел:** в найденном покрытии нет отдельного end-to-end regression, который прогоняет один и тот же полный `run_simulation_pass()` на одинаковом multi-symbol candle fixture при нескольких перестановках `symbols` и сравнивает весь trade ledger + equity path по каждому timestamp. Это остаётся дополнительной проверкой, а не основанием утверждать, что текущий код уже зависит от порядка.
+
+**Статус:** no confirmed same-timestamp ordering defect in current code; component-level invariance tests exist; full-replay permutation test remains recommended. Код движка не менялся.

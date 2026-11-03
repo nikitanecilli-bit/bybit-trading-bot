@@ -599,3 +599,36 @@ CI [41629995066](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/
 
 
 **Статус проверки кода на момент фиксации:** 10 unittest-методов добавлены и включены в Research CI (py_compile + отдельный запуск тестового файла). GitHub connector вернул пустой список commit statuses; поэтому автоматический CI run нельзя считать подтверждённо завершившимся. Независимые арифметические проверки контрольного примера, fixed-entry-tier LP, dynamic Mark-Price MM, directional fees, bankruptcy price и tick rounding выполнены отдельно (15/15 assertions), но это не подменяет запуск полного unittest-файла.
+
+
+### 2026-11-03 — этап 2: isolated margin shortfall на Mark Price
+
+Добавлена функция `evaluate_isolated_margin_health()` и результат `IsolatedMarginHealth` в `mark_price_liquidation.py`.
+
+**Логика для одной USDT-linear isolated позиции:**
+- Position IM остаётся entry-based: `entry_price × remaining_qty / leverage`.
+- К IM добавляется estimated close fee по направлению (long: `entry × qty × (1−1/lev) × fee`; short: `entry × qty × (1+1/lev) × fee`).
+- Position margin balance = entry-based IM + allocated extra margin + unrealized PnL по Mark Price − net funding cost.
+- Funding net cost положительный для уплаченного funding и отрицательный для полученного.
+- Current MM = Mark notional × текущий tier MMR − mmDeduction + estimated close fee.
+- Liquidation condition в этой position-level модели: `position_margin_balance <= maintenance_margin`.
+
+**Критический regression:** добавлен сценарий short: entry 99,000, 50x, Mark 100,450. Fixed LP по tier на entry ещё выше Mark (~100,477.61), но позиция уже перешла в tier 2; dynamic MM shortfall составляет 15 USDT. Модель правильно помечает liquidation condition до касания фиксированной LP. Это именно тот сценарий, который прежний `mark_candle_crosses_liquidation()` пропускал.
+
+**Другие тесты:** extra margin 200 USDT и funding debit 10 USDT уменьшают/увеличивают margin balance согласно знаку; funding credit увеличивает margin balance относительно funding debit на разницу потоков. Dynamic MM продолжает считаться после Mark Price tier change даже если текущий tier maxLeverage ниже исторического плеча: maxLeverage проверяется на entry/increase, но не должен прерывать ongoing MM shortfall calculation.
+
+**TP1/частичный выход:** helper принимает фактический remaining quantity. IM и close fee пересчитываются на оставшийся размер. `extra_margin` должен передаваться как фактически выделенная маржа оставшейся позиции; автоматическое распределение extra margin/realized TP1 PnL после partial close пока не моделируется и должно быть задано lifecycle caller. Funding передаётся как накопленный net cost; сам helper не извлекает funding events.
+
+**Важные ограничения:**
+- Tier selection сейчас по одной позиции (Mark notional). В Bybit risk limit tier может учитывать combined value positions + active orders. Неизвестный account/order aggregation остаётся вне модели.
+- Нет AMR (auto margin replenishment), shared wallet, cross/portfolio margin, hedged offsets, liquidation queue, partial liquidation, ADL и точной биржевой округлённой trigger logic.
+- Helper вычисляет состояние на заданном Mark Price. Он ещё не получает Mark OHLC в engine lifecycle и не определяет точный момент intrabar shortfall.
+- Mark candle OHLC only shows range; если и trade stop и margin shortfall находятся внутри одной свечи, порядок событий неизвестен. Для conservative replay liquidation/stop ordering policy должна быть задана отдельно; нельзя молча считать, что stop успел первым.
+- Нет изменений engine lifecycle и нет PnL replay. Это пока unit-level risk model.
+
+**Официальная основа:** Bybit Maintenance Margin (USDT Perpetual), updated 2026-04-16: MM = Position Value × MMR − MM Deduction; Mark Price changes position value and risk tier; position-tab MM adds estimated close fee. Bybit New Margin Calculation, updated 2026-06-18: isolated IM remains entry-based, MM uses Mark Price, risk tier dynamically adjusts on Mark Price and combined position/order value, and tier jump may trigger immediate liquidation if margin balance is insufficient. Sources:
+- https://www.bybit.com/en/help-center/article/Maintenance-Margin-USDT-Contract
+- https://www.bybit.com/en/help-center/article/Understanding-the-Adjustment-and-Impact-of-the-New-Margin-Calculation
+- https://www.bybit.com/en/help-center/article/Initial-Margin-USDT-Contract
+
+**CI status:** test file remains connected to Research CI; current GitHub connector returned no commit status entries, so no claim that GitHub Actions completed successfully. Full Research CI is still unconfirmed.

@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 import tempfile
 import time
 import urllib.error
@@ -24,6 +25,10 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Callable
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
 
 DEFAULT_BASE_URL = "https://api.bybit.com"
 ALLOWED_API_HOSTS = {

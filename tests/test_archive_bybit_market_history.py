@@ -6,12 +6,13 @@ import os
 import tempfile
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.archive_bybit_market_history import (
     FUNDING_WINDOW_MS, fetch_funding_history, fetch_mark_klines, fetch_trade_klines,
     normalize_symbol, parse_funding_rows, parse_mark_rows, parse_trade_rows, validate_base_url,
-    clip_range_to_lifecycle, load_universe_lifecycle, validate_archive_range,
+    clip_range_to_lifecycle, load_universe_lifecycle, validate_archive_range, archive_symbol,
 )
 
 
@@ -24,8 +25,11 @@ class BybitMarketHistoryTests(unittest.TestCase):
             ts = a + 1
             return [{"symbol": "BTCUSDT", "fundingRateTimestamp": str(ts),
                      "fundingRate": "0.0001"}]
-        rows = fetch_funding_history("btcusdt", start, end, fetch)
+        audit_pages = []
+        rows = fetch_funding_history("btcusdt", start, end, fetch, audit_pages=audit_pages)
         self.assertEqual(len(calls), 2)
+        self.assertEqual(len(audit_pages), 2)
+        self.assertTrue(all(page["complete"] for page in audit_pages))
         self.assertEqual(rows[0]["funding_timestamp_ms"], start + 1)
         self.assertEqual(rows[1]["funding_timestamp_ms"], start + FUNDING_WINDOW_MS + 1)
         self.assertEqual(calls[-1][1], end - 1)
@@ -39,11 +43,61 @@ class BybitMarketHistoryTests(unittest.TestCase):
                 timestamps = list(range(a+1, a+201))
             return [{"symbol": "BTCUSDT", "fundingRateTimestamp": str(ts),
                      "fundingRate": "0.001"} for ts in timestamps[:200]]
-        rows = fetch_funding_history("BTCUSDT", 10_000, 20_000, fetch, pause=0)
+        audit_pages = []
+        rows = fetch_funding_history(
+            "BTCUSDT", 10_000, 20_000, fetch, pause=0, audit_pages=audit_pages
+        )
         self.assertEqual(len(rows), 200)
         self.assertGreater(len(calls), 1)
+        self.assertTrue(any(page["saturated"] for page in audit_pages))
+        complete = sorted(
+            (page["request_start_ms"], page["request_end_ms"])
+            for page in audit_pages if page["complete"]
+        )
+        cursor = 10_000
+        for lo, hi in complete:
+            if lo <= cursor:
+                cursor = max(cursor, hi + 1)
+        self.assertGreater(cursor, 19_999)
         self.assertEqual([x["funding_timestamp_ms"] for x in rows],
                          sorted(x["funding_timestamp_ms"] for x in rows))
+
+    def test_archive_symbol_writes_funding_query_sidecar(self):
+        hour = 3_600_000
+        with tempfile.TemporaryDirectory() as tmp:
+            def fake_funding(symbol, start_ms, end_ms, *, base_url, pause, audit_pages):
+                audit_pages.append({
+                    "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
+                    "response_rows": 1, "first_ts": start_ms, "last_ts": start_ms,
+                    "complete": True, "saturated": False,
+                })
+                return [{
+                    "symbol": symbol, "funding_timestamp_ms": start_ms,
+                    "funding_rate": "0.001",
+                }]
+
+            candle = {
+                "symbol": "BTCUSDT", "timestamp_ms": hour,
+                "open": "100", "high": "102", "low": "99", "close": "101",
+                "volume": "10", "turnover": "1010",
+            }
+            mark = {
+                "symbol": "BTCUSDT", "timestamp_ms": hour,
+                "open": "100", "high": "102", "low": "99", "close": "101",
+            }
+            with patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=fake_funding), \\
+                 patch("scripts.archive_bybit_market_history.fetch_trade_klines", return_value=[candle]), \\
+                 patch("scripts.archive_bybit_market_history.fetch_mark_klines", return_value=[mark]):
+                result = archive_symbol("BTCUSDT", hour, hour * 2, tmp, "60", pause=0)
+
+            funding_path = Path(result["funding_file"])
+            manifest_path = Path(result["funding_manifest_file"])
+            self.assertTrue(funding_path.is_file())
+            self.assertTrue(manifest_path.is_file())
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["csv_sha256"], result["funding_file_sha256"])
+            self.assertEqual(manifest["runs"][0]["pages"][0]["complete"], True)
+            self.assertIsNone(manifest["settlement_schedule_evidence"])
 
     def test_funding_still_fails_if_minimum_window_is_saturated(self):
         def fetch(a, b):

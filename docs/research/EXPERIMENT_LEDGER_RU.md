@@ -838,3 +838,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Test fixture: 250,000 USDT at 10x in tier 2 gives 25,000 USDT IM and 2,000 USDT MM.
 - Research CI #41618208413 — SUCCESS, commit 7775b0358d975715273185cb80a3fa76bdccb1f9.
 - Not a liquidation/account-solvency model: margin mode, other positions/orders, available balance, extra margin and fee reserve remain unknown. H1 runner remains legacy proxy; no market PnL backtest run.
+
+
+## ENG-EXEC-011 — сохранить IM/MM оценку в позиции (2026-11-03)
+
+- Strict entry теперь сохраняет risk tier maxLeverage отдельно от настроенного leverage.
+- В OpenPositionState и Plan B backup сохраняются initial_margin_usdt и maintenance_margin_usdt как Decimal-строки; восстановление проверяет конечность и неотрицательность.
+- Расчёт entry-time: IM = position value / configured leverage; MM = position value × MMR − mmDeduction.
+- Research CI #41619268625 — SUCCESS, commit 889ae9ebdf3fbd06e81e14bed394612a5be050f6.
+- Это не динамический mark-to-market margin/liquidation engine; нет account-wide margin solvency или close-fee reserve. Никакие market PnL тесты не запускались.

@@ -948,3 +948,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - H-C gross improved +1,502.18, but fees+slippage increased +1,661.83; trade count rose 94.9%; proxy net worsened -159.65. 296 invalidation exits averaged -0.399R and totalled -4,535.90 net. Stop-loss count fell 180→138; both variants hit the 30% kill switch.
 - Decision: reject H-C for this proxy window; no tuning or rerun. CryptoFetch is not Bybit-native, not forward OOS, survivor-biased and excludes funding/mark. Full detail in docs/reports/H_C_REVERSE_TIME_RESULTS_2026-11-04_RU.md.
 - Bootstrap failure [#41722181706] occurred before import/archive/PnL; path fix passed [#41722380421] 53/53 before the first complete run. The exact execution commit passed [#41722545755] 53/53.
+
+
+## ENG-EMA-002 — exact timestamp EMA50/200 gate context (2026-11-04)
+
+- Implemented `trend_label_index` / `lookup_trend_label`: exact timestamp lookup, 1,000-bar burn-in for EMA200, chronological uniqueness, optional contiguous H1 validation, and no nearest-label fallback.
+- Added per-symbol precomputation and opt-in `ema_trend_labels_by_symbol` input to H1 `run_portfolio_variant`. The long-only H1 wrapper permits a signal only when the same completed candle is labelled `up`.
+- Baseline and current H1 grid do not pass this optional input; default behavior is unchanged. No PnL replay was run.
+- Research CI [#41727906187](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41727906187) SUCCESS, 54/54, commit `8ab840b7a127518411b01fd9828008dd479aef18`.
+- Earlier intermediate CI attempts failed on test-import formatting and a test that accidentally queried a timestamp that was actually present; both test defects were corrected. The final full suite passed.

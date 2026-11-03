@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from funding_archive_manifest import record_funding_collection, validate_funding_manifest
+from funding_archive_manifest import record_funding_collection, validate_funding_manifest, sha256_file
 
 
 class FundingArchiveManifestTests(unittest.TestCase):
@@ -17,6 +17,33 @@ class FundingArchiveManifestTests(unittest.TestCase):
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def attach_schedule(self, payload, expected_events):
+        snapshot_path = self.root / "instrument_snapshot.json"
+        snapshot_path.write_text('{"source":"Bybit V5 instruments-info"}', encoding="utf-8")
+        schedule_path = self.root / "BTCUSDT.schedule.json"
+        schedule = {
+            "schema_version": 1,
+            "source": "bybit_dated_instrument_snapshots",
+            "symbol": "BTCUSDT",
+            "category": "linear",
+            "coverage_start_ms": 1000,
+            "coverage_end_ms": 2000,
+            "source_snapshots": [{
+                "path": snapshot_path.name,
+                "sha256": sha256_file(snapshot_path),
+                "fetched_at_ms": 1000,
+                "funding_interval_minutes": 480,
+            }],
+            "expected_settlement_timestamps_ms": expected_events,
+        }
+        schedule_path.write_text(json.dumps(schedule), encoding="utf-8")
+        payload["settlement_schedule_evidence"] = {
+            "path": schedule_path.name,
+            "sha256": sha256_file(schedule_path),
+        }
+        self.manifest.write_text(json.dumps(payload), encoding="utf-8")
+        return payload
 
     def record(self):
         return record_funding_collection(
@@ -34,7 +61,7 @@ class FundingArchiveManifestTests(unittest.TestCase):
         payload = self.record()
         self.assertEqual(payload["csv_data_rows"], 2)
         self.assertEqual(len(payload["runs"][0]["pages"]), 2)
-        self.assertFalse(payload["settlement_schedule_verified"])
+        self.assertIsNone(payload["settlement_schedule_evidence"])
 
     def test_validator_rejects_missing_dated_schedule_even_with_full_query_coverage(self):
         self.record()
@@ -44,10 +71,11 @@ class FundingArchiveManifestTests(unittest.TestCase):
         )
         self.assertTrue(report["query_coverage_ok"])
         self.assertFalse(report["ok"])
-        self.assertIn("dated_settlement_schedule_not_verified", report["errors"])
+        self.assertIn("dated_settlement_schedule_evidence_missing", report["errors"])
 
     def test_validator_detects_csv_mutation_after_collection(self):
-        self.record()
+        payload = self.record()
+        self.attach_schedule(payload, [1000, 2000])
         self.csv.write_text("timestamp,datetime,funding_rate\n1000,1970-01-01,0.001\n", encoding="utf-8")
         report = validate_funding_manifest(
             self.csv, self.manifest, symbol="BTCUSDT",
@@ -57,6 +85,7 @@ class FundingArchiveManifestTests(unittest.TestCase):
 
     def test_validator_detects_query_window_gap(self):
         payload = self.record()
+        self.attach_schedule(payload, [1000, 2000])
         payload["runs"][0]["pages"] = [
             {"request_start_ms": 1000, "request_end_ms": 1499, "response_rows": 1}
         ]

@@ -133,6 +133,13 @@ def upgrade_to_schema3(data, *, key_material="fixture-account-a", base_url="http
     return data
 
 
+
+def _canonical_json_bytes_for_test(value):
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True,
+        separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")
+
 def backup(positions=None, pending=None):
     return {
         "saved_at_utc": SAVED,
@@ -630,6 +637,17 @@ class ReportOnlyComparatorTests(unittest.TestCase):
         tampered["planned_insertions"]["BTCUSDT"][0]["exec_qty"] = "0.2"
         with self.assertRaisesRegex(ReportError, "integrity check failed"):
             apply_execution_merge_plan(local, tampered)
+
+    def test_apply_execution_merge_plan_rejects_rehashed_gate_escalation(self):
+        local, plan = self._merge_fixture()
+        escalated = copy.deepcopy(plan)
+        escalated["live_resume_allowed"] = True
+        unsigned = {key: value for key, value in escalated.items() if key != "plan_sha256"}
+        escalated["plan_sha256"] = hashlib.sha256(
+            _canonical_json_bytes_for_test(unsigned)
+        ).hexdigest()
+        with self.assertRaisesRegex(ReportError, "forbidden state escalation"):
+            apply_execution_merge_plan(local, escalated)
 
     def test_apply_execution_merge_plan_is_atomic_on_invalid_candidate(self):
         local, plan = self._merge_fixture()

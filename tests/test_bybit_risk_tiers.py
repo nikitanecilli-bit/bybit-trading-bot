@@ -137,7 +137,7 @@ class RiskTierHistoryTests(unittest.TestCase):
             value = payload(fetched_at="2026-11-01T03:00:00.123+03:00")
             Path(tmp, "risk.json").write_text(json.dumps(value), encoding="utf-8")
             history = RiskTierHistory.from_directory(tmp)
-            self.assertEqual(history.snapshots[0].fetched_at_ms, 1793494800123)
+            self.assertEqual(history.snapshots[0].fetched_at_ms, 1793491200123)
 
     def test_missing_or_mismatched_source_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

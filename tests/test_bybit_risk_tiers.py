@@ -31,14 +31,14 @@ class RiskTierHistoryTests(unittest.TestCase):
             "tier_count": 2, "symbol_count": 1,
             "symbols": ["BTCUSDT"], "has_next_page": False,
         }]
-        valid = payload()
+        valid = payload(fetched_at="2026-11-01T00:00:00.500Z")
         valid["symbol_count"] = 1
         valid["collection_started_at"] = "2026-11-01T00:00:00.000Z"
         valid["page_observations"] = observations
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "risk.json").write_text(json.dumps(valid), encoding="utf-8")
             history = RiskTierHistory.from_directory(tmp)
-            self.assertEqual(len(history.get_tiers("BTCUSDT", 1793491200000)), 2)
+            self.assertEqual(len(history.get_tiers("BTCUSDT", 1793491200500)), 2)
 
         bad_total = json.loads(json.dumps(valid))
         bad_total["page_observations"][0]["tier_count"] = 1

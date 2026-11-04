@@ -1124,6 +1124,33 @@ def test_capture_book_at_rejects_out_of_order_event_after_arrival_boundary():
             raise AssertionError("out-of-order event after arrival must invalidate archive")
 
 
+def test_capture_book_at_rejects_seq_regression_after_arrival_boundary():
+    events = [
+        {"type": "snapshot", "cts": 1000, "data": {
+            "s": "AAVEUSDT", "seq": 10, "u": 1,
+            "b": [["100", "5"]], "a": [["101", "5"]],
+        }},
+        {"type": "delta", "cts": 3000, "data": {
+            "s": "AAVEUSDT", "seq": 12, "u": 3,
+            "b": [["100", "4"]], "a": [],
+        }},
+        {"type": "delta", "cts": 3500, "data": {
+            "s": "AAVEUSDT", "seq": 11, "u": 4,
+            "b": [["100", "3"]], "a": [],
+        }},
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = Path(tmp) / "seq_regression_after_arrival.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("events.data", "".join(json.dumps(event) + chr(10) for event in events))
+        try:
+            capture_book_at(archive, 2000)
+        except ValueError as exc:
+            assert "non-monotonic seq" in str(exc)
+        else:
+            raise AssertionError("seq regression after arrival must invalidate archive")
+
+
 def test_capture_book_at_rejects_non_integer_arrival_timestamp():
     try:
         capture_book_at(Path("unused.zip"), 2000.5)

@@ -449,3 +449,31 @@ CI:
 - после исправления fixture run 41836868306 на commit fe86247bec1c723a55a9daab2e3c977053089b50: SUCCESS, job tests 56/56 steps completed successfully, включая Test conservative Bybit aggregate-L2 queue replay primitives.
 
 Эти изменения укрепляют проверку структуры trade CSV, но не подтверждают, что фактический исторический архив Bybit содержит совместимые BT/RPI поля, и не доказывают полноту архивных записей. Новые архивы не загружались, strategy PnL не запускался, private API и ордера не использовались. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.
+
+
+## 22. Полная проверка trade archive после expiry / completion заявки
+
+В replay_public_trades() ранее использовался break при первом trade timestamp >= order.expiry_ts, а также break после полного fill. Это могло скрыть повреждённый порядок строк в оставшейся части CSV: если после первой post-expiry записи встречалась более ранняя запись внутри active window, replay прекращался до её обнаружения. Аналогично дубли tradeMatchID за пределами active window или после completion не обнаруживались.
+
+Исправлено:
+- весь public-trade CSV теперь читается до конца для проверки монотонности timestamp и уникальности trade ID;
+- строки вне интервала (arrival_ts, expiry_ts) не применяются к очереди;
+- после полного fill оставшиеся строки продолжают валидироваться, но не добавляются в processed_trade_ids и не влияют на исполнение;
+- повтор ID обнаруживается по всему архиву, включая записи вне active window;
+- отсутствующий/пустой/пробельный/обрамлённый пробелами ID отклоняется; текст ошибки согласован с существующим regression test.
+
+Добавлены regression tests:
+- out-of-order print после первой post-expiry строки отклоняется и транзакционно откатывает order;
+- duplicate trade ID вне active window отклоняется и не мутирует order.
+
+Изменения в research/market-regime-v1-main:
+- source logic commit: 49334bb35d1157bec7a4db6aeaeaaf577c17703d;
+- tests commit: 8e13d5600139cda2eedef74bb218422704c50c4d;
+- error-message compatibility commit: 26d5a46d6760fbede7c6ab88c16ffab48e05f04d (current code head before checkpoint update).
+
+CI:
+- run 41837173560 failed only because a pre-existing test asserted the previous error wording ("missing public trade ID"); the new validation correctly raised a broader malformed-ID message;
+- message was changed to preserve the expected phrase while still identifying surrounding whitespace;
+- final run 41837303070 on commit 26d5a46d6760fbede7c6ab88c16ffab48e05f04d: SUCCESS, job tests 56/56 steps completed successfully, including Test conservative Bybit aggregate-L2 queue replay primitives.
+
+Trade-off: each replay now scans the full CSV instead of stopping at expiry/completion. This is more CPU/I/O per hypothetical order, but avoids silently treating a malformed, out-of-order archive as a valid no-fill result. This remains deterministic input validation, not proof that the source archive itself is complete or semantically compatible. No new archive downloads, strategy PnL, private API, paper/live orders. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL remains unchanged.

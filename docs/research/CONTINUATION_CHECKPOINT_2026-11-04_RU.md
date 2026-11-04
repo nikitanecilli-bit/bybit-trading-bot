@@ -1068,3 +1068,12 @@ Restore now rejects non-positive persisted max_favorable_px/max_adverse_px (whic
 Three regressions added: zero favorable extreme, long favorable below entry, short adverse below entry. Source CI #41854906684 SUCCESS 57/57; final test CI #41854947672 on 4c7744c22180a97fa868547eac034cdf91b69491 SUCCESS 57/57; state persistence suite 81 tests, actual logs confirm all three tests.
 
 Classification: restored excursion-metric integrity only; no strategy PnL/backtest/API/runner/paper/live or main changes.
+
+
+## 57. Git topology after restored MFE/MAE validation — 2026-11-04
+
+- main: c87612207d145af433394f0ea992f2d29eba28d5.
+- Research HEAD before this checkpoint-only commit: 249e0d11596fcf8efadd572027b71fe0b55d4c52.
+- Merge base: ae599a2f3279e15fe27360662f94f0e7ef8db5be; compare main...research: diverged, 2,166 ahead / 36 behind.
+- PR #4: open, Draft, mergeable=false. No merge/rebase/reset/force-push; main unchanged.
+- Latest tested source/test commit: 4c7744c22180a97fa868547eac034cdf91b69491; CI #41854947672 SUCCESS, 57/57; state persistence 81 tests. Commits after this code/test head are documentation-only.

@@ -2162,9 +2162,18 @@ class UnifiedQuantEngine:
             remaining_qty = initial_qty - tp1_qty
             min_qty = Decimal(str(pos.min_order_qty))
             min_notional = Decimal(str(pos.min_notional_value))
+            # The remaining reduce order must still satisfy minNotional at
+            # every planned exit level. For shorts, TP2 can be below entry
+            # while the initial stop is above it; checking only min(stop, entry)
+            # would miss that lower-notional target exit.
+            lowest_planned_exit = min(
+                Decimal(str(pos.stop_price)),
+                Decimal(str(pos.entry_price)),
+                Decimal(str(pos.tp2_price)),
+            )
             if (tp1_qty < min_qty or remaining_qty < min_qty
                     or tp1_qty * Decimal(str(pos.tp1_price)) < min_notional
-                    or remaining_qty * Decimal(str(min(pos.stop_price, pos.entry_price))) < min_notional):
+                    or remaining_qty * lowest_planned_exit < min_notional):
                 return False
             pos.tp1_contract_qty = str(tp1_qty)
             pos.remaining_contract_qty = str(remaining_qty)

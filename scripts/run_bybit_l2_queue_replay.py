@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bybit_l2_queue_replay import (
     OrderBook, iter_book_events, place_passive_order, replay_public_trades,
-    signed_markout_bps,
+    signed_markout_bps, strict_int,
 )
 
 BOOK_URL = "https://quote-saver.bycsi.com/orderbook/linear/AAVEUSDT/2025-09-02_AAVEUSDT_ob200.data.zip"
@@ -97,7 +97,10 @@ def capture_scenarios(book_archive: Path) -> tuple[list[dict], dict]:
 
 
 def capture_book_states_at(book_archive: Path, targets: list[int]) -> dict[int, dict]:
-    ordered = sorted(set(targets))
+    normalized_targets = [strict_int(target, "markout target timestamp") for target in targets]
+    if any(target <= 0 for target in normalized_targets):
+        raise ValueError("markout target timestamps must be positive")
+    ordered = sorted(set(normalized_targets))
     states = {}
     next_index = 0
     book = OrderBook()
@@ -119,9 +122,6 @@ def capture_book_states_at(book_archive: Path, targets: list[int]) -> dict[int, 
             capture(ordered[next_index])
             next_index += 1
         book.apply(event)
-        while next_index < len(ordered) and ordered[next_index] == cts:
-            capture(ordered[next_index])
-            next_index += 1
     while next_index < len(ordered):
         if book.last_cts is not None and ordered[next_index] <= book.last_cts:
             capture(ordered[next_index])

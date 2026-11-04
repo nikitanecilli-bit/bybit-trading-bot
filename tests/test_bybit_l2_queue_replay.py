@@ -10,7 +10,7 @@ import scripts.run_bybit_l2_queue_replay as l2_runner
 import bybit_l2_queue_replay as l2_module
 from bybit_instrument_specs import InstrumentSpec
 from bybit_l2_queue_replay import (
-    OrderBook, apply_public_trade, capture_book_at, place_passive_order, signed_markout_bps,
+    OrderBook, apply_public_trade, capture_book_at, per_fill_fee_ledger, place_passive_order, signed_markout_bps,
 )
 
 
@@ -166,6 +166,41 @@ def test_passive_order_requires_symbol_when_spec_is_supplied():
         assert "symbol is required" in str(exc)
     else:
         raise AssertionError("spec validation must require an explicit symbol")
+
+
+
+def test_partial_fills_record_each_execution_and_calculate_vwap():
+    o = order(qty="3")
+    apply_public_trade(o, trade(1100, "Sell", "100", "6"))
+    apply_public_trade(o, trade(1200, "Sell", "100", "2"))
+    assert len(o.fills) == 2
+    assert [fill.quantity for fill in o.fills] == [D("1"), D("2")]
+    assert [fill.timestamp_ms for fill in o.fills] == [1100, 1200]
+    assert o.filled_notional == D("300")
+    assert o.filled_vwap == D("100")
+
+
+def test_per_fill_fee_ledger_requires_explicit_rate_for_every_fill():
+    o = order(qty="3")
+    apply_public_trade(o, trade(1100, "Sell", "100", "6"))
+    apply_public_trade(o, trade(1200, "Sell", "100", "2"))
+    try:
+        per_fill_fee_ledger(o, [D("0.0002")])
+    except ValueError as exc:
+        assert "one explicit maker fee rate" in str(exc)
+    else:
+        raise AssertionError("missing per-fill fee rate must fail closed")
+
+
+def test_per_fill_fee_ledger_uses_each_supplied_rate_and_allows_explicit_rebate():
+    o = order(qty="3")
+    apply_public_trade(o, trade(1100, "Sell", "100", "6"))
+    apply_public_trade(o, trade(1200, "Sell", "100", "2"))
+    ledger = per_fill_fee_ledger(o, [D("0.0002"), D("-0.00001")])
+    assert ledger[0]["notional"] == D("100")
+    assert ledger[0]["fee"] == D("0.0200")
+    assert ledger[1]["notional"] == D("200")
+    assert ledger[1]["fee"] == D("-0.00200")
 
 
 def test_snapshot_and_delta_are_absolute_level_updates_and_zero_deletes():

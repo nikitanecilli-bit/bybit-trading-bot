@@ -40,6 +40,14 @@ def parse_trade_timestamp_ms(value: object) -> int:
     return int(milliseconds)
 
 
+def parse_exchange_bool(value: object, field: str) -> bool:
+    if value is True or value == 1 or value == "1" or value == "True" or value == "true":
+        return True
+    if value is False or value == 0 or value == "0" or value == "False" or value == "false":
+        return False
+    raise ValueError(f"invalid {field} boolean flag: {value!r}")
+
+
 def dec(value: object) -> Decimal:
     try:
         result = Decimal(str(value))
@@ -145,6 +153,7 @@ class PassiveOrder:
     fill_count: int = 0
     eligible_trade_count: int = 0
     rpi_excluded_count: int = 0
+    block_trade_excluded_count: int = 0
     first_fill_ts: int | None = None
     fills: list[PassiveFill] = field(default_factory=list)
     processed_trade_ids: set[tuple[str, str]] = field(default_factory=set)
@@ -234,10 +243,10 @@ def apply_public_trade(order: PassiveOrder, trade: dict) -> None:
     price, qty = dec(trade["price"]), dec(trade["size"])
     if price <= ZERO or qty <= ZERO:
         raise ValueError("public trade price and size must be positive")
-    rpi_flag = str(trade.get("rpi", "0")).strip()
-    if rpi_flag not in ("", "0", "1", "False", "false", "True", "true"):
-        raise ValueError(f"unknown RPI flag: {rpi_flag!r}")
-    if rpi_flag in ("1", "True", "true"):
+    if parse_exchange_bool(trade.get("block_trade", False), "block trade"):
+        order.block_trade_excluded_count += 1
+        return
+    if parse_exchange_bool(trade.get("rpi", False), "RPI"):
         order.rpi_excluded_count += 1
         return
     if price != order.price:
@@ -312,8 +321,17 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
     with gzip.open(archive, "rt", encoding="utf-8", newline="") as stream:
         reader = csv.DictReader(stream)
         required = {"timestamp", "symbol", "side", "size", "price", "trdMatchID"}
-        if not required.issubset(reader.fieldnames or []):
+        fields = set(reader.fieldnames or [])
+        if not required.issubset(fields):
             raise ValueError("trade archive is missing required columns")
+        block_flag = "isBlockTrade" if "isBlockTrade" in fields else (
+            "BT" if "BT" in fields else None
+        )
+        if block_flag is None:
+            raise ValueError("trade archive is missing block-trade flag; queue replay cannot safely classify prints")
+        rpi_flag = "RPI" if "RPI" in fields else (
+            "isRPITrade" if "isRPITrade" in fields else None
+        )
         for row_no, row in enumerate(reader, 2):
             if row.get("symbol") != symbol:
                 raise ValueError(f"unexpected trade symbol at CSV row {row_no}")
@@ -324,7 +342,8 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
                 "side": row["side"],
                 "price": row["price"],
                 "size": row["size"],
-                "rpi": row.get("RPI", row.get("isRPITrade", "0")),
+                "rpi": False if rpi_flag is None else parse_exchange_bool(row[rpi_flag], "RPI"),
+                "block_trade": parse_exchange_bool(row[block_flag], "block trade"),
                 "trade_id": row["trdMatchID"],
             }
 

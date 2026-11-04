@@ -27,6 +27,31 @@ def test_trade_sample_inspector_recognizes_both_block_trade_aliases():
     assert trade_inspector.block_trade_flag_columns(["timestamp", "RPI"]) == []
 
 
+def test_trade_sample_inspector_parses_exact_seconds_and_milliseconds():
+    assert trade_inspector.parse_archive_timestamp_ms("1756771200.123") == 1_756_771_200_123
+    assert trade_inspector.parse_archive_timestamp_ms("1756771200123") == 1_756_771_200_123
+
+
+def test_trade_sample_inspector_rejects_submillisecond_rounding():
+    for value in ("1756771200.1234", "1756771200123.5"):
+        try:
+            trade_inspector.parse_archive_timestamp_ms(value)
+        except ValueError as exc:
+            assert "sub-millisecond" in str(exc)
+        else:
+            raise AssertionError("sub-millisecond timestamp must not be rounded")
+
+
+def test_trade_sample_inspector_rejects_nonfinite_and_nonpositive_timestamps():
+    for value in ("NaN", "Infinity", "0", "-1", "not-a-timestamp"):
+        try:
+            trade_inspector.parse_archive_timestamp_ms(value)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid timestamp must be rejected: {value!r}")
+
+
 
 def write_book_archive(path: Path, events: list[dict]) -> None:
     with zipfile.ZipFile(path, "w") as archive:

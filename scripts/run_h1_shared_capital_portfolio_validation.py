@@ -9,6 +9,7 @@ are not modelled.
 """
 from __future__ import annotations
 import csv
+import ast
 import hashlib
 import json
 import math
@@ -1251,9 +1252,6 @@ def build_validation_manifest(
     }
 
     repo_root = Path(__file__).resolve().parents[1]
-    code_paths = list(H1_REPLAY_CODE_PATHS) + [
-        ".github/workflows/h1-shared-capital-portfolio-validation.yml",
-    ]
     code_files = [
         _file_manifest_record(repo_root / relative)
         for relative in resolve_h1_replay_code_paths(

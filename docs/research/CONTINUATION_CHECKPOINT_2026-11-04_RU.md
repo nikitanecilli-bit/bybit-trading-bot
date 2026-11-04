@@ -1271,3 +1271,23 @@ CI:
 - Финальный Research CI #41874277483 на `5f315bdd048f8abefa07a992aa667010d0ea1f5b`: SUCCESS, job `tests` SUCCESS, 57/57 workflow steps, zero failures. Фактический лог подтверждает новую flag-alias regression; inspector/runner suite 9/9; aggregate-L2 primitives 81/81.
 
 Классификация: улучшение диагностики полноты и согласованности trade classification metadata; не execution evidence и не PnL. Сохранённый AAVE CSV не содержит BT/isBlockTrade, поэтому его нельзя переклассифицировать этим исправлением. Inspector с сетевой загрузкой не запускался; новые архивы не скачивались. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся. Нет PnL/backtest, collectors, private API, runner, paper/live orders или изменений `main`.
+
+## 68. Inspector отклоняет некорректную структуру trade CSV — 2026-11-04
+
+Сравнение `scripts/inspect_bybit_trade_sample.py` с `iter_public_trades()` выявило, что основной replay parser отклоняет duplicate column names и malformed row widths, а диагностический inspector не выполнял эти структурные проверки. Из-за поведения `csv.DictReader` повторяющиеся заголовки могут перезаписывать значения в словаре, а лишние поля попадают под ключ `None`; без явной проверки отчёт мог быть неполным или вводить в заблуждение.
+
+Исправление:
+- Добавлены `validate_trade_csv_header()` и `validate_trade_csv_row()`.
+- Duplicate header columns и отсутствующие обязательные header columns отклоняются до чтения строк.
+- Каждая строка проверяется на лишние CSV fields и отсутствующие core values (`timestamp`, `symbol`, `side`, `size`, `price`) до агрегации.
+- Поведение согласовано с fail-closed структурными проверками основного replay parser; optional classification flags и trade IDs продолжают учитываться отдельными диагностическими counters.
+
+Коммиты:
+- Source: `ab27c80413c23f4d0689441cff6f131a91a0ab5d`.
+- Test: `846279119545a7036d65b57a156c8ea38b7ae895`.
+
+Проверка:
+- Source-only CI #41875043047: SUCCESS, 57/57 workflow steps.
+- Финальный Research CI #41875093214 на `846279119545a7036d65b57a156c8ea38b7ae895`: SUCCESS, job `tests` SUCCESS, 57/57 workflow steps, zero failures. Фактический лог подтверждает новые header/row-shape regressions; inspector/runner suite 9/9; aggregate-L2 primitives 81/81.
+
+Классификация: structural data-integrity guardrail диагностического инструмента, не execution evidence и не PnL. Архивы не скачивались; inspector с сетевой загрузкой не запускался. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся. Нет PnL/backtest, collectors, private API, runner, paper/live orders или изменений `main`.

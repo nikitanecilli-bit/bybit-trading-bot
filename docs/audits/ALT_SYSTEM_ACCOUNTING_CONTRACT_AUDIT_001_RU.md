@@ -198,3 +198,38 @@ Research CI [#41928978081](https://github.com/nikitanecilli-bit/bybit-trading-bo
 **Scope disclosure:** the repository's normal research-checks workflow also ran its existing read-only CryptoFetch archive integrity/overlap audit and H-A preparation-manifest step against archives already present in the repository. The workflow did not download new archives or extract files to disk; the audit opened ZIP members and streamed their contents for integrity/overlap analysis. No PnL replay, market PnL test, API call, collector, private account query, paper/live action or parameter sweep was run.
 
 The liquidation/data/strategy/paper/live readiness gates remain BLOCKED.
+
+
+## 9. Portfolio PnL / isolated margin funding allocation — follow-up (2026-11-05)
+
+Static trace completed from `_apply_tp1` through `_unrealized_pnl_at_marks`, `_close_position`, `accrued_funding_cost`, `accrued_funding_cost_for_remaining_margin`, and `AdaptiveRiskManager` equity updates.
+
+### Confirmed ledger invariants
+
+- TP1 gross PnL is carried once in `realized_tp1_gross_usdt`; remaining gross is calculated from exact remaining contract quantity for exchange-sized positions (legacy fallback uses remaining fraction).
+- Entry, TP1 and final-exit fee/slippage legs are independently calculated on their execution notionals. Final trade net is gross less fee, slippage and full lifecycle funding.
+- Open-position MTM combines the realized TP1 leg and remaining marked leg, subtracts the same entry/TP1 cost legs and a conservative taker estimate for the remaining exit, and includes full lifecycle funding cashflows. The taker-MTM vs maker-target-close difference is already documented and regression-tested as a deliberate conservative stress asymmetry.
+- At final close, the position is removed before remaining open positions are re-marked; the closed trade net is added once to realized equity. Equity remains `realized_equity + unrealized_pnl`.
+- Remaining isolated margin uses exact remaining contract ratio for all accrued funding history after TP1, while final closed-trade PnL retains the full lifecycle funding. This is the intended split between trade PnL and the open leg's allocated share.
+- Existing deterministic tests cover TP1/full-close lifecycle, funding boundaries, exchange-sized quantities, MTM/final-close reconciliation, same-timestamp close ordering and shared-capital equity reconciliation.
+
+### Confirmed limitation: no wallet-level funding routing
+
+`evaluate_isolated_margin_health` subtracts net funding allocated to the open position directly from that position's margin balance. Bybit funding cash routing can debit/credit available balance first and only affect position margin under account-specific conditions. The engine has no available-balance ledger, wallet funding movements or account-mode-specific routing state.
+
+This is **not uniformly conservative**:
+- a funding payment covered by available balance may be charged against position margin too early, overstating liquidation risk;
+- a funding receipt credited to available balance may be applied to position margin, understating liquidation risk for that isolated position;
+- direction/magnitude depends on cashflow sign and wallet state.
+
+A correct repair requires a separately modelled wallet/available-balance ledger, explicit account mode and a documented rule for allocating funding/realized partial-close proceeds to isolated position margin. Do not patch by simply removing funding from margin or assuming every funding event hits the position: either shortcut can reverse the error. No such account-level behavior is claimed by the current model.
+
+### Partial-close realized PnL and margin
+
+Realized TP1 PnL is included in portfolio realized equity, but is not automatically transferred into the remaining position's isolated margin. That is a deliberate boundary of the current position-level approximation, not a verified Bybit wallet-routing implementation. The same applies to manual extra margin and auto-add-margin.
+
+### Conclusion
+
+No new confirmed double-counting or sign defect was established in the deterministic portfolio/funding lifecycle. The remaining wallet-routing and partial-close margin treatment are **account-model gaps**, not safely repairable from the present position-only state. Do not infer exchange-exact liquidation safety or PnL from this code path. Data, strategy and account-level liquidation readiness remain BLOCKED.
+
+No production code or trading formulas changed in this follow-up; existing CI-backed tests remain the evidence for the current deterministic contracts.

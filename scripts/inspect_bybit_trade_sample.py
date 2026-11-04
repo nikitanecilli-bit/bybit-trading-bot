@@ -59,6 +59,8 @@ def main() -> int:
         side_counts = Counter()
         ts_min = ts_max = previous_ts = None
         nonmonotonic = duplicate_ids = rows = 0
+        before_book = after_book = within_book = 0
+        rpi_counts = Counter()
         seen_ids = set()
         total_size = Decimal("0")
         total_notional = Decimal("0")
@@ -87,6 +89,15 @@ def main() -> int:
                 if previous_ts is not None and ts < previous_ts:
                     nonmonotonic += 1
                 previous_ts = ts
+                if cts_min is not None and ts < cts_min:
+                    before_book += 1
+                elif cts_max is not None and ts > cts_max:
+                    after_book += 1
+                else:
+                    within_book += 1
+                rpi_value = row.get("RPI", row.get("isRPITrade"))
+                if rpi_value is not None:
+                    rpi_counts[str(rpi_value)] += 1
                 trade_id = row.get("trdMatchID")
                 if trade_id:
                     if trade_id in seen_ids:
@@ -109,13 +120,14 @@ def main() -> int:
             "aggressor_side_counts": dict(side_counts),
             "total_contract_size": str(total_size),
             "total_contract_notional_usdt": str(total_notional),
-            "has_rpi_flag": "isRPITrade" in fields,
+            "has_rpi_flag": "RPI" in fields or "isRPITrade" in fields,
+            "rpi_flag_value_counts": dict(rpi_counts),
             "has_block_trade_flag": "isBlockTrade" in fields,
             "matching_engine_cts_min_ms": cts_min,
             "matching_engine_cts_max_ms": cts_max,
-            "trade_timestamps_within_book_cts_range": (
-                None if cts_min is None else ts_min >= cts_min and ts_max <= cts_max
-            ),
+            "trades_before_book_cts_start": before_book,
+            "trades_within_book_cts_range": within_book,
+            "trades_after_book_cts_end": after_book,
             "trade_start_offset_from_book_cts_ms": None if cts_min is None else ts_min - cts_min,
             "trade_end_offset_from_book_cts_ms": None if cts_max is None else ts_max - cts_max,
         }

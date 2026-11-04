@@ -183,7 +183,7 @@ PASS для D1–D6 требует `available` на одном и том же и
 | D4 PIT universe/lifecycle | `partial` / `unverified` | Есть код/workflows и отдельные snapshots; полный lifecycle/delisted coverage не подтверждён |
 | D5 Instrument specs | `partial` / `unverified` | Есть механизмы snapshots, но нет полного effective-time журнала |
 | D6 Risk tiers | `partial` / `unverified` | Есть workflow/код, полнота истории не доказана |
-| D7 L2/trades | `missing` для репрезентативного execution dataset | Один малый AAVEUSDT sample не является достаточным набором |
+| D7 L2/trades | `partial` — один диагностический AAVEUSDT sample; `missing` для репрезентативного execution dataset | Сохранён однодневный sample 2025-09-02 (см. раздел 9.1); n=4 hypothetical orders недостаточно для оценки fill rate |
 | D8 Fees | `unverified` | Базовые сценарии есть, но датированные account/symbol-specific ставки не подтверждены |
 
 Шесть CryptoFetch ZIP в репозитории — supplementary proxy input. Они не проходят D1–D6 как Bybit-native market history. Никакой архив не открывался, скачивался или распаковывался при составлении этого документа.
@@ -198,3 +198,18 @@ PASS для D1–D6 требует `available` на одном и том же и
 - Не менять `main`; не сливать PR #4 или PR #13.
 
 Следующий разрешённый шаг в рамках текущих ограничений — read-only inventory уже существующих файлов и workflow metadata, затем обновление таблицы статусов только на основании проверяемых фактов.
+
+
+### 9.1. Уточнение D7: существующий однодневный L2/trades sample
+
+Read-only checkpoint фиксирует уже существующий artifact workflow [#41814167058](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41814167058) для AAVEUSDT за 2025-09-02:
+
+- L2 archive: 88,252,368 bytes; SHA-256 `e3646429c600f4917c021e240497e8f3d46fd44ba57168100633181916c761f6`; 816,684 events за 24 часа; ZIP CRC проверен.
+- Public trades: 13,095,906 bytes; SHA-256 `cf11d05f6053acfeb22b1112df666ff328034963f04c6e6159f35cae63de1bc1`; 346,131 уникальных trade IDs.
+- 66 сделок предшествуют первому matching-engine book timestamp и должны исключаться из replay.
+- Четыре вручную заданные hypothetical orders дали fill fractions 58%, 100%, 100%, 33%. При n=4 это только проверка механики, не оценка fill probability и не свидетельство maker profitability.
+- Mean signed midpoint markout: 1s −2.73 bps; 5s −0.58 bps; 30s +3.11 bps; 60s +4.09 bps. При n=4 статистические выводы о стабильном adverse selection недопустимы.
+
+Дополнительный предел: статический аудит ENG-EXEC-038 установил, что исторический daily trades CSV adapter не передаёт cross-stream `seq`, поэтому сделки и L2 нельзя надёжно упорядочить внутри одинаковой миллисекунды. Текущий replay консервативно не кредитует same-ms fills. ENG-EXEC-040 подтвердил, что L2 deltas после постановки заявки не списывают очередь вторым каналом: queue consumption идёт только по допустимым public trades. Это избегает прямого двойного списания, но не восстанавливает индивидуальное распределение aggregate-L2 очереди.
+
+**Итог D7:** статус `partial` только для существующего однодневного диагностического sample; для репрезентативного multi-symbol / multi-regime execution research — `missing`. Не скачивать artifact повторно и не запускать replay в рамках текущих ограничений.

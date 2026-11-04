@@ -26,6 +26,20 @@ def strict_int(value: object, field: str) -> int:
     return value
 
 
+def parse_trade_timestamp_ms(value: object) -> int:
+    """Convert archive seconds or milliseconds to exact integer milliseconds."""
+    try:
+        raw = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError("invalid public trade timestamp") from exc
+    if not raw.is_finite() or raw <= ZERO:
+        raise ValueError("public trade timestamp must be finite and positive")
+    milliseconds = raw if raw > Decimal("1000000000000") else raw * Decimal("1000")
+    if milliseconds != milliseconds.to_integral_value():
+        raise ValueError("public trade timestamp has sub-millisecond precision")
+    return int(milliseconds)
+
+
 def dec(value: object) -> Decimal:
     try:
         result = Decimal(str(value))

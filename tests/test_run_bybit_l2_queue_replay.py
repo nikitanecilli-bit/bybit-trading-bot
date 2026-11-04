@@ -118,6 +118,25 @@ def test_trade_sample_inspector_rejects_extra_or_missing_row_fields():
         raise AssertionError("missing row values must be rejected")
 
 
+def test_orderbook_inspector_rejects_duplicate_json_object_keys():
+    raw = (
+        '{"type":"snapshot","ts":1000,"cts":999,"data":'
+        '{"s":"AAVEUSDT","seq":1,"u":1,"u":2,'
+        '"b":[["100","5"]],"a":[["101","5"]]}}'
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = Path(tmp) / "duplicate_json_key.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("events.data", raw + chr(10))
+        with zipfile.ZipFile(archive) as zf:
+            try:
+                book_inspector.inspect_member(zf, "events.data")
+            except ValueError as exc:
+                assert "duplicate JSON object key: u" in str(exc)
+            else:
+                raise AssertionError("duplicate JSON keys must be rejected by the inspector")
+
+
 def test_orderbook_inspector_uses_strict_integer_timestamp_and_sequence_fields():
     parse_fields = book_inspector.parse_event_integer_fields
     valid = {"ts": 1000, "cts": 999, "data": {"seq": 2, "u": 3}}

@@ -53,6 +53,15 @@ def validate_level(level: object) -> None:
         raise ValueError("book level contains invalid price or quantity")
 
 
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
+
+
 def parse_event_integer_fields(event: dict) -> tuple[int, int | None, int, int]:
     """Parse order-book event IDs/timestamps with the replay's strict integer contract."""
     data = event.get("data")
@@ -84,7 +93,7 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
             if not raw.strip():
                 continue
             try:
-                event = json.loads(raw)
+                event = json.loads(raw, object_pairs_hook=_unique_json_object)
             except Exception as exc:
                 raise ValueError(f"invalid JSON at row {rows + 1}: {exc}") from exc
             if not isinstance(event, dict):

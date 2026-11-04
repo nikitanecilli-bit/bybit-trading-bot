@@ -397,7 +397,9 @@ def test_runtime_provenance_separates_research_checkout_from_workflow_ref():
 
 
 
-def test_geometric_monthly_return_normalizes_compounded_returns_by_exact_duration():    month_ms = int(round(365.2425 / 12.0 * 86_400_000))
+
+def test_geometric_monthly_return_normalizes_compounded_returns_by_exact_duration():
+    month_ms = int(round(365.2425 / 12.0 * 86_400_000))
     one_month = geometric_monthly_return_pct(2_000.0, 10_000.0, 0, month_ms - 3_600_000)
     two_months = geometric_monthly_return_pct(4_400.0, 10_000.0, 0, 2 * month_ms - 3_600_000)
     assert abs(one_month["geometric_monthly_return_pct"] - 20.0) < 1e-8
@@ -495,7 +497,6 @@ def test_missing_snapshot_directories_reject_legacy_replay():
             assert "Refusing legacy notional-proxy" in str(exc)
         else:
             raise AssertionError("missing snapshots must fail closed")
-
 
 def test_empty_snapshot_directory_rejects_legacy_replay():
     with tempfile.TemporaryDirectory() as tmp:
@@ -797,3 +798,86 @@ def test_load_bybit_h1_datasets_rejects_symbol_filename_mismatch():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         path = root / "BTCUSDT.csv"
+        rows = ["symbol,timestamp_ms,open,high,low,close,volume,turnover"]
+        for index in range(501):
+            ts = 1_699_999_200_000 + index * 3_600_000
+            row_symbol = "ETHUSDT" if index == 0 else "BTCUSDT"
+            rows.append(f"{row_symbol},{ts},100,102,99,101,10,1010")
+        path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+        try:
+            load_bybit_h1_datasets(root)
+        except SystemExit as exc:
+            assert "does not match filename symbol BTCUSDT" in str(exc)
+        else:
+            raise AssertionError("mismatched CSV symbol must fail archive validation")
+
+
+
+def test_delayed_limit_quotes_are_tick_aligned_without_crossing():
+    from bybit_instrument_specs import InstrumentSpec
+
+    snapshot = {
+        "instrument": {
+            "symbol": "TESTUSDT", "category": "linear", "status": "Trading",
+            "priceFilter": {
+                "minPrice": "0.05", "maxPrice": "1000000", "tickSize": "0.05"
+            },
+            "lotSizeFilter": {
+                "qtyStep": "0.001", "minOrderQty": "0.01",
+                "maxOrderQty": "1000", "maxMktOrderQty": "800",
+                "minNotionalValue": "5",
+            },
+            "leverageFilter": {
+                "minLeverage": "1", "maxLeverage": "50", "leverageStep": "0.01"
+            },
+        }
+    }
+    spec = InstrumentSpec.from_snapshot(snapshot)
+    long_quote = round_limit_quote_to_bybit_tick(spec, 100.079, "long")
+    short_quote = round_limit_quote_to_bybit_tick(spec, 100.051, "short")
+    assert long_quote == 100.05
+    assert short_quote == 100.10
+    assert long_quote <= 100.079
+    assert short_quote >= 100.051
+
+
+if __name__ == "__main__":
+    for test in (
+        test_explore_mode_uses_only_frozen_train_selected_top_five,
+        test_confirm_mode_requires_one_frozen_predeclared_config_and_selection_manifest,
+        test_confirm_mode_requires_matching_frozen_strategy_arm_set,
+        test_selection_manifest_and_allowlist_must_match_exactly,
+        test_selection_manifest_direction_must_match_long_only_runner,
+        test_selection_manifest_must_be_valid_and_successful,
+        test_selection_provenance_rejects_changed_data_and_code,
+        test_selection_provenance_rejects_added_or_removed_replay_dependencies,
+        test_selection_provenance_rejects_duplicate_code_paths,
+        test_replay_code_dependency_closure_includes_transitive_local_imports,
+        test_replay_code_dependency_closure_discovers_nested_package_imports,
+        test_selection_provenance_rejects_changed_universe_snapshot,
+        test_runtime_provenance_separates_research_checkout_from_workflow_ref,
+        test_geometric_monthly_return_normalizes_compounded_returns_by_exact_duration,
+        test_geometric_monthly_return_rejects_invalid_duration_and_handles_total_loss,
+        test_selection_boundary_remains_first_explore_fold_in_confirm_mode,
+        test_selection_cutoff_must_precede_validation,
+        test_confirm_mode_rejects_missing_or_unregistered_config,
+        test_cost_stress_restores_engine_globals_after_success_and_exception,
+        test_missing_snapshot_directories_reject_legacy_replay,
+        test_empty_snapshot_directory_rejects_legacy_replay,
+        test_existing_archives_are_returned,
+        test_current_only_snapshots_reject_historical_fold,
+        test_snapshot_history_rejects_stale_start_and_gaps,
+        test_continuous_snapshot_history_covers_fold,
+        test_funding_dirs_are_mandatory_and_non_empty,
+        test_funding_mark_coverage_requires_every_symbol_and_h1_mark_bar,
+        test_funding_mark_coverage_includes_final_h1_close_settlement,
+        test_funding_mark_coverage_rejects_no_settlement_in_fold,
+        test_funding_mark_coverage_rejects_missing_or_unverified_archive_manifest,
+        test_bybit_kline_dir_is_mandatory,
+        test_load_bybit_h1_datasets_rejects_gaps_and_loads_exchange_candles,
+        test_load_bybit_h1_datasets_rejects_off_hour_timestamp_grid,
+        test_load_bybit_h1_datasets_rejects_symbol_filename_mismatch,
+        test_delayed_limit_quotes_are_tick_aligned_without_crossing,
+    ):
+        test()
+        print(f"PASS {test.__name__}")

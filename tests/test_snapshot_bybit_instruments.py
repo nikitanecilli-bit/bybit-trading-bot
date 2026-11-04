@@ -185,6 +185,22 @@ class SnapshotCollectorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "continuation flags"):
             collector.validate_page_observations(observations)
 
+
+    def test_page_observation_status_groups_cannot_be_interleaved(self):
+        observations = [
+            build_page_observation("PreLaunch", 1, "2026-11-02T00:00:00.000Z",
+                                   "2026-11-02T00:00:00.100Z",
+                                   [{"symbol": "NEWUSDT"}], "next"),
+            build_page_observation("Trading", 1, "2026-11-02T00:00:00.200Z",
+                                   "2026-11-02T00:00:00.300Z",
+                                   [{"symbol": "BTCUSDT"}], None),
+            build_page_observation("PreLaunch", 2, "2026-11-02T00:00:00.400Z",
+                                   "2026-11-02T00:00:00.500Z",
+                                   [{"symbol": "ALTUSDT"}], None),
+        ]
+        with self.assertRaisesRegex(ValueError, "interleave"):
+            collector.validate_page_observations(observations)
+
     def test_snapshot_requires_all_expected_status_filters(self):
         observation = build_page_observation(
             "Trading", 1, "2026-11-02T00:00:00.000Z",

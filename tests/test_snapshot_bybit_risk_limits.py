@@ -74,6 +74,58 @@ class RiskLimitSnapshotTests(unittest.TestCase):
         self.assertEqual(snapshot["tier_count"], 3)
         self.assertEqual(snapshot["fetched_at"], "2026-11-02T00:00:00.000Z")
 
+
+    def test_snapshot_records_validated_page_timing_and_collection_bounds(self):
+        observations = [
+            {
+                "page_index": 1,
+                "request_started_at": "2026-11-02T00:00:00.000Z",
+                "request_completed_at": "2026-11-02T00:00:00.120Z",
+                "tier_count": 2, "symbol_count": 1,
+                "symbols": ["BTCUSDT"], "has_next_page": True,
+            },
+            {
+                "page_index": 2,
+                "request_started_at": "2026-11-02T00:00:00.220Z",
+                "request_completed_at": "2026-11-02T00:00:00.350Z",
+                "tier_count": 1, "symbol_count": 1,
+                "symbols": ["ETHUSDT"], "has_next_page": False,
+            },
+        ]
+        snapshot = build_snapshot(
+            [row("BTCUSDT"), row("BTCUSDT", 2, "500000", mm="0.01",
+             im="0.02", lowest=0, leverage="50", deduction="1000"),
+             row("ETHUSDT")],
+            "linear", "2026-11-02T00:00:01.000Z",
+            collection_started_at="2026-11-02T00:00:00.000Z",
+            page_observations=observations,
+        )
+        self.assertEqual(snapshot["page_observations"], observations)
+        self.assertEqual(snapshot["collection_started_at"], "2026-11-02T00:00:00.000Z")
+
+    def test_page_observations_reject_missing_continuation_and_symbol_mismatch(self):
+        observation = {
+            "page_index": 1,
+            "request_started_at": "2026-11-02T00:00:00.000Z",
+            "request_completed_at": "2026-11-02T00:00:00.100Z",
+            "tier_count": 1, "symbol_count": 1,
+            "symbols": ["BTCUSDT"], "has_next_page": True,
+        }
+        with self.assertRaisesRegex(ValueError, "last risk page"):
+            build_snapshot(
+                [row()], "linear", "2026-11-02T00:00:01.000Z",
+                collection_started_at="2026-11-02T00:00:00.000Z",
+                page_observations=[observation],
+            )
+        observation["has_next_page"] = False
+        observation["symbols"] = ["ETHUSDT"]
+        with self.assertRaisesRegex(ValueError, "do not match snapshot"):
+            build_snapshot(
+                [row()], "linear", "2026-11-02T00:00:01.000Z",
+                collection_started_at="2026-11-02T00:00:00.000Z",
+                page_observations=[observation],
+            )
+
     def test_default_snapshot_timestamp_has_millisecond_precision(self):
         snapshot = build_snapshot([row()], "linear")
         self.assertRegex(snapshot["fetched_at"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")

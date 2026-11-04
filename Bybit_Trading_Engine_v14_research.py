@@ -954,6 +954,11 @@ class PlanBStatePersistence:
             )
             if risk_data["max_drawdown_pct"] + 1e-6 < implied_drawdown:
                 raise ValueError("risk.max_drawdown_pct меньше просадки, следующей из peak/current equity")
+            if (implied_drawdown >= risk_mgr.cfg.emergency_kill_switch_pct
+                    and not risk_data["kill_switch_triggered"]):
+                raise ValueError(
+                    "risk.kill_switch_triggered=false при просадке, достигшей emergency порога"
+                )
             if "current_day_str" in risk_data:
                 day_value = risk_data["current_day_str"]
                 if not isinstance(day_value, str):
@@ -965,6 +970,16 @@ class PlanBStatePersistence:
                         raise ValueError("risk.current_day_str должен быть пустым или YYYY-MM-DD") from exc
                     if parsed_day.strftime("%Y-%m-%d") != day_value:
                         raise ValueError("risk.current_day_str должен быть пустым или YYYY-MM-DD")
+                    daily_drawdown = (
+                        (risk_data["day_start_equity"] - risk_data["current_equity"])
+                        / risk_data["day_start_equity"] * 100.0
+                    )
+                    if (daily_drawdown >= risk_mgr.cfg.daily_stop_loss_pct
+                            and not risk_data["daily_stop_triggered"]):
+                        raise ValueError(
+                            "risk.daily_stop_triggered=false при дневной просадке, "
+                            "достигшей daily stop порога"
+                        )
             for field_name in ("is_paused_manual", "daily_stop_triggered", "kill_switch_triggered"):
                 if field_name in risk_data and not isinstance(risk_data[field_name], bool):
                     raise ValueError(f"risk.{field_name} должен быть bool")

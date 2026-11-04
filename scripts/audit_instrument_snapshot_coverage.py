@@ -351,14 +351,159 @@ def audit_joint_market_state(
 
 
 
+
+def audit_risk_tier_directory(directory: Path) -> dict[str, Any]:
+    files = sorted(directory.glob("*.json")) if directory.is_dir() else []
+    if not files:
+        return {
+            "directory": str(directory), "snapshot_count": 0, "snapshots": [],
+            "snapshots_with_page_observations": 0,
+            "collection_duration_ms": _distribution([]),
+            "inter_snapshot_gap_ms": _distribution([]),
+            "collection_durations_ms": [], "intervals": [],
+            "overlapping_collection_windows": 0,
+            "snapshots_missing_collection_started_at": 0,
+        }
+    history = RiskTierHistory.from_directory(directory, "linear")
+    snapshots = []
+    for path in files:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"{path}: cannot read risk-tier snapshot JSON") from exc
+        fetched_text = payload["fetched_at"]
+        fetched_ms = utc_ms(fetched_text, "fetched_at")
+        started_text = payload.get("collection_started_at")
+        started_ms = utc_ms(started_text, "collection_started_at") if started_text is not None else None
+        if started_ms is not None and started_ms > fetched_ms:
+            raise ValueError(f"{path}: collection_started_at is after fetched_at")
+        rows = payload["tiers"]
+        symbols = {str(row["symbol"]).strip().upper() for row in rows}
+        if type(payload.get("symbol_count")) is not int or payload["symbol_count"] != len(symbols):
+            raise ValueError(f"{path}: symbol_count does not match tier symbols")
+        if type(payload.get("tier_count")) is not int or payload["tier_count"] != len(rows):
+            raise ValueError(f"{path}: tier_count does not match tiers")
+        observations = payload.get("page_observations")
+        page_summary = None
+        if observations is not None:
+            if not isinstance(observations, list) or not observations:
+                raise ValueError(f"{path}: page_observations must be a non-empty list")
+            observed_symbols: set[str] = set()
+            page_symbol_counts: dict[str, int] = {}
+            durations: list[int] = []
+            page_tier_counts = []
+            previous_completed = None
+            for index, item in enumerate(observations, start=1):
+                if not isinstance(item, dict) or set(item) != {
+                    "page_index", "request_started_at", "request_completed_at",
+                    "tier_count", "symbol_count", "symbols", "has_next_page",
+                }:
+                    raise ValueError(f"{path}: invalid risk page observation schema")
+                if type(item["page_index"]) is not int or item["page_index"] != index:
+                    raise ValueError(f"{path}: risk page indexes are not sequential")
+                started = utc_ms(item["request_started_at"], "request_started_at")
+                completed = utc_ms(item["request_completed_at"], "request_completed_at")
+                if started > completed or (previous_completed is not None and started < previous_completed):
+                    raise ValueError(f"{path}: risk page observations are not chronological")
+                if started_ms is not None and started < started_ms:
+                    raise ValueError(f"{path}: risk page starts before collection_started_at")
+                if completed > fetched_ms:
+                    raise ValueError(f"{path}: risk page completes after fetched_at")
+                if type(item["tier_count"]) is not int or item["tier_count"] < 0:
+                    raise ValueError(f"{path}: invalid risk page tier_count")
+                page_symbols = item["symbols"]
+                if (not isinstance(page_symbols, list)
+                        or any(not isinstance(v, str) or not v.strip() for v in page_symbols)):
+                    raise ValueError(f"{path}: invalid risk page symbols")
+                normalized = [v.strip().upper() for v in page_symbols]
+                if normalized != sorted(set(normalized)):
+                    raise ValueError(f"{path}: risk page symbols must be unique and sorted")
+                if type(item["symbol_count"]) is not int or item["symbol_count"] != len(normalized):
+                    raise ValueError(f"{path}: risk page symbol_count mismatch")
+                if item["symbol_count"] > item["tier_count"]:
+                    raise ValueError(f"{path}: risk page symbol_count exceeds tier_count")
+                if type(item["has_next_page"]) is not bool:
+                    raise ValueError(f"{path}: risk page has_next_page must be boolean")
+                if index < len(observations) and not item["has_next_page"]:
+                    raise ValueError(f"{path}: missing risk page continuation")
+                if index == len(observations) and item["has_next_page"]:
+                    raise ValueError(f"{path}: final risk page has continuation")
+                for symbol in normalized:
+                    observed_symbols.add(symbol)
+                    page_symbol_counts[symbol] = page_symbol_counts.get(symbol, 0) + 1
+                durations.append(completed - started)
+                page_tier_counts.append(item["tier_count"])
+                previous_completed = completed
+            if observed_symbols != symbols:
+                raise ValueError(f"{path}: risk page symbols do not match snapshot tiers")
+            if sum(page_tier_counts) != len(rows):
+                raise ValueError(f"{path}: page tier counts do not match snapshot tier_count")
+            page_summary = {
+                "page_count": len(observations),
+                "tier_count": sum(page_tier_counts),
+                "request_duration_ms": _distribution(durations),
+                "duplicate_symbol_observations": [
+                    {"symbol": symbol, "occurrences": count}
+                    for symbol, count in sorted(page_symbol_counts.items()) if count > 1
+                ],
+            }
+        snapshots.append({
+            "path": str(path), "fetched_at": fetched_text,
+            "fetched_at_ms": fetched_ms, "collection_started_at": started_text,
+            "collection_started_at_ms": started_ms,
+            "collection_duration_ms": fetched_ms - started_ms if started_ms is not None else None,
+            "symbols": symbols, "tier_count": len(rows), "page_observations": page_summary,
+        })
+    snapshots.sort(key=lambda item: item["fetched_at_ms"])
+    times = [item["fetched_at_ms"] for item in snapshots]
+    if len(times) != len(set(times)):
+        raise ValueError(f"{directory}: duplicate fetched_at timestamps")
+    intervals = []
+    for previous, current in zip(snapshots, snapshots[1:]):
+        start = current["collection_started_at_ms"]
+        gap = start - previous["fetched_at_ms"] if start is not None else current["fetched_at_ms"] - previous["fetched_at_ms"]
+        intervals.append({
+            "previous_fetched_at": previous["fetched_at"],
+            "current_collection_started_at": current["collection_started_at"],
+            "current_fetched_at": current["fetched_at"],
+            "gap_from_previous_completion_ms": gap,
+            "gap_basis": "completion_to_start" if start is not None else "completion_to_completion",
+            "collection_windows_overlap": start is not None and start < previous["fetched_at_ms"],
+            "symbols_added": len(current["symbols"] - previous["symbols"]),
+            "symbols_removed": len(previous["symbols"] - current["symbols"]),
+        })
+    durations = [item["collection_duration_ms"] for item in snapshots if item["collection_duration_ms"] is not None]
+    return {
+        "directory": str(directory), "snapshot_count": len(snapshots),
+        "snapshots": [{
+            "path": item["path"], "fetched_at": item["fetched_at"],
+            "symbol_count": len(item["symbols"]), "tier_count": item["tier_count"],
+            "page_observations": item["page_observations"],
+        } for item in snapshots],
+        "snapshots_with_page_observations": sum(item["page_observations"] is not None for item in snapshots),
+        "first_fetched_at": snapshots[0]["fetched_at"],
+        "last_fetched_at": snapshots[-1]["fetched_at"],
+        "collection_duration_ms": _distribution(durations),
+        "collection_durations_ms": durations,
+        "inter_snapshot_gap_ms": _distribution([item["gap_from_previous_completion_ms"] for item in intervals]),
+        "overlapping_collection_windows": sum(item["collection_windows_overlap"] for item in intervals),
+        "snapshots_missing_collection_started_at": sum(item["collection_started_at"] is None for item in snapshots),
+        "intervals": intervals,
+    }
+
+
+
 def build_report(root: Path) -> dict[str, Any]:
     targets = {
         "linear_universe": root / "data" / "universe_history" / "linear",
         "linear_instrument_specs": root / "data" / "instrument_specs" / "linear",
         "linear_risk_tiers": root / "data" / "instrument_specs" / "risk_limits" / "linear",
     }
-    sections = {name: audit_directory(path) for name, path in targets.items()
-                if name != "linear_risk_tiers"}
+    sections = {
+        "linear_universe": audit_directory(targets["linear_universe"]),
+        "linear_instrument_specs": audit_directory(targets["linear_instrument_specs"]),
+        "linear_risk_tiers": audit_risk_tier_directory(targets["linear_risk_tiers"]),
+    }
     joint = audit_joint_market_state(
         targets["linear_instrument_specs"], targets["linear_risk_tiers"]
     )

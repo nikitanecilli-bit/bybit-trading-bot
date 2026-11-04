@@ -264,3 +264,12 @@
 - Final Research CI #41848927029 on commit 39af6fa583ef2074b33905e89c8b78c9b58d83a1: SUCCESS; 57/57 workflow steps; zero failed steps. Logs confirm funding accounting 23/23 and Bybit market-history parser 26/26, including the new regressions.
 - Current Git snapshot: main c87612207d145af433394f0ea992f2d29eba28d5; research HEAD 39af6fa583ef2074b33905e89c8b78c9b58d83a1; merge base ae599a2f3279e15fe27360662f94f0e7ef8db5be; compare diverged 2125 ahead / 36 behind. PR #4 remains open Draft and mergeable=false. Existing branch-divergence policy remains: do not merge/rebase/reset/force-push; integrate only reviewed small patches later. main unchanged.
 - No market PnL/backtest, Bybit data collection/download, private API/account access, runner registration, paper/live orders. Data completeness and execution-realism gates remain closed.
+
+
+## Session update — 2026-11-04 (TP1 remainder minNotional at TP2)
+
+- Static review of exchange-sized TP1 handling found an under-validation for short positions. The remainder check used min(stop_price, entry_price), but a short TP2 target may be below both; a remainder could pass TP1 validation while its planned TP2 reduce order would violate archived minNotionalValue.
+- Updated _apply_tp1() to validate the remaining quantity against the lowest of stop, entry and TP2 prices. Long behavior remains unchanged when TP2 is above entry; short planned target is now included.
+- Added regression: 1.0 contract, 0.1 qtyStep, 0.1 minOrderQty, minNotionalValue 45; TP1 remainder 0.5 at TP1 90 passes exactly 45, but TP2 80 would be 40. Old code accepted TP1; new code rejects it and preserves full remaining quantity.
+- Final Research CI #41850162961 on e01a53868885f5ac79f2ad3d3cfa3179e7207b1a: SUCCESS; 57/57 workflow steps; zero failures. Actual log confirms test_tp1_rejects_short_remainder_below_min_notional_at_tp2 passed; MarkPriceEngineIntegrationTests 9/9. Source-only CI #41850143419 on 7238076b271bf25010d01ce2df0c1321e3652722 also completed SUCCESS 57/57.
+- This is an exchange-order validity guardrail, not market PnL evidence. No data downloads, collectors, private API, runner, PnL/backtest, paper/live orders or main-branch changes.

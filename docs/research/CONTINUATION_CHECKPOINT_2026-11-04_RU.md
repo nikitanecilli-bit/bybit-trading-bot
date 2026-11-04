@@ -502,3 +502,25 @@ CI:
 - после fixture correction run 41837526701 на commit 50fb0b6585104996ed3b2bf279f08c7266e36612: SUCCESS, job tests 56/56 steps completed successfully, including Test conservative Bybit aggregate-L2 queue replay primitives.
 
 Это устраняет неоднозначную классификацию при наличии двух aliases, но фактическая схема исторического CSV по-прежнему не подтверждена на raw archive. Не запускались новые загрузки архивов, strategy PnL, private API, paper/live orders. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.
+
+
+## 24. Дубликаты ценовых уровней внутри одного L2 события
+
+OrderBook.apply() ранее обрабатывал уровни через dict. Если один и тот же price встречался несколько раз в одном snapshot/delta side, более поздняя запись молча перезаписывала предыдущую. Это делало malformed event неоднозначным и могло исказить displayed queue size.
+
+Исправлено:
+- внутри каждого side одного event цена может встречаться только один раз;
+- duplicate bid или ask price level отклоняется до commit;
+- candidate-state модель сохраняет атомарность: при ошибке текущая книга и last_cts/last_seq/last_u остаются неизменными.
+
+Добавлены regression tests: duplicate price levels в snapshot отклоняются без инициализации книги; duplicate levels в delta отклоняются без изменения ранее восстановленной книги.
+
+Изменения в research/market-regime-v1-main:
+- source commit: de84dc284e34d86a47324d45d3412390aaa9f307;
+- regression tests: 663595ad478d8eb81b9b365ecdd53ceaabb7d921.
+
+CI:
+- source run 41837688799: SUCCESS;
+- full test run 41837696571 на commit 663595ad478d8eb81b9b365ecdd53ceaabb7d921: SUCCESS, job tests 56/56 steps completed successfully; queue replay primitive test step SUCCESS.
+
+Это устраняет неоднозначность повторных ценовых уровней в пределах одного event, но не доказывает, что сам исторический depth-200 stream полный или соответствует контракту, который сейчас предполагает replay. Не выполнялись новые archive downloads, strategy PnL, private API, paper/live orders. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.

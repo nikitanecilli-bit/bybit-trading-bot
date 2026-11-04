@@ -2063,6 +2063,12 @@ class UnifiedQuantEngine:
                 or max_market_state_skew_ms < 0):
             raise ValueError("max_market_state_skew_ms must be a non-negative integer or None")
         self.max_market_state_skew_ms = max_market_state_skew_ms
+        if (self.instrument_spec_history is not None
+                and self.risk_tier_history is not None
+                and self.max_market_state_skew_ms is None):
+            raise ValueError(
+                "max_market_state_skew_ms is required when both dated instrument and risk-tier histories are enabled"
+            )
         self.liquidation_model_enabled = bool(self.risk_tier_history is not None and mark_price_dir)
         self._mark_price_candles: Dict[str, Dict[int, MarkPriceCandle]] = {}
         if bool(funding_dir) != bool(mark_price_dir):

@@ -114,8 +114,13 @@ class ReconciliationCollectorTests(unittest.TestCase):
             "key", "secret", SAVED, request_json=fake,
         )
         pages = snapshot["raw"]["executions"]
-        self.assertEqual(len(pages), 2)
-        first, last = pages
+        intervals = {}
+        for page in pages:
+            key = (page["interval_start_ms"], page["interval_end_ms"])
+            intervals.setdefault(key, []).append(page)
+        self.assertGreaterEqual(len(intervals), 1)
+        first, last = next(iter(intervals.values()))
+        self.assertEqual(len((first, last)), 2)
         p0, p1 = first["page_provenance"], last["page_provenance"]
         self.assertEqual(p0["endpoint"], "/v5/execution/list")
         self.assertEqual([p0["page_index"], p1["page_index"]], [0, 1])

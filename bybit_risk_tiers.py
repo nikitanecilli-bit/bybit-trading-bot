@@ -86,6 +86,8 @@ class RiskTierHistory:
         stamps = [item.fetched_at_ms for item in ordered]
         if len(stamps) != len(set(stamps)):
             raise ValueError("duplicate risk-tier snapshot timestamps")
+        if any(item.category != "linear" for item in ordered):
+            raise ValueError("RiskTierHistory only supports linear contracts")
         if len({item.category for item in ordered}) != 1:
             raise ValueError("risk-tier snapshot categories cannot be mixed")
         self.snapshots = ordered

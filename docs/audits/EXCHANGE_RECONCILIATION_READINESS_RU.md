@@ -481,3 +481,26 @@ Research CI #41917860097 — SUCCESS, 59/59 workflow steps; tested code commit `
 - Текущий comparator сопоставляет записи по execId и отклоняет изменившуюся identity; он не удаляет fills и не переписывает локальный execution ledger.
 - Реальные Bybit API calls, credentials, collector runs, archive downloads, live orders и market PnL tests не выполнялись; CI использует offline fixtures.
 - Reconciliation PASS, live resume и strategy/execution/PnL gates остаются BLOCKED.
+
+
+### ENG-RECON-019 — привязка сравнения snapshots к одной учётной области
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
+
+Обнаружен риск: функция сравнения поздних executions принимала два валидных snapshots с одинаковым `saved_at_utc`, но не проверяла, что они получены одним API-ключом и с одного Bybit API endpoint. При ошибочном выборе файлов можно было сравнить разные аккаунты или mainnet/testnet и получить ложную дельту.
+
+Изменения:
+- Collector сохраняет `api_key_fingerprint_sha256` — SHA-256 fingerprint API key; исходный ключ и secret в snapshot не записываются.
+- Snapshot schema повышена до version 3; schema v1/v2 по-прежнему доступны обычному report parser.
+- `compare_execution_snapshots()` допускает только schema v3 и требует совпадения fingerprint и точного `base_url` между captures.
+- Добавлены offline regressions: различающиеся fingerprint и base URL отвергаются; существующие late-fill и conflicting-execId проверки сохранены.
+- Fingerprint — устойчивый идентификатор credential scope, не доказательство личности владельца аккаунта или происхождения HTTP-ответа. При ротации API key сравнение старого и нового ключа fail-closed, даже если это один и тот же аккаунт.
+
+Research CI #41918766426 — SUCCESS, 59/59 workflow steps; tested code commit `f552d42c30e57ec03e16db54eb2cf117730c2799`.
+
+Ограничения:
+- Snapshot schema v1/v2 нельзя использовать для межснимкового late-execution comparison: у них нет fingerprint.
+- SHA-256 fingerprint не является server-authenticated account ID и не защищает от подделки самого snapshot; raw SHA-256 также остаётся локальной проверкой целостности.
+- Никакие реальные API calls, credentials, collector runs, archive downloads, live orders или market PnL tests не выполнялись. CI использует offline fixtures/FakeTransport.
+- Reconciliation PASS, live resume и strategy/execution/PnL gates остаются BLOCKED.

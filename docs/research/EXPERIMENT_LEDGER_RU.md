@@ -1163,3 +1163,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Source commit `83bca2b14a5cbb613e0ab849a45a2fbf4750aa71`; test commit `5f315bdd048f8abefa07a992aa667010d0ea1f5b`.
 - Source-only CI #41874223792 SUCCESS, 57/57; final CI #41874277483 on `5f315bdd` SUCCESS, 57/57, zero failures. Actual logs confirm flag-alias regression; inspector/runner suite 9/9; aggregate-L2 primitive suite 81/81.
 - Diagnostic metadata validation only; no maker-fill or PnL evidence. Historical AAVE CSV still lacks BT/isBlockTrade; no archive download or network inspector run. No PnL/backtest, collectors, API, runner, paper/live orders or main changes.
+
+## ENG-EXEC-023 — Reject malformed trade CSV structure in inspector (2026-11-04)
+
+- The diagnostic inspector did not match replay parser checks for duplicate column names, extra CSV fields and missing core row values. `csv.DictReader` can overwrite duplicate header keys or expose extra values under a `None` key.
+- Added `validate_trade_csv_header()` and `validate_trade_csv_row()`; duplicate/missing required headers, extra row fields and missing core values now fail closed before aggregation.
+- Regression covers duplicate/missing header columns, extra row fields and missing row values.
+- Source commit `ab27c80413c23f4d0689441cff6f131a91a0ab5d`; test commit `846279119545a7036d65b57a156c8ea38b7ae895`.
+- Source-only CI #41875043047 SUCCESS, 57/57; final CI #41875093214 on `8462791195` SUCCESS, 57/57, zero failures. Actual logs confirm the new structural regressions; inspector/runner suite 9/9; aggregate-L2 primitives 81/81.
+- Structural data-integrity only, not execution or PnL evidence. No archives downloaded and network inspector not run. No PnL/backtest, collectors, API, runner, paper/live orders or main changes.

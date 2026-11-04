@@ -524,3 +524,27 @@ CI:
 - full test run 41837696571 на commit 663595ad478d8eb81b9b365ecdd53ceaabb7d921: SUCCESS, job tests 56/56 steps completed successfully; queue replay primitive test step SUCCESS.
 
 Это устраняет неоднозначность повторных ценовых уровней в пределах одного event, но не доказывает, что сам исторический depth-200 stream полный или соответствует контракту, который сейчас предполагает replay. Не выполнялись новые archive downloads, strategy PnL, private API, paper/live orders. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.
+
+
+## 25. Повторяющиеся JSON object keys в L2 archive
+
+iter_book_events() ранее использовал стандартный json.loads(), который принимает повторяющиеся ключи JSON object и молча оставляет последнее значение. Например, event с двумя полями u/seq/cts или повторным data/b/a мог быть интерпретирован иначе, чем исходная строка архива.
+
+Исправлено:
+- добавлен object_pairs_hook _unique_json_object();
+- duplicate keys отклоняются на любом уровне вложенности JSON, до проверки и yield event;
+- остальные проверки event/data/symbol/strict integer cts сохраняются.
+
+Добавлен regression test с повторным вложенным data.u; archive iterator должен завершиться ValueError.
+
+Изменения в research/market-regime-v1-main:
+- source commit: 398d234ff4a0bece192780939914eb25f516f9ae;
+- test commit: caf17b5ef566d03963fa0ae4ebb6305d97f6a784;
+- исправление вызова теста на l2_module.iter_book_events: e7b60c224d77b3a8fe4bbbacb621f80e069a4294 (текущая голова кода/тестов на момент обновления).
+
+CI:
+- source run 41837887140: SUCCESS;
+- run 41837896308: FAILURE только из-за NameError в тесте (использовалось неимпортированное имя iter_book_events);
+- после module-qualified test fix run 41838006400 на commit e7b60c224d77b3a8fe4bbbacb621f80e069a4294: SUCCESS, job tests 56/56 steps completed successfully, queue replay primitive test step SUCCESS.
+
+Это устраняет неоднозначность повторных JSON ключей, но не подтверждает семантическую непрерывность update IDs depth-200 или отсутствие пропущенных архивных событий. Новые archive downloads и PnL не запускались; private API и paper/live orders не использовались. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.

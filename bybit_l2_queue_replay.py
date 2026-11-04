@@ -299,6 +299,15 @@ def signed_markout_bps(
     return (mid - fill_price) / fill_price * sign * Decimal("10000")
 
 
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
+
+
 def iter_book_events(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict]:
     with zipfile.ZipFile(archive) as zf:
         members = [name for name in zf.namelist() if name.endswith(".data")]
@@ -308,7 +317,7 @@ def iter_book_events(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict]:
             for line_no, raw in enumerate(stream, 1):
                 if not raw.strip():
                     continue
-                event = json.loads(raw)
+                event = json.loads(raw, object_pairs_hook=_unique_json_object)
                 if not isinstance(event, dict):
                     raise ValueError(f"invalid order-book event at row {line_no}")
                 data = event.get("data")

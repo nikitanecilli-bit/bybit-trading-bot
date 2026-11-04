@@ -25,6 +25,7 @@ on:
       - 'scripts/bybit_reconciliation_report.py'
       - 'tests/test_bybit_reconciliation_report.py'
       - 'scripts/snapshot_bybit_instruments.py'
+      - 'scripts/snapshot_bybit_linear_universe.py'
       - 'scripts/snapshot_bybit_risk_limits.py'
       - 'scripts/archive_bybit_market_history.py'
       - 'tests/test_archive_bybit_market_history.py'

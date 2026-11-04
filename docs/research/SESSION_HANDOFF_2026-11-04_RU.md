@@ -6,8 +6,9 @@
 
 - Репозиторий: `nikitanecilli-bit/bybit-trading-bot` (private).
 - Рабочая ветка: `research/market-regime-v1-main`.
-- Последний проверенный code/test commit: `1b50c9da41b99ea23d04e009e7ba6e6424d73e01`; последующие коммиты после него на момент этого snapshot — документальные.
-- Последний подтверждённый CI: [Research engine checks #41875905360](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41875905360), commit `1b50c9d`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps.
+- Последний code/test commit: `2b71592a1431028a5e78af2bc166327a4a5f49b8` (L2 orderbook update-ID regression guard); explanatory comment commit: `af4ad6f421b52cd24f864d5a71c581853cc569a8`.
+- Последний подтверждённый полный CI: [Research engine checks #41875905360](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41875905360), commit `1b50c9d`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps. Этот run предшествует двум указанным коммитам; для них новый workflow run не обнаружен, полный CI после изменения пока не подтверждён.
+- Текущий branch HEAD на момент обновления handoff: `af4ad6f421b52cd24f864d5a71c581853cc569a8`.
 - В этом CI: aggregate-L2 primitive tests 81/81; runner/inspector suite 9/9; portfolio accounting 54/54; state persistence 84/84. Логи подтверждают strict integer parsing orderbook inspector, structural checks trade CSV, BT/RPI aliases, strict trade timestamps и trade-ID diagnostics.
 - Предыдущая неудачная попытка #41872989853 была вызвана устаревшим тестом после перехода trade inspector на общий `parse_trade_timestamp_ms`; тест синхронизирован в `ec28763`, после чего полные CI #41873039139, #41873425668, #41874277483, #41875093214 и #41875905360 прошли.
 - PR #4: открыт, Draft, base `main`, head = текущая research-ветка; mergeable=false. Не сливать автоматически.
@@ -389,3 +390,12 @@
 - Source-only CI #41875836674 SUCCESS, 57/57; final CI #41875905360 на `1b50c9d`: SUCCESS, 57/57. Фактический лог подтверждает strict orderbook inspector regression; inspector/runner suite 9/9 и aggregate-L2 primitives 81/81.
 - Это timestamp/sequence integrity guardrail диагностического инструмента, не execution evidence и не PnL. Inspector не запускался с сетевой загрузкой; новые архивы не скачивались. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся.
 - Нет PnL/backtests, collectors, API, runner, paper/live orders или изменений `main`.
+
+## Session update — non-reset orderbook update-ID regression guard (2026-11-04)
+
+- Static review found that `OrderBook.apply()` accepted a lower non-`1` `u` after a higher update ID if `cts` and `seq` were still increasing. This could apply stale/out-of-order order-book state.
+- Added fail-closed rejection for `update_id < last_u`, except the documented `u=1` full-snapshot reset. No contiguous-`u` requirement was added.
+- Added regression coverage for atomic rejection; existing `u=1` restart snapshot coverage remains.
+- Commits: code/test `2b71592a1431028a5e78af2bc166327a4a5f49b8`; explanatory comment `af4ad6f421b52cd24f864d5a71c581853cc569a8`.
+- Focused isolated behavior check and test-source syntax check passed. GitHub Actions did not show a run for these commits; full repository CI remains unverified after this change. Latest confirmed CI is #41875905360 on prior code/test SHA `1b50c9d`.
+- No market data download, collector, PnL/backtest, private API, runner, paper/live orders, or `main` changes. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains.

@@ -13,6 +13,11 @@ from collections import Counter
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from bybit_l2_queue_replay import strict_int
 
 URL = "https://quote-saver.bycsi.com/orderbook/linear/AAVEUSDT/2025-09-02_AAVEUSDT_ob200.data.zip"
 TRADES_URL = "https://public.bybit.com/trading/AAVEUSDT/AAVEUSDT2025-09-02.csv.gz"
@@ -48,6 +53,21 @@ def validate_level(level: object) -> None:
         raise ValueError("book level contains invalid price or quantity")
 
 
+def parse_event_integer_fields(event: dict) -> tuple[int, int | None, int, int]:
+    """Parse order-book event IDs/timestamps with the replay's strict integer contract."""
+    data = event.get("data")
+    if not isinstance(data, dict):
+        raise ValueError("order-book event data must be an object")
+    ts = strict_int(event.get("ts"), "ts")
+    raw_cts = event.get("cts")
+    cts = None if raw_cts is None else strict_int(raw_cts, "cts")
+    seq = strict_int(data.get("seq"), "seq")
+    update_id = strict_int(data.get("u"), "u")
+    if ts <= 0 or (cts is not None and cts <= 0) or seq <= 0 or update_id <= 0:
+        raise ValueError("order-book timestamps and sequence/update IDs must be positive")
+    return ts, cts, seq, update_id
+
+
 def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
     event_types = Counter()
     ts_min = ts_max = cts_min = cts_max = None
@@ -75,10 +95,7 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
             data = event.get("data")
             if not isinstance(data, dict) or data.get("s") != SYMBOL:
                 raise ValueError(f"wrong/missing symbol at row {rows + 1}")
-            ts = int(event["ts"])
-            cts = int(event["cts"]) if event.get("cts") is not None else None
-            seq = int(data["seq"])
-            update_id = int(data["u"])
+            ts, cts, seq, update_id = parse_event_integer_fields(event)
             if ts_min is None or ts < ts_min:
                 ts_min = ts
             if ts_max is None or ts > ts_max:
@@ -97,7 +114,7 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
                 nonmonotonic_seq += 1
             if update_id == 1:
                 u_reset_count += 1
-            if "cts" not in event:
+            if cts is None:
                 cts_missing += 1
 
             bids, asks = data.get("b"), data.get("a")

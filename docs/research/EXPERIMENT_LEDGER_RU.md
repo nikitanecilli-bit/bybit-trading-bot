@@ -1281,3 +1281,11 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Equal-ms cts/T events cannot be ordered by timestamp alone. Runner deliberately excludes same-ms book events for hypothetical arrival/markout and reports no same-ms fills. Keep this conservative rule.
 - No code change: availability of trade `seq` in the historical daily CSV must be established before designing a cross-stream merge. Even a common sequence would not solve aggregate-L2 cancellation allocation.
 - Note: `docs/research/ENG_EXEC_038_CROSS_STREAM_ORDERING_BOUNDARY_RU.md`. Static repo review + official docs only; no API requests, archive downloads, tests, replay, PnL, collectors, private API, runner or orders. Maker gate remains blocked.
+
+## ENG-EXEC-039 — Historical trade CSV `seq` availability (2026-11-04)
+
+- Official REST recent-trade and publicTrade WS docs include cross-sequence `seq`; official REST docs say archived trades are downloadable but do not specify CSV columns or guarantee `seq` retention.
+- Secondary descriptions/implementations of daily `public.bybit.com` CSV show the common timestamp/symbol/side/size/price/tickDirection/trdMatchID/notional schema without `seq`. This makes absence likely for the common CSV format, not proven for every symbol/date/version.
+- Repo parser requires timestamp/symbol/side/size/price/trdMatchID + block/RPI flags; it tolerates extra columns but drops trade `seq` from normalized records. Existing no-seq test fixtures are synthetic, not real archive evidence. No verified raw historical CSV header is stored in repo.
+- Decision: no code change; treat historical CSV cross-stream `seq` as unavailable/unverified. Keep no-same-ms fills. A provenance-labelled existing raw sample may settle schema for its period; otherwise a separate approved acquisition would be required. No archive/API requests, tests, replay, PnL, collectors, runner or orders. Maker gate remains blocked.
+- Note: `docs/research/ENG_EXEC_039_HISTORICAL_TRADE_CSV_SEQ_AVAILABILITY_RU.md`.

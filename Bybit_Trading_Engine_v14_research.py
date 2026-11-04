@@ -2548,18 +2548,28 @@ class UnifiedQuantEngine:
         final_ts = next(iter(timestamps)) + timeframe_ms[timeframe]
         for sym, candle in marks.items():
             self._last_mark_prices[sym] = candle.close
-        self.risk_mgr.mark_to_market(self._unrealized_pnl_at_marks(final_ts), final_ts)
+        self._update_mark_to_market(final_ts)
 
-        for pos in list(self.open_positions.values()):
-            exit_px = self._last_mark_prices.get(pos.symbol, pos.entry_price)
-            stop_dist = max(1e-8, pos.initial_stop_dist)
-            if pos.direction == "long":
-                mfe_r = max(0.0, (pos.max_favorable_px - pos.entry_price) / stop_dist)
-                mae_r = max(0.0, (pos.entry_price - pos.max_adverse_px) / stop_dist)
-            else:
-                mfe_r = max(0.0, (pos.entry_price - pos.max_favorable_px) / stop_dist)
-                mae_r = max(0.0, (pos.max_adverse_px - pos.entry_price) / stop_dist)
-            self._close_position(pos, exit_px, exit_reason, final_ts, mae_r, mfe_r)
+        # End-of-test exits share one timestamp. As in the synchronized replay
+        # loop, do not let the arbitrary dictionary order create transient peaks
+        # or drawdown latches between otherwise simultaneous final closes.
+        previous_defer = getattr(self, "_defer_close_risk_evaluation", False)
+        self._defer_close_risk_evaluation = True
+        try:
+            for pos in list(self.open_positions.values()):
+                exit_px = self._last_mark_prices.get(pos.symbol, pos.entry_price)
+                stop_dist = max(1e-8, pos.initial_stop_dist)
+                if pos.direction == "long":
+                    mfe_r = max(0.0, (pos.max_favorable_px - pos.entry_price) / stop_dist)
+                    mae_r = max(0.0, (pos.entry_price - pos.max_adverse_px) / stop_dist)
+                else:
+                    mfe_r = max(0.0, (pos.entry_price - pos.max_favorable_px) / stop_dist)
+                    mae_r = max(0.0, (pos.max_adverse_px - pos.entry_price) / stop_dist)
+                self._close_position(pos, exit_px, exit_reason, final_ts, mae_r, mfe_r)
+        finally:
+            self._defer_close_risk_evaluation = previous_defer
+        self._update_mark_to_market(final_ts)
+        self._persist()
 
     def export_journal_for_dashboard(self) -> Dict:
         audit = MaintenanceGateAuditor.evaluate_portfolio(

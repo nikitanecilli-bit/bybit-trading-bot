@@ -52,6 +52,24 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
         self.assertEqual(str(before.tick_size), "0.1")
         self.assertEqual(str(after.tick_size), "0.01")
 
+    def test_uses_envelope_category_when_bybit_rows_omit_category(self):
+        for filename in ("a.json", "b.json"):
+            payload = json.loads((self.root / filename).read_text())
+            for instrument in payload["instruments"]:
+                instrument.pop("category")
+            (self.root / filename).write_text(json.dumps(payload), encoding="utf-8")
+        history = InstrumentSpecHistory.from_directory(self.root)
+        spec = history.get_spec("BTCUSDT", 1_793_577_600_000)
+        self.assertEqual(spec.category, "linear")
+        self.assertEqual(str(spec.tick_size), "0.01")
+
+    def test_row_category_mismatch_is_not_overridden_by_envelope(self):
+        payload = json.loads((self.root / "a.json").read_text())
+        payload["instruments"][0]["category"] = "spot"
+        (self.root / "a.json").write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "only supports linear"):
+            InstrumentSpecHistory.from_directory(self.root)
+
     def test_never_uses_future_snapshot(self):
         history = InstrumentSpecHistory.from_directory(self.root)
         with self.assertRaisesRegex(ValueError, "no linear instrument snapshot"):

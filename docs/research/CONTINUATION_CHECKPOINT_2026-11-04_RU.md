@@ -1364,3 +1364,11 @@ Source `86a0590f`, `68ee303e`; tests `8311daa4`, `82852d6f`. Research CI run `41
 Runner уже консервативно исключает same-ms book events для arrival/markout snapshot и не засчитывает same-ms fills. Код не менялся. Сначала нужно подтвердить, присутствует ли trade `seq` в историческом daily CSV. Даже общий sequence не решает распределение отмен в aggregate L2. Note: `ENG_EXEC_038_CROSS_STREAM_ORDERING_BOUNDARY_RU.md`.
 
 Только статический аудит и чтение официальной документации. API-запросы, архивы, тесты, replay, PnL/backtests, collectors, runner и orders не запускались. Maker gate закрыт; `main` не изменён; PR #4 не слит.
+
+## 41. Historical daily trade CSV sequence availability (ENG-EXEC-039)
+
+Официальные Bybit REST/WS docs подтверждают `seq` в live/recent trade, но не описывают полный header historical daily CSV и не гарантируют перенос `seq` в архив. Вторичные описания распространённой CSV-схемы показывают timestamp/symbol/side/size/price/tickDirection/trdMatchID/notional без `seq`; это вероятный признак, но не универсальное доказательство для всех дат/рынков.
+
+Наш parser отбрасывает trade `seq`, даже если колонка присутствует. Тестовые CSV fixtures без `seq` синтетические; реального проверенного raw header в repo нет. Код не менялся. Считать cross-stream `seq` в historical CSV недоступным/неподтверждённым, сохранить no-same-ms-fill. Для закрытия вопроса нужен provenance-labelled sample или отдельное одобренное получение данных. Note: `ENG_EXEC_039_HISTORICAL_TRADE_CSV_SEQ_AVAILABILITY_RU.md`.
+
+Статический аудит и публичная документация; архивы/API/collectors, тесты, replay, PnL, runner и orders не запускались. Maker gate закрыт; `main` не изменён; PR #4 не слит.

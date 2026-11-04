@@ -52,6 +52,8 @@ on:
       - 'scripts/diagnose_h_a_signal_candles.py'
       - 'scripts/validate_funding_coverage.py'
       - 'tests/**'
+      - 'scripts/probe_bybit_orderbook_archives.py'
+      - '.github/workflows/bybit-orderbook-archive-probe.yml'
       - '.github/workflows/bybit-market-history-archive.yml'
       - '.github/workflows/bybit-linear-universe-history.yml'
       - '.github/workflows/h1-top5-train-selection.yml'
@@ -137,6 +139,16 @@ jobs:
         run: python tests/test_bybit_reconciliation_report.py
       - name: Scan for obvious secrets
         run: python scripts/scan_secrets.py .
+      - name: Probe Bybit historical order-book archive (bounded range only)
+        continue-on-error: true
+        run: python scripts/probe_bybit_orderbook_archives.py /tmp/bybit_orderbook_archive_probe.json
+      - name: Upload Bybit order-book archive probe report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bybit-orderbook-archive-probe
+          path: /tmp/bybit_orderbook_archive_probe.json
+          if-no-files-found: warn
       - name: Test causal market-regime classifier
         run: python tests/test_market_regime.py
       - name: Test causal trend and breakout filters

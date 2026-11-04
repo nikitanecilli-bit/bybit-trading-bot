@@ -1136,3 +1136,24 @@ CI #41867866581 on 794342bbd00342d0b7f1af660362794408da0345: SUCCESS. Primitive 
 - Это подтверждение временной семантики, а не доказательство точного event ordering или maker fills.
 
 Статус execution gate не меняется: `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`. No archive download, collector, strategy PnL, API, paper/live orders, or main changes.
+
+
+## 62. Повторно использован сохранённый CI artifact: реальная схема AAVE trade CSV — 2026-11-04
+
+Без новой загрузки рыночных архивов извлечён ранее созданный GitHub Actions artifact из run `41814167058` (artifact `13314017303`, дата исходного исследования 2026-11-04 10:26 UTC). Внутри сохранён полный результат сканирования уже тогда загруженного AAVEUSDT 2025-09-02 CSV:
+
+- 346,131 trade rows; уникальных `trdMatchID` — 346,131; повторов ID — 0.
+- Фактические колонки: `timestamp,symbol,side,size,price,tickDirection,trdMatchID,grossValue,homeNotional,foreignNotional,RPI`.
+- `RPI` присутствует, все 346,131 значений равны `0`.
+- `isBlockTrade` и `BT` отсутствуют.
+- Архивный report показывает 66 trades до начала L2 `cts` и 346,065 внутри временного диапазона книги; timestamp trades начинается на 1,276 ms раньше минимального book `cts`, последний trade — на 5,177 ms раньше максимального `cts`.
+
+Критическая интерпретация:
+- Текущий строгий parser корректно отклонит этот CSV из-за отсутствия block-trade классификатора. Это ожидаемое fail-closed поведение, не поломка parser.
+- Нельзя трактовать отсутствие BT как `False`, даже несмотря на нулевой RPI в этом конкретном файле.
+- Старый сохранённый `bybit_l2_queue_replay_report.json` был создан до обязательной проверки BT/RPI. Его четыре гипотетических сценария (0.58 partial, 1.00 filled, 1.00 filled, 0.33 partial) нельзя считать валидированными maker fills: block-trade принты не были надёжно отделены. Эти fill/markout числа — только исторический exploratory artifact, не evidence для PnL или fill-rate.
+- Этот артефакт не доказывает, что все Bybit historical CSV версии имеют ту же схему; он доказывает именно схему сохранённого AAVE файла.
+
+Следующий реальный блокер: нужен источник исторических trades с достоверным block-trade flag либо независимая проверка, позволяющая безопасно классифицировать BT. Пока такого источника нет, L2 queue replay не должен проходить в strategy PnL. Не ослаблять fail-closed parser и не повторять старый replay как будто его fills подтверждены.
+
+Artifact был получен из уже существующего CI run; никаких новых Bybit market archives не скачивалось. Main не менялся.

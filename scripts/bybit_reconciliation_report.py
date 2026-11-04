@@ -146,7 +146,7 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tupl
     if not isinstance(snapshot, dict):
         raise ReportError("exchange snapshot root must be an object")
     schema_version = snapshot.get("schema_version")
-    if schema_version not in (1, 2):
+    if schema_version not in (1, 2, 3):
         raise ReportError("unsupported exchange snapshot schema_version")
     if snapshot.get("category") != "linear" or snapshot.get("settle_coin") != "USDT":
         raise ReportError("snapshot is not scoped to Bybit linear/USDT")
@@ -167,7 +167,12 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tupl
     execution_pages = raw["executions"]
     if not isinstance(execution_pages, list) or not execution_pages:
         raise ReportError("snapshot raw.executions must be a non-empty page list")
-    if schema_version == 2:
+    if schema_version == 3:
+        fingerprint = snapshot.get("api_key_fingerprint_sha256")
+        if (not isinstance(fingerprint, str) or len(fingerprint) != 64
+                or any(char not in "0123456789abcdef" for char in fingerprint)):
+            raise ReportError("snapshot API-key fingerprint is missing or malformed")
+    if schema_version in (2, 3):
         _validate_page_provenance(raw["positions"], "positions", "/v5/position/list")
         _validate_page_provenance(raw["active_orders"], "active_orders", "/v5/order/realtime")
         _validate_page_provenance(history_pages, "order_history", "/v5/order/history", interval_scoped=True)
@@ -282,6 +287,16 @@ def compare_execution_snapshots(initial: dict[str, Any], refreshed: dict[str, An
         raise ReportError("both execution snapshots must be objects")
     if initial.get("saved_at_utc") != refreshed.get("saved_at_utc"):
         raise ReportError("execution snapshots must share the same saved_at_utc")
+    if initial.get("schema_version") != 3 or refreshed.get("schema_version") != 3:
+        raise ReportError("execution snapshot comparison requires schema_version 3")
+    if initial.get("base_url") != refreshed.get("base_url"):
+        raise ReportError("execution snapshots must use the same Bybit base_url")
+    initial_fingerprint = initial.get("api_key_fingerprint_sha256")
+    refreshed_fingerprint = refreshed.get("api_key_fingerprint_sha256")
+    if (not isinstance(initial_fingerprint, str) or len(initial_fingerprint) != 64
+            or any(char not in "0123456789abcdef" for char in initial_fingerprint)
+            or initial_fingerprint != refreshed_fingerprint):
+        raise ReportError("execution snapshots must have the same valid API-key fingerprint")
     saved_dt = _utc_timestamp(initial.get("saved_at_utc"), "snapshot saved_at_utc")
     saved_at_ms = int(saved_dt.timestamp() * 1000)
     _, _, _, initial_execs = _parse_exchange_snapshot(initial, saved_at_ms)

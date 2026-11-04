@@ -49,7 +49,7 @@ from typing import List, Dict, Optional, Tuple, Any, Callable
 from funding_accounting import accrued_funding_cost, accrued_funding_cost_for_remaining_margin
 from mark_price_liquidation import evaluate_isolated_margin_health, calculate_isolated_usdt_bankruptcy_price
 from instrument_spec_history import InstrumentSpecHistory
-from bybit_risk_tiers import RiskTierHistory
+from bybit_risk_tiers import RiskTierHistory, calculate_margin_requirements_from_tiers
 from bybit_market_state import get_linear_market_state
 from exchange_order_sizing import size_to_exchange_constraints
 
@@ -2166,6 +2166,7 @@ class UnifiedQuantEngine:
         # is supplied, missing/stale symbols, leverage mismatches and exchange
         # lot constraints reject the entry; there is deliberately no proxy fallback.
         instrument_spec_history = getattr(self, "instrument_spec_history", None)
+        market_state = None
         if instrument_spec_history is not None:
             try:
                 risk_tier_history = getattr(self, "risk_tier_history", None)
@@ -2214,11 +2215,18 @@ class UnifiedQuantEngine:
         if risk_tier_history is not None:
             try:
                 position_value = Decimal(str(size_usdt))
-                risk_margin = risk_tier_history.calculate_margin_requirements(
-                    symbol, curr.ts, position_value,
-                    leverage=Decimal(str(self.cfg.leverage_val)),
-                    max_age_ms=getattr(self, "max_risk_tier_age_ms", 30 * 24 * 60 * 60 * 1000),
-                )
+                if market_state is not None:
+                    risk_margin = calculate_margin_requirements_from_tiers(
+                        symbol, position_value,
+                        leverage=Decimal(str(self.cfg.leverage_val)),
+                        tiers=market_state.risk_tiers,
+                    )
+                else:
+                    risk_margin = risk_tier_history.calculate_margin_requirements(
+                        symbol, curr.ts, position_value,
+                        leverage=Decimal(str(self.cfg.leverage_val)),
+                        max_age_ms=getattr(self, "max_risk_tier_age_ms", 30 * 24 * 60 * 60 * 1000),
+                    )
             except ValueError as exc:
                 logger.warning(
                     "Reject entry %s: dated Bybit risk tier unavailable or exceeded: %s",

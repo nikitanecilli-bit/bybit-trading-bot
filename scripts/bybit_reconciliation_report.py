@@ -14,6 +14,7 @@ import hashlib
 import json
 import sys
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -543,10 +544,10 @@ def apply_execution_merge_plan(
                 new_rows.append(execution.to_dict())
             for order_id, order in order_map.items():
                 filled = sum(
-                    (item.exec_qty_decimal for item in exec_map.values() if item.order_id == order_id),
-                    start=__import__("decimal").Decimal("0"),
+                    (Decimal(item.exec_qty) for item in exec_map.values() if item.order_id == order_id),
+                    start=Decimal("0"),
                 )
-                if filled > order.cum_exec_qty_decimal:
+                if filled > Decimal(order.cum_exec_qty):
                     raise ReportError(f"planned executions exceed cumulative fill for order {order_id}")
             state["exchange_executions"] = sorted(
                 [item.to_dict() for item in exec_map.values()],

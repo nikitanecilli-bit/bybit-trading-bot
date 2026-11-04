@@ -108,3 +108,85 @@ Official references:
 - https://www.bybit.com/en/help-center/article/FAQ-USDT-Perpetual-and-Expiry-Contracts
 
 The 0.0225% per-leg taker slippage constant is not a published Bybit fee. It remains a local modelling assumption and needs symbol/time/size-specific execution evidence.
+
+
+## 5. Проверка реальных Bybit L2 и public trades архивов (2026-11-04)
+
+### 5.1 CDN reachability and candidate-universe coverage
+
+A bounded HEAD + HTTP Range probe ran from GitHub Actions against three dates:
+- 2024-12-01: legacy `ob500`;
+- 2025-09-02: `ob200`;
+- 2026-09-02: `ob200`.
+
+Each successful object returned HTTP 200 to HEAD and HTTP 206 to `Range: bytes=0-4095`; only one byte of the returned range body was read. No full archive was downloaded during this coverage probe.
+
+The probe covered the current H1 shortlist from `scripts/h1_symbol_universes.json` plus the legacy liquidity universe and the Bybit PEPE contract alias.
+
+| Candidate group | Symbols | Result on all three sampled dates |
+|---|---|---|
+| Primary | TAOUSDT, AAVEUSDT, CAKEUSDT | 3/3 available each |
+| Reserve | DASHUSDT, HBARUSDT, ENAUSDT, GMXUSDT, ONDOUSDT | 5/5 available each |
+| Primary/reserve gaps | RAYUSDT, PUMPUSDT | 404 each date |
+| Legacy/liquidity references | BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT, DOGEUSDT, BNBUSDT, SUIUSDT | 7/7 available each |
+| PEPE Bybit contract name | 1000PEPEUSDT | 3/3 available |
+| Incorrect/unverified alias | PEPEUSDT | 404 each date |
+
+The RAY/PUMP 404 results mean only that these exact archive objects were absent at the tested paths/dates. They do not prove that the contracts were never listed or that no alternate historical feed exists. The point-in-time Bybit instrument snapshot is still not available, so do not silently drop or rename either candidate.
+
+**Confirmed symbol-mapping issue:** the official Bybit fee-group documentation lists `1000PEPEUSDT`; the tested Bybit L2 archive also exists under that exact symbol. The older Binance-style OHLCV screening report used `PEPEUSDT`. Treat these as different venue identifiers until Bybit instrument metadata confirms the contract unit, tick size and quantity step. Do not send `PEPEUSDT` to the Bybit execution layer as a substitute for `1000PEPEUSDT` without an explicit, tested mapping.
+
+Coverage probe: [Research workflow #41810416421](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41810416421). The report is an artifact of that run.
+
+### 5.2 Full one-day AAVEUSDT L2 archive integrity
+
+A complete one-day sample was downloaded inside a disposable GitHub runner, scanned to EOF, and not committed to the repository.
+
+- URL: `https://quote-saver.bycsi.com/orderbook/linear/AAVEUSDT/2025-09-02_AAVEUSDT_ob200.data.zip`
+- Compressed bytes: 88,252,368
+- SHA-256: `e3646429c600f4917c021e240497e8f3d46fd44ba57168100633181916c761f6`
+- JSONL events: 816,684 = 2 snapshots + 816,682 deltas
+- Depth: 200 bid and 200 ask levels in snapshots
+- Coverage: 24 hours; all events include `cts`
+- Non-monotonic `ts`: 0; non-monotonic `seq`: 0; adjacent duplicate timestamps: 0; `u=1` resets: 0
+- ZIP stream reached EOF and passed its CRC check through the standard ZIP reader.
+
+This validates the archive container and its event schema for this one symbol/day; it is not a full multi-month completeness audit.
+
+### 5.3 Matching public trades archive
+
+The matching AAVEUSDT trade archive was also fully downloaded and streamed to EOF:
+
+- URL: `https://public.bybit.com/trading/AAVEUSDT/AAVEUSDT2025-09-02.csv.gz`
+- Compressed bytes: 13,095,906
+- SHA-256: `cf11d05f6053acfeb22b1112df666ff328034963f04c6e6159f35cae63de1bc1`
+- Rows: 346,131; unique `trdMatchID`: 346,131; duplicate IDs: 0
+- Non-monotonic trade timestamps: 0
+- Taker/aggressor side: Buy 176,411; Sell 169,720
+- Total contract size: 338,330.20; notional: 105,423,139.2883 USDT
+- `RPI` column present; all 346,131 rows have value `0`
+- No `isBlockTrade` field in this archive schema.
+
+Trade timestamps were compared to the L2 matching-engine `cts` range (not the local/server `ts`):
+- 346,065 trades fall inside the L2 `cts` range;
+- 66 trades precede the first available book snapshot;
+- 0 trades occur after the last book `cts`;
+- the first trade is 1,276 ms before the first book `cts`; the final trade is 5,177 ms before the final book `cts`.
+
+The 66 early trades must be excluded from a replay that starts from the first L2 snapshot; the remaining overlapping interval is suitable for a first queue-model prototype. Do not extrapolate the boundary coverage result to other symbols/days without measuring it.
+
+Full sample-inspection workflow: [#41810648340](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41810648340); the follow-up overlap/RPI report is [#41810769292](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41810769292).
+
+### 5.4 What is now possible — and what is still not proven
+
+The archive pair is sufficient to prototype an aggregate L2 queue lower-bound model:
+1. Rebuild the visible book from snapshots and deltas.
+2. At hypothetical order arrival, classify a marketable order using contemporaneous best bid/ask; otherwise initialize queue-ahead with the displayed size at the limit price.
+3. Decrement queue-ahead only with eligible opposing-aggressor trades at that exact price; support partial fills.
+4. Do not credit cancellations as queue-ahead reductions. L2 deltas cannot distinguish cancellation from execution or identify whether a cancellation was ahead of or behind the hypothetical order.
+5. Exclude trades explicitly marked RPI where the archive supplies the flag; report archive schemas without a block-trade flag as a limitation.
+6. Apply explicit order-arrival and cancel latency; never use trades at or before the order-arrival timestamp to fill the hypothetical order.
+
+This remains an aggregate L2 lower-bound approximation, not L3 queue reconstruction or exchange-confirmed fills. RPI/block trades, hidden liquidity, same-timestamp ordering and market impact still require careful handling.
+
+**Decision unchanged:** `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`. Data acquisition is now feasible and one matched day passed integrity checks. The next safe engineering step is a separate, deterministic queue-replay prototype with synthetic tests and a measured AAVE sample; only after that should it be connected to H1 strategy signals. No strategy PnL was run in this data-validation stage.

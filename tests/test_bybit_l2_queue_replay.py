@@ -749,6 +749,27 @@ def test_trade_archive_rejects_conflicting_rpi_flag_aliases():
             raise AssertionError("conflicting RPI aliases must be rejected")
 
 
+def test_trade_archive_validates_side_price_and_size_for_every_row():
+    import gzip
+    cases = [
+        ("Unknown", "100", "1", "invalid public trade side"),
+        ("Sell", "0", "1", "price and size must be positive"),
+        ("Buy", "100", "0", "price and size must be positive"),
+    ]
+    for side, price, size, expected in cases:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "trades.csv.gz"
+            with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
+                stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\n")
+                stream.write(f"1756771200123,AAVEUSDT,{side},{size},{price},match-1,False,False\n")
+            try:
+                list(l2_module.iter_public_trades(path))
+            except ValueError as exc:
+                assert expected in str(exc)
+            else:
+                raise AssertionError("invalid side/price/size must be rejected")
+
+
 def test_trade_archive_parses_block_trade_and_rpi_flags():
     import gzip
     with tempfile.TemporaryDirectory() as tmp:

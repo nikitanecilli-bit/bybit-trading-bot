@@ -102,6 +102,22 @@ def test_original_signal_timestamp_survives_delayed_fill_and_journal_export():
         assert payload["trades"][0]["signal_ts_ms"] == original_signal_ts
 
 
+def test_restored_stale_pending_signal_is_discarded_before_any_entry_checks():
+    e = make_engine()
+    signal_ts = 1_800_000_000_000
+    e.pending["BTCUSDT"] = {
+        "symbol": "BTCUSDT", "direction": "long",
+        "strategy": "restored-pending-test", "signal_ts": signal_ts,
+        "entry_price": 100.0, "stop_dist": 5.0, "order_type": "market",
+    }
+    stale_bar = engine_mod.Candle(
+        signal_ts + 2 * 3_600_000, 100.0, 101.0, 99.0, 100.5, 10.0,
+    )
+    assert e._try_fill_pending("BTCUSDT", stale_bar) is False
+    assert "BTCUSDT" not in e.pending
+    assert "BTCUSDT" not in e.open_positions
+
+
 def test_engine_accepts_limit_fill_on_third_wait_bar_and_preserves_origin_signal_ts():
     e = make_engine()
     e.cfg.enable_post_break_invalidation = False

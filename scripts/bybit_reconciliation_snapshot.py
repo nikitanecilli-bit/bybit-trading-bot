@@ -192,7 +192,9 @@ def _collect_pages(
         page_params = dict(params)
         if cursor:
             page_params["cursor"] = cursor
+        request_started_at_ms = _utc_ms()
         payload = _get(base_url, endpoint, page_params, api_key, secret, request_json)
+        request_completed_at_ms = _utc_ms()
         result = _check_success(payload, endpoint)
         rows = result.get("list")
         next_cursor = result.get("nextPageCursor", "")
@@ -200,9 +202,26 @@ def _collect_pages(
             raise CollectorError(f"{endpoint} returned malformed result.list")
         if not isinstance(next_cursor, str):
             raise CollectorError(f"{endpoint} returned malformed nextPageCursor")
+        query_fingerprint = hashlib.sha256(_canonical_json_bytes(page_params)).hexdigest()
+        response_fingerprint = hashlib.sha256(_canonical_json_bytes(payload)).hexdigest()
+        cursor_fingerprint = hashlib.sha256(cursor.encode("utf-8")).hexdigest()
+        next_cursor_fingerprint = hashlib.sha256(next_cursor.encode("utf-8")).hexdigest()
         pages.append({
             "requested_cursor": cursor,
             "response": payload,
+            "page_provenance": {
+                "endpoint": endpoint,
+                "page_index": len(pages),
+                "request_started_at_ms": request_started_at_ms,
+                "request_completed_at_ms": request_completed_at_ms,
+                "query_params_sha256": query_fingerprint,
+                "requested_cursor_sha256": cursor_fingerprint,
+                "next_cursor_sha256": next_cursor_fingerprint,
+                "response_canonical_sha256": response_fingerprint,
+                "ret_code": payload.get("retCode"),
+                "row_count": len(rows),
+                "has_next_page": bool(next_cursor),
+            },
         })
         if len(pages) >= MAX_PAGES_PER_ENDPOINT and next_cursor:
             raise CollectorError(f"{endpoint} exceeded the page safety limit")

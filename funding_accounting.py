@@ -65,9 +65,14 @@ def accrued_funding_cost(
     if remaining_fraction < 0 or remaining_fraction > 1:
         raise ValueError("remaining_fraction must be within [0, 1]")
 
+    tp1_hit = getattr(position, "tp1_hit", False)
+    if not isinstance(tp1_hit, bool):
+        raise ValueError("tp1_hit must be bool")
     tp1_ts = getattr(position, "tp1_ts_ms", None)
-    if bool(getattr(position, "tp1_hit", False)) and tp1_ts is None:
+    if tp1_hit and tp1_ts is None:
         raise ValueError("tp1_ts_ms is required when tp1_hit is true")
+    if not tp1_hit and tp1_ts is not None:
+        raise ValueError("tp1_ts_ms cannot be set when tp1_hit is false")
     if tp1_ts is not None:
         tp1_ts = _timestamp_ms(tp1_ts, "tp1_ts_ms")
         if tp1_ts < entry_ts:
@@ -173,9 +178,14 @@ def accrued_funding_cost_for_remaining_margin(
     if quantity <= 0 or remaining < 0 or remaining > quantity:
         raise ValueError("invalid initial or remaining contract quantity")
     ratio = remaining / quantity
+    tp1_hit = getattr(position, "tp1_hit", False)
+    if not isinstance(tp1_hit, bool):
+        raise ValueError("tp1_hit must be bool")
     tp1_ts = getattr(position, "tp1_ts_ms", None)
-    if bool(getattr(position, "tp1_hit", False)) and tp1_ts is None:
+    if tp1_hit and tp1_ts is None:
         raise ValueError("tp1_ts_ms is required when tp1_hit is true")
+    if not tp1_hit and tp1_ts is not None:
+        raise ValueError("tp1_ts_ms cannot be set when tp1_hit is false")
     if tp1_ts is not None:
         tp1_ts = _timestamp_ms(tp1_ts, "tp1_ts_ms")
         if tp1_ts < entry_ts:

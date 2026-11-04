@@ -62,3 +62,18 @@ Evidence:
 - Logs show the new regression PASS; the H1 EMA/Donchian test module completed 12 tests and the H1 runner execution-gate module completed 74 tests, all OK.
 
 No market PnL replay was run. This is a comparison-integrity correction only.
+
+### Explicit Donchian arm metadata — 2026-11-04
+
+The same paired-result helper also used defaults for missing variant markers (`donchian_period` defaulted to 20 and `ema50_200_gate` defaulted to false). A malformed row could therefore be silently interpreted as a baseline arm. The helper now requires an explicit integer Donchian period of 20 or 48 and an actual boolean EMA marker; missing or invalid metadata is rejected before grouping.
+
+Regression:
+- `test_paired_donchian48_rejects_missing_or_invalid_arm_metadata`
+
+Evidence:
+- Fix commit: [d66d2d676f3d2d89c37ba38a6c4bed6c1131932b](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/d66d2d676f3d2d89c37ba38a6c4bed6c1131932b)
+- Test commit: [4d3a07125ec8981973ba091d274be6cdc180d0cc](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/4d3a07125ec8981973ba091d274be6cdc180d0cc)
+- Research CI: [run 41805317179](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41805317179) — **SUCCESS**.
+- Logs show PASS for both Donchian pairing regressions; the H1 EMA/Donchian test module completed 13 tests and the H1 runner execution-gate module completed 74 tests, all OK.
+
+No market PnL replay was run.

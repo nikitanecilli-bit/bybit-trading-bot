@@ -1441,3 +1441,14 @@ No market PnL, new archive download/collector, private API, runner registration,
 - Thus old-formula PnL classification applies to E01–E11 and E13, not H-A final replay or H-C reverse-time replay. Their other data/universe/funding/holdout limitations remain.
 - Provenance matrix commit `24e5549c5eae82e5651f2c73d41aba078ae82c1b`; blob read back `3beec82d86b1507df3232f8370902c99f5c201e4`. Documentation-only; no CI run.
 - No PnL rerun, artifact download, archive extraction or parameter sweep. P1 provenance is now substantially closed; remaining irreducible gaps are source dataset byte hashes for early experiments and any artifact contents not already documented. Do not download them under current gates.
+
+
+## 2026-11-05 — итоговое решение о готовности ALT-SYSTEM-RESEARCH-001
+
+- Создан `docs/research/ALT_SYSTEM_READINESS_DECISION_001_RU.md` (commit `d4b6b4f57e2cda6057b8955b34a84dfa13873a1f`), файл повторно прочитан с GitHub. Документ фиксирует: strategy readiness BLOCKED; Bybit-native PnL BLOCKED; maker execution BLOCKED; deterministic engineering framework partially verified, но не является доказательством edge.
+- Существенное уточнение maker gate из ранее сохранённого artifact #41814167058: AAVEUSDT 2025-09-02 CSV содержит 346,131 уникальных trades, RPI=0, но не содержит ни `BT`, ни `isBlockTrade`. Строгий replay обязан отвергать этот CSV; старые четыре hypothetical fills (58%, 100%, 100%, 33%) нельзя считать валидированными fills или fill-rate estimate. Не трактовать отсутствие BT как false.
+- Static read-only review текущих `bybit_l2_queue_replay.py` и `scripts/run_bybit_l2_queue_replay.py`: atomic orderbook state, strict timestamp/ID/flag validation, idempotent replay, explicit per-fill fee rates and fill-level markout are present. В проверенном срезе нового воспроизводимого дефекта не установлено; код/тесты не менялись и не запускались.
+- Branch compare после readiness doc: diverged, 2580 commits ahead / 40 behind; base `main` SHA остаётся `c06af3aa084d3513a3c2d7b183f02dba312be230`. Это не основание для merge/rebase/fast-forward всей ветки.
+- PR #4: OPEN, Draft, unmerged; PR #13: OPEN, unmerged. Ни один не слит. Main не изменён.
+- Readiness doc — документационное изменение; CI для него не запускался и не заявляется. Никаких PnL/backtests/replays, downloads, collectors, private API, self-hosted runner или orders не запускалось.
+- Следующий разрешённый шаг: только read-only provenance/static audit и deterministic synthetic regressions при доказанном дефекте. Рыночные PnL, архивы и maker strategy replay остаются запрещены текущим hold.

@@ -1659,3 +1659,55 @@ if __name__ == "__main__":
         test()
         print("PASS", name)
     print(f"{len(tests)}/{len(tests)} tests passed")
+
+
+def _run_simultaneous_kill_switch_exits(symbol_order):
+    e = make_engine()
+    e.cfg.emergency_kill_switch_pct = 0.5
+    e.cfg.daily_stop_loss_pct = 99.0
+    hour = 3_600_000
+    histories = {}
+    for symbol in ("BTCUSDT", "ETHUSDT"):
+        pos = make_position(symbol=symbol, size=1_000.0)
+        e.open_positions[symbol] = pos
+        first_ts = pos.entry_ts - 28 * hour
+        rows = [
+            engine_mod.Candle(
+                ts=first_ts + index * hour,
+                open=100.0, high=101.0, low=99.0, close=100.0, volume=10.0,
+            )
+            for index in range(29)
+        ]
+        # Both symbols hit their stop during the same synchronized H1 candle.
+        rows.append(engine_mod.Candle(
+            ts=pos.entry_ts + hour,
+            open=100.0, high=101.0, low=94.0, close=96.0, volume=10.0,
+        ))
+        histories[symbol] = rows
+
+    final_candles = {symbol: histories[symbol][-1] for symbol in symbol_order}
+    e._prepare_portfolio_intrabar_marks(final_candles)
+    exit_ts = histories[symbol_order[0]][-1].ts + hour
+    e._update_mark_to_market(exit_ts)
+    assert e.risk_mgr.kill_switch_triggered is True
+
+    for symbol in symbol_order:
+        e._manage_position(symbol, histories[symbol], fill_bar=False, exit_ts=exit_ts)
+
+    assert not e.open_positions
+    assert {trade.exit_reason for trade in e.closed_trades} == {"kill_switch"}
+    assert e.risk_mgr.current_equity == round(
+        e.risk_mgr.realized_equity + e.risk_mgr.unrealized_pnl, 4
+    )
+    return (
+        round(sum(trade.pnl_usdt for trade in e.closed_trades), 2),
+        round(e.risk_mgr.current_equity, 4),
+        sorted((trade.token, trade.pnl_usdt) for trade in e.closed_trades),
+    )
+
+
+def test_simultaneous_kill_switch_exits_are_independent_of_symbol_iteration_order():
+    forward = _run_simultaneous_kill_switch_exits(["BTCUSDT", "ETHUSDT"])
+    reverse = _run_simultaneous_kill_switch_exits(["ETHUSDT", "BTCUSDT"])
+    assert forward == reverse
+

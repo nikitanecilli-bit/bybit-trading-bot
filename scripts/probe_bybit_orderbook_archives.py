@@ -19,6 +19,7 @@ URLS = [
     for date, depth in (("2024-12-01", "ob500"), ("2025-09-02", "ob200"), ("2026-09-02", "ob200"))
     for symbol in SYMBOLS
 ]
+URLS.append("https://public.bybit.com/trading/AAVEUSDT/AAVEUSDT2025-09-02.csv.gz")
 
 def request_once(url: str, method: str) -> dict:
     headers = {"User-Agent": "bybit-orderbook-archive-probe/1.0"}

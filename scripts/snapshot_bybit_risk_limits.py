@@ -62,7 +62,7 @@ def validate_tier(row: Any) -> dict[str, Any]:
         if value is None or value <= 0:
             raise ValueError(f"{symbol}.{field} must be > 0")
     lowest = row.get("isLowestRisk")
-    if isinstance(lowest, bool) or lowest not in (0, 1):
+    if isinstance(lowest, bool) or not isinstance(lowest, int) or lowest not in (0, 1):
         raise ValueError(f"{symbol}.isLowestRisk must be integer 0 or 1")
     _decimal(row.get("mmDeduction", ""), f"{symbol}.mmDeduction", allow_empty=True)
     return dict(row)

@@ -720,3 +720,22 @@ Commits:
 - import-path correction: d2740c6ff444c3a7302b4b04dcc04d15ebf1dcb1.
 
 This adds regression coverage only; no strategy PnL, archive downloads, private API, or orders were run. Maker execution realism remains BLOCKED_FOR_STRATEGY_PNL.
+
+
+## 35. Empty L2 arrival archive fails with an explicit validation error — 2026-11-04
+
+Static audit of `scripts/run_bybit_l2_queue_replay.py:capture_scenarios()` found that a valid ZIP container with one empty `.data` member left `first_cts=None`; the scheduled-arrival tail then attempted arithmetic on `None`, producing an incidental TypeError rather than a controlled input-validation failure.
+
+Correction:
+- Explicitly reject a stream with no book events using `ValueError("order-book archive contains no events")`.
+- Added `test_capture_scenarios_rejects_empty_order_book_archive` using an empty `.data` archive.
+
+Commits:
+- source: `067109a14312c39ebd95ecf2eaede8d19375426c`
+- regression: `54f30eeb095fb01998bf9d03b69c4ff2a1b40687`
+
+Verification status:
+- Both modified files were fetched again from `research/market-regime-v1-main`; the guard and regression are present.
+- The last confirmed CI remains #41840361238 on `d2740c6ff444c3a7302b4b04dcc04d15ebf1dcb1`, SUCCESS (57/57 steps; L2 primitives 80/80; runner chronology step SUCCESS).
+- CI outcome for the new source/test commits has not been retrieved. This regression is **not yet claimed as passed**.
+- No market PnL, data download/collector, private API/account access, paper/live orders, or main-branch changes.

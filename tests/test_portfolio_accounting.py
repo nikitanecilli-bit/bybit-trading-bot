@@ -760,6 +760,7 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
     e = make_engine()
     e.instrument_spec_history = InstrumentHistory()
     e.risk_tier_history = TierHistory()
+    e.max_market_state_skew_ms = 0
     e.pending["BTCUSDT"] = {
         "direction": "long", "entry_price": 100.0, "order_type": "market",
         "strategy": "risk-tier-test", "stop_dist": 5.0,
@@ -776,7 +777,7 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
     ) as joined:
         assert e._try_fill_pending("BTCUSDT", bar)
     joined.assert_called_once()
-    assert joined.call_args.kwargs["max_snapshot_skew_ms"] is None
+    assert joined.call_args.kwargs["max_snapshot_skew_ms"] == 0
     position = e.open_positions["BTCUSDT"]
     assert position.risk_tier_id == 1
     assert position.risk_limit_value == "100000"
@@ -785,6 +786,24 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
     assert position.risk_tier_max_leverage == "100"
     assert Decimal(position.initial_margin_usdt) == Decimal(str(position.size_usdt)) / Decimal("5")
     assert Decimal(position.maintenance_margin_usdt) == Decimal(str(position.size_usdt)) * Decimal("0.005")
+
+
+def test_engine_requires_explicit_skew_budget_for_joined_dated_histories():
+    with patch.object(
+        engine_mod.InstrumentSpecHistory, "from_directory", return_value=object()
+    ), patch.object(
+        engine_mod.RiskTierHistory, "from_directory", return_value=object()
+    ):
+        try:
+            engine_mod.UnifiedQuantEngine(
+                instrument_specs_dir="specs",
+                risk_tiers_dir="risk",
+                max_market_state_skew_ms=None,
+            )
+        except ValueError as exc:
+            assert "max_market_state_skew_ms is required" in str(exc)
+        else:
+            raise AssertionError("joined dated histories must require an explicit skew budget")
 
 
 def test_engine_fails_closed_when_dated_risk_tier_is_missing_or_leverage_exceeded():

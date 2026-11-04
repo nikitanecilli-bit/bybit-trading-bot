@@ -1839,6 +1839,14 @@ class StatePersistenceTests(unittest.TestCase):
             {"start_ms": start + 40, "end_ms": start + 100},
         ])
 
+    def test_execution_coverage_requires_actual_position_entry_boundary(self):
+        position = sample_position()
+        with self.assertRaisesRegex(ValueError, "must equal the position entry_ts"):
+            position.audit_exchange_execution_coverage(
+                lifecycle_start_ms=position.entry_ts + 1,
+                audit_end_ms=position.entry_ts + 100,
+            )
+
     def test_execution_coverage_rejects_conflicting_ids_and_wrong_symbol(self):
         from exchange_execution_identity import ExchangeExecutionCoverage
         position = sample_position()

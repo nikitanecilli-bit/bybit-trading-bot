@@ -442,3 +442,11 @@
 - Added deterministic malformed-quote regressions for both parser paths. A local standard-library reproduction confirms `csv.Error: unexpected end of data`.
 - Commits: inspector `d78720991bf6a72efa05310b878505dcd5bf1123`; core `81f58d0b48705ed1e5f2db36ba80ca42c0feb50a`; tests `13f32dbc2db3e686549866a14998a0c31cf659a6` + fixture correction `5f6c245de6bbd82cd280d4db750b8e3d1434c867`; inspector test `06544878931c0daa1117980c63eb01885c8e338e` + fixture correction `9302114d0199097d834fecf112f2c6d74ec931d7`; note `69259ca59d8c653fee04e4f6ad07bb10a75d51ce`.
 - CI remains unconfirmed; no combined check records. No market archive download or network workflow, collectors, PnL, private API, runner or orders.
+
+## 2026-11-04 — ENG-EXEC-035 queue-replay compatibility summary
+
+- Inspector's top-level `status: success` means scan completion only; it could coexist with missing trade ID/BT/RPI flags or timestamp regressions. Added `queue_replay_compatibility_status`, valid only when all four validation dimensions are valid and at least one row exists.
+- Header-only/zero-row archives now return null `duration_hours` and `invalid_or_incomplete` replay compatibility rather than failing during timestamp subtraction or appearing compatible.
+- Source commits `86a0590f6c9978675426523ba8d86ddc3fdc8b85`, `68ee303ea44744950881033f9c4660912ee8ae9e`; tests `8311daa4c4f63cebaf00d1b9bc3f5dbfe91ca381`, `82852d6f82f4a619a8838db50dcc9431e04560cb`.
+- Research CI run `41888048946` on test commit `82852d6` completed successfully; log confirms strict CSV, report writer and replay compatibility tests passed. Intermediate run `41888039132` failed on a temporary signature/test mismatch before the following test commit corrected it.
+- No market archives, collectors, PnL, private API, runner or orders. Maker gate remains closed.

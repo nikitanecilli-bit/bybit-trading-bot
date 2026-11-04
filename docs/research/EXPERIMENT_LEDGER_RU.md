@@ -1143,3 +1143,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Source commit `bd2c0f9bc9fe2ad64044a4b9fe672ceb148950b3`; test commit `6dcb9d8bc000778c09975dbd462c36545e23682c`.
 - Source-only CI #41873380445 SUCCESS; final CI #41873425668 on `6dcb9d8` SUCCESS, 57/57 steps, zero failures. Actual logs: inspector/runner suite 9/9; aggregate-L2 primitives 81/81; portfolio accounting 54/54; state persistence 84/84.
 - Data-quality diagnostic only; no execution/PnL evidence. No new archives downloaded and network inspector not run. Historical AAVE CSV still lacks BT/isBlockTrade; maker execution realism remains blocked. No PnL/backtest, API, runner, paper/live orders or main changes.
+
+
+## ENG-EXEC-021 — Separate maker spread capture from post-fill mid-price movement (2026-11-04)
+
+- The prior fill-to-future-mid markout combined spread capture with post-fill midpoint movement; it could not be interpreted as a pure adverse-selection measure.
+- Each fill now stores the pre-fill midpoint from the last strictly earlier book state. Reports retain `signed_mid_markout_bps` as a compatibility alias and add `signed_fill_to_future_mid_bps` plus `signed_mid_move_from_pre_fill_bps`.
+- Same-millisecond book events remain excluded; fill timestamp uses strict integer validation.
+- Regression: Buy fill 99, pre-fill mid 100, future mid 101 => approximately 202.02 bps fill-to-future-mid and 100 bps pre-fill-mid-to-future-mid.
+- Source commit `9890e9c9748372538588c9914914a9691fb4d898`; final test commit `794342bbd00342d0b7f1af660362794408da0345`. CI #41867866581 SUCCESS, 57/57 steps; runner/markout suite 6/6; aggregate-L2 primitives 81/81. Later CI #41873039139 and #41873425668 reran the updated runner suite successfully.
+- Historical exploratory artifact predates decomposition; its old markout values cannot be relabelled as pure adverse selection. Replay was not repeated because the saved trade CSV lacks BT/isBlockTrade. No new archives, PnL/backtest, API, runner, paper/live orders or main changes.
+- This is execution-diagnostic methodology, not proof of maker execution realism or profitability. Maker PnL gate remains blocked.

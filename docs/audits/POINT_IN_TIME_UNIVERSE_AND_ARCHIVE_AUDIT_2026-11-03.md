@@ -199,3 +199,15 @@ Page provenance validation now checks more than page numbering:
 Regression coverage includes missing continuation pages, inconsistent final-page flags, omitted status filters, interleaved status groups, wrong-status rows, and repeated symbols. Research CI run [#41900677467](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41900677467) completed **SUCCESS** (59/59 steps). The prior successful baseline #41900428039 (59/59) validated the first pass; intermediate runs exposed fixture and validation-order issues, which were corrected before the final green run.
 
 **Interpretation remains conservative:** the checks establish consistency of the client-side pagination record, not proof that Bybit's backend supplied a transactionally consistent universe. Repeated symbols are surfaced; absent server-side cursor snapshots or event timestamps, no algorithm can prove that no instrument was skipped during a changing multi-page result set.
+
+## ENG-DATA-012 — contract identity continuity across snapshots (2026-11-04)
+
+The linear instrument history loader no longer treats `symbol` as a sufficient contract identity. Every instrument row must now provide non-empty `contractType`, `baseCoin`, `quoteCoin`, and `settleCoin`. It records this tuple alongside the parsed trading constraints.
+
+Across the full loaded history (not merely adjacent snapshots), reappearance of a symbol with a different identity tuple fails closed as symbol reuse/identity change. This catches reuse even if the symbol was absent from one or more intervening snapshots. Within one snapshot, two different symbols with the same identity tuple are rejected as ambiguous rather than silently joined.
+
+When the identity tuple is unchanged but the symbol differs between adjacent full snapshots, the loader exposes `possible_renames` entries classified `possible_rename_not_proven`. It does not merge aliases, rewrite history, or make the old symbol resolve to the new one. This is a candidate for manual review, not proof of an exchange rename. Trading-constraint changes (tick size, lot size, leverage limits) do not constitute a new identity and remain valid history revisions.
+
+Regression tests cover symbol reuse, reuse after a gap where the symbol is absent, ambiguous duplicate identity, possible rename reporting without aliasing, missing identity fields, and ordinary constraint changes under stable identity. CI is pending at the time of this documentation update; final status will be recorded after the workflow completes.
+
+**Limit:** Bybit's instrument-info response does not itself provide a globally immutable contract ID in the captured fields. The identity tuple is a conservative composite, not an exchange-guaranteed permanent identifier. Same tuple with changed symbol is therefore reported as a possible rename only; no automatic reconciliation is performed.

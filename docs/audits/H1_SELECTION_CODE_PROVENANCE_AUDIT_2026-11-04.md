@@ -370,3 +370,35 @@ This is evidence for the tested synchronized OHLC scenarios, not a claim that ex
 - Spread, queue priority, hidden liquidity, partial fills and adverse selection remain outside the H1 execution model.
 
 No new Bybit archive was downloaded, no market PnL replay was run, and no private API/account access or order was used.
+## Terminal Mark boundary strictness and collector failure atomicity — 2026-11-04
+
+### Additional preflight rule
+
+The funding/Mark coverage validator now permits the one extra Mark Price candle at the exact H1 close boundary only when the funding CSV contains a settlement at that same timestamp. An otherwise unexplained extra terminal Mark candle is rejected. This prevents the collector's extended Mark range from becoming a blanket allowance for arbitrary out-of-range rows.
+
+Regression: test_trade_ohlcv_rejects_terminal_mark_without_boundary_settlement. Existing positive test still permits the terminal Mark candle when the exact boundary settlement is present; the existing nonterminal-extra test still rejects unrelated timestamps.
+
+### Collector failure behavior
+
+When a dated schedule proves that a settlement occurs exactly at end_ms, the collector:
+- queries Funding History inclusively through end_ms;
+- requests the additional Mark candle beginning at end_ms, without extending trade OHLCV;
+- removes newly created per-symbol CSV/manifest/schedule/Mark outputs if the required terminal Mark candle cannot be obtained, so a partial archive cannot be mistaken for a completed one;
+- refuses to overwrite an existing per-symbol output set before collection begins. Content-addressed source snapshot copies can be reused on retry.
+
+A deterministic test covers the failure/retry path. This is a local archive-assembly safety check, not a live download.
+
+### Verification
+
+- Collector/coverage implementation commits: dcc10cddad6274667e24efcccc85a8c907ed0b30, 63c70156568fdff25f7361430fb1349b87498c9b, 6e34b47d228110e2ca3fbb01e9a9669307b42199, a7d3bb24abcff73702d978dd215aea3c948ab48c.
+- Collector boundary and retry tests: 2e417320ecc757e1ac0cf6c69a73ed0df0d004bd, 82519f5ff2c6a7f0e326ec0020c7fb13abfa0198.
+- Strict terminal Mark matching and negative regression: a7d3bb24abcff73702d978dd215aea3c948ab48c, 53a16c44bdebfc4a7c53f218732fe4bbfb2daffc.
+- Research CI #41819918064 — SUCCESS; all 55 numbered steps and cleanup completed. The collector boundary test, collector failure/retry test, and funding/Mark coverage tests passed.
+
+### Simultaneous exit and pending limit lifecycle review
+
+No new duplicate test was added for simultaneous exits: existing tests already reverse symbol order for same-bar TP1/stop outcomes and for sparse-replay emergency kill-switch flattening, then compare the resulting closed-trade ledger, net PnL and drawdown. These deterministic tests pass in Research CI. The prior portfolio batch pre-marking and order-independent risk-budget regression also remain in place.
+
+The multi-bar limit wrapper increments order age once per eligible H1 candle, fills on configured penetration or a marketable opening gap, retains an unfilled order only while TTL is active, and removes it at expiry. However, its fill result remains all-or-none from OHLC candles. Partial executions, queue position, queue depletion, cancellations ahead, exchange acknowledgement latency, and adverse selection remain unmodeled. This is a material unresolved execution-model limitation, not a confirmed defect in the tested pending-order state machine.
+
+No market PnL replay, new Bybit archive collection, private API/account access, paper order or live order was performed.

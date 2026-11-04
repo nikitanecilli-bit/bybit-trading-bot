@@ -187,3 +187,15 @@ The offline coverage auditor now validates the page metadata and reports per-sna
 Regression tests cover valid page metadata, invalid/reversed windows, chronology, snapshot-time bounds, and symbol coverage. Research CI run [#41898947956](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41898947956) completed **SUCCESS** (59/59 steps), including collector tests, temporal audit tests and offline archive audit. An intermediate run failed because the linear-universe builder had not yet forwarded its page observations into the shared validator; fixed in commit `d2edd46`, then revalidated successfully in #41898525899 and #41898947956.
 
 **Limit:** this narrows collection windows to individual page requests but does not reveal the exact instant at which Bybit's backend sampled the underlying instrument state, nor status transitions between page requests or between snapshots. The snapshot remains a sequentially collected observation, not an atomic exchange-side universe. No live/public/private API request, collector execution, archive download or PnL/market test was performed.
+
+## ENG-DATA-011 — pagination and status-filter integrity (2026-11-04)
+
+Page provenance validation now checks more than page numbering:
+- Every page advertising `has_next_page=true` must be followed by the next page for that same status filter; the final page for each filter must have `false`.
+- Status-filter groups must be contiguous and in the collector's expected order. The complete expected filter set must be present, including filters that returned an empty page.
+- The dated instrument-spec collector rejects any row whose returned `status` does not equal the requested filter. This prevents an unexpected/misrouted response from being silently attributed to the wrong lifecycle bucket.
+- The offline audit reports repeated symbol appearances across pages (`duplicate_symbol_observations`) rather than silently treating them as proof of a clean pagination boundary. Identical duplicates remain deduplicated by the collector for backward-compatible handling; conflicting duplicate rows are rejected. Duplicate appearances are a quality warning because moving exchange-side data during pagination can cause overlap and may also conceal omissions.
+
+Regression coverage includes missing continuation pages, inconsistent final-page flags, omitted status filters, interleaved status groups, wrong-status rows, and repeated symbols. Research CI run [#41900677467](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41900677467) completed **SUCCESS** (59/59 steps). The prior successful baseline #41900428039 (59/59) validated the first pass; intermediate runs exposed fixture and validation-order issues, which were corrected before the final green run.
+
+**Interpretation remains conservative:** the checks establish consistency of the client-side pagination record, not proof that Bybit's backend supplied a transactionally consistent universe. Repeated symbols are surfaced; absent server-side cursor snapshots or event timestamps, no algorithm can prove that no instrument was skipped during a changing multi-page result set.

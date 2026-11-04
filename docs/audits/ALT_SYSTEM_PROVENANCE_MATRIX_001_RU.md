@@ -56,6 +56,29 @@ Scope: existing repository documents and already-published GitHub Actions metada
 - Map each engine commit against the accounting corrections and label results provisional/impacted/unknown.
 - Only after these checks, publish the data acceptance checklist and missing-input list for P2.
 
+
+## Проверка наличия опубликованных Actions artifacts (metadata only)
+
+Проверены metadata artifacts для исторических run IDs; содержимое архивов/artifacts не скачивалось и не распаковывалось.
+
+| Run | Artifact metadata | Вывод |
+|---|---|---|
+| 40578394090 | `h1-direction-execution-ablation`, ID `12768870777`, 13,732 bytes, not expired | Artifact зарегистрирован и доступен по metadata. |
+| 40578394009 | `execution-policy-walk-forward`, ID `12767913281`, 6,453 bytes, not expired | Artifact зарегистрирован и доступен по metadata. |
+| 40578393971 | `execution-cost-ablation-report`, ID `12768457441`, 20,664 bytes, not expired | Artifact зарегистрирован и доступен по metadata. |
+| 40588753444 | `h1-chase-limit-ablation`, ID `12773465436`, 1,106,266 bytes, not expired | Artifact зарегистрирован и доступен по metadata. |
+| 40541270994 | No artifacts returned | Нет сохранённого Actions artifact в проверенной выдаче. |
+| 40587243295 | `h1-signal-trade-diagnostics`, ID `12772483348`, 1,107,852 bytes, not expired | Artifact зарегистрирован и доступен по metadata. |
+| 40566687595 | `h1-selected-primary`, ID `12764160379`, 13,704 bytes; `h1-selected-reserve`, ID `12764110430`, 13,929 bytes; both not expired | Два artifacts зарегистрированы и доступны по metadata. |
+| 40650477230 | `h1-chase-gate-decoupling`, ID `12799089180`, 2,266,093 bytes, not expired | Совпадает с ledger. |
+| 41355171678 | `e09-h1-gate-factorial`, ID `13103031404`, 1,808,245 bytes, not expired | Совпадает с ledger. |
+| 41360728294 | `e10-h1-body-gate-cross-sectional`, ID `13104981517`, 2,539,639 bytes, not expired | Совпадает с ledger. |
+| 41361376448 | `e11-h1-shared-capital-portfolio`, ID `13105661683`, 2,298,582 bytes, not expired | Совпадает с ledger. |
+| 41361856404 | `e12-h1-market-context-diagnostics`, ID `13105721458`, 701,749 bytes, not expired | Совпадает с ledger. |
+| 41362217727 | `e13-h1-compression-gate-shared-capital`, ID `13105403824`, 3,071,521 bytes, not expired | Совпадает с ledger. |
+
+Artifact metadata availability does not validate the artifact's internal contents, hashes, dataset identity or completeness. E01–E07 source commit/script/config lineage remains incomplete; this check only closes the existence/ID field for the artifacts above. H-A/H-C exact run references remain unresolved.
+
 ## Safety and scope
 
 No workflow reruns, artifact downloads, archive downloads/extraction, collectors, exchange API calls, market PnL recalculation, parameter sweeps, paper/live trading, private/account API or changes to `main`. PR #4 and PR #13 remain untouched.

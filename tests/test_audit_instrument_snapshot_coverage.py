@@ -201,6 +201,36 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
             [{"symbol": "BTCUSDT", "occurrences": 2}],
         )
 
+
+    def test_audit_rejects_interleaved_status_filter_groups(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "data" / "instrument_specs" / "linear"
+            observations = [
+                {
+                    "status_filter": "PreLaunch", "page_index": 1,
+                    "request_started_at": "2026-11-01T00:00:00.000Z",
+                    "request_completed_at": "2026-11-01T00:00:00.100Z",
+                    "row_count": 1, "symbols": ["NEWUSDT"], "has_next_page": True,
+                },
+                {
+                    "status_filter": "Trading", "page_index": 1,
+                    "request_started_at": "2026-11-01T00:00:00.200Z",
+                    "request_completed_at": "2026-11-01T00:00:00.300Z",
+                    "row_count": 1, "symbols": ["BTCUSDT"], "has_next_page": False,
+                },
+                {
+                    "status_filter": "PreLaunch", "page_index": 2,
+                    "request_started_at": "2026-11-01T00:00:00.400Z",
+                    "request_completed_at": "2026-11-01T00:00:00.500Z",
+                    "row_count": 1, "symbols": ["ALTUSDT"], "has_next_page": False,
+                },
+            ]
+            write_snapshot(target, "a.json", "2026-11-01T00:00:01.000Z",
+                           [instrument("NEWUSDT"), instrument("BTCUSDT"), instrument("ALTUSDT")],
+                           "2026-11-01T00:00:00.000Z", observations)
+            with self.assertRaisesRegex(ValueError, "interleave"):
+                audit_directory(target)
+
     def test_duplicate_snapshot_timestamps_fail_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

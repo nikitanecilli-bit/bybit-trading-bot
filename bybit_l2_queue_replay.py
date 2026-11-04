@@ -317,10 +317,11 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
 
 def replay_public_trades(order: PassiveOrder, archive: Path, symbol: str = "AAVEUSDT") -> PassiveOrder:
     previous_ts = None
+    previously_processed_ids = set(order.processed_trade_ids)
     seen_trade_ids: set[tuple[str, str]] = set()
     working_order = replace(
         order, fills=list(order.fills),
-        processed_trade_ids=set(order.processed_trade_ids),
+        processed_trade_ids=set(previously_processed_ids),
     )
     for trade in iter_public_trades(archive, symbol):
         ts = trade["timestamp_ms"]
@@ -333,13 +334,13 @@ def replay_public_trades(order: PassiveOrder, archive: Path, symbol: str = "AAVE
         if not isinstance(trade_id, str) or not trade_id:
             raise ValueError("missing public trade ID")
         trade_key = (symbol.strip().upper(), trade_id)
-        if trade_key in working_order.processed_trade_ids:
-            # Replaying an overlapping archive is idempotent: do not consume
-            # queue or count the same public match twice.
-            continue
         if trade_key in seen_trade_ids:
             raise ValueError(f"duplicate public trade ID: {trade_id}")
         seen_trade_ids.add(trade_key)
+        if trade_key in previously_processed_ids:
+            # Replaying an overlapping archive is idempotent: do not consume
+            # queue or count the same public match twice.
+            continue
         working_order.processed_trade_ids.add(trade_key)
         apply_public_trade(working_order, trade)
         if working_order.complete:

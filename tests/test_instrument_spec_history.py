@@ -214,6 +214,21 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "absent from latest"):
             history.get_spec("BTCUSDT", 1_793_577_600_000)
 
+
+    def test_possible_symbol_rename_is_reported_across_absent_snapshot(self):
+        previous = row("BTCUSDT")
+        renamed = row("XBTUSDT")
+        renamed["baseCoin"] = "BTC"
+        write_snapshot(self.root, "a.json", "2026-11-01T00:00:00Z", [previous])
+        write_snapshot(self.root, "b.json", "2026-11-02T00:00:00Z", [row("ETHUSDT")])
+        write_snapshot(self.root, "c.json", "2026-11-03T00:00:00Z", [renamed])
+        history = InstrumentSpecHistory.from_directory(self.root)
+        self.assertEqual(len(history.possible_renames), 1)
+        self.assertEqual(history.possible_renames[0]["previous_symbol"], "BTCUSDT")
+        self.assertEqual(history.possible_renames[0]["current_symbol"], "XBTUSDT")
+        self.assertEqual(history.possible_renames[0]["previous_fetched_at"],
+                         "2026-11-01T00:00:00Z")
+
     def test_missing_contract_identity_fields_are_rejected(self):
         malformed = row()
         malformed.pop("baseCoin")

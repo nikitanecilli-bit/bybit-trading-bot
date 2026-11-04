@@ -1652,6 +1652,54 @@ def test_full_replay_reconciles_tp1_funding_mtm_and_final_close():
     assert abs(e.risk_mgr.current_equity - e.risk_mgr.realized_equity) < 0.001
 
 
+
+def _run_same_timestamp_closes_for_drawdown_order(order):
+    e = make_engine()
+    e.cfg.daily_stop_loss_pct = 99.0
+    e.cfg.emergency_kill_switch_pct = 0.21
+    e.risk_mgr.cfg = e.cfg
+    positions = {
+        "BTCUSDT": make_position(symbol="BTCUSDT", size=1_000.0),
+        "ETHUSDT": make_position(symbol="ETHUSDT", size=1_000.0),
+    }
+    e.open_positions = {symbol: positions[symbol] for symbol in order}
+    e._last_mark_prices.update({"BTCUSDT": 100.0, "ETHUSDT": 100.0})
+    exit_ts = 1_800_003_600_000
+    e._update_mark_to_market(exit_ts)
+    assert e.risk_mgr.kill_switch_triggered is False
+
+    exits = {
+        "BTCUSDT": (102.0, "take_profit"),
+        "ETHUSDT": (98.0, "stop_loss"),
+    }
+    for symbol in order:
+        price, reason = exits[symbol]
+        e._close_position(
+            e.open_positions[symbol], price, reason, exit_ts, 0.0, 1.0,
+            final_exit_maker=False,
+        )
+    return {
+        "ledger": sorted((t.token, t.pnl_usdt, t.exit_reason) for t in e.closed_trades),
+        "realized_equity": round(e.risk_mgr.realized_equity, 4),
+        "current_equity": round(e.risk_mgr.current_equity, 4),
+        "max_drawdown_pct": round(e.risk_mgr.max_drawdown_pct, 6),
+        "kill_switch": e.risk_mgr.kill_switch_triggered,
+    }
+
+
+def test_same_timestamp_close_batch_cannot_trip_kill_switch_by_symbol_order():
+    win_first = _run_same_timestamp_closes_for_drawdown_order(
+        ["BTCUSDT", "ETHUSDT"]
+    )
+    loss_first = _run_same_timestamp_closes_for_drawdown_order(
+        ["ETHUSDT", "BTCUSDT"]
+    )
+    assert win_first["ledger"] == loss_first["ledger"]
+    assert win_first["realized_equity"] == loss_first["realized_equity"]
+    assert win_first["current_equity"] == loss_first["current_equity"]
+    assert win_first["kill_switch"] == loss_first["kill_switch"]
+
+
 if __name__ == "__main__":
     tests = [(name, value) for name, value in sorted(globals().items())
              if name.startswith("test_") and callable(value)]

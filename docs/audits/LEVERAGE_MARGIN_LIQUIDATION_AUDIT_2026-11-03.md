@@ -123,3 +123,24 @@ Official references checked 2026-11-04:
 - Bybit UTA isolated liquidation formula: https://www.bybit.kz/en-KAZ/help-center/article/Liquidation-Price-Calculation-under-Isolated-Mode-Unified-Trading-Account
 - Bybit V5 Mark Price Kline: https://bybit-exchange.github.io/docs/v5/market/mark-kline
 - Bybit USDT maintenance margin: https://www.bybit.cloud/help-center/article/Maintenance-Margin-USDT-Contract
+
+
+## 9. Funding cashflow routing vs position-margin approximation (rechecked 2026-11-04)
+
+Official Bybit Funding Fee Calculation documentation explicitly says the funding fee is first deducted from the trader's **available balance**. Only when that balance is insufficient is the fee deducted from the position's initial margin; the latter can move the isolated liquidation price closer to Mark Price. This is a cash-routing rule, not merely a different display of the same position PnL.
+
+The local engine currently passes the entire signed cumulative Funding cashflow for the remaining position into `evaluate_isolated_margin_health(funding_net_cost=...)`. That function always applies `position_margin_balance -= funding_net_cost`. It does not model available balance, whether a payment exhausts that balance, or where a received Funding credit is booked.
+
+| Funding event | Available balance in Bybit model | Position-margin impact in Bybit model | Current local approximation |
+|---|---|---|---|
+| Pay 10 USDT; available balance 100 | −10 | 0 | margin −10 |
+| Pay 10 USDT; available balance 4 | −4 | −6 | margin −10 |
+| Receive 10 USDT | +10 | 0 | margin +10 |
+
+The table isolates the routing rule; it is not a claim about the user's account or a complete UTA wallet simulation. It shows why the local approximation is not uniformly conservative: it can overstate liquidation risk for payments covered by available balance, and overstate position margin for receipts that should be credited to available balance.
+
+**Decision:** keep this behavior labelled as a position-level stress approximation. Do not silently replace it with an assumed available balance or AMR state. A more faithful account model requires an explicit account-margin mode and a time-indexed available-balance ledger, including realized PnL, fees, funding credits/debits, other positions and any collateral haircuts. Private account data is not required to implement a generic simulator, but the user's intended account mode/settings must not be inferred from `ISOLATED_5X`.
+
+Official source rechecked 2026-11-04: [Bybit Funding Fee Calculation](https://www.bybit-global.com/en/help-center/article/Funding-fee-calculation). It also reiterates the five-second settlement uncertainty window.
+
+No engine arithmetic, strategy configuration or trade PnL was changed. No historical market replay, private account query or live order was run.

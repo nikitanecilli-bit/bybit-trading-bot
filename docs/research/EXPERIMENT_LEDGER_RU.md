@@ -1047,3 +1047,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Decision: do not use third-party archive as sole PnL source; allow supplementary exploratory/cross-check only after forward-fill semantics, gaps and official sample reconciliation are handled.
 - Next hard dependency: a legally/regionally permitted self-hosted execution host for public Bybit market-data endpoints. No private account API, no PnL, paper or live orders.
 - Detailed evidence and source links: docs/audits/BYBIT_DATA_ACQUISITION_SOURCE_AUDIT_2026-11-04.md.
+
+
+## ENG-FUND-005 — strict integer timestamp validation (2026-11-04)
+
+- Подтверждённая проблема схемы: Funding accounting helpers и активный Bybit Funding parser применяли int() к timestamp без проверки исходного типа. Дробные числовые значения могли незаметно усекаться до миллисекунды.
+- Исправление: accounting требует положительные non-bool int timestamps для entry/as-of/TP1/final-close/events; API parser принимает только integer или ASCII digit string. Float, bool и decimal string отклоняются.
+- Регрессии: дробные/boolean timestamps в accounting; float/bool/decimal string в API parser.
+- Final Research CI #41848927029, commit 39af6fa583ef2074b33905e89c8b78c9b58d83a1: SUCCESS, 57/57 steps. Funding accounting 23/23; Bybit market-history parser 26/26; новые проверки прошли.
+- Межуточные CI запуски завершались fail только из-за неверного regex в новом тесте (ошибка была обёрнута contextual ValueError); ожидание теста исправлено, финальный CI зелёный.
+- Классификация: data/accounting contract guardrail; не рыночный эксперимент и не PnL evidence. No market replay, archive download, private API, paper/live orders.
+- Остаточные блокеры не меняются: историческая полнота funding schedule и exact settlement mark не доказаны; maker fill realism и account-specific costs не подтверждены.

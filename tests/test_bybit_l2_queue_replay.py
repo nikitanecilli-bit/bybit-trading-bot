@@ -334,6 +334,47 @@ def test_missing_orderbook_update_id_fails_closed():
 
 
 
+def test_duplicate_price_levels_in_snapshot_are_rejected_atomically():
+    b = OrderBook()
+    event = {
+        "type": "snapshot", "cts": 1000,
+        "data": {
+            "seq": 1, "u": 1,
+            "b": [["100", "5"], ["100", "7"]],
+            "a": [["101", "6"]],
+        },
+    }
+    try:
+        b.apply(event)
+    except ValueError as exc:
+        assert "duplicate b price level" in str(exc)
+    else:
+        raise AssertionError("duplicate snapshot price levels must be rejected")
+    assert b.bids == {}
+    assert b.asks == {}
+    assert b.last_cts is None
+
+
+def test_duplicate_price_levels_in_delta_are_rejected_atomically():
+    b = book()
+    before = (dict(b.bids), dict(b.asks), b.last_cts, b.last_seq, b.last_u)
+    event = {
+        "type": "delta", "cts": 1100,
+        "data": {
+            "seq": 2, "u": 2,
+            "b": [["100", "4"], ["100", "3"]],
+            "a": [],
+        },
+    }
+    try:
+        b.apply(event)
+    except ValueError as exc:
+        assert "duplicate b price level" in str(exc)
+    else:
+        raise AssertionError("duplicate delta price levels must be rejected")
+    assert (b.bids, b.asks, b.last_cts, b.last_seq, b.last_u) == before
+
+
 def test_invalid_delta_is_atomic_and_does_not_partially_mutate_book():
     b = book()
     before = b.copy_levels()

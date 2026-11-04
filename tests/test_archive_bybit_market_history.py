@@ -273,6 +273,16 @@ class BybitMarketHistoryTests(unittest.TestCase):
             parse_funding_rows([{"symbol":"ETHUSDT","fundingRateTimestamp":"1000",
                                  "fundingRate":"0.001"}], "BTCUSDT")
 
+    def test_funding_parser_rejects_float_and_boolean_timestamps(self):
+        for timestamp in (1000.5, True, 1000.0, "1000.5"):
+            with self.subTest(timestamp=timestamp):
+                with self.assertRaisesRegex(ValueError, "invalid funding timestamp"):
+                    parse_funding_rows([{
+                        "symbol": "BTCUSDT",
+                        "fundingRateTimestamp": timestamp,
+                        "fundingRate": "0.001",
+                    }], "BTCUSDT")
+
     def test_funding_rejects_non_finite_rate(self):
         with self.assertRaisesRegex(ValueError, "invalid funding rate"):
             parse_funding_rows([{"symbol":"BTCUSDT","fundingRateTimestamp":"1000",

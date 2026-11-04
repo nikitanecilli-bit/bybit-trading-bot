@@ -148,12 +148,12 @@ class AccruedFundingTests(unittest.TestCase):
             accrued_funding_cost(position(), EVENTS + [dict(EVENTS[0])], MARKS, SETTLE_2)
 
     def test_rejects_non_integer_funding_and_position_timestamps(self):
-        with self.assertRaisesRegex(ValueError, "funding event timestamp"):
+        with self.assertRaisesRegex(ValueError, "invalid funding event"):
             accrued_funding_cost(
                 position(), [{"ts": SETTLE_1 + 0.5, "rate": "0.01"}],
                 MARKS, SETTLE_1,
             )
-        with self.assertRaisesRegex(ValueError, "funding event timestamp"):
+        with self.assertRaisesRegex(ValueError, "invalid funding event"):
             accrued_funding_cost(
                 position(), [{"ts": True, "rate": "0.01"}], MARKS, SETTLE_1,
             )

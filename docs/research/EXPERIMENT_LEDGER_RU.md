@@ -1228,3 +1228,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Research CI #41885051272 on this commit completed SUCCESS, job `tests` SUCCESS, 57/57 workflow steps; actual logs confirm `PASS test_orderbook_inspector_rejects_crossed_snapshot_and_delta_books`, aggregate-L2 83/83 and runner/inspector 19/19.
 - Diagnostic data-integrity only; no archive download, PnL/backtest, collector, API, runner, paper/live order or main change.
 
+## ENG-EXEC-032 — No-overwrite JSON report serialization (2026-11-04)
+
+- Static audit found that the L2 queue replay runner, public trade inspector and orderbook inspector wrote fixed-name JSON reports with `Path.write_text()`; repeated execution in the same directory could silently destroy a previous report.
+- Added shared `report_io.py` using exclusive-create mode. Existing output files now cause `FileExistsError` without modifying existing bytes. Serialization happens before file creation; a failed write removes the newly created partial file.
+- All three report-producing scripts use the shared writer. Two deterministic tests cover valid JSON and refusal to overwrite, plus no file on JSON serialization failure.
+- Commits: helper `0a58d10fd34674708623b48fee1a633ee3c8e5f3`; runner `ddc3defd62a623f13bc4cb0db89392aab27b783e` and import correction `a70d75967867f609a0b1aa563591bb733a02911a`; trade inspector `e2f484a7225baf3f4138ec7d3e9ad191161dba19`; orderbook inspector `6bdedbebf9d29ca9381ebb08be35e03c9e65b736`; tests `ed089a1c9a6f0573a81357c4ee7116f709af1d53`.
+- Current research branch HEAD when recorded: `118acb07cec55e692cb3dd3adeeb01536426e27f`.
+- CI not yet confirmed for this change: combined commit status returned no check records. This is a code change, not a completed test result.
+- No data collection/download, network inspector workflow, market PnL/backtest, private API, runner, paper/live orders or main change. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains.

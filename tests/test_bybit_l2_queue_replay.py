@@ -1151,6 +1151,45 @@ def test_capture_book_at_rejects_seq_regression_after_arrival_boundary():
             raise AssertionError("seq regression after arrival must invalidate archive")
 
 
+
+def test_capture_book_at_rejects_malformed_book_events_after_arrival_boundary():
+    cases = [
+        {
+            "type": "delta", "cts": 3_000, "data": {
+                "s": "AAVEUSDT", "seq": 2, "u": "not-an-integer",
+                "b": [["100", "4"]], "a": [],
+            },
+        },
+        {
+            "type": "delta", "cts": 3_000, "data": {
+                "s": "AAVEUSDT", "seq": 2, "u": 2,
+                "b": [["102", "4"]], "a": [],
+            },
+        },
+    ]
+    for index, malformed in enumerate(cases):
+        events = [
+            {
+                "type": "snapshot", "cts": 1_000, "data": {
+                    "s": "AAVEUSDT", "seq": 1, "u": 1,
+                    "b": [["100", "5"]], "a": [["101", "5"]],
+                },
+            },
+            malformed,
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / f"malformed_tail_{index}.zip"
+            with zipfile.ZipFile(archive, "w") as zf:
+                zf.writestr("events.data", "".join(json.dumps(event) + chr(10) for event in events))
+            try:
+                capture_book_at(archive, 2_000)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("malformed post-arrival book event must invalidate archive")
+
+
+
 def test_capture_book_at_rejects_non_integer_arrival_timestamp():
     try:
         capture_book_at(Path("unused.zip"), 2000.5)

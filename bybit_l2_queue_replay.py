@@ -99,12 +99,16 @@ class OrderBook:
             levels = data.get(key)
             if not isinstance(levels, list):
                 raise ValueError(f"missing {key} levels")
+            event_prices: set[Decimal] = set()
             for level in levels:
                 if not isinstance(level, list) or len(level) != 2:
                     raise ValueError("invalid price/quantity level")
                 price, qty = dec(level[0]), dec(level[1])
                 if price <= ZERO or qty < ZERO:
                     raise ValueError("price must be positive and quantity non-negative")
+                if price in event_prices:
+                    raise ValueError(f"duplicate {key} price level in order-book event")
+                event_prices.add(price)
                 if qty == ZERO:
                     book_side.pop(price, None)
                 else:

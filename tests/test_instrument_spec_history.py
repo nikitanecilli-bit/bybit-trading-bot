@@ -108,6 +108,19 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not match"):
             InstrumentSpecHistory.from_directory(self.root)
 
+    def test_snapshot_schema_version_and_count_require_integer_types(self):
+        payload = json.loads((self.root / "a.json").read_text())
+        payload["schema_version"] = True
+        (self.root / "a.json").write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "unsupported instrument snapshot schema"):
+            InstrumentSpecHistory.from_directory(self.root)
+
+        payload["schema_version"] = 1
+        payload["count"] = True
+        (self.root / "a.json").write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            InstrumentSpecHistory.from_directory(self.root)
+
     def test_missing_or_malformed_required_snapshot_fields_rejected(self):
         (self.root / "b.json").write_text("not-json", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "cannot read"):

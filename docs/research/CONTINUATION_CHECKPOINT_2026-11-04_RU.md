@@ -1120,3 +1120,19 @@ CI #41867866581 on 794342bbd00342d0b7f1af660362794408da0345: SUCCESS. Primitive 
 - Latest full Research CI: #41867866581 SUCCESS, 54/54 numbered steps; L2 primitive tests 81/81 and runner tests 6/6.
 - `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains unchanged. Aggregate L2 still lacks verified historical instrument-spec snapshots for every scenario, latency/cancel modeling, L3 priority, and a broad multi-symbol/regime validation sample. Per-fill fee rates must be explicitly supplied; none are guessed.
 - No new market archives/downloads, collectors, private Bybit API, PnL backtests, parameter sweeps, paper/live orders, or changes to `main`.
+
+
+
+## 61. Проверка временной семантики Bybit L2 и public trades — 2026-11-04
+
+Проверены официальные V5 docs:
+- Public trades: `T` — время исполнения сделки в миллисекундах; `side` — сторона taker; `seq` — cross sequence: https://bybit-exchange.github.io/docs/v5/websocket/public/trade
+- Standard public orderbook: `cts` — время matching engine, когда создано состояние книги; документация говорит, что оно может коррелироваться с `T` public trade: https://bybit-exchange.github.io/docs/v5/websocket/public/orderbook
+
+Вывод:
+- Использование trade timestamp `T` и orderbook `cts` в общей временной шкале обосновано официальной документацией как коррелируемых matching-engine timestamps.
+- Документация не даёт гарантии, что все события в одной миллисекунде имеют однозначный порядок только по timestamp. Поэтому текущая политика строгого исключения book events с `cts == target` остаётся консервативной и не должна заменяться сортировкой по порядку строк архива.
+- У обоих потоков есть `seq` cross-sequence. Runner пока не использует trade `seq` для разрешения same-ms порядка. Это потенциальное улучшение точности, но сначала нужно подтвердить наличие и семантику `seq` в фактическом историческом CSV-архиве; не делать предположений о формате.
+- Это подтверждение временной семантики, а не доказательство точного event ordering или maker fills.
+
+Статус execution gate не меняется: `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`. No archive download, collector, strategy PnL, API, paper/live orders, or main changes.

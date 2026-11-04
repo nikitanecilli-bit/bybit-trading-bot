@@ -392,24 +392,25 @@ def replay_public_trades(order: PassiveOrder, archive: Path, symbol: str = "AAVE
         if previous_ts is not None and ts < previous_ts:
             raise ValueError("non-monotonic public trade timestamps")
         previous_ts = ts
-        if ts >= order.expiry_ts:
-            break
-        if ts <= order.arrival_ts:
-            continue
         trade_id = trade.get("trade_id")
-        if not isinstance(trade_id, str) or not trade_id:
-            raise ValueError("missing public trade ID")
+        if not isinstance(trade_id, str) or not trade_id or trade_id != trade_id.strip():
+            raise ValueError("missing or malformed public trade ID")
         trade_key = (symbol.strip().upper(), trade_id)
         if trade_key in seen_trade_ids:
             raise ValueError(f"duplicate public trade ID: {trade_id}")
         seen_trade_ids.add(trade_key)
+        # Validate the complete archive's ordering and ID uniqueness, including
+        # records outside this order's active window. Do not let an early
+        # post-expiry row hide a later out-of-order print that belongs in-window.
+        if ts <= order.arrival_ts or ts >= order.expiry_ts:
+            continue
+        if working_order.complete:
+            continue
         if trade_key in previously_processed_ids:
             # Replaying an overlapping archive is idempotent: do not consume
             # queue or count the same public match twice.
             continue
         working_order.processed_trade_ids.add(trade_key)
         apply_public_trade(working_order, trade)
-        if working_order.complete:
-            break
     order.__dict__.update(working_order.__dict__)
     return order

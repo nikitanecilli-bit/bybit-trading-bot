@@ -2,13 +2,17 @@ import copy
 import hashlib
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import Bybit_Trading_Engine_v14_research as engine
+from exchange_execution_identity import ExchangePositionIdentity
 from scripts.bybit_reconciliation_report import (
-    ReportError, apply_execution_merge_plan, build_execution_merge_plan, build_report, compare_execution_snapshots,
+    ReportError, apply_execution_merge_plan, build_execution_merge_plan,
+    build_report, compare_execution_snapshots, persist_execution_merge_plan,
 )
 
 SAVED = "2026-10-01T00:00:00Z"
@@ -489,6 +493,100 @@ class ReportOnlyComparatorTests(unittest.TestCase):
             local, upgrade_to_schema3(snapshot(execution_rows=[execution]))
         )
         return local, plan
+
+    def _persistable_merge_fixture(self, tmp):
+        cfg = engine.BotConfig()
+        risk_mgr = engine.AdaptiveRiskManager(cfg)
+        position = engine.OpenPositionState(
+            trade_id="T-RECON-023", symbol="BTCUSDT", direction="long",
+            strategy="offline-reconciliation-test", entry_ts=1_790_000_000_000,
+            entry_price=50000.0, stop_price=49000.0, tp1_price=51000.0,
+            tp2_price=52000.0, initial_stop_dist=1000.0, size_usdt=5000.0,
+            risk_usdt=100.0, order_type="market", breakout_level=50100.0,
+        )
+        position.set_exchange_position_identity(ExchangePositionIdentity(
+            category="linear", settle_coin="USDT", symbol="BTCUSDT",
+            position_idx=0, position_mode="one_way", side="Buy",
+            qty="0.1", avg_price="50000", entry_order_id="entry-1",
+            entry_order_link_id="",
+        ))
+        path = Path(tmp) / "plan-b.json"
+        persistence = engine.PlanBStatePersistence(str(path), enabled=True)
+        persistence.save_state(
+            cfg, risk_mgr, {"BTCUSDT": position}, {}, 7,
+            last_mark_prices={"BTCUSDT": 50000.0},
+        )
+        local = json.loads(path.read_text(encoding="utf-8"))
+        local["saved_at_utc"] = SAVED
+        path.write_text(json.dumps(local, ensure_ascii=False), encoding="utf-8")
+        execution = {
+            "execId": "e2e-late-fill", "orderId": "entry-1", "orderLinkId": "",
+            "symbol": "BTCUSDT", "execType": "Trade", "execTime": CAPTURE_MS - 1,
+            "side": "Buy", "execQty": "0.1", "execPrice": "50000", "execFee": "0.01",
+        }
+        plan = build_execution_merge_plan(
+            local, upgrade_to_schema3(snapshot(execution_rows=[execution]))
+        )
+        return local, plan, persistence, risk_mgr, cfg, path
+
+    def test_end_to_end_plan_persist_restart_and_retry_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            local, plan, persistence, risk_mgr, cfg, path = self._persistable_merge_fixture(tmp)
+            first = persist_execution_merge_plan(
+                local, plan, persistence=persistence, risk_mgr=risk_mgr,
+            )
+            self.assertEqual(first["status"], "PERSISTED")
+            restarted = engine.PlanBStatePersistence(str(path), enabled=True)
+            restored, _, trade_seq = restarted.load_state(
+                engine.AdaptiveRiskManager(cfg), log_restore=False,
+            )
+            self.assertEqual(trade_seq, 7)
+            self.assertEqual(
+                [row["exec_id"] for row in restored["BTCUSDT"].exchange_executions],
+                ["e2e-late-fill"],
+            )
+            retry = persist_execution_merge_plan(
+                local, plan, persistence=restarted, risk_mgr=risk_mgr,
+            )
+            self.assertEqual(retry["status"], "ALREADY_APPLIED_DURABLE")
+            restored_again, _, _ = restarted.load_state(
+                engine.AdaptiveRiskManager(cfg), log_restore=False,
+            )
+            self.assertEqual(len(restored_again["BTCUSDT"].exchange_executions), 1)
+            self.assertFalse(retry["execution_history_complete"])
+            self.assertFalse(retry["reconciliation_pass"])
+            self.assertFalse(retry["live_resume_allowed"])
+
+    def test_end_to_end_lost_commit_ack_is_recovered_after_directory_fsync_retry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            local, plan, persistence, risk_mgr, cfg, path = self._persistable_merge_fixture(tmp)
+            # First fsync is the temp file, second is the directory after replace
+            # and fails; the retry inspector fsyncs the directory a third time.
+            with unittest.mock.patch("os.fsync", side_effect=[None, OSError("lost commit acknowledgement"), None]):
+                result = persist_execution_merge_plan(
+                    local, plan, persistence=persistence, risk_mgr=risk_mgr,
+                )
+            self.assertEqual(result["status"], "PERSISTED_RECOVERED_AFTER_ACK_ERROR")
+            restored, _, _ = engine.PlanBStatePersistence(
+                str(path), enabled=True,
+            ).load_state(engine.AdaptiveRiskManager(cfg), log_restore=False)
+            self.assertEqual(
+                [row["exec_id"] for row in restored["BTCUSDT"].exchange_executions],
+                ["e2e-late-fill"],
+            )
+
+    def test_end_to_end_conflicting_backup_change_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            local, plan, persistence, risk_mgr, _, path = self._persistable_merge_fixture(tmp)
+            changed = json.loads(path.read_text(encoding="utf-8"))
+            changed["trade_seq"] += 1
+            path.write_text(json.dumps(changed, ensure_ascii=False), encoding="utf-8")
+            before = path.read_bytes()
+            with self.assertRaisesRegex(ReportError, "stale reconciliation plan"):
+                persist_execution_merge_plan(
+                    local, plan, persistence=persistence, risk_mgr=risk_mgr,
+                )
+            self.assertEqual(path.read_bytes(), before)
 
     def test_apply_execution_merge_plan_returns_detached_candidate_and_preserves_source(self):
         local, plan = self._merge_fixture()

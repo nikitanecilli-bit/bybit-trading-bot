@@ -672,3 +672,25 @@ Inspected full GitHub Actions log for run 41839020044 and its workflow `.github/
 Thus this CI run did not download new market archives, run the H-A PnL replay, access private Bybit API, or place orders. It did inspect existing repository OHLCV files and create/upload audit/preparation artifacts. This distinction is recorded so future workflow changes can be checked against the external-data hold.
 
 Maker execution remains blocked for strategy PnL: no measured delivery latency, no exchange-confirmed historical order lifecycle, no L3 queue priority, no verified depth-200 archive continuity contract, and no historical fee tier ledger. No arbitrary stale-age threshold was introduced.
+
+
+## 33. Cross-sequence validation across the complete arrival-capture archive
+
+Official Bybit standard public orderbook documentation was rechecked (2026-11-04): the standard depth stream describes snapshot/delta handling, says `u=1` is a restart snapshot marker, and defines `seq` as cross sequence where smaller values indicate earlier data. It does not document `u+1` continuity for the standard depth-200 stream. The separate Full Orderbook stream has a distinct explicit consecutive-u contract; it must not be transplanted to standard depth-200 archives.
+
+Accordingly, no u monotonicity/continuity enforcement was added. Existing behavior continues to treat `u=1` only as a full-snapshot reset marker, while avoiding assumptions about repeated or skipped `u` values in this archive format.
+
+New confirmed validation: capture_book_at() previously validated cts ordering across the full archive, but seq ordering was only checked by OrderBook.apply() for events before arrival_ts. A seq regression in later rows could therefore escape the full-archive integrity scan. It now validates every event's seq as a strict positive integer and rejects a decrease anywhere in the archive, including after arrival_ts. Equal seq remains allowed because the documented rule only establishes that smaller seq is earlier; it does not state that every same-stream event must have a unique seq.
+
+Regression test added: seq regression after arrival boundary.
+
+Commits:
+- source: 6fe9bd49a68ad79d596ad6ec59fbfeb3a11a21da
+- tests: b017e3f928d8dd07161a0c1fc673e18ca17b5d14
+
+CI:
+- run 41839709345 on source commit 6fe9bd49a68ad79d596ad6ec59fbfeb3a11a21da: SUCCESS, 56/56 steps, queue replay primitive test SUCCESS, no failed steps.
+
+Official documentation references: https://bybit-exchange.github.io/docs/v5/websocket/public/orderbook and https://bybit-exchange.github.io/docs/v5/websocket/public/full-ob. The former does not specify standard depth-200 u+1 continuity; the latter explicitly does for its separate Full Orderbook protocol.
+
+No archives were downloaded; no PnL replay, private API, or orders were run. Maker execution realism remains BLOCKED_FOR_STRATEGY_PNL.

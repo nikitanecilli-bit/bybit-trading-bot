@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.bybit_reconciliation_report import ReportError, build_report
+from scripts.bybit_reconciliation_report import ReportError, build_report, compare_execution_snapshots
 
 SAVED = "2026-10-01T00:00:00Z"
 SAVED_MS = 1790812800000
@@ -152,6 +152,68 @@ class ReportOnlyComparatorTests(unittest.TestCase):
         ).encode("utf-8")).hexdigest()
         with self.assertRaisesRegex(ReportError, "query params mismatch cursor"):
             build_report(backup(), data)
+
+    def test_late_execution_discovered_by_refreshed_snapshot_is_not_complete(self):
+        initial = snapshot()
+        refreshed = copy.deepcopy(initial)
+        later_bound = CAPTURE_MS + 60_000
+        execution = {
+            "execId": "late-exec-1", "orderId": "order-late", "orderLinkId": "",
+            "symbol": "BTCUSDT", "execType": "Trade", "execTime": CAPTURE_MS - 1,
+            "side": "Buy", "execQty": "0.1", "execPrice": "50000", "execFee": "0.1",
+        }
+        refreshed["raw"]["executions"][0]["response"]["result"]["list"].append(execution)
+        for field in ("executions", "order_history"):
+            for page_row in refreshed["raw"][field]:
+                page_row["interval_end_ms"] = later_bound
+        refreshed["order_history_coverage"]["end_ms"] = later_bound
+        refreshed["order_history_coverage"]["duration_ms"] = later_bound - SAVED_MS
+        refreshed["bybit_server_time_before_ms"] = later_bound
+        refreshed["bybit_server_time_after_ms"] = later_bound + 1000
+        refreshed["capture_now_ms"] = later_bound
+        refreshed["counts"]["executions"] = 1
+        refreshed["raw_sha256"] = hashlib.sha256(json.dumps(
+            refreshed["raw"], ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"), allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        result = compare_execution_snapshots(initial, refreshed)
+        self.assertEqual(result["status"], "LATE_EXECUTIONS_DISCOVERED")
+        self.assertEqual(result["late_exec_ids"], ["late-exec-1"])
+        self.assertEqual(result["subsequent_exec_ids"], [])
+        self.assertFalse(result["execution_history_complete"])
+        self.assertFalse(result["reconciliation_pass"])
+        self.assertFalse(result["live_resume_allowed"])
+
+    def test_execution_snapshot_comparison_rejects_changed_duplicate_identity(self):
+        initial = snapshot()
+        refreshed = copy.deepcopy(initial)
+        execution = {
+            "execId": "same-id", "orderId": "order-1", "orderLinkId": "",
+            "symbol": "BTCUSDT", "execType": "Trade", "execTime": CAPTURE_MS - 1,
+            "side": "Buy", "execQty": "0.1", "execPrice": "50000", "execFee": "0.1",
+        }
+        for data in (initial, refreshed):
+            data["raw"]["executions"][0]["response"]["result"]["list"] = [copy.deepcopy(execution)]
+            data["counts"]["executions"] = 1
+            data["raw_sha256"] = hashlib.sha256(json.dumps(
+                data["raw"], ensure_ascii=False, sort_keys=True,
+                separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8")).hexdigest()
+        refreshed["raw"]["executions"][0]["response"]["result"]["list"][0]["execFee"] = "0.2"
+        refreshed["bybit_server_time_before_ms"] += 1000
+        refreshed["bybit_server_time_after_ms"] += 1000
+        refreshed["capture_now_ms"] += 1000
+        for field in ("executions", "order_history"):
+            for page_row in refreshed["raw"][field]:
+                page_row["interval_end_ms"] += 1000
+        refreshed["order_history_coverage"]["end_ms"] += 1000
+        refreshed["order_history_coverage"]["duration_ms"] += 1000
+        refreshed["raw_sha256"] = hashlib.sha256(json.dumps(
+            refreshed["raw"], ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"), allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        with self.assertRaisesRegex(ReportError, "execution identity changed"):
+            compare_execution_snapshots(initial, refreshed)
 
     def test_empty_exchange_state_still_blocks_resume_without_execution_ledger(self):
         report = build_report(backup(), snapshot())

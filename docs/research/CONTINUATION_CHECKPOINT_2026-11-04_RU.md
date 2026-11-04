@@ -1003,3 +1003,12 @@ Classification: exchange-order validity guardrail; not strategy/PnL evidence. No
 - GitHub compare: diverged, 2,134 ahead / 36 behind.
 - PR #4: open, Draft, mergeable=false; head is research/market-regime-v1-main.
 - The prior topology section (2125 ahead) is superseded by this fresh snapshot. Preserve both histories; do not merge/rebase/reset/force-push. main unchanged.
+
+
+## 50. Exchange-sized restore constraints and TP1 funding-state consistency — 2026-11-04
+
+Restore path now rejects exchange-sized positions whose initial/remaining quantity is below minOrderQty, whose remaining notional at the lowest planned exit (stop/entry/TP2) is below minNotionalValue, or whose TP1 leg violates minOrderQty/minNotionalValue. Two regression cases added. CI #41851236490 (d50c923b2e158e951d9ca979708d093e54ae3983) SUCCESS, 57/57 steps. A first run exposed only an assertion mismatch against the persistence loader's intentionally wrapped RuntimeError; test now asserts fail-closed behavior rather than inner message text.
+
+Funding audit found accrued_funding_cost() and accrued_funding_cost_for_remaining_margin() accepted a TP1 timestamp while tp1_hit=false, and accepted non-bool tp1_hit values through truthiness. Both now require a bool and enforce timestamp iff TP1 is hit. Two regressions added. Final CI #41851768270 (3170738a78eac92b0a93eda66510c038660f0864) SUCCESS, 57/57 steps; actual log confirms both tests passed; funding suite 76 tests. Source-only CI #41851738950 (568f5ed2552d27dadfeb82c4d1e9610cfac3cd13) SUCCESS, 57/57.
+
+Classification: execution/persistence/accounting correctness; no evidence of strategy profitability. No market PnL, archive downloads, private API, runner, paper/live orders, or main changes.

@@ -563,3 +563,103 @@ def validate_funding_manifest(
         "csv_sha256": payload.get("csv_sha256"),
         "runs": len(payload.get("runs", [])),
     }
+
+
+def validate_archive_funding_manifests(
+    archive_root: str | Path,
+    symbols: list[str],
+    *,
+    requested_start_ms: int,
+    requested_end_exclusive_ms: int,
+) -> dict:
+    """Validate Funding manifests against each symbol's lifecycle-clipped archive range."""
+    root = Path(archive_root)
+    archive_manifest_path = root / "archive_manifest.json"
+    if not archive_manifest_path.is_file():
+        return {"ok": False, "status": "missing_archive_manifest", "results": []}
+    try:
+        archive = json.loads(archive_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"ok": False, "status": "invalid_archive_manifest", "results": []}
+
+    errors = []
+    start = int(requested_start_ms)
+    end_exclusive = int(requested_end_exclusive_ms)
+    if start <= 0 or end_exclusive <= start:
+        errors.append("invalid_requested_archive_range")
+    if archive.get("category") != "linear" or str(archive.get("interval")) != "60":
+        errors.append("archive_manifest_not_linear_h1")
+
+    expected_symbols = [str(symbol).strip().upper() for symbol in symbols]
+    if (not expected_symbols or any(not symbol for symbol in expected_symbols)
+            or len(expected_symbols) != len(set(expected_symbols))):
+        errors.append("invalid_requested_symbols")
+
+    raw_results = archive.get("results")
+    if not isinstance(raw_results, list):
+        return {
+            "ok": False, "status": "invalid_archive_manifest_results",
+            "errors": errors + ["archive_results_missing"], "results": [],
+        }
+
+    by_symbol = {}
+    for row in raw_results:
+        if not isinstance(row, dict):
+            errors.append("invalid_archive_symbol_result")
+            continue
+        symbol = str(row.get("symbol", "")).strip().upper()
+        if not symbol or symbol in by_symbol:
+            errors.append("duplicate_or_missing_archive_symbol")
+            continue
+        by_symbol[symbol] = row
+
+    if set(by_symbol) != set(expected_symbols):
+        errors.append("archive_symbol_set_mismatch")
+
+    reports = []
+    for symbol in expected_symbols:
+        row = by_symbol.get(symbol)
+        if row is None:
+            reports.append({"symbol": symbol, "ok": False, "status": "missing_symbol_result"})
+            continue
+        try:
+            row_requested_start = row["requested_start_ms"]
+            row_requested_end = row["requested_end_exclusive_ms"]
+            effective_start = row["start_ms"]
+            effective_end_exclusive = row["end_exclusive_ms"]
+            values = (row_requested_start, row_requested_end, effective_start, effective_end_exclusive)
+            if any(isinstance(value, bool) or not isinstance(value, int) for value in values):
+                raise ValueError("archive range fields must be integers")
+            if row_requested_start != start or row_requested_end != end_exclusive:
+                raise ValueError("per-symbol requested range differs from workflow inputs")
+            if (effective_start < start or effective_end_exclusive > end_exclusive
+                    or effective_end_exclusive <= effective_start):
+                raise ValueError("effective per-symbol range is outside requested archive range")
+            if effective_start % 3_600_000 or effective_end_exclusive % 3_600_000:
+                raise ValueError("effective per-symbol range is not H1-aligned")
+            expected_clipped = effective_start != start or effective_end_exclusive != end_exclusive
+            if row.get("lifecycle_clipped") is not expected_clipped:
+                raise ValueError("lifecycle_clipped flag disagrees with effective range")
+        except (KeyError, TypeError, ValueError) as exc:
+            reports.append({
+                "symbol": symbol, "ok": False,
+                "status": "invalid_symbol_archive_range", "error": str(exc),
+            })
+            continue
+
+        csv_path = root / "funding" / f"{symbol}.csv"
+        manifest_path = csv_path.with_suffix(csv_path.suffix + ".audit.json")
+        report = validate_funding_manifest(
+            csv_path, manifest_path, symbol=symbol,
+            required_start_ms=effective_start,
+            required_end_ms=effective_end_exclusive - 1,
+        )
+        reports.append({"symbol": symbol, **report})
+
+    ok = not errors and len(reports) == len(expected_symbols) and all(
+        report.get("ok", False) for report in reports
+    )
+    return {
+        "ok": ok, "status": "ok" if ok else "incomplete",
+        "errors": errors, "results": reports,
+    }

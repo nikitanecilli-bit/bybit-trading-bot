@@ -13,6 +13,7 @@ import copy
 import hashlib
 import json
 import sys
+import urllib.parse
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -177,6 +178,28 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tupl
     if not isinstance(execution_pages, list) or not execution_pages:
         raise ReportError("snapshot raw.executions must be a non-empty page list")
     if schema_version == 3:
+        base_url = snapshot.get("base_url")
+        allowed_hosts = {
+            "api.bybit.com", "api.bytick.com", "api.bybit.kz", "api.bybit.tr",
+            "api.bybitgeorgia.ge", "api.bybit.ae", "api.bybit.eu", "api.bybit.id",
+        }
+        try:
+            parsed_base_url = urllib.parse.urlsplit(base_url) if isinstance(base_url, str) else None
+            valid_base_url = (
+                parsed_base_url is not None
+                and parsed_base_url.scheme == "https"
+                and parsed_base_url.hostname in allowed_hosts
+                and parsed_base_url.username is None
+                and parsed_base_url.password is None
+                and parsed_base_url.port in (None, 443)
+                and parsed_base_url.path in ("", "/")
+                and not parsed_base_url.query
+                and not parsed_base_url.fragment
+            )
+        except ValueError:
+            valid_base_url = False
+        if not valid_base_url:
+            raise ReportError("snapshot base_url is not an official HTTPS Bybit API host")
         fingerprint = snapshot.get("api_key_fingerprint_sha256")
         if (not isinstance(fingerprint, str) or len(fingerprint) != 64
                 or any(char not in "0123456789abcdef" for char in fingerprint)):

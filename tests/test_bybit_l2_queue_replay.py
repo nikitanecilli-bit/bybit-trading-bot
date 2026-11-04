@@ -175,7 +175,7 @@ def test_book_state_capture_excludes_same_millisecond_updates():
     with tempfile.TemporaryDirectory() as tmp:
         archive = Path(tmp) / "same_ms.zip"
         with zipfile.ZipFile(archive, "w") as zf:
-            zf.writestr("events.data", "".join(json.dumps(event) + "\\n" for event in events))
+            zf.writestr("events.data", "".join(json.dumps(event) + "\n" for event in events))
         book_state, observed_ts = capture_book_at(archive, 2000)
     assert observed_ts == 1000
     assert book_state.quantity_at("Buy", D("100")) == D("5")

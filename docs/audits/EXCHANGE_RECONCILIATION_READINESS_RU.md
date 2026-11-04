@@ -180,3 +180,32 @@ Research CI [#41912294316](https://github.com/nikitanecilli-bit/bybit-trading-bo
 - Никакие mutating endpoints, live orders, collectors для рыночных данных, archive downloads или market PnL tests не выполнялись.
 - Следующий необходимый инженерный этап до любого live resume: разработать отдельную модель exchange execution identity (exact qty, positionIdx, orderId/orderLinkId, execId, partial fills и protection lifecycle), связать её с local persistence и только затем проектировать reconciliation-gated startup. Не выводить exchange qty из `size_usdt / entry_price`.
 - Strategy/execution/PnL и live-resume gates остаются BLOCKED.
+
+
+## ENG-RECON-008 — строгие типы exchange execution identity
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED AS PURE CONTRACT / NOT INTEGRATED INTO ENGINE.
+
+Добавлен `exchange_execution_identity.py` с тремя immutable records:
+
+- `ExchangePositionIdentity`: category/settleCoin/symbol, exact exchange qty и avg price как decimal strings, side, positionIdx, явный one-way/hedge mode, entry orderId/orderLinkId.
+- `ExchangeExecutionIdentity`: уникальная execution identity (execId), order identity, symbol/side, exact fill qty/price, exchange timestamp и optional fee.
+- `ExchangeOrderIdentity`: orderId/orderLinkId, symbol/side/positionIdx, original qty, leavesQty, cumExecQty, status, reduceOnly/closeOnTrigger и optional trigger price.
+
+### Инварианты
+
+- Decimal values сохраняются строками; binary float и расчёт qty из notional не используются.
+- Position mode согласуется с positionIdx: one-way только idx=0; hedge только idx=1 или 2.
+- Position qty и avg price строго положительны; execution fill qty/price строго положительны.
+- Order leavesQty и cumExecQty неотрицательны, не превышают qty и вместе не превышают исходное qty.
+- Order protection flags обязательны как bool в нормализованной модели; неизвестные/отсутствующие поля и лишние ключи при десериализации приводят к отказу.
+- Entry order identity обязательна для записи position identity. Если позиция возникла вне известного ордера/журнала, её нельзя объявлять полностью идентифицированной.
+
+### Границы текущей реализации
+
+Это типизированный pure contract с сериализацией в dict и fixture tests. Он пока **не подключён** к `OpenPositionState`, backup schema, реальным order placement/fill handlers или reconciliation comparator. Нельзя считать, что существующие backup уже содержат эти идентификаторы. Нет механизма создания/обновления этих records из фактических биржевых ответов, и нет PASS-ветки reconciliation.
+
+Tests: `tests/test_exchange_execution_identity.py` — 8 deterministic offline tests. CI status будет указан после завершения соответствующего workflow.
+
+Никаких API calls, credentials, collectors, live orders, archive downloads или PnL tests не запускалось. Live resume и strategy/execution/PnL gates остаются BLOCKED.

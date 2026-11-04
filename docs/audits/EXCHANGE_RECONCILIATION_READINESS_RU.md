@@ -234,3 +234,20 @@ Tests: `tests/test_exchange_execution_identity.py` — 8 deterministic offline t
 Методы вызываются только явно кодом/тестами. Текущий движок по-прежнему симулятор и не имеет реального Bybit order placement/fill handler. Он не генерирует exchange IDs сам и не синтезирует execId из локальных сделок. Поэтому существующие позиции без записанных exchange identity остаются не сверенными; наличие этих полей не означает reconciliation PASS.
 
 Ни API calls, credentials, collectors, live orders, archive downloads или market PnL tests не выполнялись. Live resume и strategy/execution/PnL gates остаются BLOCKED.
+
+
+### ENG-RECON-010 — сверка execution ledger с order lifecycle
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE TESTED.
+
+- Каждый execution должен ссылаться на известный `orderId`: order из сохранённого списка либо entry order из `ExchangePositionIdentity`.
+- Для tracked order проверяются совпадение symbol, side и непустого orderLinkId.
+- Сумма известных `execQty` по orderId не может превышать `cumExecQty` этого ордера. Строгое равенство намеренно не требуется: локальная история может быть неполной, и отсутствие части fills нельзя маскировать предположением.
+- Lifecycle update существующего orderId не может уменьшить `cumExecQty` или увеличить `leavesQty`; immutable поля ордера остаются неизменными.
+- Добавление execution/order и обновление position identity транзакционны: при провале проверки предыдущее состояние объекта сохраняется.
+- Добавлены regressions для orphan execution, side/orderLinkId mismatch, overfill sum, rollback, monotonic order updates и partial-ledger semantics.
+
+Research CI #41913543774 — SUCCESS, 59/59 workflow steps; тест persistence включает 96 cases на этом commit.
+
+Граница: это локальная согласованность записанного журнала, а не доказательство полноты биржевой истории. Если Bybit вернул не все execution rows, ledger может быть только нижней границей фактического fill total. Для reconciliation PASS по-прежнему необходимы полная пагинация, контроль интервалов/снимка и независимое сравнение с биржевыми позициями/ордерами. Ни API, ни live handlers, ни PnL здесь не запускались.

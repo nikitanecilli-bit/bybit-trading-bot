@@ -84,9 +84,15 @@ class InstrumentSpecHistory:
                 )
             specs: dict[str, InstrumentSpec] = {};
             for row in rows:
+                if not isinstance(row, dict):
+                    raise ValueError(f"{path}: instrument rows must be objects")
+                # Bybit returns category on result, not on each result.list row.
+                # Preserve a row-level category when present so mismatches fail closed.
+                instrument = dict(row)
+                instrument.setdefault("category", snapshot_category)
                 spec = InstrumentSpec.from_snapshot({
                     "fetched_at": fetched_at,
-                    "instrument": row,
+                    "instrument": instrument,
                 })
                 if spec.category != category:
                     raise ValueError(f"{path}: instrument {spec.symbol} has wrong category")

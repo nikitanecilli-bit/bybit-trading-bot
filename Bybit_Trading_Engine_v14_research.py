@@ -1054,8 +1054,22 @@ class PlanBStatePersistence:
                 if not tp1_hit and not math.isclose(realized_tp1, 0.0, rel_tol=0.0, abs_tol=1e-9):
                     raise ValueError(f"позиция {sym}: realized TP1 PnL задан при tp1_hit=false")
                 for field_name in ("max_favorable_px", "max_adverse_px"):
-                    if field_name in pos_dict and pos_dict[field_name] < 0:
-                        raise ValueError(f"позиция {sym}: {field_name} не может быть отрицательным")
+                    if field_name in pos_dict and pos_dict[field_name] <= 0:
+                        raise ValueError(f"позиция {sym}: {field_name} должен быть > 0")
+                if pos_dict.get("direction") == "long":
+                    if ("max_favorable_px" in pos_dict
+                            and pos_dict["max_favorable_px"] < entry):
+                        raise ValueError(f"позиция {sym}: long max_favorable_px не может быть ниже entry")
+                    if ("max_adverse_px" in pos_dict
+                            and pos_dict["max_adverse_px"] > entry):
+                        raise ValueError(f"позиция {sym}: long max_adverse_px не может быть выше entry")
+                else:
+                    if ("max_favorable_px" in pos_dict
+                            and pos_dict["max_favorable_px"] > entry):
+                        raise ValueError(f"позиция {sym}: short max_favorable_px не может быть выше entry")
+                    if ("max_adverse_px" in pos_dict
+                            and pos_dict["max_adverse_px"] < entry):
+                        raise ValueError(f"позиция {sym}: short max_adverse_px не может быть ниже entry")
                 for field_name in ("tp1_hit",):
                     if field_name in pos_dict and not isinstance(pos_dict[field_name], bool):
                         raise ValueError(f"позиция {sym}: {field_name} должен быть bool")

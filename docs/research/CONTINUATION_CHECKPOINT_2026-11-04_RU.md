@@ -571,3 +571,25 @@ CI:
 - full test run 41838211515 на commit aae78ae30df5ff84582f3ce00c39819267fddb19: SUCCESS, 56/56 steps; queue replay primitive test step SUCCESS.
 
 Таким образом, replay теперь валидирует всю последовательность строк по timestamp, ID, block/RPI flags, side, price и size, включая строки вне active window и после completion. Это повышает строгость структурной валидации, но не доказывает полноту/истинность исходного архива и maker execution realism. Не запускались новые архивные загрузки, strategy PnL, private API, paper/live orders. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.
+
+
+## 27. Queue placement за границами видимой L2 глубины
+
+place_passive_order() ранее возвращал queue_ahead=0 для любой цены, отсутствующей в snapshot. Для цены за пределами худшего видимого уровня это некорректно: отсутствие уровня в top-200 не означает отсутствие очереди, поскольку глубже границы снимка ликвидность неизвестна. Такая ситуация могла искусственно завысить fill rate.
+
+Исправлено:
+- Buy limit ниже минимальной видимой bid price, если точного уровня нет, отклоняется как outside visible bid depth;
+- Sell limit выше максимальной видимой ask price, если точного уровня нет, отклоняется как outside visible ask depth;
+- цена без отображённого уровня внутри известного ценового диапазона остаётся допустимой с queue_ahead=0;
+- существующие проверки пассивности, timestamp, spec и точного displayed queue сохранены.
+
+Добавлены regression tests на отказ за границами видимой глубины и допустимость пустого уровня внутри известного диапазона.
+
+Изменения в research/market-regime-v1-main:
+- source commit: e262ce63c903f7665392b41df4099a3ea38b74b5;
+- regression tests: 5ab0b56138bd7cc039f18c0df641a6fda8cec32a.
+
+CI:
+- full run 41838431510 на commit 5ab0b56138bd7cc039f18c0df641a6fda8cec32a: SUCCESS, job tests 56/56 steps completed successfully, queue replay primitive test step SUCCESS.
+
+Это предотвращает трактовку неизвестной очереди за границей top-200 как нулевой, но не решает stale-book age/latency и неизвестную полноту архива. Не запускались новые archive downloads, strategy PnL, private API, paper/live orders. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.

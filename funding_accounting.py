@@ -13,6 +13,12 @@ from typing import Any, Iterable, Mapping
 CENT = Decimal("0.01")
 
 
+def _timestamp_ms(value: Any, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"{name} must be a positive integer millisecond timestamp")
+    return value
+
+
 def _d(value: Any, name: str) -> Decimal:
     try:
         result = Decimal(str(value))
@@ -43,8 +49,8 @@ def accrued_funding_cost(
     remaining fraction; later settlements use the remaining fraction. For
     pre-exit MTM, defer receipts at the current as-of boundary until a later mark.
     """
-    entry_ts = int(position.entry_ts)
-    as_of_ts = int(as_of_ts)
+    entry_ts = _timestamp_ms(position.entry_ts, "entry_ts")
+    as_of_ts = _timestamp_ms(as_of_ts, "as_of_ts")
     if as_of_ts < entry_ts:
         raise ValueError("as_of_ts cannot precede position entry")
     direction = str(position.direction).lower()
@@ -63,11 +69,11 @@ def accrued_funding_cost(
     if bool(getattr(position, "tp1_hit", False)) and tp1_ts is None:
         raise ValueError("tp1_ts_ms is required when tp1_hit is true")
     if tp1_ts is not None:
-        tp1_ts = int(tp1_ts)
+        tp1_ts = _timestamp_ms(tp1_ts, "tp1_ts_ms")
         if tp1_ts < entry_ts:
             raise ValueError("tp1_ts_ms cannot precede entry")
     if closed_ts_ms is not None:
-        closed_ts_ms = int(closed_ts_ms)
+        closed_ts_ms = _timestamp_ms(closed_ts_ms, "closed_ts_ms")
         if closed_ts_ms < entry_ts:
             raise ValueError("closed_ts_ms cannot precede position entry")
 
@@ -87,7 +93,7 @@ def accrued_funding_cost(
 
     for event in events:
         try:
-            ts = int(event["ts"])
+            ts = _timestamp_ms(event["ts"], "funding event timestamp")
             rate = _d(event["rate"], "funding rate")
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError(f"invalid funding event: {event!r}") from exc
@@ -150,8 +156,8 @@ def accrued_funding_cost_for_remaining_margin(
     position's share; accrued_funding_cost() continues to return the full
     position-lifecycle cashflow for final trade PnL.
     """
-    entry_ts = int(position.entry_ts)
-    as_of_ts = int(as_of_ts)
+    entry_ts = _timestamp_ms(position.entry_ts, "entry_ts")
+    as_of_ts = _timestamp_ms(as_of_ts, "as_of_ts")
     direction = str(position.direction).lower()
     if direction not in {"long", "short"} or as_of_ts < entry_ts:
         raise ValueError("valid direction and as_of_ts >= entry_ts are required")
@@ -170,15 +176,16 @@ def accrued_funding_cost_for_remaining_margin(
     tp1_ts = getattr(position, "tp1_ts_ms", None)
     if bool(getattr(position, "tp1_hit", False)) and tp1_ts is None:
         raise ValueError("tp1_ts_ms is required when tp1_hit is true")
-    if tp1_ts is not None and int(tp1_ts) < entry_ts:
-        raise ValueError("tp1_ts_ms cannot precede position entry")
-    tp1_ts = int(tp1_ts) if tp1_ts is not None else None
+    if tp1_ts is not None:
+        tp1_ts = _timestamp_ms(tp1_ts, "tp1_ts_ms")
+        if tp1_ts < entry_ts:
+            raise ValueError("tp1_ts_ms cannot precede position entry")
     sign = Decimal("1") if direction == "long" else Decimal("-1")
     total = Decimal("0")
     seen: set[int] = set()
     for event in events:
         try:
-            ts = int(event["ts"])
+            ts = _timestamp_ms(event["ts"], "funding event timestamp")
             rate = _d(event["rate"], "funding rate")
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError(f"invalid funding event: {event!r}") from exc

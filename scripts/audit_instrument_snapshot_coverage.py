@@ -72,6 +72,8 @@ def inspect_snapshot(path: Path) -> dict[str, Any]:
         page_counts: dict[str, int] = {}
         page_durations: list[int] = []
         page_symbols: set[str] = set()
+        page_symbol_counts: dict[str, int] = {}
+        page_has_next: dict[str, list[bool]] = {}
         by_status: dict[str, dict[str, Any]] = {}
         previous_received: int | None = None
         for item in page_observations:
@@ -110,7 +112,10 @@ def inspect_snapshot(path: Path) -> dict[str, Any]:
             if len(normalized_symbols) != len(set(normalized_symbols)):
                 raise ValueError(f"{path}: duplicate page observation symbols")
             page_symbols.update(normalized_symbols)
+            for symbol in normalized_symbols:
+                page_symbol_counts[symbol] = page_symbol_counts.get(symbol, 0) + 1
             page_counts[status] = expected_index
+            page_has_next.setdefault(status, []).append(has_next)
             duration = received - started
             page_durations.append(duration)
             summary = by_status.setdefault(status, {
@@ -122,12 +127,31 @@ def inspect_snapshot(path: Path) -> dict[str, Any]:
             summary["last_request_completed_at"] = item["request_completed_at"]
             summary["row_count"] += rows_count
             previous_received = received
+        for status, continuation_flags in page_has_next.items():
+            if any(flag is False for flag in continuation_flags[:-1]) or continuation_flags[-1] is not False:
+                raise ValueError(f"{path}: page continuation flags are inconsistent for {status}")
+        category = payload.get("category")
+        if "universe_history" in path.parts:
+            expected_filters = {"default", "PreLaunch", "Settling", "Delivering", "Closed"}
+        else:
+            expected_filters = {
+                "linear": {"PreLaunch", "Trading", "Settling", "Delivering", "Closed"},
+                "inverse": {"PreLaunch", "Trading", "Settling", "Delivering", "Closed"},
+                "spot": {"Trading"},
+                "option": {"PreLaunch", "Trading", "Delivering", "Closed"},
+            }.get(category)
+        if expected_filters is not None and set(page_has_next) != expected_filters:
+            raise ValueError(f"{path}: page observations do not cover expected status filters")
         if page_symbols != set(symbols):
             raise ValueError(f"{path}: page observation symbols do not match snapshot instruments")
         page_summary = {
             "page_count": len(page_observations),
             "request_duration_ms": _distribution(page_durations),
             "status_filters": by_status,
+            "duplicate_symbol_observations": [
+                {"symbol": symbol, "occurrences": count}
+                for symbol, count in sorted(page_symbol_counts.items()) if count > 1
+            ],
         }
     return {
         "path": str(path),

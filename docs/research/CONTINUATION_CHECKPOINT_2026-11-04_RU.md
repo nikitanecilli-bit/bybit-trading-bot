@@ -424,3 +424,28 @@ CI:
 - полный run 41836556302 на commit f8f7b922e176ca5842c899760e3ef7b38a4a2a9a: job tests SUCCESS, 56/56 steps completed successfully; queue replay primitive test step SUCCESS.
 
 Это закрывает конкретную временную утечку на API уровне place_passive_order(), но не решает неизвестную непрерывность depth-200 update stream, отсутствие L3 priority, measured delivery/cancel latency и несовместимость/непроверенность historical BT/RPI CSV. Не запускались новые архивные загрузки, strategy PnL, private API, paper/live orders. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.
+
+
+## 21. Дополнительная строгая валидация строк historical trade CSV
+
+В iter_public_trades() выявлено, что csv.DictReader может помещать значения сверх числа заголовков в специальный ключ None. Ранее такие лишние поля не отклонялись и могли быть молча проигнорированы. Также идентификатор trdMatchID проверялся на пустоту через strip(), но исходное значение с внешними пробелами оставалось неизменным; это позволяло одному и тому же биржевому ID иметь разные строковые представления.
+
+Исправлено:
+- любая CSV-строка с дополнительными полями отклоняется;
+- отсутствие значения любого обязательного поля строки (включая выбранные BT/RPI флаги) отклоняется;
+- trdMatchID должен быть непустым и не содержать внешних пробелов; значение не нормализуется молча;
+- прежние проверки дублирующихся заголовков, обязательных классификационных флагов и уникальности ID сохранены.
+
+Добавлены regression tests на лишние CSV поля и пробелы вокруг trade ID.
+
+Изменения в research/market-regime-v1-main:
+- source commit: 08d6c302c795fe58e7ace603560de9c585b9e57a;
+- regression tests: 6c71ff31275e6107f6b6a533c3f0c89cf0e3d9cb;
+- исправление newline в test fixtures: fe86247bec1c723a55a9daab2e3c977053089b50 (текущая голова на момент обновления).
+
+CI:
+- source run 41836837057: SUCCESS;
+- test run 41836847048: FAILURE из-за дефекта новой fixture (newline escape был некорректным, поэтому тест лишних полей не создавал ожидаемую строку);
+- после исправления fixture run 41836868306 на commit fe86247bec1c723a55a9daab2e3c977053089b50: SUCCESS, job tests 56/56 steps completed successfully, включая Test conservative Bybit aggregate-L2 queue replay primitives.
+
+Эти изменения укрепляют проверку структуры trade CSV, но не подтверждают, что фактический исторический архив Bybit содержит совместимые BT/RPI поля, и не доказывают полноту архивных записей. Новые архивы не загружались, strategy PnL не запускался, private API и ордера не использовались. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.

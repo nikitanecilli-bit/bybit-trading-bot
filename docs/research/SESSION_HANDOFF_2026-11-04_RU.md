@@ -145,3 +145,16 @@
 - The changed files were re-fetched and both corrections are present. The available commit-associated workflow lookup returned no runs for the latest test commit; both changes remain CI-unverified. Do not call tests passed.
 - No PnL, archive downloads/collectors, Bybit API/account access, runner registration, paper/live orders, or main-branch changes.
 - Next safe action: retrieve actual CI results if an Actions run becomes available. Until then, avoid stacking further queue-replay changes on top of unverified edits; continue only independent read-only review.
+
+
+## Session update — 2026-11-04 (runner tests actually executed; CI verified)
+
+- Corrected a test-infrastructure defect: `tests/test_run_bybit_l2_queue_replay.py` contained five plain test functions but no executable test entrypoint. The Research CI command invoked the file directly, so the step previously exited 0 without running those functions. Earlier statements treating that step as evidence of executed runner tests were too strong.
+- Added a deterministic `__main__` entrypoint that invokes all `test_*` functions and prints each PASS plus a total.
+- First real execution exposed a bad expectation in `test_markout_capture_excludes_exact_target_event_and_never_extrapolates`: the test expected a markout snapshot after the last archive event, contrary to the intended fail-closed no-extrapolation behavior. Corrected fixture to include a later event that brackets the intermediate target; retained assertion that a target beyond the final archive event is omitted.
+- Commits: test entrypoint `60d9202b0f93fccd1938c99137cbeefd3094f9d5` (CI #41842455791 correctly failed, revealing the assertion defect); corrected test `19ca8bcfe407cecea18a2bfc6ad5c86cf54085af`.
+- Final CI #41842592947 on `19ca8bcfe407cecea18a2bfc6ad5c86cf54085af`: run SUCCESS; job `tests` SUCCESS; all 56 workflow steps completed successfully. Crucially, log confirms `tests/test_run_bybit_l2_queue_replay.py` executed **5/5 tests passed**, and aggregate L2 primitive suite executed **81/81 tests passed**, including the new post-arrival malformed-tail regression.
+- CI #41842036275 on `57f5263c7bbd5f123e19cd2be2f23c2a31765446` also succeeded (all steps), but its runner test file was still a no-op at that point; do not count it as runner-test execution evidence. The empty-archive regression was exercised only by the later 5/5 runner suite.
+- Current research branch code/test HEAD before this documentation update: `19ca8bcfe407cecea18a2bfc6ad5c86cf54085af`. PR #4 remains Draft/open; no merge/rebase/retarget.
+- No market PnL, new market archive download/collector, private API/account access, runner registration, paper/live orders, or main-branch changes.
+- Next safe task: continue independent read-only review of report serialization/CSV schema and provenance; do not add further changes to this now-green runner path without a new reproducible defect.

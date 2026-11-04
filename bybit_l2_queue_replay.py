@@ -231,7 +231,7 @@ def capture_book_at(
 def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict]:
     with gzip.open(archive, "rt", encoding="utf-8", newline="") as stream:
         reader = csv.DictReader(stream)
-        required = {"timestamp", "symbol", "side", "size", "price"}
+        required = {"timestamp", "symbol", "side", "size", "price", "trdMatchID"}
         if not required.issubset(reader.fieldnames or []):
             raise ValueError("trade archive is missing required columns")
         for row_no, row in enumerate(reader, 2):
@@ -245,12 +245,13 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
                 "price": row["price"],
                 "size": row["size"],
                 "rpi": row.get("RPI", row.get("isRPITrade", "0")),
-                "trade_id": row.get("trdMatchID"),
+                "trade_id": row["trdMatchID"],
             }
 
 
 def replay_public_trades(order: PassiveOrder, archive: Path, symbol: str = "AAVEUSDT") -> PassiveOrder:
     previous_ts = None
+    seen_trade_ids: set[str] = set()
     for trade in iter_public_trades(archive, symbol):
         ts = trade["timestamp_ms"]
         if previous_ts is not None and ts < previous_ts:
@@ -258,6 +259,12 @@ def replay_public_trades(order: PassiveOrder, archive: Path, symbol: str = "AAVE
         previous_ts = ts
         if ts >= order.expiry_ts:
             break
+        trade_id = trade.get("trade_id")
+        if not isinstance(trade_id, str) or not trade_id:
+            raise ValueError("missing public trade ID")
+        if trade_id in seen_trade_ids:
+            raise ValueError(f"duplicate public trade ID: {trade_id}")
+        seen_trade_ids.add(trade_id)
         apply_public_trade(order, trade)
         if order.complete:
             break

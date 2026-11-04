@@ -82,3 +82,38 @@ Artifact metadata availability does not validate the artifact's internal content
 ## Safety and scope
 
 No workflow reruns, artifact downloads, archive downloads/extraction, collectors, exchange API calls, market PnL recalculation, parameter sweeps, paper/live trading, private/account API or changes to `main`. PR #4 and PR #13 remain untouched.
+
+
+## 2026-11-05 — P1: восстановлена точная привязка H-A / H-C к Actions artifacts
+
+Read-only проверены первичные result reports, preregistration docs и метаданные workflow jobs/artifacts. Содержимое ZIP artifacts не скачивалось.
+
+### H-A — Relative Strength Breakout
+
+**Финальный отчётный run:** [#41670116033](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41670116033)
+- Job `replay`: completed / success.
+- Artifact: `h-a-preregistered-ohlcv-results`, ID `13247672222`, 372,438 bytes, не expired на момент проверки; создан 2026-11-03 16:03:58 UTC.
+- Frozen strategy/report: H-A relative-strength rank + Donchian(20) против frozen H1 Donchian + volume baseline.
+- Source: существующие CryptoFetch H1 OHLCV ZIP; dynamic archive-available universe; shared capital 10,000 USDT на каждый из трёх независимых folds; max 5 positions; 0.5% risk/trade; 2% portfolio risk cap; market entries/exits; costs ×2; funding omitted.
+- Reported net: baseline −5,635.98 USDT; H-A −6,135.26 USDT; H-A хуже на 499.28 USDT. Все три folds отрицательны у обеих версий; fold 3 — основное относительное ухудшение.
+- **Code SHA для финального run #41670116033 не восстановлен из проверенных report/metadata; оставить unknown, не переносить SHA другого run.**
+- В preregistration также описан более ранний successful replay run [#41633199418](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41633199418): job `replay` success; artifact `h-a-preregistered-ohlcv-results`, ID `13228658700`, 313,595 bytes, not expired. В preregistration указан commit `3ac4bb0c20c48e31e0264df7fe39235cb5c8a658` для этого run. Не смешивать его artifact/commit с финальным run #41670116033 без отдельного подтверждения.
+- Primary documents: `docs/reports/H_A_RELATIVE_STRENGTH_BREAKOUT_RESULTS_2026-11-03_RU.md` and `docs/research/H_A_RELATIVE_STRENGTH_BREAKOUT_PREREGISTRATION_RU.md`.
+
+### H-C — post-break invalidation reverse-time robustness
+
+**Run:** [#41722545731](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41722545731)
+- Job `reverse-time-proxy`: completed / success.
+- Artifact: `h-c-reverse-time-cryptofetch-proxy`, ID `13272957989`, 211,799 bytes, не expired на момент проверки; создан 2026-11-03 21:31:48 UTC.
+- Research commit указан в первичном отчёте: `a5e7e1799f472db4cc00824dfcc774b40058165e`.
+- Protocol: `H-C-RT-CRYPTOFETCH-2026-11-04-v1`; 25 frozen symbols; 2025-10-30 00:00 — 2026-04-26 23:00 UTC; 72 H1 warmup bars; shared capital 10,000 USDT per variant; market execution; fees/slippage ×2; funding and mark-price liquidation omitted.
+- Baseline 313 trades, proxy net before funding −2,720.47 USDT, PF 0.63; H-C 610 trades, proxy net before funding −2,880.12 USDT, PF 0.72. H-C worse than baseline by 159.65 USDT; both variants hit 30% kill switch.
+- The run is reverse-time robustness on previously examined CryptoFetch history, not forward OOS or Bybit-native PnL.
+- Primary documents: `docs/reports/H_C_REVERSE_TIME_RESULTS_2026-11-04_RU.md` and `docs/research/H_C_POST_BREAK_INVALIDATION_PREREGISTRATION_RU.md`.
+
+### Provenance conclusion
+
+- H-A and H-C now have explicit primary report → workflow run → artifact ID/size → job conclusion links.
+- H-A final run code SHA remains unresolved; earlier H-A run SHA must not be misattributed.
+- Artifact metadata confirms existence and retention only; no artifact contents, hashes, or data completeness were re-verified in this step.
+- H-A and H-C remain rejected in their tested configurations. No tuning, replay, artifact download, archive download, PnL calculation, API call, or order was performed.

@@ -6,6 +6,8 @@ import os
 import tempfile
 import json
 import csv
+from types import SimpleNamespace
+from unittest.mock import patch
 
 repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(repo_root))
@@ -89,7 +91,7 @@ from run_h1_shared_capital_portfolio_validation import (
     resolve_validation_design, load_frozen_selection_manifest, resolve_h1_replay_code_paths,
     validate_selection_cutoff, validate_selection_provenance, runtime_provenance,
     selection_validation_boundary, geometric_monthly_return_pct,
-    resolve_market_state_skew_budget,
+    resolve_market_state_skew_budget, resolve_h1_limit_wait_spec,
 )
 
 
@@ -895,3 +897,35 @@ def test_market_state_skew_budget_requires_explicit_nonnegative_integer():
             assert "non-negative integer" in str(exc)
         else:
             raise AssertionError(f"invalid skew budget accepted: {value!r}")
+
+def test_h1_limit_wait_spec_uses_joined_state_and_explicit_skew_budget():
+    engine = SimpleNamespace(
+        instrument_spec_history=object(), risk_tier_history=object(),
+        max_market_state_skew_ms=1250,
+        max_instrument_spec_age_ms=5000, max_risk_tier_age_ms=6000,
+    )
+    spec = object()
+    joined_state = SimpleNamespace(instrument_spec=spec)
+    with patch.object(em, "get_linear_market_state", return_value=joined_state) as joined:
+        assert resolve_h1_limit_wait_spec(engine, "BTCUSDT", 1_800_000_000_000) is spec
+    joined.assert_called_once_with(
+        engine.instrument_spec_history, engine.risk_tier_history,
+        "BTCUSDT", 1_800_000_000_000,
+        max_snapshot_skew_ms=1250,
+        max_instrument_age_ms=5000,
+        max_risk_tier_age_ms=6000,
+    )
+
+
+def test_h1_limit_wait_spec_fails_closed_without_both_histories():
+    engine = SimpleNamespace(
+        instrument_spec_history=object(), risk_tier_history=None,
+        max_market_state_skew_ms=0,
+    )
+    try:
+        resolve_h1_limit_wait_spec(engine, "BTCUSDT", 1_800_000_000_000)
+    except RuntimeError as exc:
+        assert "instrument and risk-tier histories" in str(exc)
+    else:
+        raise AssertionError("limit wait accepted without joined risk-tier history")
+

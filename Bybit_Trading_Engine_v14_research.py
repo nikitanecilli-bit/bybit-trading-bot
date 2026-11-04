@@ -1148,6 +1148,25 @@ class PlanBStatePersistence:
             raise RuntimeError("Plan B backup path must be a regular non-symlink file")
 
     @staticmethod
+    def _read_backup_payload(filepath: str) -> Dict[str, Any]:
+        """Read a regular backup through an O_NOFOLLOW descriptor."""
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if nofollow is None:
+            raise RuntimeError("Plan B backup reads require O_NOFOLLOW support")
+        fd = os.open(filepath, os.O_RDONLY | nofollow)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode):
+                raise RuntimeError("Plan B backup must be a regular file")
+            with os.fdopen(fd, "r", encoding="utf-8", closefd=False) as source:
+                payload = json.load(source)
+            if not isinstance(payload, dict):
+                raise ValueError("Plan B backup root must be a JSON object")
+            return payload
+        finally:
+            os.close(fd)
+
+    @staticmethod
     def _canonical_backup_digest(payload: Dict[str, Any]) -> str:
         encoded = json.dumps(
             payload, ensure_ascii=False, sort_keys=True,
@@ -1226,9 +1245,13 @@ class PlanBStatePersistence:
             "open_positions": {sym: asdict(pos) for sym, pos in open_positions.items()},
             "last_mark_prices": validated_marks,
         }
-        tmp_path = self.backup_filepath + ".tmp"
+        parent_dir = os.path.dirname(os.path.abspath(self.backup_filepath)) or "."
+        fd, tmp_path = tempfile.mkstemp(
+            prefix=os.path.basename(self.backup_filepath) + ".",
+            suffix=".tmp", dir=parent_dir,
+        )
         try:
-            with open(tmp_path, "w", encoding="utf-8") as f:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2, ensure_ascii=False, allow_nan=False)
                 f.flush()
                 os.fsync(f.fileno())
@@ -1299,8 +1322,7 @@ class PlanBStatePersistence:
             if not os.path.isfile(self.backup_filepath):
                 return "BACKUP_MISSING"
             try:
-                with open(self.backup_filepath, "r", encoding="utf-8") as current_file:
-                    current_payload = json.load(current_file)
+                current_payload = self._read_backup_payload(self.backup_filepath)
                 current_digest = self._canonical_backup_digest(current_payload)
             except Exception as exc:
                 raise RuntimeError("cannot inspect reconciliation state: backup is unreadable") from exc
@@ -1367,8 +1389,7 @@ class PlanBStatePersistence:
 
                 # Re-check immediately before replace (the lock also serializes
                 # all ordinary save_state writers in this process family).
-                with open(self.backup_filepath, "r", encoding="utf-8") as current_file:
-                    latest_payload = json.load(current_file)
+                latest_payload = self._read_backup_payload(self.backup_filepath)
                 if self._canonical_backup_digest(latest_payload) != expected_backup_sha256:
                     raise RuntimeError("stale reconciliation candidate: Plan B backup changed")
 
@@ -1395,8 +1416,7 @@ class PlanBStatePersistence:
         if not os.path.exists(self.backup_filepath):
             return {}, {}, 0
         try:
-            with open(self.backup_filepath, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            data = self._read_backup_payload(self.backup_filepath)
             if not isinstance(data, dict):
                 raise ValueError("корень backup должен быть JSON-объектом")
             required_envelope = {

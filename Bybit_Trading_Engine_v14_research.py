@@ -2495,13 +2495,13 @@ class UnifiedQuantEngine:
                     reason = "kill_switch"
                 stop_dist = max(1e-8, pos.initial_stop_dist)
                 if pos.direction == "long":
+                    pos.max_adverse_px = min(pos.max_adverse_px, exit_price)
                     mae_r = max(0.0, (pos.entry_price - pos.max_adverse_px) / stop_dist)
                     mfe_r = max(0.0, (pos.max_favorable_px - pos.entry_price) / stop_dist)
-                    pos.max_adverse_px = min(pos.max_adverse_px, exit_price)
                 else:
+                    pos.max_adverse_px = max(pos.max_adverse_px, exit_price)
                     mae_r = max(0.0, (pos.max_adverse_px - pos.entry_price) / stop_dist)
                     mfe_r = max(0.0, (pos.entry_price - pos.max_favorable_px) / stop_dist)
-                    pos.max_adverse_px = max(pos.max_adverse_px, exit_price)
                 self._close_position(
                     pos, float(exit_price), reason, exit_ts, mae_r, mfe_r,
                     final_exit_maker=False,

@@ -107,13 +107,13 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
                 {
                     "status_filter": "default", "page_index": 1,
                     "request_started_at": "2026-11-01T00:00:00.000Z",
-                    "response_received_at": "2026-11-01T00:00:00.250Z",
+                    "request_completed_at": "2026-11-01T00:00:00.250Z",
                     "row_count": 1, "symbols": ["BTCUSDT"], "has_next_page": False,
                 },
                 {
                     "status_filter": "Closed", "page_index": 1,
                     "request_started_at": "2026-11-01T00:00:01.000Z",
-                    "response_received_at": "2026-11-01T00:00:01.500Z",
+                    "request_completed_at": "2026-11-01T00:00:01.500Z",
                     "row_count": 1, "symbols": ["OLDUSDT"], "has_next_page": False,
                 },
             ]
@@ -135,7 +135,7 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
             observations = [{
                 "status_filter": "Trading", "page_index": 1,
                 "request_started_at": "2026-11-01T00:00:00.000Z",
-                "response_received_at": "2026-11-01T00:00:00.100Z",
+                "request_completed_at": "2026-11-01T00:00:00.100Z",
                 "row_count": 1, "symbols": ["ETHUSDT"], "has_next_page": False,
             }]
             write_snapshot(target, "a.json", "2026-11-01T00:00:01.000Z",

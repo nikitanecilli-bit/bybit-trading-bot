@@ -349,3 +349,13 @@
 - Source-only CI #41873380445 завершился SUCCESS; final Research CI #41873425668 на `6dcb9d8`: SUCCESS, job `tests` SUCCESS, 57/57 steps. Фактический лог подтверждает runner/inspector suite 9/9, включая новый ID classification regression; aggregate-L2 primitives 81/81.
 - Это улучшение диагностики качества CSV, не подтверждение исторических maker fills. Сохранённый AAVE archive всё ещё не содержит BT/isBlockTrade; maker execution realism остаётся BLOCKED_FOR_STRATEGY_PNL.
 - Никакие новые архивы не скачивались; inspector с сетевой загрузкой не запускался; нет PnL/backtest, collectors, private API, runner, paper/live orders или изменений main.
+
+
+## Session update — maker markout decomposition (2026-11-04)
+
+- В `scripts/run_bybit_l2_queue_replay.py:add_post_fill_markouts()` прежний fill-to-future-mid показатель включал одновременно spread capture и движение midpoint после fill. Добавлен pre-fill midpoint из последнего BBO строго до fill timestamp и отдельный `signed_mid_move_from_pre_fill_bps`; `signed_fill_to_future_mid_bps` хранит полный fill-to-future-mid результат, старое `signed_mid_markout_bps` оставлено как compatibility alias.
+- Same-millisecond book events исключаются; fill timestamp проверяется строгим integer guard.
+- Regression: Buy fill 99, pre-fill mid 100, future mid 101 даёт около 202.02 bps fill-to-future-mid и ровно 100 bps mid-to-mid.
+- CI #41867866581 на `794342bbd00342d0b7f1af660362794408da0345`: SUCCESS, 57/57 steps; runner suite 6/6, aggregate-L2 primitives 81/81. Позднее #41873039139 и #41873425668 повторно подтвердили runner/markout suite.
+- Старый сохранённый AAVE report не содержит pre-fill mid и не позволяет ретроспективно выделить adverse selection. Повторный replay не делался: CSV не содержит BT/isBlockTrade и строгий parser его отклоняет.
+- Никаких новых архивов, PnL/backtest, collectors, API, runner, paper/live orders или main changes.

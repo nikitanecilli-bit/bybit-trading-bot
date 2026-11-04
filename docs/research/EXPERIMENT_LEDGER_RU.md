@@ -1106,3 +1106,11 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Regression corrupts legacy realized TP1 gross 30→31 and expects fail-closed restore. Exchange-sized fixtures now use exact gross 3; legacy liquidity fixture uses gross 30.
 - Final CI #41854119883, f42979860d97090120ee3a8aed79d59695d441ee: SUCCESS 57/57; state persistence 78 tests. Earlier runs exposed stale fixture values, corrected before final green run.
 - Persisted PnL integrity guardrail only; no PnL/backtest or exchange operations.
+
+
+## ENG-EXEC-018 — Validate persisted MFE/MAE extrema (2026-11-04)
+
+- Restore rejects zero/non-positive saved favorable/adverse extrema and directionally impossible values (long favorable below entry/adverse above entry; short favorable above entry/adverse below entry). Missing legacy fields retain entry-price defaults.
+- Three regression tests cover zero favorable, long favorable below entry, and short adverse below entry.
+- Source CI #41854906684 SUCCESS 57/57; final CI #41854947672, 4c7744c22180a97fa868547eac034cdf91b69491 SUCCESS 57/57; state persistence 81 tests.
+- Persisted excursion-metric integrity only; no PnL/backtest or exchange operations.

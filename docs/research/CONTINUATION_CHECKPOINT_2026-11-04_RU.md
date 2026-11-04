@@ -278,3 +278,18 @@ Runner report now declares mandatory BT/RPI metadata and counts excluded block t
 Официальные источники: Bybit Orderbook docs указывают matching-engine смысл `cts` и корреляцию с `T`; Public Trade docs определяют `T` как время исполнения, а `i` как trade ID и `BT`/`RPI` как специальные признаки. См. https://bybit-exchange.github.io/docs/v5/websocket/public/orderbook и https://bybit-exchange.github.io/docs/v5/websocket/public/trade.
 
 Итог: timestamp boundary реализована консервативно; временная модель остаётся proxy, пока не будет проверен формат конкретного сохранённого CSV и пока не будет измерена реальная задержка доставки/постановки заявки. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` без изменений.
+
+
+## 14. Проверка совместимости публичного trade archive с обязательными BT/RPI флагами
+
+Проверен контракт источника, который зашит в runner: `https://public.bybit.com/trading/AAVEUSDT/AAVEUSDT2025-09-02.csv.gz`. По опубликованным описаниям структуры futures CSV у `public.bybit.com` содержит стандартные поля сделки и `RPI`, но `BT/isBlockTrade` в перечисленной схеме отсутствует. При этом официальный V5 recent-trade API явно предоставляет оба флага — `isBlockTrade` и `isRPITrade` — но это другой формат/endpoint, не доказательство наличия этих полей в историческом CSV.
+
+Следствие для текущей реализации:
+- `iter_public_trades()` намеренно требует оба признака и завершает обработку ошибкой, если один отсутствует;
+- поэтому текущий runner, вероятно, остановится на проверке заголовка CSV, не дойдя до replay, если исторический CSV соответствует опубликованной стандартной схеме;
+- это не дефект fail-closed логики, а несовместимость выбранного источника с требованиями модели: нельзя безопасно приравнивать отсутствие BT к `False`;
+- не ослаблять проверку и не считать все строки обычными сделками. Нужен источник исторических принтов с достоверными BT и RPI, либо доказательство, что конкретная версия архива содержит дополнительные колонки.
+
+Источники для проверки: Bybit V5 Recent Public Trades документирует оба флага; описание публичной futures CSV схемы перечисляет `RPI`, но не `BT`. Это schema-level warning; реальный заголовок файла не проверялся, потому что действует запрет на новые скачивания. См. https://bybit-exchange.github.io/docs/v5/market/recent-trade и https://github.com/Anton495/bybit-data-downloader.
+
+Никаких новых архивов не скачивал. Не менял парсер, так как fail-closed поведение здесь корректно. Это отдельный блокер для L2 replay: `TRADE_ARCHIVE_FLAGS = UNVERIFIED_COMPATIBILITY`. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` сохраняется.

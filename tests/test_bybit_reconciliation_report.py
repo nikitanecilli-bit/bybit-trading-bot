@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.bybit_reconciliation_report import (
-    ReportError, build_execution_merge_plan, build_report, compare_execution_snapshots,
+    ReportError, apply_execution_merge_plan, build_execution_merge_plan, build_report, compare_execution_snapshots,
 )
 
 SAVED = "2026-10-01T00:00:00Z"
@@ -466,6 +466,83 @@ class ReportOnlyComparatorTests(unittest.TestCase):
         with self.assertRaisesRegex(ReportError, "server-time bounds"):
             build_report(backup(), data)
 
+
+    def _merge_fixture(self):
+        position = {
+            "symbol": "BTCUSDT",
+            "exchange_position_identity": {
+                "category": "linear", "settle_coin": "USDT", "symbol": "BTCUSDT",
+                "position_idx": 0, "position_mode": "one_way", "side": "Buy",
+                "qty": "0.1", "avg_price": "50000", "entry_order_id": "entry-1",
+                "entry_order_link_id": "",
+            },
+            "exchange_orders": [],
+            "exchange_executions": [],
+        }
+        local = backup(positions={"BTCUSDT": position})
+        execution = {
+            "execId": "late-fill-apply", "orderId": "entry-1", "orderLinkId": "",
+            "symbol": "BTCUSDT", "execType": "Trade", "execTime": CAPTURE_MS - 1,
+            "side": "Buy", "execQty": "0.1", "execPrice": "50000", "execFee": "0.01",
+        }
+        plan = build_execution_merge_plan(
+            local, upgrade_to_schema3(snapshot(execution_rows=[execution]))
+        )
+        return local, plan
+
+    def test_apply_execution_merge_plan_returns_detached_candidate_and_preserves_source(self):
+        local, plan = self._merge_fixture()
+        original = copy.deepcopy(local)
+        result = apply_execution_merge_plan(local, plan)
+        self.assertEqual(result["status"], "DETACHED_BACKUP_CANDIDATE")
+        self.assertEqual(result["inserted"], 1)
+        self.assertEqual(
+            result["backup"]["open_positions"]["BTCUSDT"]["exchange_executions"][0]["exec_id"],
+            "late-fill-apply",
+        )
+        self.assertEqual(local, original)
+        self.assertFalse(result["execution_history_complete"])
+        self.assertFalse(result["reconciliation_pass"])
+        self.assertFalse(result["live_resume_allowed"])
+
+    def test_apply_execution_merge_plan_rejects_stale_backup(self):
+        local, plan = self._merge_fixture()
+        changed = copy.deepcopy(local)
+        changed["pending_orders"]["ETHUSDT"] = {"changed": True}
+        with self.assertRaisesRegex(ReportError, "stale execution merge plan"):
+            apply_execution_merge_plan(changed, plan)
+
+    def test_apply_execution_merge_plan_rejects_modified_plan(self):
+        local, plan = self._merge_fixture()
+        tampered = copy.deepcopy(plan)
+        tampered["planned_insertions"]["BTCUSDT"][0]["exec_qty"] = "0.2"
+        with self.assertRaisesRegex(ReportError, "integrity check failed"):
+            apply_execution_merge_plan(local, tampered)
+
+    def test_apply_execution_merge_plan_is_atomic_on_invalid_candidate(self):
+        local, plan = self._merge_fixture()
+        original = copy.deepcopy(local)
+        invalid = copy.deepcopy(plan)
+        invalid["planned_insertions"]["BTCUSDT"].append({
+            "exec_id": "orphan", "order_id": "unknown-order", "order_link_id": "",
+            "symbol": "BTCUSDT", "side": "Buy", "exec_qty": "0.1",
+            "exec_price": "50000", "exec_time_ms": CAPTURE_MS, "exec_fee": "0.01",
+        })
+        invalid["planned_insert_count"] += 1
+        unsigned = {key: value for key, value in invalid.items() if key != "plan_sha256"}
+        invalid["plan_sha256"] = hashlib.sha256(json.dumps(
+            unsigned, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        with self.assertRaisesRegex(ReportError, "unknown order"):
+            apply_execution_merge_plan(local, invalid)
+        self.assertEqual(local, original)
+
+    def test_apply_execution_merge_plan_replay_is_rejected_as_stale(self):
+        local, plan = self._merge_fixture()
+        applied = apply_execution_merge_plan(local, plan)
+        with self.assertRaisesRegex(ReportError, "stale execution merge plan"):
+            apply_execution_merge_plan(applied["backup"], plan)
 
     def test_dry_run_merge_plan_proposes_late_fill_without_mutating_backup(self):
         position = {

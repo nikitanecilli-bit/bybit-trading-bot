@@ -94,6 +94,35 @@ jobs:
           SYMBOLS: ${{ inputs.symbols }}
         run: |
           python scripts/validate_funding_coverage.py --funding-dir "data/archives/bybit/${{ inputs.start_ms }}_${{ inputs.end_ms }}_${GITHUB_RUN_ID}/funding" --mark-dir "data/archives/bybit/${{ inputs.start_ms }}_${{ inputs.end_ms }}_${GITHUB_RUN_ID}/mark_price" --trade-kline-dir "data/archives/bybit/${{ inputs.start_ms }}_${{ inputs.end_ms }}_${GITHUB_RUN_ID}/kline" --symbols "$SYMBOLS"
+      - name: Require dated Funding schedule and exact settlement-event coverage
+        env:
+          SYMBOLS: ${{ inputs.symbols }}
+          START_MS: ${{ inputs.start_ms }}
+          END_MS: ${{ inputs.end_ms }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from funding_archive_manifest import validate_archive_funding_manifests
+
+          root = Path("data/archives/bybit") / f"{os.environ['START_MS']}_{os.environ['END_MS']}_{os.environ['GITHUB_RUN_ID']}"
+          start_ms = int(os.environ["START_MS"])
+          end_ms_exclusive = int(os.environ["END_MS"])
+          if end_ms_exclusive <= start_ms:
+              raise SystemExit("Invalid archive interval: END_MS must be greater than START_MS.")
+
+          symbols = [item.strip().upper() for item in os.environ["SYMBOLS"].split(",") if item.strip()]
+          report = validate_archive_funding_manifests(
+              root,
+              symbols,
+              requested_start_ms=start_ms,
+              requested_end_exclusive_ms=end_ms_exclusive,
+          )
+          print(json.dumps(report, indent=2))
+          if not report.get("ok", False):
+              raise SystemExit("Strict Funding manifest/schedule validation failed; archive will not be committed.")
+          PY
       - name: Commit verified archive
         run: |
           if [[ -n "$(git status --porcelain data/archives/bybit)" ]]; then

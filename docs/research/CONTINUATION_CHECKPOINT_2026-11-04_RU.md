@@ -1171,3 +1171,20 @@ Artifact был получен из уже существующего CI run; н
 Research CI run #41870649976 завершился SUCCESS: job completed, все 57 шагов завершены без failure; шаг runner chronology/markout test также SUCCESS. Это подтверждает кодовую проверку alias helper, но не меняет вывод по сохранённому AAVE CSV: в нём по-прежнему отсутствуют оба block-trade aliases. Никакие архивы не скачивались и инспектор с сетевой загрузкой не запускался.
 
 Статус execution gate остаётся MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL: нет исторического источника с надёжным BT classification. Main не менялся (HEAD c87612207d145af433394f0ea992f2d29eba28d5).
+
+
+## 64. Проверка доступных официальных каналов для исторического BT — 2026-11-04
+
+Проверены актуальные публичные контракты Bybit:
+- REST Get Recent Public Trades (/v5/market/recent-trade) возвращает isBlockTrade, isRPITrade и seq, но параметры запроса включают category/symbol/baseCoin/optionType/limit; startTime/endTime для выборки произвольного исторического интервала в этом endpoint отсутствуют. Максимальный limit для linear — 1,000. Документация: https://bybit-exchange.github.io/docs/v5/market/recent-trade.
+- Public Trade WebSocket содержит BT, RPI и seq в real time: https://bybit-exchange.github.io/docs/v5/websocket/public/trade.
+- Bybit Get Trade History (/v5/execution/list) относится к пользовательским исполнениям и не является market-wide public print tape: https://bybit-exchange.github.io/docs/v5/order/execution.
+- Сохранённый исторический AAVE CSV действительно не имеет BT/isBlockTrade. Внешняя схема публичного daily CSV, найденная в независимой документации downloader, также перечисляет 11 колонок без BT; это вспомогательное corroboration, не официальный контракт: https://github.com/Anton495/bybit-data-downloader.
+
+Вывод:
+- Нельзя восстановить историческую BT-классификацию за произвольный старый период из documented public REST recent-trade endpoint.
+- Private execution history не может классифицировать все публичные сделки рынка.
+- Для достоверного historical BT нужен уже существующий WS capture/архив с BT или внешний источник с документированной и проверенной семантикой этого поля. Ничего из этого в проверенных сохранённых артефактах пока не найдено.
+- Не запускать collector и не загружать новые архивы в обход текущего ограничения. Возможный будущий WS capture — только после отдельного решения пользователя; до этого исторический maker replay остаётся заблокированным.
+
+Статус: MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL. Никакие REST/WS запросы к Bybit не выполнялись; проверялась только публичная документация. Main не менялся.

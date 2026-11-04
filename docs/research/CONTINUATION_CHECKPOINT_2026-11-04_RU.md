@@ -593,3 +593,13 @@ CI:
 - full run 41838431510 на commit 5ab0b56138bd7cc039f18c0df641a6fda8cec32a: SUCCESS, job tests 56/56 steps completed successfully, queue replay primitive test step SUCCESS.
 
 Это предотвращает трактовку неизвестной очереди за границей top-200 как нулевой, но не решает stale-book age/latency и неизвестную полноту архива. Не запускались новые archive downloads, strategy PnL, private API, paper/live orders. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.
+
+
+## 28. Граница применимости update ID continuity contract
+
+Повторно сверена официальная документация Bybit по двум различным каналам:
+- Standard public orderbook (включая level 200): описывает snapshot/delta, u как Update ID, seq как Cross sequence и occasional u=1 как restart snapshot; отдельное правило u+1 для depth-200 standard stream в описании не установлено.
+- Full Orderbook: отдельный delta-only channel; его документация явно требует consecutive u+1 в пределах session и отдельную процедуру синхронизации с REST snapshot.
+
+Вывод: u+1 continuity нельзя переносить с Full Orderbook на исторический depth-200 archive без доказательства, что архив действительно использует тот же stream contract. Текущий replay сохраняет строгую проверку positive integer u, u=1 только snapshot, монотонность seq/cts и атомарность, но не делает неподтверждённое u+1 предположение. Для окончательного решения нужны raw historical archive samples и подтверждённая спецификация формата; новые архивы не загружались из-за действующего external-data hold.
+

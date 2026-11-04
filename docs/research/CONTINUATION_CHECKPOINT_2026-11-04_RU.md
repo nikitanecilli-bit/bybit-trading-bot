@@ -1019,3 +1019,13 @@ Classification: execution/persistence/accounting correctness; no evidence of str
 Refined exchange-sized TP1/restore checks: entry price is not a planned exit order. The minimum notional price is now min(stop_price, tp2_price), with TP1 leg separately validated at TP1 price. This avoids false rejection after a long trailing stop rises above entry while both actual exit prices still meet minNotionalValue.
 
 Regression: exchange-sized long entry 100, trailing stop 110, TP2 112, qty 1, minNotional 105. Restore succeeds although entry notional is 100, because stop and TP2 notionals are valid. CI #41852293859 on c88e587d01739eb7c0ee6fe94e0369b28aff664c: SUCCESS 57/57; actual log confirms new test passed; state persistence suite 77/77.
+
+
+## 52. Git topology after execution/accounting guardrail updates — 2026-11-04
+
+- main: c87612207d145af433394f0ea992f2d29eba28d5.
+- research/market-regime-v1-main before this checkpoint-only commit: 3bdce827c02767e93b43eb5c9e7d88fea58b8a3d.
+- merge base: ae599a2f3279e15fe27360662f94f0e7ef8db5be.
+- GitHub compare: diverged, 2,148 ahead / 36 behind.
+- PR #4: open, Draft, mergeable=false; preserve both histories. No merge/rebase/reset/force-push; main unchanged.
+- Latest tested code/test head: c88e587d01739eb7c0ee6fe94e0369b28aff664c; CI #41852293859 SUCCESS, 57/57. Subsequent commits were documentation-only.

@@ -150,3 +150,46 @@ Read-only проверены первичные result reports, preregistration 
 - E05's exact failure commit and attempted scope are known; it produced no result artifact.
 - The E07 workflow generated separate primary/reserve artifacts; the headline +3,947.32 USDT example must not be treated as a clean untouched holdout or combined primary+reserve portfolio.
 - No artifacts were downloaded, no ZIP inputs were opened, and no tests, PnL, collectors, API calls or orders were executed during this provenance pass.
+
+
+## 2026-11-05 — P1: historical accounting-version impact for E01–E07
+
+### Confirmed version boundary
+
+Static comparison of `Bybit_Trading_Engine_v14_research.py` at each experiment's exact checked-out commit against the later corrected engine establishes:
+
+- E01–E03 (commit `4e27b6adf8c3199ce78446d33703984394c94152`): engine blob `e4501bd3666d7fe25ae8c1a10a9813da89b535dd`; old exit-cost basis.
+- E04 (commit `4b291265976d66f77b692d057a921d170be865da`): same engine blob `e4501bd3666d7fe25ae8c1a10a9813da89b535dd`; old exit-cost basis.
+- E06 (commit `9601f4d855f69d58e7353655a0c62060f519de13`): same engine blob `e4501bd3666d7fe25ae8c1a10a9813da89b535dd`; diagnostic trade/cost exports use old exit-cost basis.
+- E07 (commit `a5a9851622544b4d16a0aec7f9ccab7d612cc608`): engine blob `c47caac76de0a9a38da1a839462495bfd14fa3af`; its `_close_position()` still uses the old entry-notional formula for TP1 and final exit fees/slippage.
+- E05 (commit `c0b61c2e87c46b347179d811c1410a6ad84478b0`): failed at public-data download with HTTP 403 before holdout script execution; no PnL result to classify.
+
+The old formula used `pos.size_usdt * TP1_FRACTION` for TP1 costs and `pos.size_usdt * remaining_fraction` for final exit costs. The corrected implementation, verified present in engine blob `b91c40f142ddbbe65703eb6e84f24ce4fd05dc26` at commit `4eb9a2e7d7fc6a198937ef028dec32a5f723e22d`, uses proxy quantity `size_usdt / entry_price` multiplied by the relevant TP1/final execution price and leg fraction. Entry costs remain based on entry notional; stop-risk cost estimates are also adjusted to the stop execution price.
+
+### Direction of historical bias
+
+For a profitable exit, the old entry-notional basis understates exit fees/slippage when exit notional is above entry notional? More precisely:
+- if the total exit execution notional is greater than entry notional (aggregate profitable position), old exit costs are understated and old net PnL is overstated;
+- if total exit execution notional is lower than entry notional (aggregate losing position), old exit costs are overstated and old net PnL is understated.
+
+This direction follows the linear USDT quantity identity: total exit notional across all legs = entry notional + gross PnL, assuming unchanged quantity apart from recorded partial exits. It does **not** determine the net effect on a multi-trade experiment without its per-leg fills and execution classifications.
+
+### Impact classification
+
+| Experiment | Old fee/slippage formula present? | Classification |
+|---|---|---|
+| E01 | Yes | **PROVISIONAL — PnL and possibly position sizing affected.** Contains both market and OHLC-limit variants; no aggregate correction can be inferred from the published summary alone. |
+| E02 | Yes | **PROVISIONAL — PnL and policy-selection scores affected.** The train-only policy selection itself may choose different candidates after corrected costs; fixed-trade adjustment is insufficient. |
+| E03 | Yes | **PROVISIONAL — PnL and entry-policy comparisons affected.** Exit legs are taker by design, but limit-entry variants still have maker/taker entry classification; exact per-leg cost correction not reconstructed. |
+| E04 | Yes | **PROVISIONAL — PnL and risk sizing affected.** Selected five-symbol diagnostic with OHLC limit fills and 2× cost assumptions; fold-level aggregate is not enough for a corrected ledger. |
+| E05 | No PnL executed | **NOT APPLICABLE** — data-access failure only. |
+| E06 | Yes | **DIAGNOSTIC COST FIELDS PROVISIONAL.** It is not an independent strategy PnL test; any trade-level cost attribution inherits the old engine formula. |
+| E07 | Yes | **PROVISIONAL — shared-capital PnL and portfolio path affected.** Corrected stop-cost reserves can change position sizes, slot competition and subsequent trades; the selected grid result cannot be repaired by a scalar adjustment. |
+
+### What is and is not concluded
+
+- The code-version mismatch is confirmed by exact run checkout SHA and exact engine blob at those commits.
+- The correction was present and tested by Research CI #41536540759 on commit `4eb9a2e7d7fc6a198937ef028dec32a5f723e22d`; the engine file at that commit contains price-specific TP1/final notional formulas.
+- This is a classification of historical evidence, not a claim that every old result is numerically wrong in the same direction.
+- No historical PnL was recalculated, no fixed-trade sensitivity was applied to E01–E07, no artifacts were downloaded, and no backtest or parameter sweep was run.
+- Preserve original reported figures as historical outputs, but do not use them as corrected-engine profitability evidence. Any future rerun would require the separate user/data/execution gates to be explicitly reopened.

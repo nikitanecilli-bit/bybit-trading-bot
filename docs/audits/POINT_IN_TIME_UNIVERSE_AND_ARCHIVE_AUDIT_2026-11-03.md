@@ -144,3 +144,17 @@ The dedicated CryptoFetch audit workflow completed successfully:
 - AAVEUSDT, DOTUSDT, TAOUSDT each have a 4,321-bar subset exactly matching the same timestamps in an 8,761-bar archive. ENAUSDT, ONDOUSDT, QNTUSDT each have two identical 8,761-bar copies.
 - All six ZIP SHA-256 hashes in the E11 and E13 artifacts match the current checked-in archive hashes. Thus the scan covers the exact archive bytes used in those experiments.
 - Conclusion: no current duplicate-selection corruption or coverage loss was found in E11/E13 source archives. This resolves the present duplicate-archive concern for these exact inputs only. It does not resolve the separate Binance-vs-Bybit market-data gap, historical listing availability, funding, spread, or execution fidelity.
+
+## ENG-DATA-008 — current status is not historical tradability (2026-11-04)
+
+Static audit of `scripts/snapshot_bybit_linear_universe.py`, `instrument_spec_history.py`, and their offline tests found an important distinction:
+
+- `is_linear_usdt_perpetual_within_lifecycle_at()` deliberately checks only launch/delivery bounds. Its test accepts a `Closed` instrument for a timestamp before its recorded `deliveryTime`. This is not a claim that the instrument was continuously `Trading`; the helper's docstring explicitly says it does not check current tradability.
+- The universe snapshot stores the status observed in each completed collection. `InstrumentSpecHistory.get_spec()` selects the newest completed snapshot at or before `as_of_ts`, and with its default `require_trading=True` requires that snapshot's observed status to equal `Trading`. It does not retroactively apply today's status to earlier timestamps.
+- A symbol absent from the latest full-universe snapshot fails closed. This avoids silently carrying a previously observed spec forward after disappearance.
+- However, a snapshot is a point observation, not a status-transition log. Between snapshots, temporary suspensions, delisting/status changes and newly listed instruments cannot be reconstructed. `max_age_ms` is optional and defaults to no age limit; even a freshness bound limits staleness but cannot prove there was no intrainterval status change.
+- The collector queries default (Trading/PendingOpen) plus PreLaunch, Settling, Delivering and Closed statuses, but the actual Bybit capture remains unverified because the manual-only collector workflow has not been run and prior public API access returned HTTP 403.
+
+**Finding:** no demonstrated code path was found that intentionally uses a present-day status as the historical status for an earlier `as_of_ts`; the dated-snapshot selector is directionally correct. But neither lifecycle eligibility nor a stale status snapshot proves continuous historical tradability. The current collector/history design is insufficient to certify an exact historical tradable universe without sufficiently frequent archived status observations or authoritative status-transition evidence.
+
+**Decision:** do not change the lifecycle predicate to exclude every `Closed` row before delivery: that would conflate contractual lifecycle with observed trading status and discard useful lifecycle evidence. Do not invent a default freshness interval. Keep point-in-time tradability and strategy-PnL gates blocked until dated status coverage and its sampling gaps can be measured. No market tests, collector runs, API requests or archive downloads were performed for this audit.

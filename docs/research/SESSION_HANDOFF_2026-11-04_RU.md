@@ -290,3 +290,13 @@
 - Both TP1 and restore checks now use min(stop_price, tp2_price), i.e. the actual planned stop/target exit levels; TP1 leg remains checked separately at TP1 price.
 - Added regression for an exchange-sized long with entry 100, trailing stop 110, TP2 112, qty 1, minNotional 105: restore must succeed because both planned exits satisfy the threshold even though entry notional does not.
 - CI #41852293859 on c88e587d01739eb7c0ee6fe94e0369b28aff664c: SUCCESS, 57/57 steps, zero failures. Actual log confirms the new restore regression passed; state-persistence suite 77/77.
+
+
+## Session update — funding TP1/quantity invariant (2026-11-04)
+
+- Further accounting audit found both funding helpers accepted contradictory lifecycle state: `tp1_hit=false` with a partial remaining quantity, or `tp1_hit=true` while remaining quantity still equaled initial quantity. This could silently misclassify the exposure share used in cumulative funding and liquidation-margin funding.
+- Both `accrued_funding_cost()` and `accrued_funding_cost_for_remaining_margin()` now fail closed on those contradictions. The margin helper also explicitly validates `remaining_fraction` in [0,1]. Exact contract quantities remain authoritative over a stale/rounded display fraction, consistent with existing behavior/tests.
+- Updated funding test fixture default to a full remaining fraction when TP1 is false; previous default encoded an invalid half-sized position without a TP1 event. Added three regressions: partial quantity without TP1, TP1 flag without quantity reduction, and exact contract partial quantity without TP1.
+- Final CI #41853410298 on test commit 0cf45d16809a04e2653325934b37723b009097d0: SUCCESS, 57/57 workflow steps; actual log confirms all three new tests passed and funding accounting suite ran 28 tests.
+- Intermediate source-only CI #41853363357 used the prior test fixture (half remaining with TP1 false) and failed in the funding suite as expected for the newly enforced invariant. The fixture was corrected in the next commit and the full workflow rerun passed; no source rollback was needed.
+- Classification: funding/accounting state-integrity guardrail, not PnL evidence. No market data downloads, PnL/backtest, private API, runner, paper/live orders, or main-branch changes.

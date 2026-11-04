@@ -4,6 +4,7 @@ import json
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -562,7 +563,7 @@ class ReportOnlyComparatorTests(unittest.TestCase):
             local, plan, persistence, risk_mgr, cfg, path = self._persistable_merge_fixture(tmp)
             # First fsync is the temp file, second is the directory after replace
             # and fails; the retry inspector fsyncs the directory a third time.
-            with unittest.mock.patch("os.fsync", side_effect=[None, OSError("lost commit acknowledgement"), None]):
+            with patch("os.fsync", side_effect=[None, OSError("lost commit acknowledgement"), None]):
                 result = persist_execution_merge_plan(
                     local, plan, persistence=persistence, risk_mgr=risk_mgr,
                 )

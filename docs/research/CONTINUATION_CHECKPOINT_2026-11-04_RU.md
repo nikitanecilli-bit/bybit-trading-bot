@@ -909,3 +909,25 @@ Verification:
 - Actual logs confirm the new inverse-category regression and risk-tier history suite **16/16 passed**.
 
 No Bybit data collection/download, PnL, private API/account access, runner registration, paper/live orders or main-branch changes. PR #4 remains Draft/open. Continue read-only metadata and type-guard review; the PnL gate remains closed.
+
+
+## 45. Snapshot history loaders enforce integer metadata types — 2026-11-04
+
+Static review found that Python considers bool values equal to integers: schema_version=true passed a comparison with 1, and count/tier_count=true could pass for a one-row snapshot.
+
+Correction:
+- InstrumentSpecHistory and RiskTierHistory now require schema_version to be a non-bool int equal to 1.
+- Instrument snapshot count and risk-tier tier_count must be non-bool integers equal to the actual row count.
+- Added regressions for boolean schema_version and count/tier_count in both history loaders.
+
+Commits:
+- instrument history source: 43765d20a61a56c0ce165f6e20c7eb163ae38987;
+- risk-tier history source: b2d284529ceeddab617d4d2ba95c7974b2d0098a;
+- instrument history tests: 7fd2d8623ef2ba70248b457504f868e1877afa63;
+- risk-tier history tests: 3b7442b32383f5c41043ea7bf74430e1acbcd7b2.
+
+Verification:
+- Research CI #41846644399 on 3b7442b32383f5c41043ea7bf74430e1acbcd7b2: SUCCESS; job tests SUCCESS; all 57 workflow steps completed without failure.
+- Actual logs confirm InstrumentSpecHistory **12/12 passed** and RiskTierHistory **17/17 passed**, including the new metadata type regressions.
+
+No Bybit collector/download, market PnL, private API/account access, runner registration, paper/live orders or main-branch changes. PR #4 remains Draft/open. Next: verify final branch/PR/CI state, then continue independent static execution-consumer review.

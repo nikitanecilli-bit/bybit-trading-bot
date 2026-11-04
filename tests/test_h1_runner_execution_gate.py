@@ -226,6 +226,58 @@ def test_selection_provenance_rejects_changed_data_and_code():
 
 
 
+def test_selection_provenance_rejects_added_or_removed_replay_dependencies():
+    selection = {
+        "input_files": {
+            "kline": [], "funding": [], "mark_price": [],
+            "instrument_specs": [], "risk_tiers": [], "universe_snapshot": [],
+        },
+        "code_files": [{"path": "engine.py", "sha256": "engine-v1", "size_bytes": 100}],
+    }
+    current_inputs = {
+        "kline": [], "funding": [], "mark_price": [],
+        "instrument_specs": [], "risk_tiers": [], "universe_snapshot": [],
+    }
+    for current_code in (
+        [
+            {"path": "engine.py", "sha256": "engine-v1", "size_bytes": 100},
+            {"path": "new_dependency.py", "sha256": "dep-v1", "size_bytes": 50},
+        ],
+        [],
+    ):
+        try:
+            validate_selection_provenance(selection, current_inputs, current_code)
+        except SystemExit as exc:
+            assert "dependency set changed" in str(exc)
+            assert "rerun train-only selection" in str(exc)
+        else:
+            raise AssertionError("added or removed replay dependencies must invalidate selection")
+
+
+def test_selection_provenance_rejects_duplicate_code_paths():
+    selection = {
+        "input_files": {
+            "kline": [], "funding": [], "mark_price": [],
+            "instrument_specs": [], "risk_tiers": [], "universe_snapshot": [],
+        },
+        "code_files": [{"path": "engine.py", "sha256": "engine-v1", "size_bytes": 100}],
+    }
+    current_inputs = {
+        "kline": [], "funding": [], "mark_price": [],
+        "instrument_specs": [], "risk_tiers": [], "universe_snapshot": [],
+    }
+    duplicate = [
+        {"path": "engine.py", "sha256": "engine-v1", "size_bytes": 100},
+        {"path": "engine.py", "sha256": "engine-v1", "size_bytes": 100},
+    ]
+    try:
+        validate_selection_provenance(selection, current_inputs, duplicate)
+    except SystemExit as exc:
+        assert "Duplicate current checkout replay code provenance path" in str(exc)
+    else:
+        raise AssertionError("duplicate replay dependency paths must fail closed")
+
+
 def test_selection_provenance_rejects_changed_universe_snapshot():
     selection = {
         "input_files": {
@@ -680,6 +732,8 @@ if __name__ == "__main__":
         test_selection_manifest_direction_must_match_long_only_runner,
         test_selection_manifest_must_be_valid_and_successful,
         test_selection_provenance_rejects_changed_data_and_code,
+        test_selection_provenance_rejects_added_or_removed_replay_dependencies,
+        test_selection_provenance_rejects_duplicate_code_paths,
         test_selection_provenance_rejects_changed_universe_snapshot,
         test_runtime_provenance_separates_research_checkout_from_workflow_ref,
         test_geometric_monthly_return_normalizes_compounded_returns_by_exact_duration,

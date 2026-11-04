@@ -196,7 +196,10 @@ def build_page_observation(
     }
 
 
-def validate_page_observations(observations: Any) -> list[dict[str, Any]]:
+def validate_page_observations(
+    observations: Any, *, expected_symbols: set[str] | None = None,
+    collection_started_at: str | None = None, fetched_at: str | None = None,
+) -> list[dict[str, Any]]:
     if not isinstance(observations, list) or not observations:
         raise ValueError("page_observations must be a non-empty list")
     validated = []
@@ -231,6 +234,14 @@ def validate_page_observations(observations: Any) -> list[dict[str, Any]]:
         page_counts[status] = expected_index
         previous_received = normalized["response_received_at"]
         validated.append(normalized)
+    if collection_started_at is not None and validated[0]["request_started_at"] < _snapshot_timestamp(collection_started_at):
+        raise ValueError("first page observation starts before collection_started_at")
+    if fetched_at is not None and validated[-1]["response_received_at"] > _snapshot_timestamp(fetched_at):
+        raise ValueError("last page observation is after fetched_at")
+    if expected_symbols is not None:
+        observed_symbols = {symbol for item in validated for symbol in item["symbols"]}
+        if observed_symbols != expected_symbols:
+            raise ValueError("page observation symbols do not match snapshot instruments")
     return validated
 
 
@@ -262,7 +273,10 @@ def build_snapshot(rows: list[dict[str, Any]], category: str,
     if started_at is not None:
         snapshot["collection_started_at"] = started_at
     if page_observations is not None:
-        snapshot["page_observations"] = validate_page_observations(page_observations)
+        snapshot["page_observations"] = validate_page_observations(
+            page_observations, expected_symbols=set(symbols),
+            collection_started_at=started_at, fetched_at=timestamp,
+        )
     return snapshot
 
 

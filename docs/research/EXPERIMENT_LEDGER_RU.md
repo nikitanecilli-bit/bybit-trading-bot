@@ -1133,3 +1133,13 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Финальный CI #41873039139 на `ec28763da6ade2635c31cd0111ae8c612625f23d`: SUCCESS, 57/57 workflow steps, zero failures; inspector/runner suite 7/7; aggregate-L2 primitive suite 81/81.
 - Промежуточный #41872989853 failed только потому, что тест ссылался на удалённый helper `parse_archive_timestamp_ms` после refactor к shared parser; тест синхронизирован в `ec28763`, полный финальный CI прошёл.
 - Это timestamp-integrity guardrail диагностического инструмента, не доказательство исполнения или доходности. Никакие архивы не скачивались; inspector с сетевым вызовом не запускался. No PnL/backtest, API, runner, paper/live orders or main changes.
+
+
+## ENG-EXEC-020 — Report missing and malformed public trade IDs in archive inspector (2026-11-04)
+
+- The historical trade archive inspector previously counted only truthy `trdMatchID` values. Missing/blank IDs and IDs with surrounding whitespace were silently omitted from the identity counts, unlike the strict replay parser.
+- Added `classify_trade_id()` and report fields for missing IDs, malformed whitespace IDs, duplicate IDs, presence of the ID column, and an overall `trade_id_validation_status`.
+- Regression covers None, empty, whitespace-only, surrounding whitespace, unique ID and duplicate ID.
+- Source commit `bd2c0f9bc9fe2ad64044a4b9fe672ceb148950b3`; test commit `6dcb9d8bc000778c09975dbd462c36545e23682c`.
+- Source-only CI #41873380445 SUCCESS; final CI #41873425668 on `6dcb9d8` SUCCESS, 57/57 steps, zero failures. Actual logs: inspector/runner suite 9/9; aggregate-L2 primitives 81/81; portfolio accounting 54/54; state persistence 84/84.
+- Data-quality diagnostic only; no execution/PnL evidence. No new archives downloaded and network inspector not run. Historical AAVE CSV still lacks BT/isBlockTrade; maker execution realism remains blocked. No PnL/backtest, API, runner, paper/live orders or main changes.

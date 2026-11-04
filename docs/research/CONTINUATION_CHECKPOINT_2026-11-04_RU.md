@@ -1310,3 +1310,17 @@ Read-only comparison `scripts/inspect_bybit_orderbook_sample.py` с `OrderBook.a
 - Финальный Research CI #41875905360 на `1b50c9da41b99ea23d04e009e7ba6e6424d73e01`: SUCCESS, job `tests` SUCCESS, 57/57 workflow steps, zero failures. Фактический лог подтверждает strict orderbook inspector regression; inspector/runner suite 9/9, aggregate-L2 primitives 81/81.
 
 Классификация: strict timestamp/sequence provenance guardrail диагностического инструмента; не execution evidence и не PnL. Inspector не запускался с сетевой загрузкой, новые архивы не скачивались. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся. Нет PnL/backtest, collectors, private API, runner, paper/live orders или изменений `main`.
+
+## 34. No-overwrite JSON report serialization (ENG-EXEC-032)
+
+Три исследовательских скрипта ранее записывали JSON в фиксированные имена через `Path.write_text()`, поэтому повторный запуск мог перезаписать прежний отчёт.
+
+Исправлено:
+- общий `report_io.py` открывает отчёт в exclusive-create режиме `x`; существующий файл остаётся неизменным и вызывает `FileExistsError`;
+- сериализация выполняется до создания файла; частично записанный новый файл удаляется при ошибке записи;
+- обновлены queue replay runner, trade inspector и orderbook inspector;
+- добавлены два deterministic tests: no-overwrite/byte preservation и отсутствие файла при serialization failure.
+
+Commits: helper `0a58d10f`; runner `ddc3defd` + import correction `a70d7596`; trade inspector `e2f484a7`; orderbook inspector `6bdedbeb`; tests `ed089a1c`; note `118acb07`.
+
+CI для HEAD `118acb07` не подтверждён: combined commit status не вернул check records. Не считать тесты выполненными. Не запускать network inspection workflow: он скачивает новые архивы и выполняет bounded queue probe. Новые архивы, collectors, market PnL, private API, runner, paper/live orders не использовались. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`; `main` не изменён, PR #4 не слит.

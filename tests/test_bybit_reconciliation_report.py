@@ -240,6 +240,23 @@ class ReportOnlyComparatorTests(unittest.TestCase):
         with self.assertRaisesRegex(ReportError, "execution identity changed"):
             compare_execution_snapshots(initial, refreshed)
 
+    def test_schema_v3_snapshot_rejects_untrusted_base_url(self):
+        data = upgrade_to_schema3(snapshot(), base_url="https://attacker.example")
+        with self.assertRaisesRegex(ReportError, "official HTTPS Bybit API host"):
+            build_report(backup(), data)
+
+    def test_schema_v3_snapshot_rejects_url_credentials_and_nonstandard_port(self):
+        for base_url in (
+            "https://user:pass@api.bybit.com",
+            "https://api.bybit.com:8443",
+            "http://api.bybit.com",
+            "https://api.bybit.com/path",
+        ):
+            with self.subTest(base_url=base_url):
+                data = upgrade_to_schema3(snapshot(), base_url=base_url)
+                with self.assertRaisesRegex(ReportError, "official HTTPS Bybit API host"):
+                    build_report(backup(), data)
+
     def test_execution_snapshot_comparison_rejects_different_api_key_fingerprint(self):
         initial = upgrade_to_schema3(snapshot())
         refreshed = upgrade_to_schema3(snapshot(), key_material="fixture-account-b")

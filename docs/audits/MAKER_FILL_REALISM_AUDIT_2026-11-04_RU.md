@@ -211,7 +211,7 @@ Confirmed semantics:
 - marketable orders are rejected from this maker-only model;
 - partial fills are supported and order replay stops after full fill or expiry.
 
-The 14/14 synthetic tests passed. Research CI passed on both runs `#41812211150` and `#41812277499`.
+The 14/14 synthetic tests passed. Full Research CI passed on run `#41812777279` (58/58 steps).
 
 ### 6.2 Four deterministic hypothetical orders on the real sample
 
@@ -249,14 +249,14 @@ This tiny four-order probe shows a potentially adverse immediate post-fill move,
 
 **Interpretation limit:** these four hand-scheduled BBO orders are a mechanics smoke test, not a statistically meaningful fill-rate estimate, not strategy-signal replay, not evidence of maker profitability, and not a comparison against market execution. They demonstrate that the parser reconstructs a usable book and that trade prints can consume the modeled queue and produce partial/full fills under the stated assumptions.
 
-### 6.3 Remaining model limitations before strategy integration
+### 6.4 Remaining model limitations before strategy integration
 
 This first implementation is intentionally a conservative baseline, but not yet a production execution simulator:
 1. L2 cannot identify cancellations vs executions or determine whether cancelled quantity was ahead of/behind the hypothetical order. We therefore do not credit any cancellation; this can materially overstate queue-ahead after cancellations.
 2. New displayed size at the same price after our arrival is not added to queue-ahead. This assumes it joined behind us; hidden priority/refresh behavior is unknown.
-3. No exchange order-arrival latency, cancel latency, replace behavior, partial-fill fee accounting or adverse-selection markout is yet integrated.
+3. No measured exchange order-arrival/cancel latency, replace behavior or partial-fill fee lifecycle is integrated. Only a first-fill midpoint markout is measured; per-fill VWAP markout and adverse-selection cost accounting remain outstanding.
 4. No spread crossing, market impact, order-size/depth constraints or Bybit tick/quantity-step validation is included.
 5. Trade and L2 matching-engine timestamps are close but not a full exchange sequence join. Same-millisecond prints are conservatively excluded; exact ordering is unresolved.
 6. One AAVEUSDT day and four hypothetical orders do not establish generalization across symbols or regimes.
 
-**Decision:** queue-replay mechanics have passed their first synthetic tests and one real-data smoke test. Keep `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` until latency, order sizing/spec validation, partial-fill lifecycle and adverse-selection analysis are implemented and tested. Do not rerun H1 PnL on this prototype yet.
+**Decision:** queue-replay mechanics have passed their first synthetic tests and one real-data smoke test. Keep `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` until measured latency/cancel behavior, order sizing/spec validation, full partial-fill fee lifecycle and adequately sampled per-fill adverse-selection analysis are implemented and tested. Do not rerun H1 PnL on this prototype yet.

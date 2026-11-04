@@ -129,7 +129,8 @@ def is_linear_usdt_perpetual_within_lifecycle_at(row: dict[str, Any], timestamp_
 
 
 def build_universe_snapshot(
-    rows: list[dict[str, Any]], status_counts: dict[str, int], fetched_at: str | None = None
+    rows: list[dict[str, Any]], status_counts: dict[str, int], fetched_at: str | None = None,
+    collection_started_at: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(rows, list) or not rows or any(not isinstance(row, dict) for row in rows):
         raise ValueError("universe snapshot requires non-empty instrument objects")
@@ -147,7 +148,11 @@ def build_universe_snapshot(
     if status_counts != expected_counts or sum(status_counts.values()) != len(rows):
         raise ValueError("status counts do not match the captured universe")
     timestamp = _snapshot_timestamp(fetched_at)
-    return {
+    started_at = (_snapshot_timestamp(collection_started_at)
+                  if collection_started_at is not None else None)
+    if started_at is not None and started_at > timestamp:
+        raise ValueError("snapshot collection_started_at cannot be after fetched_at")
+    snapshot = {
         "schema_version": 1,
         "source": "Bybit V5 GET /v5/market/instruments-info",
         "category": "linear",
@@ -157,6 +162,9 @@ def build_universe_snapshot(
         "count": len(rows),
         "instruments": rows,
     }
+    if started_at is not None:
+        snapshot["collection_started_at"] = started_at
+    return snapshot
 
 
 def main() -> None:
@@ -175,8 +183,9 @@ def main() -> None:
             time.sleep(args.pause)
         return rows, next_cursor
 
+    collection_started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     rows, counts = fetch_linear_universe(fetch_page)
-    snapshot = build_universe_snapshot(rows, counts)
+    snapshot = build_universe_snapshot(rows, counts, collection_started_at=collection_started_at)
     fetched = datetime.fromisoformat(snapshot["fetched_at"].replace("Z", "+00:00"))
     stamp = fetched.astimezone(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     output = Path(args.output_dir) / "linear" / f"{stamp}.json"

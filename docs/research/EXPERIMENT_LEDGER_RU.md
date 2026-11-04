@@ -1181,3 +1181,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Source commit `d6078d4f0e56c1d398b427b8c7640b1f09021b89`; test commit `1b50c9da41b99ea23d04e009e7ba6e6424d73e01`.
 - Source-only CI #41875836674 SUCCESS, 57/57; final CI #41875905360 on `1b50c9da` SUCCESS, 57/57, zero failures. Actual logs confirm the new orderbook inspector regression; inspector/runner suite 9/9; aggregate-L2 primitives 81/81.
 - Timestamp/sequence diagnostic integrity only, not maker execution or PnL evidence. No archive download or network inspector run. No PnL/backtest, collectors, API, runner, paper/live orders or main changes.
+
+## ENG-EXEC-025 — Reject non-reset orderbook update-ID regressions (2026-11-04)
+
+- Static review of `OrderBook.apply()` found that `u` was type/positivity checked and the documented `u=1` restart marker was handled, but a lower non-`1` update ID after a higher ID was still accepted. This could apply stale/out-of-order book state while `cts` and `seq` happened to increase.
+- Added a fail-closed guard: reject `update_id < last_u` unless the event is the documented `u=1` full-snapshot reset. The change deliberately does not require contiguous `u) increments; it only rejects regressions outside the reset marker.
+- Added a regression test proving the stale update is rejected atomically without mutating bids, asks, timestamps, sequence, or update ID. Existing `u=1` restart-snapshot tests remain in place.
+- Code + regression commit: `2b71592a1431028a5e78af2bc166327a4a5f49b8`; explanatory comment commit: `af4ad6f421b52cd24f864d5a71c581853cc569a8`.
+- Focused isolated reproduction passed for the regression and valid `u=1` reset; inserted test syntax compiled. **No GitHub Actions run was observed for these commits**, so the full repository test suite is not yet confirmed. Last confirmed full Research CI remains #41875905360 on `1b50c9d`, before this change.
+- This is order-book archive integrity hardening only, not maker execution evidence or PnL. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains. No archive download, collector, PnL/backtest, API, runner, paper/live order, or `main` change.

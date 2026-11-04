@@ -16,28 +16,40 @@ def evaluate_limit_wait(
     penetration_bps: float,
     age: int,
     max_wait_bars: int,
+    open_price: float | None = None,
 ) -> tuple[str, int]:
-    """Return (fill|wait|expire, updated_age) for one eligible candle."""
+    """Return (fill|wait|expire, updated_age) for one eligible candle.
+
+    A limit already marketable at the candle open fills immediately; the
+    additional penetration requirement applies only to a resting intrabar touch.
+    """
     side = str(direction).strip().lower()
     if side not in {"long", "short"}:
         raise ValueError(f"unsupported direction: {direction!r}")
     values = (low, high, limit_price, penetration_bps)
+    if open_price is not None:
+        values += (open_price,)
     if any(not isinstance(value, (int, float)) for value in values):
         raise TypeError("OHLC and limit parameters must be numeric")
     if not all(math.isfinite(float(value)) for value in values):
         raise ValueError("OHLC and limit parameters must be finite")
-    if low <= 0 or high <= 0 or limit_price <= 0 or low > high:
+    if (low <= 0 or high <= 0 or limit_price <= 0 or low > high
+            or (open_price is not None and not low <= open_price <= high)):
         raise ValueError("invalid OHLC/limit price range")
     if penetration_bps < 0 or age < 0 or max_wait_bars < 1:
         raise ValueError("penetration_bps, age, and max_wait_bars are out of range")
 
     next_age = age + 1
+    marketable_at_open = (
+        open_price < limit_price if side == "long"
+        else open_price > limit_price
+    ) if open_price is not None else False
     penetration = (
         low <= limit_price * (1.0 - penetration_bps / 10_000.0)
         if side == "long"
         else high >= limit_price * (1.0 + penetration_bps / 10_000.0)
     )
-    if penetration:
+    if marketable_at_open or penetration:
         return "fill", next_age
     if next_age >= max_wait_bars:
         return "expire", next_age

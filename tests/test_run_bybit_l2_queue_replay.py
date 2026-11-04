@@ -79,8 +79,8 @@ def test_trade_sample_inspector_marks_nonmonotonic_timestamps_invalid():
 
 def test_trade_sample_inspector_rejects_unterminated_quoted_csv_field():
     content = (
-        "timestamp,symbol,side,size,price,trdMatchID,BT,RPI\\n"
-        '1700000000.123,AAVEUSDT,Buy,1,10,trade-1,false,"false\\n'
+        "timestamp,symbol,side,size,price,trdMatchID,BT,RPI\n"
+        '1700000000.123,AAVEUSDT,Buy,1,10,trade-1,false,"false\n'
     )
     fields, rows = trade_inspector.validated_trade_csv_reader(io.StringIO(content))
     assert fields[-1] == "RPI"

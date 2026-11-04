@@ -36,7 +36,7 @@ def trade(ts, side, price, size, rpi="0"):
 def test_snapshot_and_delta_are_absolute_level_updates_and_zero_deletes():
     b = book()
     b.apply({"type": "delta", "cts": 1100, "data": {
-        "seq": 2, "b": [["100", "7"], ["99", "0"]],
+        "seq": 2, "u": 2, "b": [["100", "7"], ["99", "0"]],
         "a": [["101", "4"]],
     }})
     assert b.quantity_at("Buy", D("100")) == D("7")
@@ -48,10 +48,10 @@ def test_snapshot_and_delta_are_absolute_level_updates_and_zero_deletes():
 def test_u1_restart_snapshot_resets_book_and_allows_new_sequence_epoch():
     b = book()
     b.apply({"type": "delta", "cts": 1100, "data": {
-        "u": 2, "seq": 2, "b": [["100", "7"]], "a": [],
+        "u": 2, "seq": 2, "u": 2, "b": [["100", "7"]], "a": [],
     }})
     b.apply({"type": "snapshot", "cts": 1200, "data": {
-        "u": 1, "seq": 1, "b": [["98", "4"]], "a": [["99", "6"]],
+        "u": 1, "seq": 1, "u": 1, "b": [["98", "4"]], "a": [["99", "6"]],
     }})
     assert b.last_u == 1
     assert b.last_seq == 1
@@ -65,7 +65,7 @@ def test_u1_restart_marker_on_delta_fails_closed_without_mutating_book():
     before = b.copy_levels()
     try:
         b.apply({"type": "delta", "cts": 1100, "data": {
-            "u": 1, "seq": 1, "b": [["100", "0"]], "a": [],
+            "u": 1, "seq": 1, "u": 1, "b": [["100", "0"]], "a": [],
         }})
     except ValueError as exc:
         assert "requires a full snapshot" in str(exc)
@@ -190,14 +190,14 @@ def test_l2_cancellations_and_new_size_do_not_rewrite_existing_queue_ahead():
     # An L2 size reduction may be a cancellation, but cannot be assigned
     # to a position ahead of or behind our hypothetical order.
     b.apply({"type": "delta", "cts": 1100, "data": {
-        "seq": 2, "b": [["100", "0"]], "a": [],
+        "seq": 2, "u": 2, "b": [["100", "0"]], "a": [],
     }})
     assert b.quantity_at("Buy", D("100")) == 0
     assert o.queue_ahead_remaining == D("5")
 
     # New displayed size after our arrival is not added ahead of us.
     b.apply({"type": "delta", "cts": 1200, "data": {
-        "seq": 3, "b": [["100", "9"]], "a": [],
+        "seq": 3, "u": 3, "b": [["100", "9"]], "a": [],
     }})
     assert b.quantity_at("Buy", D("100")) == D("9")
     assert o.queue_ahead_remaining == D("5")
@@ -207,7 +207,7 @@ def test_non_monotonic_book_timestamp_is_rejected():
     b = book()
     try:
         b.apply({"type": "delta", "cts": 999, "data": {
-            "seq": 2, "b": [], "a": [],
+            "seq": 2, "u": 2, "b": [], "a": [],
         }})
     except ValueError as exc:
         assert "non-monotonic" in str(exc)
@@ -246,11 +246,11 @@ def test_book_state_capture_excludes_same_millisecond_updates():
 def test_post_fill_markout_snapshot_excludes_same_millisecond_updates():
     events = [
         {"type": "snapshot", "cts": 1000, "data": {
-            "s": "AAVEUSDT", "seq": 1,
+            "s": "AAVEUSDT", "seq": 1, "u": 1,
             "b": [["100", "5"]], "a": [["101", "5"]],
         }},
         {"type": "delta", "cts": 2000, "data": {
-            "s": "AAVEUSDT", "seq": 2,
+            "s": "AAVEUSDT", "seq": 2, "u": 2,
             "b": [["100", "1"]], "a": [],
         }},
     ]

@@ -190,6 +190,7 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
     def test_possible_symbol_rename_is_reported_but_never_merged(self):
         previous = row("BTCUSDT")
         renamed = row("XBTUSDT")
+        renamed["baseCoin"] = "BTC"
         write_snapshot(self.root, "a.json", "2026-11-01T00:00:00Z", [previous])
         write_snapshot(self.root, "b.json", "2026-11-02T00:00:00Z", [renamed])
         history = InstrumentSpecHistory.from_directory(self.root)

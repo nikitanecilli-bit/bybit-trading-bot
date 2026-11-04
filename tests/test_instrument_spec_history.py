@@ -112,6 +112,23 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "as_of_ts must be an integer"):
                     history.get_spec("BTCUSDT", value)
 
+    def test_collection_interval_must_be_valid_and_not_after_completion(self):
+        payload = json.loads((self.root / "a.json").read_text())
+        payload["collection_started_at"] = "2026-11-01T00:00:00Z"
+        (self.root / "a.json").write_text(json.dumps(payload), encoding="utf-8")
+        history = InstrumentSpecHistory.from_directory(self.root)
+        self.assertIsNotNone(history.snapshots[0].collection_started_at_ms)
+
+        payload["collection_started_at"] = "2026-11-02T00:00:00Z"
+        (self.root / "a.json").write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "cannot be after"):
+            InstrumentSpecHistory.from_directory(self.root)
+
+        payload["collection_started_at"] = 123
+        (self.root / "a.json").write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "must be an ISO-8601 string"):
+            InstrumentSpecHistory.from_directory(self.root)
+
     def test_snapshot_timestamp_rejects_submillisecond_precision(self):
         payload = json.loads((self.root / "a.json").read_text())
         payload["fetched_at"] = "2026-11-01T00:00:00.000500Z"

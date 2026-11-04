@@ -1664,5 +1664,89 @@ class StatePersistenceTests(unittest.TestCase):
         self.assertEqual(position.exchange_orders, [partial.to_dict()])
 
 
+    def test_exchange_quantity_audit_matches_entry_minus_partial_exit_fills(self):
+        from exchange_execution_identity import (
+            ExchangeExecutionIdentity, ExchangeOrderIdentity, ExchangePositionIdentity,
+        )
+        position = sample_position()
+        position.set_exchange_position_identity(ExchangePositionIdentity(
+            "linear", "USDT", "BTCUSDT", 0, "one_way", "Buy",
+            "0.6", "100", "entry-audit", "entry-audit-link",
+        ))
+        position.record_exchange_order(ExchangeOrderIdentity(
+            "close-audit", "close-audit-link", "BTCUSDT", "Sell", 0,
+            "0.5", "0.1", "0.4", "PartiallyFilled", True, False,
+        ))
+        position.record_exchange_execution(ExchangeExecutionIdentity(
+            "entry-fill-audit", "entry-audit", "entry-audit-link", "BTCUSDT",
+            "Buy", "1.0", "100", position.entry_ts + 1,
+        ))
+        position.record_exchange_execution(ExchangeExecutionIdentity(
+            "exit-fill-audit", "close-audit", "close-audit-link", "BTCUSDT",
+            "Sell", "0.4", "101", position.entry_ts + 2,
+        ))
+        audit = position.audit_exchange_position_quantity(execution_history_complete=True)
+        self.assertEqual(audit["status"], "MATCH")
+        self.assertEqual(audit["entry_exec_qty"], "1.0")
+        self.assertEqual(audit["exit_exec_qty"], "0.4")
+        self.assertEqual(audit["net_exec_qty"], "0.6")
+        self.assertEqual(audit["position_qty"], "0.6")
+        self.assertEqual(audit["difference_qty"], "0.0")
+
+    def test_exchange_quantity_audit_does_not_claim_match_for_incomplete_history(self):
+        from exchange_execution_identity import ExchangePositionIdentity
+        position = sample_position()
+        position.set_exchange_position_identity(ExchangePositionIdentity(
+            "linear", "USDT", "BTCUSDT", 0, "one_way", "Buy",
+            "0.6", "100", "entry-incomplete", "",
+        ))
+        audit = position.audit_exchange_position_quantity()
+        self.assertEqual(audit["status"], "INCOMPLETE")
+        self.assertEqual(audit["net_exec_qty"], "0")
+        self.assertEqual(audit["difference_qty"], "0.6")
+
+    def test_exchange_quantity_audit_reports_mismatch_when_history_is_complete(self):
+        from exchange_execution_identity import (
+            ExchangeExecutionIdentity, ExchangePositionIdentity,
+        )
+        position = sample_position()
+        position.set_exchange_position_identity(ExchangePositionIdentity(
+            "linear", "USDT", "BTCUSDT", 0, "one_way", "Buy",
+            "0.5", "100", "entry-mismatch", "",
+        ))
+        position.record_exchange_execution(ExchangeExecutionIdentity(
+            "entry-fill-mismatch", "entry-mismatch", "", "BTCUSDT",
+            "Buy", "0.6", "100", position.entry_ts + 1,
+        ))
+        audit = position.audit_exchange_position_quantity(execution_history_complete=True)
+        self.assertEqual(audit["status"], "MISMATCH")
+        self.assertEqual(audit["net_exec_qty"], "0.6")
+        self.assertEqual(audit["difference_qty"], "-0.1")
+
+    def test_exchange_quantity_audit_rejects_closing_fills_above_opening_fills(self):
+        from exchange_execution_identity import (
+            ExchangeExecutionIdentity, ExchangeOrderIdentity, ExchangePositionIdentity,
+        )
+        position = sample_position()
+        position.set_exchange_position_identity(ExchangePositionIdentity(
+            "linear", "USDT", "BTCUSDT", 0, "one_way", "Buy",
+            "0.1", "100", "entry-overclose", "",
+        ))
+        position.record_exchange_order(ExchangeOrderIdentity(
+            "close-overclose", "", "BTCUSDT", "Sell", 0,
+            "0.2", "0", "0.2", "Filled", True, False,
+        ))
+        position.record_exchange_execution(ExchangeExecutionIdentity(
+            "entry-overclose-fill", "entry-overclose", "", "BTCUSDT",
+            "Buy", "0.1", "100", position.entry_ts + 1,
+        ))
+        position.record_exchange_execution(ExchangeExecutionIdentity(
+            "exit-overclose-fill", "close-overclose", "", "BTCUSDT",
+            "Sell", "0.2", "99", position.entry_ts + 2,
+        ))
+        with self.assertRaisesRegex(ValueError, "closing execution quantity exceeds"):
+            position.audit_exchange_position_quantity(execution_history_complete=True)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

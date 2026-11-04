@@ -155,7 +155,7 @@ def test_post_fill_markout_separates_spread_capture_from_mid_price_move():
     markout = next(x for x in fill["post_fill_markout"] if x["horizon_ms"] == 1_000)
     assert fill["pre_fill_book_state"]["mid_price"] == "100"
     assert markout["signed_fill_to_future_mid_bps"] == str(Decimal("202.0202020202020202020202020"))
-    assert markout["signed_mid_move_from_pre_fill_bps"] == "100"
+    assert Decimal(markout["signed_mid_move_from_pre_fill_bps"]) == Decimal("100")
     assert markout["pre_fill_mid_price"] == "100"
 
 

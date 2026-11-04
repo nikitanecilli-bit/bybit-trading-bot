@@ -153,3 +153,30 @@ Comparator validates the historical-order pages, coverage interval and metadata,
 CI: [Research engine checks #41460727701](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41460727701), SUCCESS; parser 14/14, collector 15/15, comparator 16/16, persistence 54/54, configured suites and secret scan passed.
 
 No real Bybit snapshot was captured. Final reconciliation remains `UNSUPPORTED_LOCAL_MODEL / BLOCKED`: no exact local exchange qty, positionIdx, order identity map or full local execution ledger. No live resume or PnL sweep.
+
+
+## ENG-RECON-007 — граница между локальным restore и биржевой reconciliation
+
+Дата: 2026-11-05  
+Статус: BLOCKED — read-only protocol verified by fixtures; no live exchange capture and no automatic resume.
+
+### Подтверждено аудитом
+
+- `scripts/bybit_reconciliation_snapshot.py` отправляет только GET-запросы. До account endpoints он проверяет `/v5/user/query-api`, точное совпадение API key и `readOnly == 1`; при отрицательном результате прекращает работу до чтения позиций/ордеров.
+- Base URL проверяется по allowlist официальных HTTPS Bybit hosts до отправки credentials; redirects отключены. Позиции, active orders, order history и executions собираются cursor pagination; ошибка/неполная цепочка не превращается в пустой аккаунт.
+- `scripts/bybit_reconciliation_report.py` проверяет raw SHA-256, schema, counts, server-time bounds и coverage intervals, но всегда возвращает `BLOCKED_UNSUPPORTED_LOCAL_MODEL`, `reconciliation_pass=false`, `live_resume_allowed=false`.
+- `UnifiedQuantEngine(restore_plan_b=True)` восстанавливает локальный backup и повторно проверяет joined instrument/risk history для позиций. Этот локальный restore не является биржевой reconciliation: engine не вызывает collector/comparator и не сверяет account positions, active/conditional orders или execution history.
+- Добавлен regression test `test_local_only_and_exchange_only_positions_are_both_reported`: comparator явно перечисляет локальные символы без exchange counterpart и exchange symbols без local counterpart, сохраняя безусловный BLOCKED verdict.
+
+### CI
+
+Research CI [#41912294316](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41912294316): **SUCCESS**, 59/59 steps; tested code commit `3fc0e6a5ff2f8f22fdb3c67dcce0b77610ab2225`.
+
+### Операционный вывод
+
+- Нельзя интерпретировать успешный `restore_plan_b` как разрешение возобновить торговлю на аккаунте.
+- Даже `CAPTURED_READ_ONLY_NOT_RECONCILED` — это только снимок; comparator не имеет PASS-ветки.
+- Реальный collector не запускался, credentials не читались, Bybit API не вызывался; нет доказанного свежего exchange snapshot.
+- Никакие mutating endpoints, live orders, collectors для рыночных данных, archive downloads или market PnL tests не выполнялись.
+- Следующий необходимый инженерный этап до любого live resume: разработать отдельную модель exchange execution identity (exact qty, positionIdx, orderId/orderLinkId, execId, partial fills и protection lifecycle), связать её с local persistence и только затем проектировать reconciliation-gated startup. Не выводить exchange qty из `size_usdt / entry_price`.
+- Strategy/execution/PnL и live-resume gates остаются BLOCKED.

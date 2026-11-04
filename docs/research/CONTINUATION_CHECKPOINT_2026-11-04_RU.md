@@ -1324,3 +1324,9 @@ Read-only comparison `scripts/inspect_bybit_orderbook_sample.py` с `OrderBook.a
 Commits: helper `0a58d10f`; runner `ddc3defd` + import correction `a70d7596`; trade inspector `e2f484a7`; orderbook inspector `6bdedbeb`; tests `ed089a1c`; note `118acb07`.
 
 CI для HEAD `118acb07` не подтверждён: combined commit status не вернул check records. Не считать тесты выполненными. Не запускать network inspection workflow: он скачивает новые архивы и выполняет bounded queue probe. Новые архивы, collectors, market PnL, private API, runner, paper/live orders не использовались. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`; `main` не изменён, PR #4 не слит.
+
+## 35. Explicit public-trade timestamp ordering status (ENG-EXEC-033)
+
+Trade inspector ранее считал timestamp regressions, но не публиковал явный статус совместимости с replay. Replay path отклоняет уменьшение timestamp. Добавлено поле `timestamp_order_validation_status`: `valid` только при нулевом `nonmonotonic_timestamp_count`, иначе `invalid`. Добавлен строгий classifier и deterministic regression на valid/invalid и malformed inputs.
+
+Source `0c4cf2e2`; tests `6fc17e4d`. CI не подтверждён (combined status пуст). Новые архивы и network workflows не запускались; collectors, PnL/backtest, private API, runner и paper/live orders не запускались. Maker gate закрыт.

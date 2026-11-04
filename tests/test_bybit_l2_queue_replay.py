@@ -430,6 +430,43 @@ def test_partial_fill_and_later_completion():
     assert o.complete
 
 
+
+def test_trade_timestamp_parser_preserves_exact_seconds_and_milliseconds():
+    assert l2_module.parse_trade_timestamp_ms("1756771200.123") == 1756771200123
+    assert l2_module.parse_trade_timestamp_ms("1756771200123") == 1756771200123
+
+
+def test_trade_timestamp_parser_rejects_submillisecond_rounding():
+    try:
+        l2_module.parse_trade_timestamp_ms("1756771200123.5")
+    except ValueError as exc:
+        assert "sub-millisecond" in str(exc)
+    else:
+        raise AssertionError("fractional milliseconds must not be rounded")
+
+
+def test_trade_timestamp_parser_rejects_nonfinite_and_nonpositive_values():
+    for value in ("NaN", "Infinity", "0", "-1", "not-a-time"):
+        try:
+            l2_module.parse_trade_timestamp_ms(value)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid timestamp accepted: {value}")
+
+
+def test_apply_public_trade_rejects_fractional_timestamp_without_truncation():
+    o = order()
+    try:
+        apply_public_trade(o, trade(1100.5, "Sell", "100", "10"))
+    except ValueError as exc:
+        assert "must be an integer" in str(exc)
+    else:
+        raise AssertionError("fractional timestamp must not be truncated")
+    assert o.filled == D("0")
+    assert o.queue_ahead_remaining == D("5")
+
+
 def test_trade_at_or_before_arrival_is_never_credited():
     o = order()
     apply_public_trade(o, trade(1000, "Sell", "100", "100"))

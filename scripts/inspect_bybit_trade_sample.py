@@ -10,7 +10,7 @@ import tempfile
 import urllib.request
 from collections import Counter
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 URL = "https://public.bybit.com/trading/AAVEUSDT/AAVEUSDT2025-09-02.csv.gz"
@@ -42,6 +42,20 @@ def download(url: str, path: Path) -> tuple[int, str]:
 def block_trade_flag_columns(fields: list[str]) -> list[str]:
     """Return supported Bybit block-trade flag columns in stable order."""
     return [name for name in ("isBlockTrade", "BT") if name in fields]
+
+
+def parse_archive_timestamp_ms(value: object) -> int:
+    """Parse archive seconds or milliseconds without float rounding."""
+    try:
+        raw = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError("invalid trade archive timestamp") from exc
+    if not raw.is_finite() or raw <= 0:
+        raise ValueError("trade archive timestamp must be finite and positive")
+    milliseconds = raw if raw >= Decimal("1000000000000") else raw * Decimal("1000")
+    if milliseconds != milliseconds.to_integral_value():
+        raise ValueError("trade archive timestamp has sub-millisecond precision")
+    return int(milliseconds)
 
 
 def main() -> int:
@@ -80,8 +94,7 @@ def main() -> int:
             for row in reader:
                 if row.get("symbol") != SYMBOL:
                     raise ValueError(f"unexpected trade symbol: {row.get('symbol')!r}")
-                raw_ts = float(row["timestamp"])
-                ts = int(round(raw_ts if raw_ts > 1_000_000_000_000 else raw_ts * 1000))
+                ts = parse_archive_timestamp_ms(row["timestamp"])
                 side = str(row["side"]).strip()
                 if side not in ("Buy", "Sell"):
                     raise ValueError(f"unexpected aggressor side: {side!r}")

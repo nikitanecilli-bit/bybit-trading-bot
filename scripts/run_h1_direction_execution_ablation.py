@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import Bybit_Trading_Engine_v14_research as em
 from run_uploaded_dataset_backtests import read_zip_datasets
+from multibar_limit_wait import prepare_signal_for_next_bar_fill
 
 FOLDS=[(0.50,0.65),(0.65,0.80),(0.80,1.00)]
 VARIANTS=[("both_market","both","market"),("long_market","long","market"),
@@ -50,6 +51,14 @@ def run_segment(symbol, tf, candles, start_idx, end_idx, direction_mode, entry_m
         meta["age"]+=1
         ref=float(sig["entry_price"])
         touched=candle.low<=ref if sig["direction"]=="long" else candle.high>=ref
+        timeframe_ms={
+                "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
+                "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
+                "4h": 14_400_000, "6h": 21_600_000, "12h": 43_200_000,
+                "1d": 86_400_000,
+            }.get(str(cfg.timeframe).strip().lower())
+        if timeframe_ms is None: raise ValueError(f"unsupported delayed-limit timeframe: {cfg.timeframe!r}")
+        prepare_signal_for_next_bar_fill(sig,int(candle.ts),timeframe_ms)
         filled=original_fill(sym,candle)
         if filled: ages.pop(sym,None); return True
         if not touched and meta["age"]<3:

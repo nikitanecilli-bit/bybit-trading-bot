@@ -235,6 +235,8 @@ class SnapshotCollectorTests(unittest.TestCase):
         from instrument_spec_history import InstrumentSpecHistory
         instrument = {
             "symbol": "BTCUSDT", "status": "Trading", "category": "linear",
+            "contractType": "LinearPerpetual", "baseCoin": "BTC",
+            "quoteCoin": "USDT", "settleCoin": "USDT",
             "priceFilter": {"minPrice": "0.01", "maxPrice": "1000000", "tickSize": "0.1"},
             "lotSizeFilter": {
                 "qtyStep": "0.001", "minOrderQty": "0.001", "maxOrderQty": "100",

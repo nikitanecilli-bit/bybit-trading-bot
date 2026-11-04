@@ -57,6 +57,24 @@ def test_trade_sample_inspector_classifies_missing_malformed_and_duplicate_ids()
     assert seen == {"trade-1"}
 
 
+def test_trade_sample_inspector_validates_flag_alias_values_and_conflicts():
+    classify = trade_inspector.classify_boolean_flag_aliases
+    assert classify({}, [], "block trade") == "missing"
+    assert classify({"BT": None}, ["BT"], "block trade") == "missing"
+    assert classify({"BT": ""}, ["BT"], "block trade") == "missing"
+    assert classify({"BT": "not-a-flag"}, ["BT"], "block trade") == "malformed"
+    assert classify({"BT": "1"}, ["BT"], "block trade") == "true"
+    assert classify({"RPI": "0"}, ["RPI"], "RPI") == "false"
+    assert classify(
+        {"BT": "0", "isBlockTrade": "0"},
+        ["BT", "isBlockTrade"], "block trade",
+    ) == "false"
+    assert classify(
+        {"BT": "0", "isBlockTrade": "1"},
+        ["BT", "isBlockTrade"], "block trade",
+    ) == "conflict"
+
+
 
 def write_book_archive(path: Path, events: list[dict]) -> None:
     with zipfile.ZipFile(path, "w") as archive:

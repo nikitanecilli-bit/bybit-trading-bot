@@ -1748,6 +1748,58 @@ class StatePersistenceTests(unittest.TestCase):
             position.audit_exchange_position_quantity(execution_history_complete=True)
 
 
+    def test_execution_batch_merge_deduplicates_overlapping_pages_and_sorts_late_fills(self):
+        from exchange_execution_identity import ExchangeExecutionIdentity, ExchangePositionIdentity
+        position = sample_position()
+        position.set_exchange_position_identity(ExchangePositionIdentity(
+            "linear", "USDT", "BTCUSDT", 0, "one_way", "Buy",
+            "0.6", "100", "batch-entry", "",
+        ))
+        late = ExchangeExecutionIdentity(
+            "exec-late", "batch-entry", "", "BTCUSDT", "Buy",
+            "0.2", "100", position.entry_ts + 1,
+        )
+        recent = ExchangeExecutionIdentity(
+            "exec-recent", "batch-entry", "", "BTCUSDT", "Buy",
+            "0.4", "101", position.entry_ts + 3,
+        )
+        first = position.merge_exchange_execution_batch([recent])
+        self.assertEqual(first, {"inserted": 1, "duplicates": 0, "total": 1})
+        overlap = position.merge_exchange_execution_batch([late, recent])
+        self.assertEqual(overlap, {"inserted": 1, "duplicates": 1, "total": 2})
+        self.assertEqual(
+            [item["exec_id"] for item in position.exchange_executions],
+            ["exec-late", "exec-recent"],
+        )
+        audit = position.audit_exchange_position_quantity()
+        self.assertEqual(audit["net_exec_qty"], "0.6")
+        self.assertEqual(audit["status"], "INCOMPLETE")
+
+    def test_execution_batch_merge_conflict_or_invalid_row_rolls_back_entire_batch(self):
+        from exchange_execution_identity import ExchangeExecutionIdentity
+        position = sample_position()
+        valid = ExchangeExecutionIdentity(
+            "batch-valid", "entry-order", "", "BTCUSDT", "Buy",
+            "0.1", "100", position.entry_ts + 1,
+        )
+        orphan = ExchangeExecutionIdentity(
+            "batch-orphan", "unknown-order", "", "BTCUSDT", "Buy",
+            "0.1", "100", position.entry_ts + 2,
+        )
+        with self.assertRaisesRegex(ValueError, "unknown orderId"):
+            position.merge_exchange_execution_batch([valid, orphan])
+        self.assertEqual(position.exchange_executions, [])
+
+        position.record_exchange_execution(valid)
+        conflict = ExchangeExecutionIdentity(
+            "batch-valid", "entry-order", "", "BTCUSDT", "Buy",
+            "0.2", "100", position.entry_ts + 1,
+        )
+        before = list(position.exchange_executions)
+        with self.assertRaisesRegex(ValueError, "conflicting duplicate"):
+            position.merge_exchange_execution_batch([valid, conflict])
+        self.assertEqual(position.exchange_executions, before)
+
     def test_exchange_quantity_audit_survives_plan_b_restart(self):
         from exchange_execution_identity import (
             ExchangeExecutionIdentity, ExchangeOrderIdentity, ExchangePositionIdentity,

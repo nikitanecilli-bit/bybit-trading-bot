@@ -22,6 +22,38 @@ def payload(fetched_at="2026-11-01T00:00:00Z", tiers=None):
 
 
 class RiskTierHistoryTests(unittest.TestCase):
+
+    def test_runtime_loader_validates_optional_collection_and_page_metadata(self):
+        observations = [{
+            "page_index": 1,
+            "request_started_at": "2026-11-01T00:00:00.100Z",
+            "request_completed_at": "2026-11-01T00:00:00.200Z",
+            "tier_count": 2, "symbol_count": 1,
+            "symbols": ["BTCUSDT"], "has_next_page": False,
+        }]
+        valid = payload()
+        valid["symbol_count"] = 1
+        valid["collection_started_at"] = "2026-11-01T00:00:00.000Z"
+        valid["page_observations"] = observations
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(valid), encoding="utf-8")
+            history = RiskTierHistory.from_directory(tmp)
+            self.assertEqual(len(history.get_tiers("BTCUSDT", 1793491200000)), 2)
+
+        bad_total = json.loads(json.dumps(valid))
+        bad_total["page_observations"][0]["tier_count"] = 1
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(bad_total), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "tier counts do not match"):
+                RiskTierHistory.from_directory(tmp)
+
+        bad_window = json.loads(json.dumps(valid))
+        bad_window["collection_started_at"] = "2026-11-01T00:00:01.000Z"
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(bad_window), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "after fetched_at"):
+                RiskTierHistory.from_directory(tmp)
+
     def test_selects_first_tier_covering_position_value_and_enforces_max_leverage(self):
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")

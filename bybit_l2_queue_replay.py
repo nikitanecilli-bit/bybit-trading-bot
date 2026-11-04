@@ -30,6 +30,7 @@ class OrderBook:
         self.asks: dict[Decimal, Decimal] = {}
         self.last_cts: int | None = None
         self.last_seq: int | None = None
+        self.last_u: int | None = None
 
     def apply(self, event: dict) -> None:
         kind = event.get("type")
@@ -38,9 +39,23 @@ class OrderBook:
             raise ValueError("invalid order-book event")
         cts = int(event["cts"])
         seq = int(data["seq"])
+        raw_u = data.get("u")
+        if isinstance(raw_u, bool) or raw_u is None:
+            raise ValueError("missing or invalid order-book update ID")
+        try:
+            update_id = int(raw_u)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("missing or invalid order-book update ID") from exc
+        if update_id <= 0:
+            raise ValueError("order-book update ID must be positive")
+        reset_snapshot = update_id == 1
+        if reset_snapshot and kind != "snapshot":
+            raise ValueError("u=1 restart marker requires a full snapshot for this archive format")
         if self.last_cts is not None and cts < self.last_cts:
             raise ValueError("non-monotonic matching-engine timestamp")
-        if self.last_seq is not None and seq < self.last_seq:
+        # Bybit documents u=1 as a service-restart reset. Its new snapshot
+        # starts a fresh sequence epoch, so the previous seq must not reject it.
+        if (not reset_snapshot and self.last_seq is not None and seq < self.last_seq):
             raise ValueError("non-monotonic cross sequence")
         if kind == "snapshot":
             self.bids.clear()
@@ -59,7 +74,7 @@ class OrderBook:
                     book_side.pop(price, None)
                 else:
                     book_side[price] = qty
-        self.last_cts, self.last_seq = cts, seq
+        self.last_cts, self.last_seq, self.last_u = cts, seq, update_id
         if self.bids and self.asks and max(self.bids) >= min(self.asks):
             raise ValueError("crossed reconstructed order book")
 

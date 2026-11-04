@@ -9,7 +9,7 @@ import csv
 import gzip
 import json
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Iterator
@@ -252,6 +252,7 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
 def replay_public_trades(order: PassiveOrder, archive: Path, symbol: str = "AAVEUSDT") -> PassiveOrder:
     previous_ts = None
     seen_trade_ids: set[str] = set()
+    working_order = replace(order)
     for trade in iter_public_trades(archive, symbol):
         ts = trade["timestamp_ms"]
         if previous_ts is not None and ts < previous_ts:
@@ -265,7 +266,8 @@ def replay_public_trades(order: PassiveOrder, archive: Path, symbol: str = "AAVE
         if trade_id in seen_trade_ids:
             raise ValueError(f"duplicate public trade ID: {trade_id}")
         seen_trade_ids.add(trade_id)
-        apply_public_trade(order, trade)
-        if order.complete:
+        apply_public_trade(working_order, trade)
+        if working_order.complete:
             break
+    order.__dict__.update(working_order.__dict__)
     return order

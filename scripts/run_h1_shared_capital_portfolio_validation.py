@@ -131,8 +131,13 @@ def build_paired_ema_comparison(result_rows, comparison_enabled):
         if key in target:
             raise ValueError(f"duplicate EMA comparison row for key {key}")
         target[key] = row
-    if not gated or not set(gated).issubset(baseline):
-        raise ValueError("EMA comparison requires an exactly paired baseline for every gated row")
+    if not gated or set(gated) != set(baseline):
+        missing_ema = sorted(set(baseline) - set(gated))
+        missing_baseline = sorted(set(gated) - set(baseline))
+        raise ValueError(
+            "EMA comparison requires identical baseline/EMA key sets; "
+            f"missing EMA rows={missing_ema}, missing baseline rows={missing_baseline}"
+        )
 
     pairs = []
     for key in sorted(gated):

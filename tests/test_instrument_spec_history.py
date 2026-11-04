@@ -14,6 +14,8 @@ from instrument_spec_history import InstrumentSpecHistory
 def row(symbol="BTCUSDT", tick="0.1", status="Trading"):
     return {
         "symbol": symbol, "status": status, "category": "linear",
+        "contractType": "LinearPerpetual",
+        "baseCoin": symbol.removesuffix("USDT"), "quoteCoin": "USDT", "settleCoin": "USDT",
         "priceFilter": {"minPrice": "0.01", "maxPrice": "1000000", "tickSize": tick},
         "lotSizeFilter": {
             "qtyStep": "0.001", "minOrderQty": "0.001",
@@ -176,6 +178,50 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
         (self.root / "a.json").write_text(json.dumps(payload), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "does not match"):
             InstrumentSpecHistory.from_directory(self.root)
+
+
+    def test_symbol_reuse_with_different_contract_identity_fails_closed(self):
+        changed = row()
+        changed["contractType"] = "LinearFutures"
+        write_snapshot(self.root, "c.json", "2026-11-03T00:00:00Z", [changed])
+        with self.assertRaisesRegex(ValueError, "identity changed while symbol was reused"):
+            InstrumentSpecHistory.from_directory(self.root)
+
+    def test_possible_symbol_rename_is_reported_but_never_merged(self):
+        previous = row("BTCUSDT")
+        renamed = row("XBTUSDT")
+        write_snapshot(self.root, "a.json", "2026-11-01T00:00:00Z", [previous])
+        write_snapshot(self.root, "b.json", "2026-11-02T00:00:00Z", [renamed])
+        history = InstrumentSpecHistory.from_directory(self.root)
+        self.assertEqual(len(history.possible_renames), 1)
+        self.assertEqual(history.possible_renames[0]["previous_symbol"], "BTCUSDT")
+        self.assertEqual(history.possible_renames[0]["current_symbol"], "XBTUSDT")
+        self.assertEqual(
+            history.possible_renames[0]["classification"],
+            "possible_rename_not_proven",
+        )
+        with self.assertRaisesRegex(ValueError, "absent from latest"):
+            history.get_spec("BTCUSDT", 1_793_577_600_000)
+
+    def test_missing_contract_identity_fields_are_rejected(self):
+        malformed = row()
+        malformed.pop("baseCoin")
+        write_snapshot(self.root, "c.json", "2026-11-03T00:00:00Z", [malformed])
+        with self.assertRaisesRegex(ValueError, "missing or invalid identity field baseCoin"):
+            InstrumentSpecHistory.from_directory(self.root)
+
+    def test_duplicate_contract_identity_with_two_symbols_is_ambiguous(self):
+        first = row("BTCUSDT")
+        second = row("XBTUSDT")
+        write_snapshot(self.root, "c.json", "2026-11-03T00:00:00Z", [first, second])
+        with self.assertRaisesRegex(ValueError, "ambiguous duplicate contract identity"):
+            InstrumentSpecHistory.from_directory(self.root)
+
+    def test_identity_is_stable_when_only_trading_constraints_change(self):
+        history = InstrumentSpecHistory.from_directory(self.root)
+        self.assertEqual(history.snapshots[0].identities["BTCUSDT"],
+                         history.snapshots[1].identities["BTCUSDT"])
+        self.assertEqual(str(history.get_spec("BTCUSDT", 1_793_577_600_000).tick_size), "0.01")
 
     def test_missing_or_malformed_required_snapshot_fields_rejected(self):
         (self.root / "b.json").write_text("not-json", encoding="utf-8")

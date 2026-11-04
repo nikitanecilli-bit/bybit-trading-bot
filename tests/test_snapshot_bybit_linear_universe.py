@@ -11,6 +11,7 @@ from pathlib import Path
 from scripts.snapshot_bybit_linear_universe import (
     CAPTURED_STATUSES, STATUSES, build_universe_snapshot, fetch_linear_universe,
     fetch_status, is_linear_usdt_perpetual_within_lifecycle_at, validate_instrument_row,
+    _timestamp_ms,
 )
 from scripts.snapshot_bybit_instruments import write_snapshot
 
@@ -103,6 +104,14 @@ class PointInTimeUniverseTests(unittest.TestCase):
                 malformed["deliveryTime"] = value
                 with self.assertRaisesRegex(ValueError, "invalid deliveryTime"):
                     validate_instrument_row(malformed, None)
+
+    def test_timestamp_parser_zero_policy_and_integer_types(self):
+        self.assertEqual(_timestamp_ms("0", "deliveryTime", allow_zero=True), 0)
+        self.assertEqual(_timestamp_ms(1234, "launchTime", allow_zero=False), 1234)
+        for value in (0, True, 1234.0, "001  ", "+1234", "-1"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "invalid timestamp"):
+                    _timestamp_ms(value, "timestamp", allow_zero=False)
 
     def test_lifecycle_timestamp_integer_values_are_accepted(self):
         instrument = row("BTCUSDT", "Trading")

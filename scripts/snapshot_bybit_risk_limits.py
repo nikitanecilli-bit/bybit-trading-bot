@@ -186,9 +186,26 @@ def fetch_all_tiers(category: str = "linear",
     return validate_tier_groups([rows[key] for key in sorted(rows)])
 
 
+def _snapshot_timestamp(value: str | None) -> str:
+    if value is None:
+        parsed = datetime.now(timezone.utc)
+    else:
+        if not isinstance(value, str):
+            raise ValueError("snapshot fetched_at must be an ISO-8601 string")
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("snapshot fetched_at must be a valid ISO-8601 timestamp") from exc
+        if parsed.tzinfo is None:
+            raise ValueError("snapshot fetched_at must include timezone")
+        if parsed.microsecond % 1000:
+            raise ValueError("snapshot fetched_at must have millisecond precision")
+    return parsed.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
 def build_snapshot(rows: list[dict[str, Any]], category: str,
                    fetched_at: str | None = None) -> dict[str, Any]:
-    timestamp = fetched_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    timestamp = _snapshot_timestamp(fetched_at)
     individually_validated = [validate_tier(row) for row in rows]
     keys = [(row["symbol"], row["id"]) for row in individually_validated]
     if not individually_validated or len(keys) != len(set(keys)):

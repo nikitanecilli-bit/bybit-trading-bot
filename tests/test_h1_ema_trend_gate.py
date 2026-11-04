@@ -142,6 +142,32 @@ def test_paired_ema_comparison_fails_closed_for_unpaired_rows():
 
 
 
+def test_paired_ema_comparison_rejects_unmatched_extra_baseline_rows():
+    def row(fold, gated):
+        return {
+            "fold": fold, "min_volume_ratio": 1.6, "min_breakout_atr": 0.1,
+            "cost_multiplier": 2.0, "ema50_200_gate": gated,
+            "timeframe": "1h", "symbol_list": "BTCUSDT;ETHUSDT",
+            "symbols": 2, "common_h1_bars": 4000,
+            "test_start_ts": 1_000_000, "test_end_ts": 2_000_000,
+            "shared_starting_capital": 10_000.0, "max_concurrent_positions": 5,
+            "net_pnl": -100.0, "trades": 40, "costs": 50.0,
+            "profit_factor": 0.8, "expectancy_r": -0.05,
+        }
+
+    rows = [
+        row(1, False), row(1, True),
+        row(2, False),  # This baseline has no EMA comparison leg.
+    ]
+    try:
+        build_paired_ema_comparison(rows, comparison_enabled=True)
+    except ValueError as exc:
+        assert "identical baseline/EMA key sets" in str(exc)
+        assert "missing EMA rows" in str(exc)
+    else:
+        raise AssertionError("an unmatched extra baseline row must fail closed")
+
+
 def test_ema_gate_precomputes_full_history_and_uses_exact_scored_timestamp():
     rows = make_rows(1_100)
     first_scored_ts = rows[1_000].ts

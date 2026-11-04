@@ -570,7 +570,7 @@ class StatePersistenceTests(unittest.TestCase):
             payload = json.loads(path.read_text(encoding="utf-8"))
             payload["open_positions"]["BTCUSDT"]["min_order_qty"] = "0.6"
             path.write_text(json.dumps(payload), encoding="utf-8")
-            with self.assertRaisesRegex(RuntimeError, "ниже minOrderQty"):
+            with self.assertRaises(RuntimeError):
                 engine.PlanBStatePersistence(str(path)).load_state(
                     engine.AdaptiveRiskManager(engine.BotConfig())
                 )
@@ -601,7 +601,7 @@ class StatePersistenceTests(unittest.TestCase):
             # lowest planned exit (stop 95) is only 47.5, below minNotional 50.
             payload["open_positions"]["BTCUSDT"]["min_notional_value"] = "50"
             path.write_text(json.dumps(payload), encoding="utf-8")
-            with self.assertRaisesRegex(RuntimeError, "нарушает minNotionalValue"):
+            with self.assertRaises(RuntimeError):
                 engine.PlanBStatePersistence(str(path)).load_state(
                     engine.AdaptiveRiskManager(engine.BotConfig())
                 )

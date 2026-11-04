@@ -176,6 +176,8 @@ def main() -> int:
         "warning": "Four deterministic hypothetical orders only. This is not strategy PnL, a fill-rate estimate, L3 replay, or exchange-confirmed execution.",
         "order_spec_validation": "not_performed_no_verified_historical_snapshot",
         "fee_accounting": "not_calculated_requires_account_fee_tier_per_fill",
+        "latency_model": "not_measured_or_modeled",
+        "cancel_model": "no_cancel_credit_and_no_cancel_latency_model",
         "status": "started",
     }
     with tempfile.TemporaryDirectory(prefix="bybit-l2-queue-replay-") as tmp:

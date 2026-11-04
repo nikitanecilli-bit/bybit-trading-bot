@@ -478,3 +478,9 @@
 - Repo parser drops any trade `seq` even if present. Existing no-seq fixtures are synthetic; no verified real historical header is stored in repo.
 - No code change. Historical CSV cross-stream `seq` remains unavailable/unverified; keep conservative no-same-ms-fill policy. Need provenance-labelled sample or a separate approved acquisition to settle schema. Note: `ENG_EXEC_039_HISTORICAL_TRADE_CSV_SEQ_AVAILABILITY_RU.md`.
 - No archive/API requests, tests, replay, PnL, collectors, runner or orders. Maker gate closed; `main` unchanged; PR #4 Draft/unmerged.
+
+## 2026-11-04 — ENG-EXEC-040 L2/trade volume double-count audit
+
+- Static audit confirms initial queue-ahead is seeded from pre-arrival L2; after arrival L2 deltas do not consume it. Eligible public trades alone consume queue. Duplicate trade IDs fail closed and repeated archive replay is idempotent.
+- No direct L2+trade double consumption exists in current implementation because L2 reductions are not a consumption input. This is not cross-stream correctness: there is no event identity/sequence reconciliation and aggregate L2 cannot distinguish executions from cancellations.
+- Keep single-source trade consumption; do not add L2 reduction consumption without reconciliation. No code changes or runtime tests/data operations. Maker realism blocked. Note: `ENG_EXEC_040_L2_TRADE_VOLUME_DOUBLE_COUNT_AUDIT_RU.md`.

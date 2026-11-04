@@ -114,6 +114,31 @@ class RiskTierHistoryTests(unittest.TestCase):
                 RiskTierHistory.from_directory(tmp)
 
 
+    def test_as_of_timestamp_must_be_strict_integer_milliseconds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")
+            history = RiskTierHistory.from_directory(tmp)
+            for value in (1793606400000.5, True, "1793606400000"):
+                with self.subTest(value=value):
+                    with self.assertRaisesRegex(ValueError, "as_of_ts must be an integer"):
+                        history.get_tiers("BTCUSDT", value)
+                    with self.assertRaisesRegex(ValueError, "as_of_ts must be an integer"):
+                        history.get_tier("BTCUSDT", value, "1000", leverage="10")
+
+    def test_snapshot_timestamp_rejects_submillisecond_precision(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = payload(fetched_at="2026-11-01T00:00:00.000500Z")
+            Path(tmp, "risk.json").write_text(json.dumps(bad), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "millisecond precision"):
+                RiskTierHistory.from_directory(tmp)
+
+    def test_snapshot_timestamp_conversion_is_exact_across_timezone_offsets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            value = payload(fetched_at="2026-11-01T03:00:00.123+03:00")
+            Path(tmp, "risk.json").write_text(json.dumps(value), encoding="utf-8")
+            history = RiskTierHistory.from_directory(tmp)
+            self.assertEqual(history.snapshots[0].fetched_at_ms, 1793494800123)
+
     def test_missing_or_mismatched_source_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             bad = payload()

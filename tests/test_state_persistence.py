@@ -1805,6 +1805,55 @@ class StatePersistenceTests(unittest.TestCase):
             position.merge_exchange_execution_batch([valid, conflict])
         self.assertEqual(position.exchange_executions, before)
 
+    def test_execution_coverage_merges_overlapping_complete_windows(self):
+        from exchange_execution_identity import ExchangeExecutionCoverage
+        position = sample_position()
+        start = position.entry_ts
+        first = ExchangeExecutionCoverage("page-set-1", "BTCUSDT", start, start + 100, 3, True, True)
+        second = ExchangeExecutionCoverage("page-set-2", "BTCUSDT", start + 90, start + 200, 2, True, True)
+        self.assertTrue(position.record_exchange_execution_coverage(first))
+        self.assertFalse(position.record_exchange_execution_coverage(first))
+        self.assertTrue(position.record_exchange_execution_coverage(second))
+        audit = position.audit_exchange_execution_coverage(
+            lifecycle_start_ms=start, audit_end_ms=start + 200,
+        )
+        self.assertEqual(audit["status"], "COMPLETE")
+        self.assertEqual(audit["gaps"], [])
+        self.assertEqual(audit["complete_window_count"], 2)
+
+    def test_execution_coverage_detects_gaps_and_incomplete_pagination(self):
+        from exchange_execution_identity import ExchangeExecutionCoverage
+        position = sample_position()
+        start = position.entry_ts
+        position.record_exchange_execution_coverage(ExchangeExecutionCoverage(
+            "complete-before-gap", "BTCUSDT", start, start + 40, 1, True, True,
+        ))
+        position.record_exchange_execution_coverage(ExchangeExecutionCoverage(
+            "incomplete-after-gap", "BTCUSDT", start + 60, start + 100, 2, False, False,
+        ))
+        audit = position.audit_exchange_execution_coverage(
+            lifecycle_start_ms=start, audit_end_ms=start + 100,
+        )
+        self.assertEqual(audit["status"], "INCOMPLETE")
+        self.assertEqual(audit["gaps"], [
+            {"start_ms": start + 40, "end_ms": start + 100},
+        ])
+
+    def test_execution_coverage_rejects_conflicting_ids_and_wrong_symbol(self):
+        from exchange_execution_identity import ExchangeExecutionCoverage
+        position = sample_position()
+        start = position.entry_ts
+        original = ExchangeExecutionCoverage("coverage-x", "BTCUSDT", start, start + 10, 1, True, True)
+        self.assertTrue(position.record_exchange_execution_coverage(original))
+        with self.assertRaisesRegex(ValueError, "conflicting duplicate"):
+            position.record_exchange_execution_coverage(ExchangeExecutionCoverage(
+                "coverage-x", "BTCUSDT", start, start + 20, 1, True, True,
+            ))
+        with self.assertRaisesRegex(ValueError, "symbol mismatch"):
+            position.record_exchange_execution_coverage(ExchangeExecutionCoverage(
+                "coverage-y", "ETHUSDT", start, start + 10, 1, True, True,
+            ))
+
     def test_exchange_quantity_audit_survives_plan_b_restart(self):
         from exchange_execution_identity import (
             ExchangeExecutionIdentity, ExchangeOrderIdentity, ExchangePositionIdentity,
@@ -1815,6 +1864,11 @@ class StatePersistenceTests(unittest.TestCase):
             position.set_exchange_position_identity(ExchangePositionIdentity(
                 "linear", "USDT", "BTCUSDT", 0, "one_way", "Buy",
                 "0.75", "100", "entry-restart", "",
+            )) 
+            from exchange_execution_identity import ExchangeExecutionCoverage
+            position.record_exchange_execution_coverage(ExchangeExecutionCoverage(
+                "restart-coverage", "BTCUSDT", position.entry_ts,
+                position.entry_ts + 10_000, 2, True, True,
             ))
             position.record_exchange_order(ExchangeOrderIdentity(
                 "exit-restart", "", "BTCUSDT", "Sell", 0,
@@ -1842,6 +1896,7 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertEqual(audit["net_exec_qty"], "0.75")
             self.assertEqual(restored.exchange_position_identity, position.exchange_position_identity)
             self.assertEqual(restored.exchange_executions, position.exchange_executions)
+            self.assertEqual(restored.exchange_execution_coverage, position.exchange_execution_coverage)
 
 
 if __name__ == "__main__":

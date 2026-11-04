@@ -526,6 +526,19 @@ class ReportOnlyComparatorTests(unittest.TestCase):
         with self.assertRaisesRegex(ReportError, "conflicting local execution identity"):
             build_execution_merge_plan(local, data)
 
+    def test_dry_run_merge_plan_rejects_position_without_exchange_identity(self):
+        position = {"symbol": "BTCUSDT", "exchange_orders": [], "exchange_executions": []}
+        local = backup(positions={"BTCUSDT": position})
+        execution = {
+            "execId": "late-fill-no-identity", "orderId": "entry-1", "orderLinkId": "",
+            "symbol": "BTCUSDT", "execType": "Trade", "execTime": CAPTURE_MS - 1,
+            "side": "Buy", "execQty": "0.1", "execPrice": "50000", "execFee": "0.01",
+        }
+        original = copy.deepcopy(local)
+        with self.assertRaisesRegex(ReportError, "lacks exchange position identity"):
+            build_execution_merge_plan(local, upgrade_to_schema3(snapshot(execution_rows=[execution])))
+        self.assertEqual(local, original)
+
     def test_dry_run_merge_plan_rejects_unknown_order_before_returning_plan(self):
         position = {
             "symbol": "BTCUSDT",

@@ -1029,3 +1029,12 @@ Regression: exchange-sized long entry 100, trailing stop 110, TP2 112, qty 1, mi
 - GitHub compare: diverged, 2,148 ahead / 36 behind.
 - PR #4: open, Draft, mergeable=false; preserve both histories. No merge/rebase/reset/force-push; main unchanged.
 - Latest tested code/test head: c88e587d01739eb7c0ee6fe94e0369b28aff664c; CI #41852293859 SUCCESS, 57/57. Subsequent commits were documentation-only.
+
+
+## 53. Funding helpers enforce TP1 flag vs actual remaining quantity — 2026-11-04
+
+Both cumulative funding helpers now reject inconsistent lifecycle state: TP1 false with a partial remaining quantity, and TP1 true with no quantity reduction. The remaining-margin helper also validates remaining_fraction in [0,1]. Exact contract quantity is authoritative over stale/rounded display fraction.
+
+The funding test fixture's default was corrected from a half-size remainder to full quantity when TP1 is false. Added three regressions (partial quantity without TP1, TP1 true without reduction, exact partial contract quantity without TP1). Final CI #41853410298 on 0cf45d16809a04e2653325934b37723b009097d0: SUCCESS 57/57; log confirms all three tests and funding suite 28/28. An intermediate source-only run failed because it checked out the previous fixture, which contradicted the new invariant; corrected fixture and rerun passed.
+
+Classification: accounting/state-integrity guardrail only; not strategy/PnL evidence. No market-data, PnL, API, runner, paper/live or main changes.

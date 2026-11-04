@@ -1452,3 +1452,14 @@ No market PnL, new archive download/collector, private API, runner registration,
 - PR #4: OPEN, Draft, unmerged; PR #13: OPEN, unmerged. Ни один не слит. Main не изменён.
 - Readiness doc — документационное изменение; CI для него не запускался и не заявляется. Никаких PnL/backtests/replays, downloads, collectors, private API, self-hosted runner или orders не запускалось.
 - Следующий разрешённый шаг: только read-only provenance/static audit и deterministic synthetic regressions при доказанном дефекте. Рыночные PnL, архивы и maker strategy replay остаются запрещены текущим hold.
+
+
+## 2026-11-05 — static contract audit: specs, risk tiers, funding, portfolio accounting
+
+- Создан `docs/audits/ALT_SYSTEM_ACCOUNTING_CONTRACT_AUDIT_001_RU.md` (commit `c4038f9271dde6070846e58b0f50d8b0897ad1a7`).
+- Проверены instrument spec parser/history/collector/tests; risk-tier parser/history/collector/tests; funding arithmetic/archive manifest/preflight/tests; portfolio accounting audit and recorded CI evidence.
+- В проверенных арифметических контрактах нового подтверждённого profit-inflating дефекта не найдено. Funding sign, partial TP1 allocation, exact quantity, duplicate/missing-mark handling and ambiguous boundary receipts have deterministic fixture coverage. Risk tier ladder checks, mmDeduction recurrence, position-level IM/MM and as-of selection have static code/test coverage.
+- Новый акцент на contract caveats: instrument/risk `fetched_at` — observation completion, не точный exchange effective_from; page observations в runtime loader optional, поэтому legacy snapshots без них не имеют attested pagination completeness; многозапросный universe сбор не является атомарным exchange snapshot.
+- Funding Mark candle open остаётся settlement-mark proxy; dated snapshot schedule не исключает interval change+reversion между наблюдениями. Risk tier IM/MM остаётся position-level approximation, не UTA/cross-margin liquidation engine.
+- Это read-only аудит. Тесты не запускались; CI status не обновлялся. Не использовались API, collectors, archives, market PnL, backtests, replay или parameter sweeps.
+- Все data/PnL/maker/paper/live gates остаются BLOCKED. Следующий безопасный участок — проверить integration callers, что они fail closed на missing/stale/misaligned instrument/risk snapshots и временной skew.

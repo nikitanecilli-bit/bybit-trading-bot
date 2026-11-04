@@ -189,6 +189,38 @@ class MarkPriceEngineIntegrationTests(unittest.TestCase):
         # post-TP1 settlement is already on the remaining 50% quantity.
         self.assertEqual(observed["funding_net_cost"], Decimal("995.00"))
 
+    def test_liquidation_margin_uses_only_remaining_quantity_after_tp1(self):
+        engine = make_engine()
+        pos = make_position(direction="long", stop=98_000.0)
+        pos.tp1_hit = True
+        pos.tp1_ts_ms = pos.entry_ts + 2_000_000
+        pos.remaining_fraction = 0.5
+        engine.liquidation_model_enabled = True
+        close_ts = pos.entry_ts + 3_600_000
+        engine.risk_tier_history = make_risk_history(close_ts)
+        engine._mark_price_candles = {"BTCUSDT": {
+            pos.entry_ts: em.MarkPriceCandle(
+                pos.entry_ts, Decimal("99000"), Decimal("100450"),
+                Decimal("98500"), Decimal("100000"),
+            )
+        }}
+        observed = {}
+
+        def capture_health(**kwargs):
+            observed["quantity"] = kwargs["quantity"]
+            observed["tiers"] = kwargs["tiers"]
+            return SimpleNamespace(liquidation_triggered=False)
+
+        with patch.object(em, "evaluate_isolated_margin_health", side_effect=capture_health):
+            engine._liquidation_exit_price(
+                pos,
+                em.Candle(pos.entry_ts, 99000, 100500, 98500, 100000, 1),
+                close_ts,
+            )
+
+        self.assertEqual(observed["quantity"], Decimal("0.5"))
+        self.assertEqual(observed["tiers"], engine.risk_tier_history.get_tiers("BTCUSDT", close_ts))
+
     def test_dynamic_mark_tier_shortfall_triggers_before_fixed_lp(self):
         engine = make_engine()
         pos = make_position()

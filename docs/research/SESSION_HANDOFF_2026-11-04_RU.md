@@ -6,12 +6,12 @@
 
 - Репозиторий: `nikitanecilli-bit/bybit-trading-bot` (private).
 - Рабочая ветка: `research/market-regime-v1-main`.
-- Последний проверенный code/test commit: `6dcb9d8bc000778c09975dbd462c36545e23682c`; последние изменения после него в handoff/checkpoint/ledger являются документальными.
-- Последний подтверждённый CI: [Research engine checks #41873425668](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41873425668), commit `6dcb9d8`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps.
-- В этом CI: aggregate-L2 primitive tests 81/81; runner chronology/inspector suite 9/9; portfolio accounting 54/54; state persistence 84/84. Логи подтверждают новые проверки отсутствующих, whitespace-malformed и duplicate trade IDs.
-- Предыдущая неудачная попытка #41872989853 была вызвана устаревшим тестом, который после перехода инспектора на общий `parse_trade_timestamp_ms` всё ещё обращался к удалённому локальному helper `parse_archive_timestamp_ms`. Тест синхронизирован в `ec28763`; финальный CI прошёл.
+- Последний проверенный code/test commit: `5f315bdd048f8abefa07a992aa667010d0ea1f5b`; последующие коммиты после него на момент этого snapshot — документальные.
+- Последний подтверждённый CI: [Research engine checks #41874277483](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41874277483), commit `5f315bdd`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps.
+- В этом CI: aggregate-L2 primitive tests 81/81; runner/inspector suite 9/9; portfolio accounting 54/54; state persistence 84/84. Логи подтверждают BT/RPI alias validation, согласованные и конфликтующие aliases, strict timestamp parser и trade-ID diagnostics.
+- Предыдущая неудачная попытка #41872989853 была вызвана устаревшим тестом после перехода инспектора на общий `parse_trade_timestamp_ms`; тест синхронизирован в `ec28763`, после чего последующие полные CI #41873039139, #41873425668 и #41874277483 прошли.
 - PR #4: открыт, Draft, base `main`, head = текущая research-ветка; mergeable=false. Не сливать автоматически.
-- Сравнение с `main` на code/test snapshot `6dcb9d8`: diverged, 2195 commits ahead / 36 behind. Merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. Точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
+- Сравнение с `main` на code/test snapshot `5f315bdd`: diverged, 2204 commits ahead / 36 behind. Merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. Точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
 - `main` не менять. Не делать wholesale merge/rebase research branch. Использовать только reviewed selective PR/cherry-pick при отдельном обосновании.
 - В репозитории есть отдельная ветка `Audit` и `chore/main-repository-organization`; не предполагать, что они слиты или актуальны без проверки.
 
@@ -359,3 +359,13 @@
 - CI #41867866581 на `794342bbd00342d0b7f1af660362794408da0345`: SUCCESS, 57/57 steps; runner suite 6/6, aggregate-L2 primitives 81/81. Позднее #41873039139 и #41873425668 повторно подтвердили runner/markout suite.
 - Старый сохранённый AAVE report не содержит pre-fill mid и не позволяет ретроспективно выделить adverse selection. Повторный replay не делался: CSV не содержит BT/isBlockTrade и строгий parser его отклоняет.
 - Никаких новых архивов, PnL/backtest, collectors, API, runner, paper/live orders или main changes.
+
+## Session update — BT/RPI flag alias validation in trade archive inspector (2026-11-04)
+
+- Сверка inspector с `iter_public_trades()` показала, что инспектор фиксировал только наличие BT/RPI колонок, но не валидировал значения по строкам и не сравнивал aliases, если присутствовали оба поля. Основной replay parser уже отклонял missing/malformed flags и conflicting aliases.
+- Добавлен `classify_boolean_flag_aliases()` на базе общего `parse_exchange_bool()`. Отчёт теперь содержит status counters (`true`, `false`, `missing`, `malformed`, `conflict`) и отдельный `*_flag_validation_status` для BT и RPI; `valid` возможен только при наличии alias и отсутствии проблемных строк.
+- Regression покрывает отсутствие колонок/значений, пустые и malformed flags, true/false, совпадающие и конфликтующие aliases.
+- Source commit `83bca2b14a5cbb613e0ab849a45a2fbf4750aa71`; test commit `5f315bdd048f8abefa07a992aa667010d0ea1f5b`.
+- Source-only CI #41874223792 SUCCESS, 57/57; final CI #41874277483 на `5f315bdd`: SUCCESS, 57/57. Фактический лог подтверждает новую flag-alias regression; inspector/runner suite 9/9 и aggregate-L2 primitives 81/81.
+- Это диагностика качества trade metadata, не maker execution evidence и не PnL. Сохранённый AAVE CSV по-прежнему не содержит BT/isBlockTrade. Inspector с сетевой загрузкой не запускался; архивы не скачивались.
+- `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`. Нет PnL/backtests, collectors, API, runner, paper/live orders или изменений `main`.

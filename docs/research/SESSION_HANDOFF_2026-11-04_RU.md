@@ -6,14 +6,13 @@
 
 - Репозиторий: `nikitanecilli-bit/bybit-trading-bot` (private).
 - Рабочая ветка: `research/market-regime-v1-main`.
-- HEAD на момент подготовки handoff: `025cfca91ebb3a0d4419f8cdaa53be3b9c29f667`.
-- Последний code commit, покрытый успешным Research CI: `d2740c6ff444c3a7302b4b04dcc04d15ebf1dcb1`.
-- HEAD handoff commit — документальное дополнение поверх проверенного code commit; его diff добавляет только раздел 34 в checkpoint, production/research code не менялся.
-- Последний подтверждённый CI: [Research engine checks #41840361238](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41840361238), commit `d2740c6`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps.
-- В этом CI: aggregate-L2 primitive tests 80/80 passed; runner chronology/markout test step SUCCESS (4 теста в `tests/test_run_bybit_l2_queue_replay.py`).
-- Предыдущая неудачная попытка #41840229312 была исправлена import-path fix в `d2740c6`; после исправления #41840361238 прошёл.
-- PR #4: открыт, draft, base `main`, head = текущая research-ветка. Не сливать автоматически.
-- Сравнение с `main`: diverged, 2061 commits ahead / 36 behind. Merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`.
+- Актуальный HEAD при обновлении handoff: `ec28763da6ade2635c31cd0111ae8c612625f23d`.
+- Последний code/test commit, покрытый успешным Research CI: `ec28763da6ade2635c31cd0111ae8c612625f23d`; последние изменения после него в handoff/checkpoint/ledger являются документальными.
+- Последний подтверждённый CI: [Research engine checks #41873039139](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41873039139), commit `ec28763`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps.
+- В этом CI: aggregate-L2 primitive tests 81/81 passed; runner chronology/markout test step 7/7 passed, включая shared strict trade-timestamp parser coverage; state persistence 84/84.
+- Предыдущая неудачная попытка #41872989853 была вызвана устаревшим тестом, который после перехода инспектора на общий `parse_trade_timestamp_ms` всё ещё обращался к удалённому локальному helper `parse_archive_timestamp_ms`. Тест синхронизирован в `ec28763`; финальный CI прошёл.
+- PR #4: открыт, Draft, base `main`, head = текущая research-ветка; mergeable=false. Не сливать автоматически.
+- Сравнение с `main`: diverged, 2192 commits ahead / 36 behind. Merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`.
 - `main` не менять. Не делать wholesale merge/rebase research branch. Использовать только reviewed selective PR/cherry-pick при отдельном обосновании.
 - В репозитории есть отдельная ветка `Audit` и `chore/main-repository-organization`; не предполагать, что они слиты или актуальны без проверки.
 
@@ -329,3 +328,14 @@
 - Regressions cover emergency threshold currently breached, historical emergency DD breached then recovered, and daily threshold currently breached. Source CI #41861236015 SUCCESS 57/57; final CI #41861273155 on 669a7d66c50df5426e63c5490580b2d8bbc92f22 SUCCESS 57/57; log confirms all three regressions; state persistence suite 84 tests.
 - Residual observability limit: if an intraday daily-stop breach occurred and equity later recovered above the threshold before backup, the existing schema has no daily minimum-equity watermark; restore cannot independently reconstruct that prior breach if the latch itself is corrupted. Runtime persists the latch on false->true. A future schema-level daily watermark would be needed to validate recovered intraday breaches.
 - Classification: risk-control persistence integrity, not profitability evidence. No PnL/backtest, market data downloads, API, runner, paper/live or main changes.
+
+## Session update — строгая временная валидация trade archive inspector (2026-11-04)
+
+- Статический аудит выявил, что `scripts/inspect_bybit_trade_sample.py` преобразовывал CSV timestamp через `float()` и `round()`. Это могло молча округлить sub-millisecond значение, хотя основной queue replay parser уже отклоняет такие значения как неоднозначные.
+- Инспектор теперь использует общий `parse_trade_timestamp_ms()` из `bybit_l2_queue_replay.py`: Decimal parsing, поддержка секунд/миллисекунд, fail-closed для non-finite/non-positive и sub-millisecond значений. Это устраняет две расходящиеся реализации одного контракта.
+- Regression coverage: точные секунды и миллисекунды, sub-millisecond timestamps, non-finite/non-positive values; тесты находятся в `tests/test_run_bybit_l2_queue_replay.py`.
+- Финальный Research CI #41873039139 на `ec28763da6ade2635c31cd0111ae8c612625f23d`: SUCCESS; job `tests` SUCCESS; все 57 workflow steps завершились без failure. Фактический лог подтверждает inspector/runner suite 7/7 и aggregate-L2 primitives 81/81.
+- Промежуточный run #41872989853 завершился failure из-за устаревшего имени helper в тесте после refactor к общему parser; тест исправлен, финальный полный workflow прошёл. Source-only и предшествующий тестовый runs #41872780436 и #41872788110 также SUCCESS на своих промежуточных commits.
+- Это проверка целостности временных меток диагностического инструмента, не доказательство maker fill или PnL. Inspector с сетевой загрузкой не запускался; новые архивы не скачивались.
+- Execution gate остаётся `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`: сохранённый AAVE CSV не содержит ни `BT`, ни `isBlockTrade`; documented REST recent-trade endpoint не предоставляет произвольный исторический диапазон. Нужен уже имеющийся проверенный WS capture/archive с BT либо отдельное решение о будущем сборе данных.
+- Никаких PnL/backtests, market data downloads, collectors, private API, runner, paper/live orders или изменений `main` не было.

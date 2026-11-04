@@ -40,6 +40,34 @@ class RiskTierHistoryTests(unittest.TestCase):
             self.assertEqual([item.tier_id for item in tiers], [1, 2])
             self.assertEqual(tiers[1].max_leverage, Decimal("50"))
 
+    def test_risk_tier_parameters_are_selected_from_the_as_of_snapshot(self):
+        first = payload(fetched_at="2026-11-01T00:00:00Z")
+        second = payload(fetched_at="2026-11-02T00:00:00Z", tiers=[
+            {"symbol":"BTCUSDT","id":1,"riskLimitValue":"200000","maintenanceMargin":"0.004","initialMargin":"0.008","maxLeverage":"80","mmDeduction":"0","isLowestRisk":1},
+            {"symbol":"BTCUSDT","id":2,"riskLimitValue":"600000","maintenanceMargin":"0.009","initialMargin":"0.018","maxLeverage":"40","mmDeduction":"1000","isLowestRisk":0},
+        ])
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "a.json").write_text(json.dumps(first), encoding="utf-8")
+            Path(tmp, "b.json").write_text(json.dumps(second), encoding="utf-8")
+            history = RiskTierHistory.from_directory(tmp)
+
+            before = history.get_tier(
+                "BTCUSDT", 1793577599999, "150000", leverage="80"
+            )
+            after = history.get_tier(
+                "BTCUSDT", 1793577600000, "150000", leverage="80"
+            )
+            self.assertEqual(before.risk_limit_value, Decimal("100000"))
+            self.assertEqual(before.maintenance_margin_rate, Decimal("0.005"))
+            self.assertEqual(before.initial_margin_rate, Decimal("0.01"))
+            self.assertEqual(before.max_leverage, Decimal("100"))
+            self.assertEqual(before.mm_deduction, Decimal("0"))
+
+            self.assertEqual(after.risk_limit_value, Decimal("200000"))
+            self.assertEqual(after.maintenance_margin_rate, Decimal("0.004"))
+            self.assertEqual(after.initial_margin_rate, Decimal("0.008"))
+            self.assertEqual(after.max_leverage, Decimal("80"))
+            self.assertEqual(after.mm_deduction, Decimal("0"))
     def test_calculates_position_level_initial_and_maintenance_margin(self):
         with tempfile.TemporaryDirectory() as tmp:
             Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")

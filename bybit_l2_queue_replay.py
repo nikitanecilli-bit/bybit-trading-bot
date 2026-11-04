@@ -238,6 +238,10 @@ def place_passive_order(
     best_ask, _ = book.best_ask()
     if (side == "Buy" and price >= best_ask) or (side == "Sell" and price <= best_bid):
         raise ValueError("marketable order is not a passive maker order")
+    if side == "Buy" and price not in book.bids and price < min(book.bids):
+        raise ValueError("buy order price is outside visible bid depth; queue ahead is unknown")
+    if side == "Sell" and price not in book.asks and price > max(book.asks):
+        raise ValueError("sell order price is outside visible ask depth; queue ahead is unknown")
     queue = book.quantity_at(side, price)
     return PassiveOrder(
         side=side, price=price, quantity=quantity, arrival_ts=arrival_ts,

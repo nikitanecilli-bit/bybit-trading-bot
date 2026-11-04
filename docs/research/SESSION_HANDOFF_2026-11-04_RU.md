@@ -111,3 +111,14 @@
 Начать с перепроверки текущего branch HEAD, PR #4, последних Actions runs и содержимого этого документа. Затем прочитать обязательные файлы из раздела 2. Не считать SHA выше актуальными после начала новой сессии: это снимок состояния на момент handoff.
 
 **Пользовательская инструкция:** продолжать автономно; не ждать одобрения на безопасные исследовательские действия; не прекращать работу только потому, что workflow ещё выполняется; спрашивать только при реальном внешнем блокере. При этом все ограничения data/PnL/API/live из раздела 2 остаются обязательными.
+
+
+## Session update — 2026-11-04 (L2 empty-archive guard)
+
+- Re-read the current working rules and handoff before continuing. The branch's documented starting HEAD was `025cfca91ebb3a0d4419f8cdaa53be3b9c29f667`; the previous verified Research CI remains #41840361238 on code commit `d2740c6ff444c3a7302b4b04dcc04d15ebf1dcb1` (SUCCESS, 57/57 steps; L2 primitives 80/80; runner chronology step SUCCESS).
+- Static audit found one malformed-input edge case in `scripts/run_bybit_l2_queue_replay.py:capture_scenarios()`: an empty .data event stream left `first_cts=None` and later failed with an incidental TypeError instead of a clear validation error.
+- Fixed by explicitly raising `ValueError("order-book archive contains no events")`; added `test_capture_scenarios_rejects_empty_order_book_archive` in `tests/test_run_bybit_l2_queue_replay.py`.
+- Commits: source `067109a14312c39ebd95ecf2eaede8d19375426c`; regression `54f30eeb095fb01998bf9d03b69c4ff2a1b40687`.
+- The two files were re-fetched from the working branch and the guard/test presence confirmed. CI result for these commits has not yet been retrieved; do not report the new regression as passed until the actual job/test output is inspected.
+- No market PnL, archive download, collector, API/account access, runner registration, paper/live order, or main-branch change.
+- Next safe task: continue static L2 queue-replay audit on report generation and CSV edge cases, avoiding reinspection of already-covered chronology, sequence ordering, trade-ID uniqueness, and same-ms boundaries. Then retrieve/verify the CI result for the two commits if available.

@@ -603,3 +603,26 @@ CI:
 
 Вывод: u+1 continuity нельзя переносить с Full Orderbook на исторический depth-200 archive без доказательства, что архив действительно использует тот же stream contract. Текущий replay сохраняет строгую проверку positive integer u, u=1 только snapshot, монотонность seq/cts и атомарность, но не делает неподтверждённое u+1 предположение. Для окончательного решения нужны raw historical archive samples и подтверждённая спецификация формата; новые архивы не загружались из-за действующего external-data hold.
 
+
+
+## 29. capture_book_at: проверка хронологии после arrival boundary
+
+В capture_book_at() был ранний break на первом событии с cts >= arrival_ts. Это корректно исключало same-ms/future updates из книги, но одновременно прекращало чтение архива. Если позже в файле находилось событие с cts < arrival_ts (нарушение порядка архива), оно не обнаруживалось; функция могла вернуть устаревшее состояние, считая архив корректным.
+
+Исправлено:
+- arrival_ts проходит strict integer validation и должен быть положительным;
+- функция продолжает сканировать весь archive после arrival boundary;
+- все cts проверяются как strict positive integer и globally non-decreasing;
+- в OrderBook.apply() попадают только события с cts < arrival_ts; same-ms/future updates не применяются;
+- out-of-order event после arrival теперь fail-closed вместо незаметного возврата неполной книги.
+
+Добавлены regression tests: out-of-order cts после arrival boundary и fractional arrival_ts.
+
+Изменения в research/market-regime-v1-main:
+- source commit: 4362daa0b6bd9941e5ac32109389d23eb7b42eee;
+- regression tests: 892ca5bcf09a8c7bda7b2d677b66b6dc9f6f4baf.
+
+CI:
+- full run 41838847266 на commit 4362daa0b6bd9941e5ac32109389d23eb7b42eee: SUCCESS, 56/56 steps; queue replay primitive test SUCCESS; no failed steps.
+
+Исправление гарантирует, что point-in-time capture не принимает архив с нарушенной хронологией после точки отсечения. Оно не подтверждает непрерывность update IDs depth-200 и не заменяет доказательство полноты архива. Новые архивы не скачивались, strategy PnL не запускался, private API и paper/live orders не использовались. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.

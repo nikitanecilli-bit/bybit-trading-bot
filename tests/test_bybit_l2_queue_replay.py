@@ -609,8 +609,8 @@ def test_trade_archive_rejects_empty_or_whitespace_trade_id():
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "trades.csv.gz"
             with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
-                stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\\n")
-                stream.write(f"1756771200123,AAVEUSDT,Sell,10,100,{trade_id},False,False\\n")
+                stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\n")
+                stream.write(f"1756771200123,AAVEUSDT,Sell,10,100,{trade_id},False,False\n")
             try:
                 list(l2_module.iter_public_trades(path))
             except ValueError as exc:

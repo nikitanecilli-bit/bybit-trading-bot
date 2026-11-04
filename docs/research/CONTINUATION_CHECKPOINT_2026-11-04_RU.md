@@ -317,3 +317,27 @@ Runner report now declares mandatory BT/RPI metadata and counts excluded block t
 Статическая проверка изменений выполнена повторным чтением файлов из GitHub. В tests/test_bybit_l2_queue_replay.py добавлены четыре regression tests; тесты не объявляются пройденными до terminal CI. Для последних двух commits запущены Research engine checks через push; на момент checkpoint runs ещё выполнялись. main не менялся.
 
 Не запускались новые архивные загрузки, market/PnL replay, private API, paper/live orders. Сохраняются TRADE_ARCHIVE_FLAGS = UNVERIFIED_COMPATIBILITY и MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL.
+
+
+## 16. Terminal CI verification for queue replay hardening
+
+После последовательного устранения несоответствий в legacy regression tests полный Research engine checks завершился SUCCESS:
+- workflow run: 41835268896
+- URL: https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41835268896
+- tested commit: e7f4174fbf99e1b311980a106c9bf4ee66d60630
+- job: tests — SUCCESS
+- conservative Bybit aggregate-L2 queue replay primitives: 60/60 tests passed
+- compile step и остальные включённые Research CI steps завершились успешно.
+
+Предыдущие CI failures были вызваны несовпадающими с текущим строгим контрактом тестовыми ожиданиями, которые последовательно исправлены:
+- четыре order-spec rejection tests не передавали обязательный symbol;
+- markout test сравнивал текстовое форматирование Decimal вместо численного значения;
+- missing-u test ожидал старое сообщение, а не strict integer validation;
+- restart-sequence test использовал seq=0, который корректно отклоняется раньше как неположительный; сценарий изменён на seq=2 → seq=1;
+- RPI validation test ожидал прежний текст ошибки.
+
+Test-only repair commits: e1bd0e6acf5ddc534cb1531f168483bb4abd2a0e, 2f9fb8fff4f09ceb4ef8f7f04adfef065f0e5b94, 76e964b6455a2cf188ac37e89e987f4664d78915, b2c1aa69a0c4de015f48fc6fcd8c0876a0d617ac, e7f4174fbf99e1b311980a106c9bf4ee66d60630.
+
+Это подтверждает корректность текущих deterministic parser/queue primitive tests в GitHub CI, но не подтверждает реальную maker execution: aggregate L2 без L3, latency/cancel model, verified historical instrument spec и подтверждённого historical BT/RPI trade archive остаётся proxy. Не запускались новые Bybit archive downloads, strategy PnL, private API, paper/live orders. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся без изменений.
+
+Branch compare после изменений: research/market-regime-v1-main diverged from main, 2009 ahead / 36 behind. `main` не менялся; wholesale merge/rebase не выполнять.

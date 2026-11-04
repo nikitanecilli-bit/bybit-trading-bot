@@ -61,7 +61,10 @@ class InstrumentSpecHistory:
                 payload = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
                 raise ValueError(f"{path}: cannot read instrument snapshot JSON") from exc
-            if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+            if (not isinstance(payload, dict)
+                    or isinstance(payload.get("schema_version"), bool)
+                    or not isinstance(payload.get("schema_version"), int)
+                    or payload.get("schema_version") != 1):
                 raise ValueError(f"{path}: unsupported instrument snapshot schema")
             snapshot_category = str(payload.get("category") or "")
             if payload.get("source") != "Bybit V5 GET /v5/market/instruments-info":
@@ -73,7 +76,9 @@ class InstrumentSpecHistory:
             rows = payload.get("instruments")
             if not isinstance(rows, list) or not rows:
                 raise ValueError(f"{path}: instruments must be a non-empty list")
-            if payload.get("count") != len(rows):
+            if (isinstance(payload.get("count"), bool)
+                    or not isinstance(payload.get("count"), int)
+                    or payload.get("count") != len(rows)):
                 raise ValueError(
                     f"{path}: snapshot count {payload.get('count')!r} does not match {len(rows)} rows"
                 )

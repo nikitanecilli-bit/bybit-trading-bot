@@ -157,6 +157,20 @@ def apply_public_trade(order: PassiveOrder, trade: dict) -> None:
                 order.first_fill_ts = ts
 
 
+def signed_markout_bps(
+    side: str, fill_price: Decimal, best_bid: Decimal, best_ask: Decimal,
+) -> Decimal:
+    """Signed mid-price markout in bps: positive means favorable to the maker."""
+    if side not in ("Buy", "Sell"):
+        raise ValueError("side must be Buy or Sell")
+    fill_price, best_bid, best_ask = dec(fill_price), dec(best_bid), dec(best_ask)
+    if fill_price <= ZERO or best_bid <= ZERO or best_ask <= ZERO or best_bid > best_ask:
+        raise ValueError("invalid fill price or BBO")
+    mid = (best_bid + best_ask) / Decimal("2")
+    sign = Decimal("1") if side == "Buy" else Decimal("-1")
+    return (mid - fill_price) / fill_price * sign * Decimal("10000")
+
+
 def iter_book_events(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict]:
     with zipfile.ZipFile(archive) as zf:
         members = [name for name in zf.namelist() if name.endswith(".data")]

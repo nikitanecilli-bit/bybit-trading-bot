@@ -416,3 +416,14 @@
 - Commits: code/test `2b71592a1431028a5e78af2bc166327a4a5f49b8`; explanatory comment `af4ad6f421b52cd24f864d5a71c581853cc569a8`.
 - Focused isolated behavior check and test-source syntax check passed. Research CI #41881215008 on `af4ad6f` completed the `tests` job SUCCESS with 57/57 workflow steps SUCCESS; logs confirm the new regression PASS, aggregate-L2 primitives 82/82 and runner/inspector suite 13/13.
 - No market data download, collector, PnL/backtest, private API, runner, paper/live orders, or `main` changes. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains.
+
+## 2026-11-04 — continuation: no-overwrite report serialization (ENG-EXEC-032)
+
+- Confirmed current research branch commit: `118acb07cec55e692cb3dd3adeeb01536426e27f`.
+- Static audit found three fixed-name JSON outputs written with `Path.write_text()`, allowing a repeated run in the same working directory to silently overwrite a prior diagnostic artifact.
+- Added shared `report_io.py`; report creation uses exclusive mode `x`, so existing artifacts cause `FileExistsError` and remain byte-for-byte unchanged. JSON serialization occurs before file creation; an interrupted write removes the newly created partial file.
+- Updated the L2 queue replay runner, trade inspector and orderbook inspector to use the helper. Added two deterministic tests for valid JSON/no-overwrite and serialization failure/no file.
+- Source commits: helper `0a58d10fd34674708623b48fee1a633ee3c8e5f3`; queue runner `ddc3defd62a623f13bc4cb0db89392aab27b783e` plus import correction `a70d75967867f609a0b1aa563591bb733a02911a`; trade inspector `e2f484a7225baf3f4138ec7d3e9ad191161dba19`; orderbook inspector `6bdedbebf9d29ca9381ebb08be35e03c9e65b736`; tests `ed089a1c9a6f0573a81357c4ee7116f709af1d53`; documentation `118acb07cec55e692cb3dd3adeeb01536426e27f`.
+- Research CI workflow path filters include the modified scripts/tests and should trigger on push; combined commit status has not returned check records. Do not claim tests/CI passed until actual logs are available.
+- Do not dispatch `bybit-orderbook-sample-inspection.yml`: it downloads new L2/trade archives and runs the bounded queue probe, all currently gated.
+- No collectors, new archives, private API, runner, market PnL/backtests, paper/live orders. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`. `main` unchanged; PR #4 remains Draft/unmerged.

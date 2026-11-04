@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from decimal import Decimal
+from report_io import write_json_report
 from unittest.mock import patch
 
 import scripts.run_bybit_l2_queue_replay as runner
@@ -17,6 +18,37 @@ import scripts.inspect_bybit_orderbook_sample as book_inspector
 from scripts.run_bybit_l2_queue_replay import (
     HOUR_MS, capture_book_states_at, capture_scenarios,
 )
+
+
+
+def test_report_writer_creates_valid_json_and_refuses_to_overwrite():
+    with tempfile.TemporaryDirectory() as tmp:
+        report_path = Path(tmp) / "report.json"
+        write_json_report(report_path, {"status": "success", "rows": 3})
+        original = report_path.read_bytes()
+        assert json.loads(original) == {"status": "success", "rows": 3}
+        try:
+            write_json_report(report_path, {"status": "replacement"})
+        except FileExistsError:
+            pass
+        else:
+            raise AssertionError("existing report must never be overwritten")
+        assert report_path.read_bytes() == original
+
+
+def test_report_writer_does_not_leave_partial_file_on_serialization_failure():
+    class NotSerializable:
+        pass
+
+    with tempfile.TemporaryDirectory() as tmp:
+        report_path = Path(tmp) / "invalid.json"
+        try:
+            write_json_report(report_path, {"bad": NotSerializable()})
+        except TypeError:
+            pass
+        else:
+            raise AssertionError("non-JSON value must fail serialization")
+        assert not report_path.exists()
 
 
 def test_trade_sample_inspector_recognizes_both_block_trade_aliases():

@@ -100,30 +100,24 @@ Queue prototype прошёл 14 synthetic tests и CI #41812777279; same-millise
 - Both sample-inspection runs caused by the two parser commits completed SUCCESS; they re-read only the same existing AAVEUSDT 2025-09-02 sample, not a new date or symbol.
 - All data-collection / sample-download workflows now require explicit manual dispatch; default deterministic CI no longer runs Bybit network probes or full L2 downloads.
 
-## 10. Bybit L2 update-ID restart semantics — исправление внесено, CI не подтверждён
+## 10. Bybit L2 update-ID restart semantics — hardening внесён, CI не подтверждён
 
-Официальная Bybit V5 orderbook документация определяет u как update ID и указывает, что u=1 означает snapshot после service restart; локальный стакан должен быть заменён новым snapshot. seq — cross sequence; для full-depth документации он монотонный, но не обязан быть consecutive. Источник: https://bybit-exchange.github.io/docs/v5/websocket/public/orderbook.
+Официальная Bybit V5 orderbook документация определяет u как update ID и указывает, что u=1 означает snapshot после service restart; локальный стакан должен быть заменён новым snapshot. seq — отдельный cross sequence; меньший seq означает более раннее состояние. Источник: https://bybit-exchange.github.io/docs/v5/websocket/public/orderbook.
 
-Подтверждённый дефект в прежнем OrderBook.apply():
-- код очищал стакан только при type=snapshot, но не читал data.u;
-- проверка seq < last_seq выполнялась до очистки snapshot, поэтому корректный restart snapshot с новой sequence epoch мог быть отвергнут;
-- u=1 на delta мог быть применён как обычный incremental update, хотя без полного snapshot такой state нельзя считать синхронизированным.
+В прежнем OrderBook.apply() поле data.u не проверялось. Поэтому parser не мог fail-closed остановиться, если в архиве встречался u=1 вместе с type=delta: такой event мог быть применён как обычное изменение, хотя полное состояние стакана не подтверждено.
 
-Исправление в research branch:
+Изменения в research branch:
 - u обязателен, положителен и не может быть bool;
-- u=1 принимается только вместе с type=snapshot; такой snapshot сбрасывает старые уровни и разрешает новую seq epoch;
-- u=1 на delta отклоняется fail-closed;
-- обычная монотонная проверка cts сохраняется, а для non-reset событий сохраняется проверка non-decreasing seq.
+- u=1 разрешён только вместе с type=snapshot; u=1 delta отклоняется fail-closed;
+- snapshot по-прежнему полностью заменяет уровни книги;
+- seq ordering не сбрасывается автоматически вместе с u: сохраняется проверка non-decreasing seq, поскольку это отдельный cross-sequence сигнал;
+- cts остаётся монотонным.
 
-Regression coverage:
-- restart snapshot с уменьшившимся seq очищает старые уровни и загружает новые;
-- u=1 delta отклоняется без изменения предыдущего стакана;
-- отсутствие u отклоняется;
-- существующие synthetic fixtures дополнены update IDs.
-- Source commit: 46d264d40a567438c0311bd227f76b0b753700ef.
-- Test commits: 5687cd39ff869b9bcabc2f12a55f51596b899e63, ed03e42bbba772d2e0b9c55a3282f05b3df4fdf9, 7d8f54318552d8d8aa3b9d7ae08d0feb61bb0ebb; current queue test file contains 22 tests.
-- The Research CI workflow is configured to run on pushes touching these paths. Its new run is not visible through the available PR-only workflow-run lookup; do not mark this patch CI-passed until a terminal push-run result is checked.
+Regression coverage: reset snapshot заменяет старые уровни; u=1 delta отклоняется без мутации; отсутствующий u отклоняется; u=1 не обходит seq ordering. Queue test file содержит 23 теста.
+- Source commits: 46d264d40a567438c0311bd227f76b0b753700ef, 3b6b71b43776f79b4ec19d3e801ac6fa52b356a2.
+- Test commits: 5687cd39ff869b9bcabc2f12a55f51596b899e63, ed03e42bbba772d2e0b9c55a3282f05b3df4fdf9, 7d8f54318552d8d8aa3b9d7ae08d0feb61bb0ebb, 5113865fb1accd38b202cb67ca5d6c541c2113cc.
+- Research CI is configured to run on pushes touching these paths. The new push-run terminal result is not exposed by the available PR-only workflow-run lookup; do not mark this patch CI-passed until a terminal run is checked.
 
-The previously inspected AAVEUSDT 2025-09-02 sample had zero u=1 resets, so this is a future-data integrity guard, not a correction to the four-order sample metrics. No archive was re-downloaded, no strategy signal was replayed, no PnL was run, and no Bybit account/API/order operation occurred.
+The previously inspected AAVEUSDT 2025-09-02 sample had zero u=1 resets, so this is a parser-integrity guard, not a correction to the four-order sample metrics. No archive was re-downloaded, no strategy signal was replayed, no PnL was run, and no Bybit account/API/order operation occurred.
 
 Next static audit items remain: order-spec/tick/qty validation, per-fill fee and VWAP markout lifecycle, latency/cancel assumptions, and duplicate public-trade ID handling. Keep MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL.

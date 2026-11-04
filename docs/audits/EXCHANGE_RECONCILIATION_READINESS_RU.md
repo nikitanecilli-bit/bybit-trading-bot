@@ -408,3 +408,43 @@ Research CI #41916699655 — SUCCESS, 59/59 workflow steps; протестиро
 - Сырые opaque cursors намеренно не сохраняются; нет подтверждения, что backend не пропустил/не продублировал события между страницами.
 - Даже корректная terminal page chain не доказывает, что задержанные исполнения уже появились в API или что границы временного запроса полностью соответствуют lifecycle позиции.
 - Реальные API, credentials, collectors, archive downloads, live orders и market PnL tests не запускались. Reconciliation PASS, live resume и strategy/execution/PnL gates остаются BLOCKED.
+
+
+### ENG-RECON-017 — response provenance для read-only reconciliation pages
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
+
+Read-only snapshot collector теперь записывает для каждой страницы `page_provenance`:
+- endpoint и page index внутри соответствующей pagination chain;
+- client-observed `request_started_at_ms` / `request_completed_at_ms`;
+- фактически использованные query params и их canonical SHA-256;
+- SHA-256 запрошенного и следующего cursor (сами cursor остаются в существующем raw envelope);
+- SHA-256 canonical JSON decoded response;
+- retCode, row_count и has_next_page.
+
+Новый capture schema — version 2. Report validator для schema v2 перепроверяет:
+- точный набор provenance полей;
+- endpoint и последовательность page index;
+- query params против requested cursor и fingerprint;
+- response fingerprint против сохранённого decoded JSON;
+- next cursor fingerprint против cursor следующей страницы;
+- retCode, row count, continuation flag;
+- отсутствие пересекающихся/переставленных client-observed request intervals и наличие terminal page в каждой chain.
+Schema v1 остаётся читаемым для backwards compatibility, но не содержит этих новых provenance guarantees.
+
+Offline tests:
+- multi-page execution collector fixture проверяет cursor chain, response/query fingerprints, row count и client timing;
+- report schema-v2 принимает валидную provenance;
+- изменение response fingerprint и подмена query cursor отвергаются;
+- существующие schema-v1 report fixtures продолжают работать.
+
+Research CI #41917443294 — SUCCESS, 59/59 workflow steps; tested code commit `52a492d8c9fd5582fbe52b67dc1cf9f6b168a7ed`.
+
+Границы доказательности:
+- `response_canonical_sha256` считается по canonical JSON после декодирования ответа, не по исходным HTTP wire bytes. Это проверка целостности сохранённого decoded payload, не подпись Bybit и не доказательство происхождения ответа.
+- Query params и cursor fingerprints — provenance metadata; collector не сохраняет HTTP request/response headers или TLS transcript.
+- Request timestamps — клиентские границы вокруг `request_json`; completion фиксируется после возврата и JSON decoding, не является точным socket receive time или server event time.
+- Schema v1 snapshots остаются совместимыми, поэтому report не может требовать provenance от старых captures.
+- Read-only collector не запускался вручную; CI использует FakeTransport. Реальных Bybit API calls, credentials, collector runs, archive downloads, live orders или market PnL tests не было.
+- Snapshot остаётся `CAPTURED_READ_ONLY_NOT_RECONCILED`; reconciliation PASS, live resume и strategy/execution/PnL gates остаются BLOCKED.

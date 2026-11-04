@@ -47,7 +47,7 @@ def test_passive_order_accepts_exact_exchange_instrument_constraints():
     }})
     o = place_passive_order(
         book(), side="Buy", price=D("100"), quantity=D("0.05"),
-        arrival_ts=1000, expiry_ts=5000, instrument_spec=spec,
+        arrival_ts=1000, expiry_ts=5000, instrument_spec=spec, symbol="TESTUSDT",
     )
     assert o.quantity == D("0.05")
 
@@ -126,6 +126,46 @@ def test_passive_order_rejects_below_exchange_min_notional():
         assert "minNotionalValue" in str(exc)
     else:
         raise AssertionError("below-minimum notional must be rejected")
+
+
+
+def test_passive_order_rejects_instrument_spec_for_different_symbol():
+    spec = InstrumentSpec.from_snapshot({"instrument": {
+        "symbol": "ETHUSDT", "category": "linear", "status": "Trading",
+        "priceFilter": {"minPrice": "0.1", "maxPrice": "1000000", "tickSize": "0.1"},
+        "lotSizeFilter": {"qtyStep": "0.01", "minOrderQty": "0.01",
+                          "maxOrderQty": "1000", "maxMktOrderQty": "800",
+                          "minNotionalValue": "1"},
+    }})
+    try:
+        place_passive_order(
+            book(), side="Buy", price=D("100"), quantity=D("1"),
+            arrival_ts=1000, expiry_ts=5000, instrument_spec=spec,
+            symbol="BTCUSDT",
+        )
+    except ValueError as exc:
+        assert "does not match" in str(exc)
+    else:
+        raise AssertionError("instrument spec for another symbol must be rejected")
+
+
+def test_passive_order_requires_symbol_when_spec_is_supplied():
+    spec = InstrumentSpec.from_snapshot({"instrument": {
+        "symbol": "TESTUSDT", "category": "linear", "status": "Trading",
+        "priceFilter": {"minPrice": "0.1", "maxPrice": "1000000", "tickSize": "0.1"},
+        "lotSizeFilter": {"qtyStep": "0.01", "minOrderQty": "0.01",
+                          "maxOrderQty": "1000", "maxMktOrderQty": "800",
+                          "minNotionalValue": "1"},
+    }})
+    try:
+        place_passive_order(
+            book(), side="Buy", price=D("100"), quantity=D("1"),
+            arrival_ts=1000, expiry_ts=5000, instrument_spec=spec,
+        )
+    except ValueError as exc:
+        assert "symbol is required" in str(exc)
+    else:
+        raise AssertionError("spec validation must require an explicit symbol")
 
 
 def test_snapshot_and_delta_are_absolute_level_updates_and_zero_deletes():

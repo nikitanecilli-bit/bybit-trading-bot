@@ -1252,7 +1252,7 @@ CI:
 - Повторный replay не выполнялся: тот же сохранённый AAVE trade CSV не имеет BT/isBlockTrade и потому не проходит строгий parser. Новые архивы не скачивались.
 - Это улучшение измерения execution diagnostics, не доказательство maker fill realism или PnL. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся закрытым.
 
-## 67. Inspector validates every BT/RPI flag value and alias — 2026-11-04
+## 68. Inspector validates every BT/RPI flag value and alias — 2026-11-04
 
 Сверка диагностического inspector с `iter_public_trades()` выявила ещё один разрыв: inspector сообщал только о наличии колонок BT/RPI и считал значения первого RPI alias, но не проверял каждую строку и не выявлял конфликт между одновременно присутствующими aliases. Основной replay parser уже fail-closed отклоняет missing/malformed flags и conflicting aliases.
 

@@ -82,6 +82,9 @@ def capture_scenarios(book_archive: Path) -> tuple[list[dict], dict]:
         events += 1
         last_cts = cts
 
+    if first_cts is None:
+        raise ValueError("order-book archive contains no events")
+
     while next_index < len(offsets):
         arrival = first_cts + offsets[next_index] * HOUR_MS
         if arrival > last_cts:

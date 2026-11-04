@@ -55,6 +55,27 @@ class JoinedMarketStateTests(unittest.TestCase):
             get_linear_market_state(s,r,"BTCUSDT",1793491202000,max_snapshot_skew_ms=1000,
                                     max_risk_tier_age_ms=500)
 
+    def test_age_budgets_must_be_nonnegative_integers(self):
+        s,r=self.load("2026-11-01T00:00:00Z","2026-11-01T00:00:00Z")
+        for name, value in (("max_instrument_age_ms", True),
+                            ("max_instrument_age_ms", 1.5),
+                            ("max_instrument_age_ms", -1),
+                            ("max_risk_tier_age_ms", True),
+                            ("max_risk_tier_age_ms", 1.5),
+                            ("max_risk_tier_age_ms", -1)):
+            with self.subTest(name=name, value=value), self.assertRaisesRegex(ValueError, name):
+                get_linear_market_state(
+                    s,r,"BTCUSDT",1793491200000,max_snapshot_skew_ms=0,
+                    **{name:value}
+                )
+
+    def test_rejects_blank_symbol(self):
+        s,r=self.load("2026-11-01T00:00:00Z","2026-11-01T00:00:00Z")
+        with self.assertRaisesRegex(ValueError,"non-empty string"):
+            get_linear_market_state(
+                s,r,"   ",1793491200000,max_snapshot_skew_ms=0
+            )
+
     def test_skew_budget_must_be_explicit_nonnegative_integer(self):
         s,r=self.load("2026-11-01T00:00:00Z","2026-11-01T00:00:00Z")
         for value in (-1,True,1.5):

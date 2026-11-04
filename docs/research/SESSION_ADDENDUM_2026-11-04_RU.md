@@ -201,3 +201,13 @@ CI: run [41901402434](https://github.com/nikitanecilli-bit/bybit-trading-bot/act
 - Итоговый Research CI [#41908375736](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41908375736): **SUCCESS**, 59/59 шагов, code head `e05e070b02bf3a8785a317600f466c9ce1207fda`. Это итоговая проверка исправленного кода; предыдущие промежуточные failed runs не считаются успешными.
 - Offline risk-tier auditor проверяет page tier totals, временные границы, sequential indexes, continuation chain, уникальность/сортировку символов, объединение page symbols и final snapshot, request durations и collection-window overlap.
 - Только offline tests и CI; ручной запуск collector, Bybit API, архивные загрузки, live orders и market PnL не выполнялись. `MAKER_EXECUTION_REALISM` и strategy/execution/PnL gates остаются BLOCKED.
+
+
+## ENG-DATA-021 — runtime loader валидирует временную метаинформацию risk-tier snapshots
+
+- Статическая проверка выявила, что ``RiskTierHistory.from_directory`` валидировал risk-tier rows и as-of timestamps, но игнорировал optional ``collection_started_at`` и ``page_observations``, даже если они присутствовали и были некорректны.
+- Runtime loader теперь проверяет ``collection_started_at <= fetched_at``; если ``symbol_count`` присутствует — сверяет его с уникальными символами; если присутствуют page observations — требует их непустой список и collection start, точную схему, последовательные page indexes, корректную хронологию/границы, page continuation, уникальные отсортированные symbols, symbol/tier counts, union page symbols == snapshot symbols и сумму page tier counts == реальному числу tier rows.
+- Legacy schema-v1 snapshots без optional collection/page metadata остаются совместимыми; новая проверка применяется к metadata, когда они присутствуют. Это закрывает разрыв между валидатором сборщика/offline auditor и runtime history loader, который потребляет архивы.
+- Regression test проверяет валидный page metadata, отклонение неверной суммы tier rows и collection start после fetched_at. Существующие тесты продолжают проверять загрузку старых снимков без optional metadata.
+- Research CI [#41908898109](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41908898109): **SUCCESS**, 59/59 шагов, tested code HEAD ``1cc503608a238141a70b6ab8f8cb81ef0824ad3b``.
+- Только offline unit tests/CI. Сборщик, Bybit API, архивные загрузки, live orders и market PnL не запускались. Никакие execution/PnL gates не изменялись.

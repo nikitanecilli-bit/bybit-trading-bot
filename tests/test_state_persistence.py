@@ -57,8 +57,7 @@ class StatePersistenceTests(unittest.TestCase):
 
     def test_restored_position_is_checked_against_joined_entry_time_market_state(self):
         bot, state, margin = self._restored_engine_with_joined_histories()
-        with patch.object(engine, "get_linear_market_state", return_value=state) as joined, \\
-             patch.object(engine, "calculate_margin_requirements_from_tiers", return_value=margin) as calc:
+        with patch.object(engine, "get_linear_market_state", return_value=state) as joined, patch.object(engine, "calculate_margin_requirements_from_tiers", return_value=margin) as calc:
             bot._validate_restored_positions_market_state()
         joined.assert_called_once_with(
             bot.instrument_spec_history, bot.risk_tier_history, "BTCUSDT",
@@ -75,8 +74,7 @@ class StatePersistenceTests(unittest.TestCase):
     def test_restored_position_rejects_mismatched_entry_risk_tier(self):
         bot, state, margin = self._restored_engine_with_joined_histories()
         bot.open_positions["BTCUSDT"].risk_tier_id = 1
-        with patch.object(engine, "get_linear_market_state", return_value=state), \\
-             patch.object(engine, "calculate_margin_requirements_from_tiers", return_value=margin):
+        with patch.object(engine, "get_linear_market_state", return_value=state), patch.object(engine, "calculate_margin_requirements_from_tiers", return_value=margin):
             with self.assertRaisesRegex(ValueError, "risk_tier_id differs"):
                 bot._validate_restored_positions_market_state()
 

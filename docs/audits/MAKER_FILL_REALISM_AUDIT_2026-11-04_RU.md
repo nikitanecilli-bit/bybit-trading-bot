@@ -260,3 +260,14 @@ This first implementation is intentionally a conservative baseline, but not yet 
 6. One AAVEUSDT day and four hypothetical orders do not establish generalization across symbols or regimes.
 
 **Decision:** queue-replay mechanics have passed their first synthetic tests and one real-data smoke test. Keep `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` until measured latency/cancel behavior, order sizing/spec validation, full partial-fill fee lifecycle and adequately sampled per-fill adverse-selection analysis are implemented and tested. Do not rerun H1 PnL on this prototype yet.
+
+
+## Same-millisecond L2 state exclusion — 2026-11-04
+
+The queue-replay probe now excludes order-book events with `cts == arrival_ts` when capturing the pre-arrival book state. Post-fill markout snapshots also use the latest reconstructed state strictly before the target millisecond. This avoids using an update whose ordering relative to the hypothetical order/fill cannot be established from the available sequence fields.
+
+- Added two deterministic regressions for arrival-state and post-fill markout same-millisecond exclusion.
+- Both passed in Research CI [#41814166935](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41814166935), 58/58 workflow steps.
+- The matched AAVEUSDT L2 + public-trade sample replay completed successfully in [workflow #41814167058](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41814167058), with all compile/test/download/replay/upload steps successful.
+
+Important limitation: excluding same-millisecond updates prevents direct lookahead but does not reveal whether an excluded same-ms addition occurred before or after hypothetical arrival. The captured book can therefore be stale and may understate or overstate queue-ahead in that ambiguous millisecond. Such samples remain a bounded mechanics probe, not guaranteed conservative fill evidence; exact same-ms order sequence is still unresolved.

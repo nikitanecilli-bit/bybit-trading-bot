@@ -300,3 +300,13 @@
 - Final CI #41853410298 on test commit 0cf45d16809a04e2653325934b37723b009097d0: SUCCESS, 57/57 workflow steps; actual log confirms all three new tests passed and funding accounting suite ran 28 tests.
 - Intermediate source-only CI #41853363357 used the prior test fixture (half remaining with TP1 false) and failed in the funding suite as expected for the newly enforced invariant. The fixture was corrected in the next commit and the full workflow rerun passed; no source rollback was needed.
 - Classification: funding/accounting state-integrity guardrail, not PnL evidence. No market data downloads, PnL/backtest, private API, runner, paper/live orders, or main-branch changes.
+
+
+## Session update — validate restored realized TP1 gross (2026-11-04)
+
+- Persistence audit found restore validated that TP1 was hit and the remaining fraction/contract quantities were consistent, but trusted arbitrary nonnegative `realized_tp1_gross_usdt`. That value is added directly to final trade PnL and MTM; a modified/stale backup could therefore inject incorrect realized PnL after TP1.
+- `load_state()` now recomputes expected TP1 gross from the closed leg and TP1 price: exchange-sized positions use exact `tp1_contract_qty * abs(tp1_price-entry_price)`; legacy positions use `size_usdt * (1-remaining_fraction) * abs(tp1_price-entry_price)/entry_price`. The stored value must match after the engine's 4-decimal money rounding (tolerance 1e-4).
+- Added regression that corrupts a legacy TP1 realized gross from 30 to 31 and confirms restore fails closed. Corrected exchange-sized TP1 fixtures from legacy gross 30 to exact contract gross 3; corrected liquidity fixture to persist its legitimate 30 legacy TP1 gross.
+- Final CI #41854119883 on f42979860d97090120ee3a8aed79d59695d441ee: SUCCESS, 57/57 workflow steps; state persistence suite 78 tests; log confirms corrupt-gross rejection and valid legacy/exchange-sized round trips.
+- Earlier attempts #41853865541 and #41853997743 failed on stale test fixtures inconsistent with the new source invariant (legacy TP1 liquidity fixture omitted gross; exchange-sized fixtures used legacy-sized gross). Fixtures corrected; final full workflow green.
+- Classification: persisted PnL integrity guardrail, not strategy profitability evidence. No PnL/backtest, market archive downloads, private API, runner, paper/live orders, or main changes.

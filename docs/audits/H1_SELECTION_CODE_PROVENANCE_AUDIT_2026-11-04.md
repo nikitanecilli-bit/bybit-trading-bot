@@ -262,3 +262,32 @@ Verification:
 - Research CI [#41814790870](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41814790870) completed **SUCCESS**, 58/58 workflow steps.
 - Tests for valid frozen mode, missing frozen mode, invalid thresholds and mismatched arm sets passed.
 - No H1 market PnL replay was run.
+
+
+## Dated exchange-snapshot source identity — 2026-11-04
+
+A provenance review found that the as-of instrument and risk-tier loaders validated
+schema, category, timestamps and record consistency, but did not require the
+collector's declared source identifier. A syntactically valid JSON file could
+therefore be consumed without asserting which Bybit V5 endpoint it represented.
+
+Correction:
+- `InstrumentSpecHistory.from_directory()` now requires the exact collector
+  source string `Bybit V5 GET /v5/market/instruments-info`.
+- `RiskTierHistory.from_directory()` now requires
+  `Bybit V5 GET /v5/market/risk-limit`.
+- Missing or mismatched source identifiers fail closed; test fixtures now use
+  the same source identifiers as the official-endpoint collectors, with explicit
+  negative tests for missing provenance.
+
+This is an integrity guard, not cryptographic proof of server origin. A source
+string can be forged; stronger evidence still depends on collector code,
+HTTPS endpoint validation, immutable Git history, file hashes and independent
+archive validation.
+
+Verification:
+- Research CI [#41815529806](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41815529806) completed **SUCCESS**.
+- The instrument as-of loader and risk-tier as-of loader tests passed, as did
+  the complete Research CI job (all 55 numbered test/audit steps and cleanup).
+- No Bybit archive collection, selector run, H1 market PnL, private API access,
+  paper order or live order was performed.

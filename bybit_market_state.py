@@ -27,6 +27,13 @@ def get_linear_market_state(instrument_history, risk_tier_history, symbol, as_of
     if (isinstance(max_snapshot_skew_ms, bool)
             or not isinstance(max_snapshot_skew_ms, int) or max_snapshot_skew_ms < 0):
         raise ValueError("max_snapshot_skew_ms must be a non-negative integer")
+    for label, value in (("max_instrument_age_ms", max_instrument_age_ms),
+                         ("max_risk_tier_age_ms", max_risk_tier_age_ms)):
+        if value is not None and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 0):
+            raise ValueError(f"{label} must be a non-negative integer or None")
+    if not isinstance(symbol, str) or not symbol.strip():
+        raise ValueError("symbol must be a non-empty string")
     if instrument_history.category != "linear" or risk_tier_history.category != "linear":
         raise ValueError("combined market state only supports linear category")
     specs = [s for s in instrument_history.snapshots if s.fetched_at_ms <= as_of_ts]
@@ -47,7 +54,9 @@ def get_linear_market_state(instrument_history, risk_tier_history, symbol, as_of
     if skew > max_snapshot_skew_ms:
         raise ValueError(f"instrument/risk-tier snapshot skew exceeds budget: skew_ms={skew}")
     key = symbol.strip().upper()
-    spec = instrument_history.get_spec(key, as_of_ts, max_age_ms=max_instrument_age_ms)
+    spec = instrument_history.get_spec(
+        key, as_of_ts, max_age_ms=max_instrument_age_ms, require_trading=True
+    )
     tiers = risk_tier_history.get_tiers(key, as_of_ts, max_age_ms=max_risk_tier_age_ms)
     return BybitLinearMarketState(key, spec, tiers, spec_snapshot.fetched_at_ms,
                                   risk_snapshot.fetched_at_ms, as_of_ts)

@@ -1421,3 +1421,13 @@ No market PnL, new archive download/collector, private API, runner registration,
 - Key unresolved item: historical experiment scripts do not provide complete immutable SHA-256 manifests for the CryptoFetch input archive bytes. Artifact ZIP hashes are not input dataset hashes. No artifact or source archive was downloaded.
 - Updated provenance matrix commit: `2db060b140b258bb3d71152082f30933eb16b3a6`; blob read back as `adfbe96e1acf5d8ff6b2f8d2814db564ee05e9ee`. Documentation-only; no CI run.
 - Next: inspect exact historical engine/accounting commits and identify which old E01–E07 numbers predate fee/slippage accounting corrections. Do not recalculate PnL; only classify historical results by code version and known impact.
+
+
+## 2026-11-05 — P1: E01–E07 historical accounting impact classified
+
+- Compared `Bybit_Trading_Engine_v14_research.py` at the exact checked-out commits for E01–E07. E01–E03/E04/E06 all used engine blob `e4501bd...`; E07 used `c47caac...`; both contain the old exit-fee/slippage formula based on entry notional for TP1/final legs. E05 failed before PnL and is not applicable.
+- Verified corrected execution-price formulas in engine blob `b91c40f...` at commit `4eb9a2e7d7fc6a198937ef028dec32a5f723e22d`; Research CI #41536540759 on that commit passed 31 steps (per audit record).
+- Impact: E01–E04/E07 net PnL and potentially position sizing/portfolio sequence are provisional; E02 train-only policy selection may itself change; E06 diagnostic cost fields provisional; E05 no PnL. Direction of cost bias depends on gross PnL: old costs understate profitable exits and overstate losing exits. Do not apply a blanket scalar adjustment.
+- No recalculation, fixed-trade sensitivity, artifact download, PnL replay or parameter sweep was run.
+- Provenance matrix update commit `c5bc10b8360d56781c5e919e974c5b03570cf4cf`; blob read back `fc55570e4f56b07ce295b75d1be6684f1bd2bd93`. Documentation-only; no CI run.
+- P1 next decision: the old E01–E07 numbers are now version-classified but not economically corrected. With external data and PnL gates still closed, the next safe step is to consolidate the evidence/data gate and identify whether any additional useful static audit remains; do not start new market testing.

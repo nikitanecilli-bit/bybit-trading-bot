@@ -170,3 +170,20 @@ A workflow/source audit found:
 Added `scripts/audit_instrument_snapshot_coverage.py` and deterministic tests. The offline tool reports per-source snapshot counts and date span, collection-duration distribution, inter-snapshot gaps (completion-to-start where available, otherwise completion-to-completion), overlapping collection windows, symbols added/removed, and observed status changes. It has no built-in freshness threshold; optional gap/duration thresholds must be supplied explicitly. It fails closed on malformed files, duplicate timestamps and overlapping collection windows. Empty archive directories are reported as `NO_DATA`, not as zero-gap coverage.
 
 **Decision:** no automatic schedule or live capture was enabled. First obtain an approved public-data capture path and enough dated snapshots to measure actual cadence, collection durations and gaps. Even a measured cadence cannot prove absence of intrainterval status transitions; use authoritative status-change events if exact historical tradability is required. Keep point-in-time tradability and strategy-PnL gates blocked. No API requests, collectors, archive downloads or market tests were run for this work.
+
+## ENG-DATA-010 — per-page request timing provenance (2026-11-04)
+
+Both Bybit snapshot collectors now attach optional `page_observations` metadata to newly generated snapshots:
+- `status_filter` and sequential `page_index`;
+- `request_started_at` and `request_completed_at` (UTC, millisecond precision);
+- `row_count`, sorted `symbols`, and `has_next_page`.
+
+`request_completed_at` is recorded after `_request_page` returns, including JSON parsing and response-shape/retCode validation. It is a conservative client-side completion bound, not an exchange-side event timestamp or exact socket-receipt timestamp. Raw opaque pagination cursors are deliberately not persisted.
+
+Snapshot builders validate each observation window, global chronological ordering, sequential page indices per status filter, collection start/fetch bounds, and exact union of observed symbols versus the final snapshot universe. Older schema-v1 snapshots without this optional field remain readable.
+
+The offline coverage auditor now validates the page metadata and reports per-snapshot page counts, per-status request windows and row counts, and request-duration distributions. It rejects malformed timing, out-of-order pages, duplicate symbols, and incomplete symbol coverage.
+
+Regression tests cover valid page metadata, invalid/reversed windows, chronology, snapshot-time bounds, and symbol coverage. Research CI run [#41898947956](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41898947956) completed **SUCCESS** (59/59 steps), including collector tests, temporal audit tests and offline archive audit. An intermediate run failed because the linear-universe builder had not yet forwarded its page observations into the shared validator; fixed in commit `d2edd46`, then revalidated successfully in #41898525899 and #41898947956.
+
+**Limit:** this narrows collection windows to individual page requests but does not reveal the exact instant at which Bybit's backend sampled the underlying instrument state, nor status transitions between page requests or between snapshots. The snapshot remains a sequentially collected observation, not an atomic exchange-side universe. No live/public/private API request, collector execution, archive download or PnL/market test was performed.

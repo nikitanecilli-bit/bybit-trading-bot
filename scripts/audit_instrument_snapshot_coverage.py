@@ -82,7 +82,7 @@ def inspect_snapshot(path: Path) -> dict[str, Any]:
             if not isinstance(status, str) or not status or type(index) is not int or index < 1:
                 raise ValueError(f"{path}: invalid page observation status or index")
             started = utc_ms(item.get("request_started_at"), "request_started_at")
-            received = utc_ms(item.get("response_received_at"), "response_received_at")
+            received = utc_ms(item.get("request_completed_at"), "request_completed_at")
             if started > received:
                 raise ValueError(f"{path}: page request starts after response")
             if previous_received is not None and started < previous_received:
@@ -115,11 +115,11 @@ def inspect_snapshot(path: Path) -> dict[str, Any]:
             page_durations.append(duration)
             summary = by_status.setdefault(status, {
                 "page_count": 0, "first_request_started_at": item["request_started_at"],
-                "last_response_received_at": item["response_received_at"],
+                "last_request_completed_at": item["request_completed_at"],
                 "row_count": 0,
             })
             summary["page_count"] += 1
-            summary["last_response_received_at"] = item["response_received_at"]
+            summary["last_request_completed_at"] = item["request_completed_at"]
             summary["row_count"] += rows_count
             previous_received = received
         if page_symbols != set(symbols):

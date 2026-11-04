@@ -84,13 +84,14 @@ def test_markout_capture_excludes_exact_target_event_and_never_extrapolates():
         write_book_archive(archive, [
             event("snapshot", 1_000, 1, 1, "5"),
             event("delta", 2_000, 2, 2, "8"),
+            event("delta", 4_000, 3, 3, "9"),
         ])
-        states = capture_book_states_at(archive, [2_000, 2_500, 5_000])
+        states = capture_book_states_at(archive, [2_000, 3_500, 5_000])
 
     assert states[2_000]["book_cts"] == 1_000
     assert states[2_000]["bids"][100] == 5
-    assert states[2_500]["book_cts"] == 2_000
-    assert states[2_500]["bids"][100] == 8
+    assert states[3_500]["book_cts"] == 2_000
+    assert states[3_500]["bids"][100] == 8
     assert 5_000 not in states
 
 

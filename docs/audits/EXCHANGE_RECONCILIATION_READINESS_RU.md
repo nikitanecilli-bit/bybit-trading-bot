@@ -251,3 +251,20 @@ Tests: `tests/test_exchange_execution_identity.py` — 8 deterministic offline t
 Research CI #41913543774 — SUCCESS, 59/59 workflow steps; тест persistence включает 96 cases на этом commit.
 
 Граница: это локальная согласованность записанного журнала, а не доказательство полноты биржевой истории. Если Bybit вернул не все execution rows, ledger может быть только нижней границей фактического fill total. Для reconciliation PASS по-прежнему необходимы полная пагинация, контроль интервалов/снимка и независимое сравнение с биржевыми позициями/ордерами. Ни API, ни live handlers, ни PnL здесь не запускались.
+
+
+### ENG-RECON-011 — проверка positionIdx и направления ордеров
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
+
+- Если локальная позиция имеет exchange identity, каждый связанный ордер обязан иметь тот же `symbol` и тот же `positionIdx`.
+- Проверка покрывает one-way (`positionIdx=0`) и hedge (`positionIdx=1/2`) identity; индекс ордера не выводится из стороны ордера. В hedge mode закрывающий Sell для long positionIdx=1 остаётся связан с индексом 1.
+- Ордер на противоположной стороне от биржевой позиции требует `reduceOnly=true`; ордер на той же стороне не может быть reduce-only для этой позиции.
+- `closeOnTrigger=true` требует `reduceOnly=true`.
+- Добавлены тесты на несовпадающий hedge positionIdx, корректный hedge close, ошибочный reduceOnly на entry/exit и некорректный closeOnTrigger.
+- Research CI #41913895096 — SUCCESS, 59/59 workflow steps.
+
+Ограничение: правила проверяются только когда position identity известна. Для legacy backup без exchange identity данные не восстанавливаются догадками. Это локальная проверка связности ордеров, не полная верификация всех Bybit order types/position modes; реальный обменный протокол и обработчики ордеров не запускались.
+
+Не выполнялись API calls, credentials, collectors, archive downloads, live orders или market PnL tests. Reconciliation PASS и live resume остаются BLOCKED.

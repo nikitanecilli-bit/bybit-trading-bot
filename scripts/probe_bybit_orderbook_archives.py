@@ -13,7 +13,7 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "BNBUSDT", "SUIUSDT", "1000PEPEUSDT"]
+SYMBOLS = ["RAYUSDT", "PUMPUSDT", "TAOUSDT", "AAVEUSDT", "CAKEUSDT", "DASHUSDT", "HBARUSDT", "ENAUSDT", "GMXUSDT", "ONDOUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "BNBUSDT", "SUIUSDT", "1000PEPEUSDT"]
 URLS = [
     f"https://quote-saver.bycsi.com/orderbook/linear/{symbol}/{date}_{symbol}_{depth}.data.zip"
     for date, depth in (("2024-12-01", "ob500"), ("2025-09-02", "ob200"), ("2026-09-02", "ob200"))

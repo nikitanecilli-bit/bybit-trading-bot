@@ -714,10 +714,10 @@ def test_trade_archive_rejects_unterminated_quoted_optional_flag():
         path = Path(tmp) / "malformed.csv.gz"
         with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
             stream.write(
-                "timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\\n"
+                "timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\n"
             )
             stream.write(
-                '1756771200123,AAVEUSDT,Sell,10,100,match-1,False,"False\\n'
+                '1756771200123,AAVEUSDT,Sell,10,100,match-1,False,"False\n'
             )
         try:
             list(l2_module.iter_public_trades(path))

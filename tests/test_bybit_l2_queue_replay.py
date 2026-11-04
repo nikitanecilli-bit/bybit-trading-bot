@@ -670,7 +670,7 @@ def test_unknown_rpi_flag_fails_even_when_trade_price_does_not_match():
     try:
         apply_public_trade(o, trade(1100, "Sell", "99", "5", rpi="maybe"))
     except ValueError as exc:
-        assert "unknown RPI flag" in str(exc)
+        assert "invalid RPI boolean flag" in str(exc)
     else:
         raise AssertionError("unknown RPI flag must fail closed")
 

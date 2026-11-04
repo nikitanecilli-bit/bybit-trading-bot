@@ -1397,3 +1397,17 @@ Verification:
 - Actual logs: aggregate-L2 primitive suite **85/85 passed**; L2 runner/inspector step **26/26 passed**; all workflow steps succeeded.
 
 No market PnL, new archive download/collector, private API, runner registration, paper/live orders or main changes. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains unchanged.
+
+
+## 2026-11-05 — autonomous continuation: data contract and provenance closure
+
+- User reaffirmed full autonomy for feasible work; existing explicit gates remain unchanged: no self-hosted runner registration, collectors, archive downloads/extraction, exchange/private API, market PnL/replay/sweeps, paper/live or real orders. Do not change `main`; do not merge PR #4 or #13.
+- Added `docs/research/ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md`: D1–D8 source contract, UTC/causality, PIT universe, manifest/checksum requirements, quality checks and G0–G5 gates. Read back from GitHub and verified.
+- Refined D7 to `partial`: the existing one-day AAVEUSDT L2/public-trade sample from workflow #41814167058 is documented (816,684 book events; 346,131 unique trades; four hypothetical orders only). It remains insufficient for representative execution research; no artifact was downloaded or replayed.
+- Completed static read-only review of `bybit_l2_queue_replay.py`, its tests and existing ENG-EXEC-038/040/042 audits. Existing safeguards include strict event parsing, pre-arrival book snapshot, same-ms exclusion, trade-only queue consumption and explicit fee-per-fill inputs. No new reproducible defect was established; no code/test changes or test execution.
+- Resolved H-A/H-C primary report → Actions run → artifact metadata in `docs/audits/ALT_SYSTEM_PROVENANCE_MATRIX_001_RU.md`. H-A final report run #41670116033: artifact 13247672222, 372,438 bytes, job success; final run code SHA remains unknown. Earlier H-A run #41633199418 has artifact 13228658700 and preregistered code SHA 3ac4bb0c...; do not attribute that SHA to final run. H-C run #41722545731: artifact 13272957989, 211,799 bytes, job success, research commit a5e7e179... . Artifact contents were not downloaded.
+- H-A remains rejected (−6,135.26 USDT vs baseline −5,635.98; all folds negative). H-C remains rejected (−2,880.12 vs −2,720.47 proxy net before funding; both variants hit kill switch). No reruns or tuning.
+- Docs commits created in this session: `4c45b52a82d1b016edbb865d0a8583efa1bad6ae` (data contract), `6904127019afca1536a8507c8aa8e530e9b522a6` (D7 clarification), `e7c0130ff874572d4d977668413b3a0d5df63c50` (H-A/H-C provenance). These are documentation-only; no CI run is claimed.
+- Re-read confirmation: data contract blob `4c605a54d137fe4ae8b305e0cd8de325d414094a`; provenance matrix blob `86b4c483cd956c87e4824439c0901d4d90a10ed0`.
+- State check: `main` remains at `c06af3aa084d3513a3c2d7b183f02dba312be230`; PR #4 remains open Draft/unmerged and non-mergeable; PR #13 remains open/unmerged. No merges or main writes.
+- Next safe step: continue read-only reconciliation of E01–E07 run/script/config provenance and historical accounting-version impact; if exact links cannot be established from existing records, record the gap rather than infer. After that, finalize data-readiness decision; do not start market PnL while the explicit hold remains active.

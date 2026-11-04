@@ -798,6 +798,29 @@ def test_missing_public_trade_id_fails_closed():
     assert o.queue_ahead_remaining == D("5")
 
 
+def test_capture_book_at_rejects_fractional_cts_even_when_boundary_would_skip_event():
+    events = [
+        {"type": "snapshot", "cts": 1000, "data": {
+            "s": "AAVEUSDT", "seq": 1, "u": 1,
+            "b": [["100", "5"]], "a": [["101", "5"]],
+        }},
+        {"type": "delta", "cts": 2000.5, "data": {
+            "s": "AAVEUSDT", "seq": 2, "u": 2,
+            "b": [["100", "4"]], "a": [],
+        }},
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = Path(tmp) / "fractional_cts.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("events.data", "".join(json.dumps(event) + chr(10) for event in events))
+        try:
+            capture_book_at(archive, 2000)
+        except ValueError as exc:
+            assert "invalid cts" in str(exc)
+        else:
+            raise AssertionError("fractional cts must not be skipped by int truncation")
+
+
 def test_book_state_capture_excludes_same_millisecond_updates():
     events = [
         {"type": "snapshot", "cts": 1000, "data": {

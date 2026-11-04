@@ -78,6 +78,15 @@ class RiskLimitSnapshotTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "timezone|millisecond precision"):
                     build_snapshot([row()], "linear", value)
 
+    def test_default_snapshot_round_trips_through_as_of_history_loader(self):
+        from bybit_risk_tiers import RiskTierHistory
+        with tempfile.TemporaryDirectory() as directory:
+            snapshot = build_snapshot([row()], "linear")
+            write_snapshot(snapshot, Path(directory) / "snapshot.json")
+            history = RiskTierHistory.from_directory(directory)
+            tiers = history.get_tiers("BTCUSDT", 1793577601000)
+            self.assertEqual([tier.tier_id for tier in tiers], [1])
+
     def test_snapshot_timestamp_normalizes_offset_to_utc(self):
         snapshot = build_snapshot(
             [row()], "linear", "2026-11-02T03:00:00.123+03:00"

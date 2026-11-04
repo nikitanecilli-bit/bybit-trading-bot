@@ -133,20 +133,20 @@ def add_post_fill_markouts(book_archive: Path, results: list[dict]) -> None:
     horizons = (1_000, 5_000, 30_000, 60_000)
     target_keys = {}
     for result in results:
-        fill_ts = result["first_fill_ts_ms"]
-        if fill_ts is None:
-            result["post_fill_markout"] = []
-            continue
-        for horizon in horizons:
-            target = fill_ts + horizon
-            target_keys.setdefault(target, []).append((result, horizon))
+        fills = result.get("fills", [])
+        for fill in fills:
+            fill_ts = int(fill["timestamp_ms"])
+            fill["post_fill_markout"] = []
+            for horizon in horizons:
+                target = fill_ts + horizon
+                target_keys.setdefault(target, []).append((fill, horizon))
 
     states = capture_book_states_at(book_archive, list(target_keys))
     for target, keys in target_keys.items():
         state = states.get(target)
-        for result, horizon in keys:
+        for fill, horizon in keys:
             if state is None or not state["bids"] or not state["asks"]:
-                result.setdefault("post_fill_markout", []).append({
+                fill["post_fill_markout"].append({
                     "horizon_ms": horizon, "status": "no_book_state",
                 })
                 continue
@@ -155,9 +155,9 @@ def add_post_fill_markouts(book_archive: Path, results: list[dict]) -> None:
             if best_bid > best_ask:
                 raise ValueError("crossed book in post-fill markout snapshot")
             signed = signed_markout_bps(
-                result["side"], Decimal(result["limit_price"]), best_bid, best_ask,
+                fill["side"], Decimal(fill["price"]), best_bid, best_ask,
             )
-            result.setdefault("post_fill_markout", []).append({
+            fill["post_fill_markout"].append({
                 "horizon_ms": horizon,
                 "book_state_cts_ms": state["book_cts"],
                 "book_state_age_ms": target - state["book_cts"],
@@ -212,6 +212,17 @@ def main() -> int:
                 "remaining_quantity": str(order.remaining),
                 "fill_fraction": str(order.filled / order.quantity),
                 "fill_count": order.fill_count,
+                "filled_notional": str(order.filled_notional),
+                "filled_vwap": None if order.filled_vwap is None else str(order.filled_vwap),
+                "fills": [
+                    {
+                        "timestamp_ms": fill.timestamp_ms,
+                        "side": fill.side,
+                        "price": str(fill.price),
+                        "quantity": str(fill.quantity),
+                    }
+                    for fill in order.fills
+                ],
                 "eligible_opposing_trades_at_price": order.eligible_trade_count,
                 "rpi_trades_excluded": order.rpi_excluded_count,
                 "first_fill_ts_ms": order.first_fill_ts,

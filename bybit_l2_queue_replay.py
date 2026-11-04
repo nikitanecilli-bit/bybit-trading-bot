@@ -334,7 +334,10 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
     with gzip.open(archive, "rt", encoding="utf-8", newline="") as stream:
         reader = csv.DictReader(stream)
         required = {"timestamp", "symbol", "side", "size", "price", "trdMatchID"}
-        fields = set(reader.fieldnames or [])
+        fieldnames = reader.fieldnames or []
+        if len(fieldnames) != len(set(fieldnames)):
+            raise ValueError("trade archive contains duplicate column names")
+        fields = set(fieldnames)
         if not required.issubset(fields):
             raise ValueError("trade archive is missing required columns")
         block_flag = "isBlockTrade" if "isBlockTrade" in fields else (
@@ -351,6 +354,9 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
             if row.get("symbol") != symbol:
                 raise ValueError(f"unexpected trade symbol at CSV row {row_no}")
             timestamp_ms = parse_trade_timestamp_ms(row["timestamp"])
+            trade_id = row.get("trdMatchID")
+            if not isinstance(trade_id, str) or not trade_id.strip():
+                raise ValueError(f"missing public trade ID at CSV row {row_no}")
             yield {
                 "timestamp_ms": timestamp_ms,
                 "side": row["side"],
@@ -358,7 +364,7 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
                 "size": row["size"],
                 "rpi": parse_exchange_bool(row[rpi_flag], "RPI"),
                 "block_trade": parse_exchange_bool(row[block_flag], "block trade"),
-                "trade_id": row["trdMatchID"],
+                "trade_id": trade_id,
             }
 
 

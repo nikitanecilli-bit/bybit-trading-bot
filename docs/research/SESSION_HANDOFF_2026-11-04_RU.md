@@ -427,3 +427,10 @@
 - Research CI workflow path filters include the modified scripts/tests and should trigger on push; combined commit status has not returned check records. Do not claim tests/CI passed until actual logs are available.
 - Do not dispatch `bybit-orderbook-sample-inspection.yml`: it downloads new L2/trade archives and runs the bounded queue probe, all currently gated.
 - No collectors, new archives, private API, runner, market PnL/backtests, paper/live orders. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`. `main` unchanged; PR #4 remains Draft/unmerged.
+
+## 2026-11-04 — ENG-EXEC-033 trade timestamp order status
+
+- Static comparison found that the public trade inspector counted timestamp regressions but did not expose an explicit validity status, while replay rejects a timestamp regression. A consumer could mistake report scan status `success` for replay-order validity.
+- Added `timestamp_order_validation_status` to the trade inspector validation block (`valid` only when `nonmonotonic_timestamp_count == 0`; otherwise `invalid`) and a strict count classifier. Added deterministic valid/invalid and malformed-input coverage.
+- Source commit `0c4cf2e2504d69d31d3113b0f408f2b236c3db09`; test commit `6fc17e4d7f3274a8d4a609b845d658fd8010df15`; note `1e8b9fcd63df6777296412b78fef9b21cfc3184a`.
+- CI status remains unconfirmed; combined status returned no check records. No archives/network inspector, collectors, market PnL, private API, runner or orders. Maker gate remains closed.

@@ -193,7 +193,9 @@ def capture_book_at(
 ) -> tuple[OrderBook, int]:
     book = OrderBook()
     for event in iter_book_events(archive, symbol):
-        if int(event["cts"]) > arrival_ts:
+        # Same-millisecond event ordering relative to our hypothetical order is
+        # unknowable without an exchange sequence for the order; exclude it.
+        if int(event["cts"]) >= arrival_ts:
             break
         book.apply(event)
     if book.last_cts is None:

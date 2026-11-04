@@ -58,13 +58,48 @@ def test_missing_orderbook_update_id_fails_closed():
         raise AssertionError("missing Bybit update ID must fail closed")
 
 
-def test_u1_restart_snapshot_resets_book_and_allows_new_sequence_epoch():
+
+def test_invalid_delta_is_atomic_and_does_not_partially_mutate_book():
+    b = book()
+    before = b.copy_levels()
+    try:
+        b.apply({"type": "delta", "cts": 1100, "data": {
+            "seq": 2, "u": 2, "b": [["100", "7"], ["bad-price", "1"]], "a": [],
+        }})
+    except Exception:
+        pass
+    else:
+        raise AssertionError("malformed delta must fail")
+    assert b.copy_levels() == before
+    assert b.last_cts == 1000
+    assert b.last_seq == 1
+    assert b.last_u == 1
+
+
+def test_invalid_snapshot_is_atomic_and_preserves_previous_book():
+    b = book()
+    before = b.copy_levels()
+    try:
+        b.apply({"type": "snapshot", "cts": 1100, "data": {
+            "seq": 2, "u": 2, "b": [["98", "4"]], "a": "not-a-level-list",
+        }})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("malformed snapshot must fail")
+    assert b.copy_levels() == before
+    assert b.last_cts == 1000
+    assert b.last_seq == 1
+    assert b.last_u == 1
+
+
+def test_u1_restart_snapshot_replaces_book_and_preserves_cross_sequence_order():
     b = book()
     b.apply({"type": "delta", "cts": 1100, "data": {
-        "u": 2, "seq": 2, "u": 2, "b": [["100", "7"]], "a": [],
+        "u": 2, "seq": 2, "b": [["100", "7"]], "a": [],
     }})
     b.apply({"type": "snapshot", "cts": 1200, "data": {
-        "u": 1, "seq": 1, "u": 1, "b": [["98", "4"]], "a": [["99", "6"]],
+        "u": 1, "seq": 3, "b": [["98", "4"]], "a": [["99", "6"]],
     }})
     assert b.last_u == 1
     assert b.last_seq == 3
@@ -91,7 +126,7 @@ def test_u1_restart_marker_on_delta_fails_closed_without_mutating_book():
     before = b.copy_levels()
     try:
         b.apply({"type": "delta", "cts": 1100, "data": {
-            "u": 1, "seq": 1, "u": 1, "b": [["100", "0"]], "a": [],
+            "u": 1, "seq": 1, "b": [["100", "0"]], "a": [],
         }})
     except ValueError as exc:
         assert "requires a full snapshot" in str(exc)

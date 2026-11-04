@@ -1244,3 +1244,10 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Added strict count classifier and deterministic valid/invalid/malformed-input regression.
 - Source commit `0c4cf2e2504d69d31d3113b0f408f2b236c3db09`; test commit `6fc17e4d7f3274a8d4a609b845d658fd8010df15`.
 - CI not confirmed; combined status returned no check records. No archives, collectors, market PnL, API, runner or orders. Maker execution gate remains blocked.
+
+## ENG-EXEC-034 — Strict CSV quoting for public trade archives (2026-11-04)
+
+- Python `csv.DictReader` defaults to `strict=False`; a malformed unterminated quote in the optional RPI field could be accepted as a string and pass later boolean parsing. Both replay parser and standalone inspector now use `strict=True`.
+- Extracted the inspector's validated reader for deterministic testing. Added regressions for malformed unterminated quoted optional fields in both parser paths.
+- Inspector commit `d78720991bf6a72efa05310b878505dcd5bf1123`; core commit `81f58d0b48705ed1e5f2db36ba80ca42c0feb50a`; tests `13f32dbc2db3e686549866a14998a0c31cf659a6` + fixture correction `5f6c245de6bbd82cd280d4db750b8e3d1434c867`, inspector test `06544878931c0daa1117980c63eb01885c8e338e` + correction `9302114d0199097d834fecf112f2c6d74ec931d7`.
+- Local stdlib parser reproduction confirms strict mode rejects the malformed fixture. CI not confirmed. No archives, collectors, PnL, API, runner or orders.

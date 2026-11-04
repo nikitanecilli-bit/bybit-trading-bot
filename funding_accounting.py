@@ -92,6 +92,10 @@ def accrued_funding_cost(
     )
     if quantity <= 0 or remaining_quantity < 0 or remaining_quantity > quantity:
         raise ValueError("contract quantities must satisfy 0 <= remaining <= initial")
+    if tp1_hit and remaining_quantity >= quantity:
+        raise ValueError("tp1_hit requires a reduced remaining contract quantity")
+    if not tp1_hit and remaining_quantity != quantity:
+        raise ValueError("remaining contract quantity cannot be partial when tp1_hit is false")
     remaining_ratio = remaining_quantity / quantity
     total = Decimal("0")
     seen: set[int] = set()
@@ -174,6 +178,8 @@ def accrued_funding_cost_for_remaining_margin(
     exact_remaining = getattr(position, "remaining_contract_qty", None)
     quantity = _d(exact_initial, "contract_qty") if exact_initial is not None else size_usdt / entry_price
     remaining_fraction = _d(position.remaining_fraction, "remaining_fraction")
+    if remaining_fraction < 0 or remaining_fraction > 1:
+        raise ValueError("remaining_fraction must be within [0, 1]")
     remaining = _d(exact_remaining, "remaining_contract_qty") if exact_remaining is not None else quantity * remaining_fraction
     if quantity <= 0 or remaining < 0 or remaining > quantity:
         raise ValueError("invalid initial or remaining contract quantity")
@@ -190,6 +196,10 @@ def accrued_funding_cost_for_remaining_margin(
         tp1_ts = _timestamp_ms(tp1_ts, "tp1_ts_ms")
         if tp1_ts < entry_ts:
             raise ValueError("tp1_ts_ms cannot precede position entry")
+    if tp1_hit and remaining >= quantity:
+        raise ValueError("tp1_hit requires a reduced remaining contract quantity")
+    if not tp1_hit and remaining != quantity:
+        raise ValueError("remaining contract quantity cannot be partial when tp1_hit is false")
     sign = Decimal("1") if direction == "long" else Decimal("-1")
     total = Decimal("0")
     seen: set[int] = set()

@@ -7,6 +7,9 @@ on:
     paths:
       - 'scripts/inspect_bybit_orderbook_sample.py'
       - 'scripts/inspect_bybit_trade_sample.py'
+      - 'bybit_l2_queue_replay.py'
+      - 'scripts/run_bybit_l2_queue_replay.py'
+      - 'tests/test_bybit_l2_queue_replay.py'
       - '.github/workflows/bybit-orderbook-sample-inspection.yml'
 
 permissions:
@@ -15,14 +18,24 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile and test conservative queue replay
+        run: |
+          python -m py_compile bybit_l2_queue_replay.py scripts/run_bybit_l2_queue_replay.py tests/test_bybit_l2_queue_replay.py
+          python tests/test_bybit_l2_queue_replay.py
       - name: Download and inspect one AAVEUSDT L2 archive
         run: python scripts/inspect_bybit_orderbook_sample.py
       - name: Download and inspect matching public trades archive
         run: python scripts/inspect_bybit_trade_sample.py
+      - name: Run bounded aggregate-L2 queue replay probe
+        run: python scripts/run_bybit_l2_queue_replay.py
       - name: Upload compact inspection reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -31,4 +44,5 @@ jobs:
           path: |
             bybit_orderbook_sample_inspection.json
             bybit_trade_sample_inspection.json
+            bybit_l2_queue_replay_report.json
           if-no-files-found: warn

@@ -72,17 +72,15 @@ def capture_scenarios(book_archive: Path) -> tuple[list[dict], dict]:
             first_cts = cts
         if last_cts is not None and cts < last_cts:
             raise ValueError("non-monotonic cts in full order-book archive")
-        while next_index < len(offsets) and first_cts + offsets[next_index] * HOUR_MS < cts:
+        # Capture before applying cts == arrival events: their sequence
+        # relative to the hypothetical order is unknown.
+        while next_index < len(offsets) and first_cts + offsets[next_index] * HOUR_MS <= cts:
             arrival = first_cts + offsets[next_index] * HOUR_MS
             capture(arrival)
             next_index += 1
         book.apply(event)
         events += 1
         last_cts = cts
-        while next_index < len(offsets) and first_cts + offsets[next_index] * HOUR_MS == cts:
-            arrival = first_cts + offsets[next_index] * HOUR_MS
-            capture(arrival)
-            next_index += 1
 
     while next_index < len(offsets):
         arrival = first_cts + offsets[next_index] * HOUR_MS
@@ -115,7 +113,9 @@ def capture_book_states_at(book_archive: Path, targets: list[int]) -> dict[int, 
 
     for event in iter_book_events(book_archive, SYMBOL):
         cts = int(event["cts"])
-        while next_index < len(ordered) and ordered[next_index] < cts:
+        # Exclude same-millisecond book events; no order sequence exists to
+        # establish whether they preceded or followed hypothetical arrival.
+        while next_index < len(ordered) and ordered[next_index] <= cts:
             capture(ordered[next_index])
             next_index += 1
         book.apply(event)

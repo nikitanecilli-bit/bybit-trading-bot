@@ -1006,6 +1006,24 @@ def test_missing_public_trade_id_fails_closed():
     assert o.queue_ahead_remaining == D("5")
 
 
+def test_orderbook_archive_rejects_duplicate_json_keys():
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = Path(tmp) / "duplicate_json_key.zip"
+        raw = (
+            '{"type":"snapshot","cts":1000,"data":'
+            '{"s":"AAVEUSDT","seq":1,"u":1,"u":2,'
+            '"b":[["100","5"]],"a":[["101","5"]]}}'
+        )
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("events.data", raw + chr(10))
+        try:
+            list(iter_book_events(archive))
+        except ValueError as exc:
+            assert "duplicate JSON object key: u" in str(exc)
+        else:
+            raise AssertionError("duplicate JSON keys must be rejected")
+
+
 def test_capture_book_at_rejects_fractional_cts_even_when_boundary_would_skip_event():
     events = [
         {"type": "snapshot", "cts": 1000, "data": {

@@ -554,3 +554,32 @@ CI #41919550697 — SUCCESS, 59/59 workflow steps; tested code commit `a32254a01
 - `base_backup_sha256` обеспечивает optimistic stale-state guard, но не заменяет файловую блокировку или compare-and-swap при будущей интеграции с Plan B.
 - Успешное применение не доказывает полноту execution history; флаги `execution_history_complete`, `reconciliation_pass` и `live_resume_allowed` остаются false.
 - Никакие Bybit API calls, collector runs, archive downloads, live orders или market PnL tests не выполнялись. Все execution/PnL gates остаются BLOCKED.
+
+### ENG-RECON-022 — атомарная запись reconciliation-кандидата в Plan B
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
+
+Добавлен явный метод `PlanBStatePersistence.save_reconciliation_candidate(candidate, expected_backup_sha256, risk_mgr)`:
+- Метод доступен только при `enabled=True`; disabled persistence не создаёт файлов.
+- Обычный `save_state()` и reconciliation persistence теперь используют один POSIX advisory file lock (`<backup>.lock`), сериализующий кооперативные записи между процессами.
+- До подготовки temp-файла проверяется canonical SHA-256 текущего backup против digest, на котором был построен merge plan.
+- Кандидат сериализуется во временный файл в том же каталоге через уникальный `mkstemp`, затем flush + file fsync.
+- Точный временный файл проходит строгий `PlanBStatePersistence.load_state()` с переданным risk manager до замены основного backup.
+- Перед `os.replace` выполняется повторная проверка исходного digest; затем atomic replace и fsync родительского каталога.
+- Ошибки сериализации, строгой валидации, stale-state или replace оставляют прежний backup нетронутым и удаляют временный файл.
+- Возвращается SHA-256 установленного кандидата. Engine instance не мутируется; метод не вызывает API и не включает live resume.
+
+Новые тесты:
+1. Успешная запись exchange execution в Plan B и последующее строгое восстановление.
+2. Stale backup отклоняется без перезаписи более свежего состояния.
+3. Невалидный кандидат не заменяет предыдущий backup.
+4. Ошибка `os.replace` сохраняет предыдущий backup и очищает temp.
+Существующие тесты обычного Plan B сохранения продолжают проходить; persistence suite — 118 tests OK. Research CI #41920525574 — SUCCESS, 59/59 workflow steps; tested code commit `2addcdcff57b8edf7482a90a63c82c378447e44a`.
+
+Ограничения и safety:
+- Файловая блокировка реализована через POSIX `fcntl.flock`; на непосix платформах операция fail-closed. Все процессы, которые пишут этот backup, должны использовать новую реализацию/тот же lock protocol; внешние писатели, игнорирующие lock, вне её гарантий.
+- Это локальная persistence primitive, не автоматический engine integration: вызов должен быть явно инициирован после успешного построения и проверки detached-кандидата.
+- Ошибка directory fsync после `os.replace` означает, что rename уже произошёл, но durability directory entry не подтверждена; операция сообщает ошибку и требует остановки/проверки backup.
+- Успешная запись не доказывает полноту execution history; reconciliation/live-resume флаги не повышаются.
+- Никакие Bybit API calls, collector runs, archive downloads, live orders или market PnL tests не выполнялись. Все execution/PnL gates остаются BLOCKED.

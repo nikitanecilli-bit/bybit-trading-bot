@@ -1273,3 +1273,11 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Existing tests explicitly lock exact-price matching and keep initial queue-ahead unchanged after L2 deletion/new size. This is a restricted mechanical model, not maker execution realism; it can miss price-through fills and cannot allocate cancellations ahead/behind the order.
 - No code/test change: do not add optimistic better-price fills without synchronized L2/trade event ordering and confirmed source semantics. Future model needs joint event replay and fail-closed handling of ambiguous ordering/cancellations.
 - Note: `docs/research/ENG_EXEC_037_PRICE_THROUGH_PASSIVE_REPLAY_BOUNDARY_RU.md`. Static source/test review only; no tests, archives, queue replay, PnL, collectors, API, runner or orders. Maker gate remains blocked.
+
+## ENG-EXEC-038 — Cross-stream L2/trade ordering boundary (2026-11-04)
+
+- Official Bybit docs state that order-book `cts` can be correlated with public-trade `T`; both orderbook and publicTrade expose cross-sequence `seq`, and REST recent trades also returns `seq`.
+- Current historical pipeline uses L2 ZIP + public.bybit.com daily trade CSV.GZ. L2 parser preserves `seq`; trade normalizer drops any trade `seq` and only emits timestamp/side/price/size/ID/flags. Each stream is validated independently, not merged on a common sequence.
+- Equal-ms cts/T events cannot be ordered by timestamp alone. Runner deliberately excludes same-ms book events for hypothetical arrival/markout and reports no same-ms fills. Keep this conservative rule.
+- No code change: availability of trade `seq` in the historical daily CSV must be established before designing a cross-stream merge. Even a common sequence would not solve aggregate-L2 cancellation allocation.
+- Note: `docs/research/ENG_EXEC_038_CROSS_STREAM_ORDERING_BOUNDARY_RU.md`. Static repo review + official docs only; no API requests, archive downloads, tests, replay, PnL, collectors, private API, runner or orders. Maker gate remains blocked.

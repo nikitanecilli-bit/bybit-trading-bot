@@ -557,6 +557,8 @@ def test_partial_fill_and_later_completion():
 def test_trade_timestamp_parser_preserves_exact_seconds_and_milliseconds():
     assert l2_module.parse_trade_timestamp_ms("1756771200.123") == 1756771200123
     assert l2_module.parse_trade_timestamp_ms("1756771200123") == 1756771200123
+    # Exactly 1e12 is the first value classified as epoch milliseconds.
+    assert l2_module.parse_trade_timestamp_ms("1000000000000") == 1000000000000
 
 
 def test_trade_timestamp_parser_rejects_submillisecond_rounding():

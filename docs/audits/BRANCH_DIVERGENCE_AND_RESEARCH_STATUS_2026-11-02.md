@@ -364,3 +364,16 @@ Decision: do not attribute the entire E10-to-E11 result difference to shared-cap
 - Closed trade equity curve treats same-timestamp closes as one net event; intrabar path remains represented by engine MTM drawdown where available. This is a metrics correctness fix, not a strategy/profitability result.
 
 - Follow-up [CI #41513430881](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41513430881) SUCCESS. Same-bar two-stop permutation tests now also compare `risk_mgr.max_drawdown_pct`, not just realized/current equity; the MTM drawdown scalar is order-independent in those covered scenarios. Portfolio suite 24/24; persistence suite 60.
+
+
+## Fresh Git topology snapshot — 2026-11-04
+
+The opening snapshot above is historical (2026-11-02). A fresh read after the latest research commits gives:
+
+- `main`: `c87612207d145af433394f0ea992f2d29eba28d5`.
+- `research/market-regime-v1-main`: `39af6fa583ef2074b33905e89c8b78c9b58d83a1` (code/test head before documentation-only session updates).
+- merge base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`.
+- GitHub Compare: `diverged`, research **2,125 ahead / 36 behind**.
+- PR #4: open, Draft, `mergeable=false`.
+
+The larger ahead count reflects accumulated branch history and is not a count of independent code changes. It reinforces the existing decision: do not merge PR #4 as-is and do not rebase/reset/force-push the research branch. Keep both histories intact; any later integration should use reviewed, narrowly scoped patches or a fresh integration branch from current `main`. `main` was not modified.

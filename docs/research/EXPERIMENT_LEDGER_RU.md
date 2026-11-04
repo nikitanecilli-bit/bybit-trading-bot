@@ -1081,3 +1081,11 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Added two regression tests for timestamp-without-hit and integer-as-bool.
 - Final CI #41851768270, 3170738a78eac92b0a93eda66510c038660f0864: SUCCESS 57/57; actual log confirms both tests passed; funding accounting suite ran 76 tests. Source-only CI #41851738950 also SUCCESS 57/57.
 - These are correctness gates, not PnL evidence; no live/paper activity.
+
+
+### ENG-EXEC-015/016 amendment — planned exits only (2026-11-04)
+
+- Уточнение: entry price не является самостоятельной плановой ценой выхода. Использование min(stop, entry, TP2) могло ложно отклонять валидное восстановление long после подъёма trailing stop выше entry.
+- Исправлено на min(stop, TP2) и в TP1 guard, и в restore validation; TP1-ордер по-прежнему отдельно проверяется по TP1 price.
+- Регрессия: long entry 100, trailing stop 110, TP2 112, qty 1, minNotional 105 — restore разрешён, так как обе реальные цены выхода проходят ограничение.
+- CI #41852293859, c88e587d01739eb7c0ee6fe94e0369b28aff664c: SUCCESS 57/57; state persistence 77/77, новая регрессия подтверждена логом.

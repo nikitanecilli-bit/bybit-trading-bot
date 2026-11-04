@@ -206,3 +206,19 @@ Bybit public orderbook docs define `u` and `seq` as integer fields, `cts` as mat
 CI remains unverified for these new push commits: combined status is empty and the available commit-workflow wrapper only returns PR-triggered runs; `research-checks.yml` has push/workflow_dispatch triggers but no `pull_request` trigger. No test-pass claim. Research branch compare: 1973 ahead / 36 behind `main`, diverged. Do not merge PR #4 or retarget it.
 
 External-data hold remains in force: do not dispatch collectors, configure self-hosted runner, download new Bybit archives, connect account/private API, or place paper/live orders until user-defined profitability condition is met. Current static work only. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`.
+## 16. Idempotent overlapping public-trade replay
+
+Статический аудит выявил риск повторного применения одного и того же trade archive к уже частично обработанному PassiveOrder: прежняя реализация хранила duplicate IDs только в локальном set одного вызова. Повторный вызов мог повторно уменьшить `queue_ahead_remaining` и завысить fill.
+
+Исправление:
+- `PassiveOrder` теперь хранит `processed_trade_ids` как пары `(SYMBOL, trade_id)`.
+- Replay работает на копии order и копии persistent ID set; новые ID фиксируются только после успешного прохода.
+- Повторное чтение уже обработанных trade IDs из overlapping archive пропускается, поэтому повторный replay идемпотентен.
+- Повтор ID внутри одного текущего архива по-прежнему вызывает ValueError; транзакционность не допускает частичного commit.
+- IDs до `arrival_ts` не сохраняются, чтобы не раздувать память полным префиксом дневного CSV; timestamps при этом продолжают проверяться на монотонность.
+
+Добавлен regression test: первый replay расходует только часть queue-ahead без fill; повторный replay того же архива не уменьшает очередь повторно и не увеличивает eligible trade count. Всего 43 test functions в `tests/test_bybit_l2_queue_replay.py`.
+
+Commits: initial idempotency source `f318a21d0d13676ce79390decaaea24aa6951b91`; test `c5b2e036b3af98f7a4d5d203acf671ab3ee6feb1`; duplicate-vs-prior-ID correction `539adee9722887aec4c26a30de4f413aa597ad93`; active-window ID retention `4852ebb7ed4fc32e0cd622b89301db1c60119129`.
+
+Bybit trade archive runner remains a one-pass per-order probe. Persistent ID state makes the primitive safe for overlapping/restarted replay use; it does not improve the underlying aggregate-L2 queue approximation or prove fills. CI is still not terminally verified for latest push commits; no tests-pass claim. No new data, private API, PnL or orders.

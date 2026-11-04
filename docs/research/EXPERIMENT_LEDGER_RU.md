@@ -1259,3 +1259,10 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Source `86a0590f`, `68ee303e`; tests `8311daa4`, `82852d6f`.
 - Research CI run `41888048946` on `82852d6` passed. An intermediate run failed because the test call had not yet been updated for the added row_count parameter; the next commit fixed it and passed.
 - No archives, collectors, market PnL, API, runner or orders.
+
+## ENG-EXEC-036 — L2 inspector/replay compatibility boundary (2026-11-04)
+
+- Static comparison found that L2 inspector can complete successfully while reporting missing `cts`; this is scan completion, not replay readiness. Queue replay requires `cts` on every event.
+- Inspector rejects `cts`/`seq` regressions but does not impose archive-wide `u` monotonicity. Replay's `OrderBook.apply()` rejects non-reset `u` regressions. ENG-EXEC-031 intentionally avoided a universal `u` rule because the archive contract is not fully established.
+- No code change: keep replay strict; do not infer replay compatibility from inspector `status: success`. Follow-up: add explicit L2 replay-compatibility dimensions after confirming source semantics.
+- Note: `docs/research/ENG_EXEC_036_L2_INSPECTOR_REPLAY_COMPATIBILITY_RU.md`. Static audit only; no archive downloads, workflows, PnL, API, runner or orders. Maker gate remains blocked.

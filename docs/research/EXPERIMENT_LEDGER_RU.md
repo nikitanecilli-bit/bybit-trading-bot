@@ -1266,3 +1266,10 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Inspector rejects `cts`/`seq` regressions but does not impose archive-wide `u` monotonicity. Replay's `OrderBook.apply()` rejects non-reset `u` regressions. ENG-EXEC-031 intentionally avoided a universal `u` rule because the archive contract is not fully established.
 - No code change: keep replay strict; do not infer replay compatibility from inspector `status: success`. Follow-up: add explicit L2 replay-compatibility dimensions after confirming source semantics.
 - Note: `docs/research/ENG_EXEC_036_L2_INSPECTOR_REPLAY_COMPATIBILITY_RU.md`. Static audit only; no archive downloads, workflows, PnL, API, runner or orders. Maker gate remains blocked.
+
+## ENG-EXEC-037 — Price-through trades and passive-order replay boundary (2026-11-04)
+
+- Static audit confirmed `apply_public_trade()` only consumes opposing-aggressor prints at the exact limit price; better-price prints are ignored. Post-arrival L2 level deletion, price-through and level reappearance are not connected to the hypothetical order state.
+- Existing tests explicitly lock exact-price matching and keep initial queue-ahead unchanged after L2 deletion/new size. This is a restricted mechanical model, not maker execution realism; it can miss price-through fills and cannot allocate cancellations ahead/behind the order.
+- No code/test change: do not add optimistic better-price fills without synchronized L2/trade event ordering and confirmed source semantics. Future model needs joint event replay and fail-closed handling of ambiguous ordering/cancellations.
+- Note: `docs/research/ENG_EXEC_037_PRICE_THROUGH_PASSIVE_REPLAY_BOUNDARY_RU.md`. Static source/test review only; no tests, archives, queue replay, PnL, collectors, API, runner or orders. Maker gate remains blocked.

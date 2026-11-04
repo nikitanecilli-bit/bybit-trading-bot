@@ -580,6 +580,8 @@ class OpenPositionState:
                 raise ValueError(f"{name} must be a positive integer")
         if audit_end_ms <= lifecycle_start_ms:
             raise ValueError("audit_end_ms must exceed lifecycle_start_ms")
+        if lifecycle_start_ms != self.entry_ts:
+            raise ValueError("lifecycle_start_ms must equal the position entry_ts")
         self._validate_exchange_identity_state()
         complete = []
         for raw in self.exchange_execution_coverage:
@@ -588,26 +590,43 @@ class OpenPositionState:
                 complete.append((item.window_start_ms, item.window_end_ms))
         complete.sort()
         cursor = lifecycle_start_ms
+        contiguous_until = lifecycle_start_ms
+        first_gap_seen = False
         gaps = []
         for start, end in complete:
             if end <= cursor:
                 continue
             if start > cursor:
-                gaps.append({"start_ms": cursor, "end_ms": min(start, audit_end_ms)})
+                gap = {"start_ms": cursor, "end_ms": min(start, audit_end_ms)}
+                if gap["end_ms"] > gap["start_ms"]:
+                    gaps.append(gap)
+                if not first_gap_seen:
+                    contiguous_until = cursor
+                    first_gap_seen = True
             cursor = max(cursor, end)
             if cursor >= audit_end_ms:
                 break
         if cursor < audit_end_ms:
             gaps.append({"start_ms": cursor, "end_ms": audit_end_ms})
+            if not first_gap_seen:
+                contiguous_until = cursor
+                first_gap_seen = True
         gaps = [gap for gap in gaps if gap["end_ms"] > gap["start_ms"]]
-        covered_until = min(cursor, audit_end_ms)
+        out_of_window_exec_ids = []
+        for raw in self.exchange_executions:
+            execution = ExchangeExecutionIdentity.from_dict(raw)
+            if not any(start <= execution.exec_time_ms < end for start, end in complete):
+                out_of_window_exec_ids.append(execution.exec_id)
+        if not gaps and not out_of_window_exec_ids:
+            contiguous_until = audit_end_ms
         return {
-            "status": "COMPLETE" if not gaps else "INCOMPLETE",
+            "status": "COMPLETE" if not gaps and not out_of_window_exec_ids else "INCOMPLETE",
             "lifecycle_start_ms": lifecycle_start_ms,
             "audit_end_ms": audit_end_ms,
-            "covered_until_ms": covered_until,
+            "covered_until_ms": contiguous_until,
             "complete_window_count": len(complete),
             "gaps": gaps,
+            "out_of_window_exec_ids": sorted(out_of_window_exec_ids),
         }
 
     def audit_exchange_position_quantity(

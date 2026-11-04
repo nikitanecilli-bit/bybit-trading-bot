@@ -69,6 +69,16 @@ def validate_trade_csv_row(row: dict, row_no: int) -> None:
         raise ValueError(f"missing CSV field value at row {row_no}: {missing}")
 
 
+
+def trade_timestamp_order_status(nonmonotonic_count: int) -> str:
+    """Classify whether archive trade timestamps are replay-order compatible."""
+    if isinstance(nonmonotonic_count, bool) or not isinstance(nonmonotonic_count, int):
+        raise ValueError("nonmonotonic timestamp count must be an integer")
+    if nonmonotonic_count < 0:
+        raise ValueError("nonmonotonic timestamp count must be non-negative")
+    return "valid" if nonmonotonic_count == 0 else "invalid"
+
+
 def validate_trade_side(value: object) -> str:
     """Validate the exact public-trade aggressor-side token; do not trim/coerce."""
     if value not in ("Buy", "Sell"):
@@ -194,6 +204,7 @@ def main() -> int:
             "timestamp_max_ms": ts_max,
             "duration_hours": round((ts_max - ts_min) / 3_600_000, 4),
             "nonmonotonic_timestamp_count": nonmonotonic,
+            "timestamp_order_validation_status": trade_timestamp_order_status(nonmonotonic),
             "duplicate_trade_id_count": duplicate_ids,
             "missing_trade_id_count": missing_trade_ids,
             "malformed_trade_id_count": malformed_trade_ids,

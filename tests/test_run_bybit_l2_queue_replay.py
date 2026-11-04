@@ -27,6 +27,17 @@ def test_trade_sample_inspector_recognizes_both_block_trade_aliases():
     assert trade_inspector.block_trade_flag_columns(["timestamp", "RPI"]) == []
 
 
+def test_trade_sample_inspector_uses_exact_millisecond_timestamp_parser():
+    assert trade_inspector.parse_trade_timestamp_ms("1700000000.123") == 1_700_000_000_123
+    assert trade_inspector.parse_trade_timestamp_ms("1700000000123") == 1_700_000_000_123
+    try:
+        trade_inspector.parse_trade_timestamp_ms("1700000000.1234")
+    except ValueError as exc:
+        assert "sub-millisecond" in str(exc)
+    else:
+        raise AssertionError("sub-millisecond trade timestamp must fail closed")
+
+
 def test_trade_sample_inspector_parses_exact_seconds_and_milliseconds():
     assert trade_inspector.parse_archive_timestamp_ms("1756771200.123") == 1_756_771_200_123
     assert trade_inspector.parse_archive_timestamp_ms("1756771200123") == 1_756_771_200_123

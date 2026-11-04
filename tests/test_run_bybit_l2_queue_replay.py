@@ -182,6 +182,59 @@ def test_orderbook_inspector_rejects_u1_restart_marker_on_delta():
                 raise AssertionError("u=1 delta must be rejected by the inspector")
 
 
+
+def test_orderbook_inspector_rejects_nonmonotonic_cts_seq_and_update_id():
+    cases = [
+        (
+            [
+                event("snapshot", 1_000, 1, 1, "5"),
+                event("delta", 900, 2, 2, "6"),
+            ],
+            "non-monotonic matching-engine timestamp",
+        ),
+        (
+            [
+                event("snapshot", 1_000, 2, 1, "5"),
+                event("delta", 1_100, 1, 2, "6"),
+            ],
+            "non-monotonic cross sequence",
+        ),
+        (
+            [
+                event("snapshot", 1_000, 1, 5, "5"),
+                event("delta", 1_100, 2, 4, "6"),
+            ],
+            "non-monotonic order-book update ID",
+        ),
+    ]
+    for events, expected_error in cases:
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / "nonmonotonic_orderbook.zip"
+            write_book_archive(archive, events)
+            with zipfile.ZipFile(archive) as zf:
+                try:
+                    book_inspector.inspect_member(zf, "events.data")
+                except ValueError as exc:
+                    assert expected_error in str(exc)
+                else:
+                    raise AssertionError(f"{expected_error} must be rejected")
+
+
+def test_orderbook_inspector_allows_u1_snapshot_reset_with_monotonic_seq_cts():
+    events = [
+        event("snapshot", 1_000, 1, 5, "5"),
+        event("snapshot", 1_100, 2, 1, "6"),
+        event("delta", 1_200, 3, 2, "7"),
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = Path(tmp) / "valid_u1_reset.zip"
+        write_book_archive(archive, events)
+        with zipfile.ZipFile(archive) as zf:
+            report = book_inspector.inspect_member(zf, "events.data")
+    assert report["update_id_reset_count"] == 1
+    assert report["nonmonotonic_cross_sequence_count"] == 0
+
+
 def test_orderbook_inspector_rejects_crossed_snapshot_and_delta_books():
     cases = [
         (

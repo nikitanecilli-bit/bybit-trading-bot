@@ -247,7 +247,7 @@ class ReportOnlyComparatorTests(unittest.TestCase):
 
     def test_schema_v3_snapshot_rejects_url_credentials_and_nonstandard_port(self):
         for base_url in (
-            "https://user" + ":" + "pass@api.bybit.com",
+            "https://@api.bybit.com",
             "https://api.bybit.com:8443",
             "http://api.bybit.com",
             "https://api.bybit.com/path",

@@ -683,8 +683,8 @@ def test_trade_archive_rejects_conflicting_block_flag_aliases():
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "trades.csv.gz"
         with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
-            stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,BT,RPI\\n")
-            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,False,True,False\\n")
+            stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,BT,RPI\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,False,True,False\n")
         try:
             list(l2_module.iter_public_trades(path))
         except ValueError as exc:
@@ -698,8 +698,8 @@ def test_trade_archive_rejects_conflicting_rpi_flag_aliases():
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "trades.csv.gz"
         with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
-            stream.write("timestamp,symbol,side,size,price,trdMatchID,BT,RPI,isRPITrade\\n")
-            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,False,False,True\\n")
+            stream.write("timestamp,symbol,side,size,price,trdMatchID,BT,RPI,isRPITrade\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,False,False,True\n")
         try:
             list(l2_module.iter_public_trades(path))
         except ValueError as exc:

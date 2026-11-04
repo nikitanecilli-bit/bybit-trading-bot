@@ -106,6 +106,37 @@ def test_rpi_trade_does_not_consume_queue_or_fill():
     assert o.rpi_excluded_count == 1
 
 
+def test_unknown_trade_side_fails_even_when_trade_price_does_not_match():
+    o = order()
+    try:
+        apply_public_trade(o, trade(1100, "Unknown", "99", "5"))
+    except ValueError as exc:
+        assert "unknown trade side" in str(exc)
+    else:
+        raise AssertionError("unknown trade side must fail closed")
+
+
+def test_unknown_rpi_flag_fails_even_when_trade_price_does_not_match():
+    o = order()
+    try:
+        apply_public_trade(o, trade(1100, "Sell", "99", "5", rpi="maybe"))
+    except ValueError as exc:
+        assert "unknown RPI flag" in str(exc)
+    else:
+        raise AssertionError("unknown RPI flag must fail closed")
+
+
+def test_non_positive_public_trade_price_or_size_fails_closed():
+    o = order()
+    for price, size in (("0", "1"), ("100", "0"), ("-1", "1"), ("100", "-1")):
+        try:
+            apply_public_trade(o, trade(1100, "Sell", price, size))
+        except ValueError as exc:
+            assert "must be positive" in str(exc)
+        else:
+            raise AssertionError("non-positive public trade values must fail closed")
+
+
 def test_marketable_orders_are_rejected_from_maker_model():
     b = book()
     try:

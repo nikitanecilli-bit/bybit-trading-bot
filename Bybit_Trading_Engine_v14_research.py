@@ -1696,7 +1696,7 @@ class UnifiedQuantEngine:
         if not getattr(self, "liquidation_model_enabled", False):
             return None
         mark_candle = self._mark_candle_for_symbol(pos.symbol, trade_candle.ts, required=True)
-        if self.instrument_spec_history is not None:
+        if getattr(self, "instrument_spec_history", None) is not None:
             market_state = get_linear_market_state(
                 self.instrument_spec_history, self.risk_tier_history,
                 pos.symbol, as_of_ts,

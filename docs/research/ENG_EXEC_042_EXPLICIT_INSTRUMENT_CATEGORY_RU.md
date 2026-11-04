@@ -39,3 +39,19 @@
 - Фактический лог `tests/test_bybit_instrument_specs.py`: **15/15 passed**, включая новые regressions для category и symbol.
 - Остальные затронутые CI steps (compile, snapshot collector, as-of history, exchange sizing integration) завершились SUCCESS.
 - Никакие внешние API, collectors или market data downloads не запускались этой задачей; CI выполнял только уже определённые repo checks.
+
+
+## Дополнительная проверка формата публичного API и снимков
+
+Официальная схема Bybit V5 `GET /v5/market/instruments-info` указывает `category` в объекте `result`, а строки в `result.list` описывает отдельно; в примере linear-строки поле `category` отсутствует. См. [официальную документацию](https://bybit-exchange.github.io/docs/v5/market/instrument).
+
+Исторический загрузчик ранее требовал `category` внутри каждой строки, хотя архив хранит её на верхнем уровне снимка. Теперь он использует проверенную категорию конверта как значение для строки, только если строка сама не содержит category. Если row-level category присутствует и противоречит envelope, она не перезаписывается и snapshot отклоняется.
+
+Дополнительно усилена валидация `symbol` на границе обоих сборщиков: нестроковые и пустые символы больше не преобразуются в строки. Builder стандартного snapshot также проверяет тип каждой строки и символа.
+
+- Сборщики: [8c04cde](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/8c04cde99b20fc6a42908c620e1786bb0231a6f7), [ff7e5bb](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/ff7e5bbda19907ef11b70695e0109cf90958a19e).
+- Регрессионные тесты сборщиков: [f7ef140](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/f7ef1405013e0593f045b5c6f8de19fa9749c5d2), [c9096a7](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/c9096a7ccb2fd9b3b3a48537a709907529ec3c62).
+- Category-envelope history fix: [c069075](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/c06907551c4210ed09540f77115fd218778676a3); regression tests [3025039](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/302503937f47277ab0ee7a83c2a0247bcf51a81c).
+- Research CI for the full latest change set is being verified; results will be recorded after completion.
+
+Эти изменения касаются только парсинга и офлайн-валидации снимков. Они не создают фактический Bybit snapshot и не подтверждают историческую полноту данных.

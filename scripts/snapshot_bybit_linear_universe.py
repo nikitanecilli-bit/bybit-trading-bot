@@ -125,6 +125,7 @@ def is_linear_usdt_perpetual_within_lifecycle_at(row: dict[str, Any], timestamp_
     perpetual. A terminal/in-progress terminal status with no positive
     boundary is ambiguous and is excluded rather than assigned an invented
     historical end time.
+    """
     if timestamp_ms < 0:
         raise ValueError("timestamp_ms must be non-negative")
     if row.get("contractType") != "LinearPerpetual":

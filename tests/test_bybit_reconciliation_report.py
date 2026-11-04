@@ -237,7 +237,7 @@ class ReportOnlyComparatorTests(unittest.TestCase):
                 page_row["interval_end_ms"] += 1000
         refreshed["order_history_coverage"]["end_ms"] += 1000
         refreshed["order_history_coverage"]["duration_ms"] += 1000
-        refreshed = upgrade_to_schema3(refreshed, api_key="different-api-key")
+        refreshed = upgrade_to_schema3(refreshed, key_material="fixture-account-b")
         with self.assertRaisesRegex(ReportError, "same valid API-key fingerprint"):
             compare_execution_snapshots(initial, refreshed)
 

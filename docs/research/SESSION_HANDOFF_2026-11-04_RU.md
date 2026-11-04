@@ -6,12 +6,12 @@
 
 - Репозиторий: `nikitanecilli-bit/bybit-trading-bot` (private).
 - Рабочая ветка: `research/market-regime-v1-main`.
-- Последний проверенный code/test commit: `5f315bdd048f8abefa07a992aa667010d0ea1f5b`; последующие коммиты после него на момент этого snapshot — документальные.
-- Последний подтверждённый CI: [Research engine checks #41874277483](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41874277483), commit `5f315bdd`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps.
-- В этом CI: aggregate-L2 primitive tests 81/81; runner/inspector suite 9/9; portfolio accounting 54/54; state persistence 84/84. Логи подтверждают BT/RPI alias validation, согласованные и конфликтующие aliases, strict timestamp parser и trade-ID diagnostics.
-- Предыдущая неудачная попытка #41872989853 была вызвана устаревшим тестом после перехода инспектора на общий `parse_trade_timestamp_ms`; тест синхронизирован в `ec28763`, после чего последующие полные CI #41873039139, #41873425668 и #41874277483 прошли.
+- Последний проверенный code/test commit: `846279119545a7036d65b57a156c8ea38b7ae895`; последующие коммиты после него на момент этого snapshot — документальные.
+- Последний подтверждённый CI: [Research engine checks #41875093214](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41875093214), commit `8462791`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps.
+- В этом CI: aggregate-L2 primitive tests 81/81; runner/inspector suite 9/9; portfolio accounting 54/54; state persistence 84/84. Логи подтверждают структурную проверку CSV headers/rows, BT/RPI aliases, strict timestamp parser и trade-ID diagnostics.
+- Предыдущая неудачная попытка #41872989853 была вызвана устаревшим тестом после перехода инспектора на общий `parse_trade_timestamp_ms`; тест синхронизирован в `ec28763`, после чего полные CI #41873039139, #41873425668, #41874277483 и #41875093214 прошли.
 - PR #4: открыт, Draft, base `main`, head = текущая research-ветка; mergeable=false. Не сливать автоматически.
-- Сравнение с `main` на code/test snapshot `5f315bdd`: diverged, 2204 commits ahead / 36 behind. Merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. Точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
+- Сравнение с `main` на code/test snapshot `8462791`: diverged, 2213 commits ahead / 36 behind. Merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. Точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
 - `main` не менять. Не делать wholesale merge/rebase research branch. Использовать только reviewed selective PR/cherry-pick при отдельном обосновании.
 - В репозитории есть отдельная ветка `Audit` и `chore/main-repository-organization`; не предполагать, что они слиты или актуальны без проверки.
 
@@ -369,3 +369,13 @@
 - Source-only CI #41874223792 SUCCESS, 57/57; final CI #41874277483 на `5f315bdd`: SUCCESS, 57/57. Фактический лог подтверждает новую flag-alias regression; inspector/runner suite 9/9 и aggregate-L2 primitives 81/81.
 - Это диагностика качества trade metadata, не maker execution evidence и не PnL. Сохранённый AAVE CSV по-прежнему не содержит BT/isBlockTrade. Inspector с сетевой загрузкой не запускался; архивы не скачивались.
 - `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`. Нет PnL/backtests, collectors, API, runner, paper/live orders или изменений `main`.
+
+## Session update — malformed trade CSV structure is rejected by inspector (2026-11-04)
+
+- Сравнение `scripts/inspect_bybit_trade_sample.py` с replay parser выявило, что инспектор не отклонял duplicate CSV headers, extra row fields и missing core row values. `csv.DictReader` может перезаписать значения при повторяющихся заголовках и помещает лишние поля в ключ `None`.
+- Добавлены `validate_trade_csv_header()` и `validate_trade_csv_row()`. Инспектор теперь отклоняет duplicate/missing required headers, extra CSV fields и missing core values (`timestamp`, `symbol`, `side`, `size`, `price`) до агрегации.
+- Regression покрывает duplicate/missing headers, extra row fields и missing row values.
+- Source commit `ab27c80413c23f4d0689441cff6f131a91a0ab5d`; test commit `846279119545a7036d65b57a156c8ea38b7ae895`.
+- Source-only CI #41875043047 SUCCESS, 57/57; final CI #41875093214 на `8462791`: SUCCESS, 57/57. Фактический лог подтверждает structural regressions; inspector/runner suite 9/9 и aggregate-L2 primitives 81/81.
+- Это structural data-integrity guardrail диагностического инструмента, не maker execution evidence и не PnL. Архивы не скачивались; inspector с сетевой загрузкой не запускался. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся.
+- Нет PnL/backtests, collectors, API, runner, paper/live orders или изменений `main`.

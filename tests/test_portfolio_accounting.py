@@ -261,6 +261,30 @@ def test_simultaneous_daily_stop_and_kill_switch_latch_independently():
     assert risk.can_open_new_trade(0) == (False, "KILL_SWITCH_ACTIVE")
 
 
+def test_step_candle_uses_boundary_mark_before_utc_day_rollover():
+    e = make_engine()
+    before_midnight = 1_767_308_400_000  # 2026-01-01 23:00:00 UTC
+    midnight = 1_767_312_000_000         # 2026-01-02 00:00:00 UTC
+    e.risk_mgr.mark_to_market(0.0, before_midnight)
+
+    position = make_position()
+    position.entry_ts = before_midnight - 3_600_000
+    e.open_positions["BTCUSDT"] = position
+    e._unrealized_pnl_at_marks = lambda _ts: -600.0
+    e._manage_position = lambda *_args, **_kwargs: None
+    candle = engine_mod.Candle(
+        ts=before_midnight, open=100.0, high=101.0,
+        low=99.0, close=100.0, volume=10.0,
+    )
+
+    e.step_candle("BTCUSDT", [candle], evaluate_new_signal=False)
+
+    assert e.risk_mgr.current_day_str == "2026-01-02"
+    assert e.risk_mgr.current_equity == 9_400.0
+    assert e.risk_mgr.day_start_equity == 9_400.0
+    assert e.risk_mgr.daily_stop_triggered is False
+
+
 def test_utc_midnight_daily_baseline_uses_mark_at_boundary():
     cfg = engine_mod.BotConfig(
         capital_usdt=10_000.0,

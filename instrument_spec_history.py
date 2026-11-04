@@ -56,12 +56,15 @@ class InstrumentSpecHistory:
         categories = {item.category for item in ordered}
         if len(categories) != 1:
             raise ValueError("instrument snapshot categories cannot be mixed")
-        for previous, current in zip(ordered, ordered[1:]):
-            for symbol in set(previous.identities) & set(current.identities):
-                if previous.identities[symbol] != current.identities[symbol]:
+        last_identity_by_symbol: dict[str, InstrumentIdentity] = {}
+        for snapshot in ordered:
+            for symbol, identity in snapshot.identities.items():
+                previous_identity = last_identity_by_symbol.get(symbol)
+                if previous_identity is not None and previous_identity != identity:
                     raise ValueError(
                         f"instrument identity changed while symbol was reused: {symbol}"
                     )
+                last_identity_by_symbol[symbol] = identity
         self.snapshots = ordered
         self.category = ordered[0].category
         self.possible_renames = self._find_possible_renames(ordered)

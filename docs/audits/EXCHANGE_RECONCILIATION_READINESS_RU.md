@@ -583,3 +583,34 @@ CI #41919550697 — SUCCESS, 59/59 workflow steps; tested code commit `a32254a01
 - Ошибка directory fsync после `os.replace` означает, что rename уже произошёл, но durability directory entry не подтверждена; операция сообщает ошибку и требует остановки/проверки backup.
 - Успешная запись не доказывает полноту execution history; reconciliation/live-resume флаги не повышаются.
 - Никакие Bybit API calls, collector runs, archive downloads, live orders или market PnL tests не выполнялись. Все execution/PnL gates остаются BLOCKED.
+
+### ENG-RECON-023 — сквозное применение merge plan и crash/retry recovery
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
+
+Добавлен явный orchestration helper `persist_execution_merge_plan()`:
+- Повторно валидирует merge plan через detached apply и формирует canonical candidate digest.
+- Перед записью классифицирует текущий Plan B под общей file lock: `BASE_UNCHANGED`, `CANDIDATE_INSTALLED_DURABLE`, `CONFLICTING_STATE` или `BACKUP_MISSING`.
+- Если точный candidate уже установлен предыдущей попыткой, повторно синхронизирует parent directory и возвращает `ALREADY_APPLIED_DURABLE`, не добавляя fills повторно.
+- Если исходная версия ещё на месте, выполняет atomic Plan B persistence с optimistic SHA-256 compare-and-swap.
+- Если запись сообщила об ошибке после возможного `os.replace`, helper перечитывает backup под lock; при совпадении candidate повторно fsync каталога и возвращает `PERSISTED_RECOVERED_AFTER_ACK_ERROR`. Если файл остался исходным или стал конфликтующим, операция не объявляется успешной.
+- Пустой merge, в котором candidate digest совпадает с base digest, возвращает `NO_NEW_EXECUTIONS` без переписывания backup.
+- Все исходы сохраняют `execution_history_complete=false`, `reconciliation_pass=false`, `live_resume_allowed=false`.
+
+Сквозные offline tests:
+1. Создание реального Plan B fixture с typed exchange position identity, построение schema-v3 execution plan, detached apply, атомарная запись, создание нового persistence object, restore и проверка одного execution в ledger.
+2. Повтор того же плана после restore возвращает `ALREADY_APPLIED_DURABLE`; второй execution не появляется.
+3. Смоделирован сбой directory fsync после успешного replace; retry inspector повторно fsync каталога и классифицирует результат как `PERSISTED_RECOVERED_AFTER_ACK_ERROR`.
+4. Конкурирующее изменение backup приводит к fail-closed stale-plan отказу, исходное содержимое файла не перезаписывается.
+5. Пустой merge — no-op без изменения байтов backup.
+6. Restore сохраняет защиту trade sequence: последовательность не ниже числового суффикса существующего trade_id.
+
+Research CI #41921356622 — SUCCESS, 59/59 workflow steps; tested code commit `2dcd3fcce250a6b92042003bb00cba6625ef8449`. Reconciliation report suite — 37 tests OK; Plan B persistence suite — 118 tests OK.
+
+Ограничения:
+- Это локальный recovery protocol и file persistence helper. Он не запускает collector, не вызывает Bybit API, не сверяет фактический account position и не мутирует работающий engine object.
+- `ALREADY_APPLIED_DURABLE` подтверждает digest точного candidate в локальном backup и повторный directory fsync; это не доказательство биржевой полноты execution history или подлинности snapshot.
+- Advisory lock защищает только cooperative writers, использующие этот же lock protocol; сторонние процессы, игнорирующие lock, остаются вне гарантий.
+- После неожиданного повреждения/внешней замены файла состояние классифицируется как conflict и требует ручного расследования; автоматического overwrite нет.
+- Ни одна стратегия не запускалась; никаких Bybit API calls, collector runs, archive downloads, live orders или market PnL tests не выполнялось. Все execution/PnL gates остаются BLOCKED.

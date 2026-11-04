@@ -1,0 +1,29 @@
+name: Bybit historical order-book archive probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/market-regime-v1-main]
+    paths:
+      - 'scripts/probe_bybit_orderbook_archives.py'
+      - '.github/workflows/bybit-orderbook-archive-probe.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Probe public archive headers and bounded byte ranges
+        run: python scripts/probe_bybit_orderbook_archives.py /tmp/bybit_orderbook_archive_probe.json
+      - name: Upload probe report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bybit-orderbook-archive-probe
+          path: /tmp/bybit_orderbook_archive_probe.json
+          if-no-files-found: warn

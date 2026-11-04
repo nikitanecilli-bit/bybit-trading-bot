@@ -60,6 +60,20 @@ def test_trade_sample_inspector_recognizes_both_block_trade_aliases():
     assert trade_inspector.block_trade_flag_columns(["timestamp", "RPI"]) == []
 
 
+
+def test_trade_sample_inspector_marks_nonmonotonic_timestamps_invalid():
+    classify = trade_inspector.trade_timestamp_order_status
+    assert classify(0) == "valid"
+    assert classify(1) == "invalid"
+    for value in (-1, True, 1.0, "1"):
+        try:
+            classify(value)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid nonmonotonic count must fail: {value!r}")
+
+
 def test_trade_sample_inspector_uses_shared_exact_millisecond_timestamp_parser():
     parser = trade_inspector.parse_trade_timestamp_ms
     assert parser("1700000000.123") == 1_700_000_000_123

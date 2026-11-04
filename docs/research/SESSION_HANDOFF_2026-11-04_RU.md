@@ -6,12 +6,12 @@
 
 - Репозиторий: `nikitanecilli-bit/bybit-trading-bot` (private).
 - Рабочая ветка: `research/market-regime-v1-main`.
-- Последний проверенный code/test commit: `846279119545a7036d65b57a156c8ea38b7ae895`; последующие коммиты после него на момент этого snapshot — документальные.
-- Последний подтверждённый CI: [Research engine checks #41875093214](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41875093214), commit `8462791`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps.
-- В этом CI: aggregate-L2 primitive tests 81/81; runner/inspector suite 9/9; portfolio accounting 54/54; state persistence 84/84. Логи подтверждают структурную проверку CSV headers/rows, BT/RPI aliases, strict timestamp parser и trade-ID diagnostics.
-- Предыдущая неудачная попытка #41872989853 была вызвана устаревшим тестом после перехода инспектора на общий `parse_trade_timestamp_ms`; тест синхронизирован в `ec28763`, после чего полные CI #41873039139, #41873425668, #41874277483 и #41875093214 прошли.
+- Последний проверенный code/test commit: `1b50c9da41b99ea23d04e009e7ba6e6424d73e01`; последующие коммиты после него на момент этого snapshot — документальные.
+- Последний подтверждённый CI: [Research engine checks #41875905360](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41875905360), commit `1b50c9d`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps.
+- В этом CI: aggregate-L2 primitive tests 81/81; runner/inspector suite 9/9; portfolio accounting 54/54; state persistence 84/84. Логи подтверждают strict integer parsing orderbook inspector, structural checks trade CSV, BT/RPI aliases, strict trade timestamps и trade-ID diagnostics.
+- Предыдущая неудачная попытка #41872989853 была вызвана устаревшим тестом после перехода trade inspector на общий `parse_trade_timestamp_ms`; тест синхронизирован в `ec28763`, после чего полные CI #41873039139, #41873425668, #41874277483, #41875093214 и #41875905360 прошли.
 - PR #4: открыт, Draft, base `main`, head = текущая research-ветка; mergeable=false. Не сливать автоматически.
-- Сравнение с `main` на code/test snapshot `8462791`: diverged, 2213 commits ahead / 36 behind. Merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. Точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
+- Сравнение с `main` на code/test snapshot `1b50c9d`: diverged, 2218 commits ahead / 36 behind. Merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. Точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
 - `main` не менять. Не делать wholesale merge/rebase research branch. Использовать только reviewed selective PR/cherry-pick при отдельном обосновании.
 - В репозитории есть отдельная ветка `Audit` и `chore/main-repository-organization`; не предполагать, что они слиты или актуальны без проверки.
 
@@ -378,4 +378,14 @@
 - Source commit `ab27c80413c23f4d0689441cff6f131a91a0ab5d`; test commit `846279119545a7036d65b57a156c8ea38b7ae895`.
 - Source-only CI #41875043047 SUCCESS, 57/57; final CI #41875093214 на `8462791`: SUCCESS, 57/57. Фактический лог подтверждает structural regressions; inspector/runner suite 9/9 и aggregate-L2 primitives 81/81.
 - Это structural data-integrity guardrail диагностического инструмента, не maker execution evidence и не PnL. Архивы не скачивались; inspector с сетевой загрузкой не запускался. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся.
+- Нет PnL/backtests, collectors, API, runner, paper/live orders или изменений `main`.
+
+## Session update — strict integer orderbook inspector fields (2026-11-04)
+
+- Сверка `scripts/inspect_bybit_orderbook_sample.py` с `OrderBook.apply()` выявила coercion через `int()` для `ts`, `cts`, `seq`, `u`: bool, numeric strings и fractional floats принимались, хотя основной replay parser требует JSON integers и положительные значения.
+- Inspector теперь использует общий `strict_int()` через `parse_event_integer_fields()`. `ts`, `seq`, `u` обязательны; `cts` проверяется строго, если присутствует. Отсутствующий/null `cts` учитывается как missing.
+- Regression покрывает корректные поля, отсутствующий cts, bool, float, string и неположительные значения.
+- Source commit `d6078d4f0e56c1d398b427b8c7640b1f09021b89`; test commit `1b50c9da41b99ea23d04e009e7ba6e6424d73e01`.
+- Source-only CI #41875836674 SUCCESS, 57/57; final CI #41875905360 на `1b50c9d`: SUCCESS, 57/57. Фактический лог подтверждает strict orderbook inspector regression; inspector/runner suite 9/9 и aggregate-L2 primitives 81/81.
+- Это timestamp/sequence integrity guardrail диагностического инструмента, не execution evidence и не PnL. Inspector не запускался с сетевой загрузкой; новые архивы не скачивались. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся.
 - Нет PnL/backtests, collectors, API, runner, paper/live orders или изменений `main`.

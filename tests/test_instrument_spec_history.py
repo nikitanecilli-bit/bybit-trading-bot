@@ -213,6 +213,7 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
     def test_duplicate_contract_identity_with_two_symbols_is_ambiguous(self):
         first = row("BTCUSDT")
         second = row("XBTUSDT")
+        second["baseCoin"] = "BTC"
         write_snapshot(self.root, "c.json", "2026-11-03T00:00:00Z", [first, second])
         with self.assertRaisesRegex(ValueError, "ambiguous duplicate contract identity"):
             InstrumentSpecHistory.from_directory(self.root)

@@ -334,6 +334,8 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
         rpi_flag = "RPI" if "RPI" in fields else (
             "isRPITrade" if "isRPITrade" in fields else None
         )
+        if rpi_flag is None:
+            raise ValueError("trade archive is missing RPI flag; queue replay cannot safely classify prints")
         for row_no, row in enumerate(reader, 2):
             if row.get("symbol") != symbol:
                 raise ValueError(f"unexpected trade symbol at CSV row {row_no}")
@@ -343,7 +345,7 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
                 "side": row["side"],
                 "price": row["price"],
                 "size": row["size"],
-                "rpi": False if rpi_flag is None else parse_exchange_bool(row[rpi_flag], "RPI"),
+                "rpi": parse_exchange_bool(row[rpi_flag], "RPI"),
                 "block_trade": parse_exchange_bool(row[block_flag], "block trade"),
                 "trade_id": row["trdMatchID"],
             }

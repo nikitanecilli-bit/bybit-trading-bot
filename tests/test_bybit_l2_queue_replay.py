@@ -484,6 +484,35 @@ def test_passive_order_rejects_book_without_timestamp():
         raise AssertionError("untimestamped book must not seed queue position")
 
 
+def test_passive_order_rejects_prices_beyond_visible_depth():
+    for side, price, expected in (
+        ("Buy", "98", "outside visible bid depth"),
+        ("Sell", "103", "outside visible ask depth"),
+    ):
+        try:
+            place_passive_order(
+                book(), side=side, price=D(price), quantity=D("1"),
+                arrival_ts=1001, expiry_ts=5000,
+            )
+        except ValueError as exc:
+            assert expected in str(exc)
+        else:
+            raise AssertionError("order beyond visible L2 depth must not assume zero queue")
+
+
+def test_passive_order_accepts_empty_price_inside_visible_depth():
+    buy = place_passive_order(
+        book(), side="Buy", price=D("99.5"), quantity=D("1"),
+        arrival_ts=1001, expiry_ts=5000,
+    )
+    sell = place_passive_order(
+        book(), side="Sell", price=D("101.5"), quantity=D("1"),
+        arrival_ts=1001, expiry_ts=5000,
+    )
+    assert buy.queue_ahead_initial == D("0")
+    assert sell.queue_ahead_initial == D("0")
+
+
 def test_buy_order_queue_ahead_is_initial_displayed_bid_size():
     o = order()
     assert o.queue_ahead_initial == D("5")

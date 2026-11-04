@@ -297,6 +297,7 @@ def build_snapshot(
             raise ValueError("page observations require collection_started_at")
         snapshot["page_observations"] = validate_page_observations(
             page_observations, expected_symbols=set(symbols),
+            expected_tier_count=len(validated),
             collection_started_at=collection_started_at, fetched_at=timestamp,
         )
     return snapshot

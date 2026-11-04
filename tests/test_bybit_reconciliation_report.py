@@ -576,6 +576,19 @@ class ReportOnlyComparatorTests(unittest.TestCase):
                 ["e2e-late-fill"],
             )
 
+    def test_end_to_end_empty_merge_is_noop_without_backup_rewrite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            local, _, persistence, risk_mgr, _, path = self._persistable_merge_fixture(tmp)
+            empty_plan = build_execution_merge_plan(
+                local, upgrade_to_schema3(snapshot())
+            )
+            before = path.read_bytes()
+            result = persist_execution_merge_plan(
+                local, empty_plan, persistence=persistence, risk_mgr=risk_mgr,
+            )
+            self.assertEqual(result["status"], "NO_NEW_EXECUTIONS")
+            self.assertEqual(path.read_bytes(), before)
+
     def test_end_to_end_conflicting_backup_change_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             local, plan, persistence, risk_mgr, _, path = self._persistable_merge_fixture(tmp)

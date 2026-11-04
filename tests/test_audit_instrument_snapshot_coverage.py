@@ -79,6 +79,19 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
         self.assertEqual(report["overlapping_collection_windows"], 1)
         self.assertEqual(report["intervals"][0]["gap_from_previous_completion_ms"], -1000)
 
+    def test_overlapping_collection_windows_fail_audit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "data" / "universe_history" / "linear"
+            write_snapshot(target, "a.json", "2026-11-01T00:00:02.000Z",
+                           [instrument("BTCUSDT")], "2026-11-01T00:00:00.000Z")
+            write_snapshot(target, "b.json", "2026-11-01T00:00:03.000Z",
+                           [instrument("BTCUSDT")], "2026-11-01T00:00:01.000Z")
+            with patch("sys.argv", ["audit", "--root", str(root)]):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    result = main()
+        self.assertEqual(result, 1)
+
     def test_duplicate_snapshot_timestamps_fail_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

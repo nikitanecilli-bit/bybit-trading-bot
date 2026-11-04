@@ -120,3 +120,13 @@ def test_markout_capture_rejects_out_of_order_archive_after_last_target():
             assert "non-monotonic matching-engine timestamp" in str(exc)
         else:
             raise AssertionError("out-of-order tail must invalidate markout archive")
+
+if __name__ == "__main__":
+    test_names = sorted(
+        name for name, value in globals().items()
+        if name.startswith("test_") and callable(value)
+    )
+    for name in test_names:
+        globals()[name]()
+        print(f"PASS {name}")
+    print(f"{len(test_names)}/{len(test_names)} tests passed")

@@ -293,3 +293,27 @@ Runner report now declares mandatory BT/RPI metadata and counts excluded block t
 Источники для проверки: Bybit V5 Recent Public Trades документирует оба флага; описание публичной futures CSV схемы перечисляет `RPI`, но не `BT`. Это schema-level warning; реальный заголовок файла не проверялся, потому что действует запрет на новые скачивания. См. https://bybit-exchange.github.io/docs/v5/market/recent-trade и https://github.com/Anton495/bybit-data-downloader.
 
 Никаких новых архивов не скачивал. Не менял парсер, так как fail-closed поведение здесь корректно. Это отдельный блокер для L2 replay: `TRADE_ARCHIVE_FLAGS = UNVERIFIED_COMPATIBILITY`. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` сохраняется.
+
+
+## 15. Повторный audit нормализованных trade events и границ L2 archive
+
+В ходе повторной статической проверки найдены два обхода fail-closed гарантий:
+
+1. apply_public_trade() использовал trade.get("block_trade", False) и trade.get("rpi", False). Поэтому прямой вызов функции с неполным normalized event мог засчитать неизвестный print как обычную сделку, хотя CSV parser требовал оба флага. Теперь отсутствие любого флага приводит к ValueError до изменения очереди/объёма. parse_exchange_bool() также больше не принимает float 0.0/1.0 через неявное равенство с integer.
+2. capture_book_at() делал int(event["cts"]) до проверки события. Дробный cts на границе arrival мог быть усечён и привести к тому, что malformed event был пропущен без вызова OrderBook.apply(). Теперь iter_book_events() валидирует тип события, data object, symbol и строгий integer cts на каждой строке до передачи вызывающему коду.
+
+Добавлены regression tests:
+- отсутствующий block_trade отклоняется;
+- отсутствующий rpi отклоняется;
+- float bool flags отклоняются;
+- fractional cts отклоняется даже если прежнее boundary сравнение могло пропустить событие.
+
+Изменения в research/market-regime-v1-main:
+- trade flag source: 1fe177b36b4564e3aefcfb79b445b2108840c54e
+- trade flag tests: 0e5a8d9fa5af9cd715e3cc574b20c1f57871fbde
+- archive cts source: 6f493dd914783d825ed916bd1f7bb930d594485b
+- archive cts test: fe2c706f237bee563deb6101ca9cc03f566263b8
+
+Статическая проверка изменений выполнена повторным чтением файлов из GitHub. В tests/test_bybit_l2_queue_replay.py добавлены четыре regression tests; тесты не объявляются пройденными до terminal CI. Для последних двух commits запущены Research engine checks через push; на момент checkpoint runs ещё выполнялись. main не менялся.
+
+Не запускались новые архивные загрузки, market/PnL replay, private API, paper/live orders. Сохраняются TRADE_ARCHIVE_FLAGS = UNVERIFIED_COMPATIBILITY и MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL.

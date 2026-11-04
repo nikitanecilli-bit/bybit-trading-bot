@@ -158,3 +158,15 @@
 - Current research branch code/test HEAD before this documentation update: `19ca8bcfe407cecea18a2bfc6ad5c86cf54085af`. PR #4 remains Draft/open; no merge/rebase/retarget.
 - No market PnL, new market archive download/collector, private API/account access, runner registration, paper/live orders, or main-branch changes.
 - Next safe task: continue independent read-only review of report serialization/CSV schema and provenance; do not add further changes to this now-green runner path without a new reproducible defect.
+
+
+## Session update — 2026-11-04 (trade timestamp unit boundary)
+
+- Independent CSV/report audit found a boundary bug in `parse_trade_timestamp_ms()`: the seconds-vs-milliseconds heuristic used `raw > 1_000_000_000_000`, so the exact valid millisecond timestamp `1000000000000` was misclassified as seconds and multiplied by 1,000.
+- Changed the threshold to `>=` and added an exact-boundary regression assertion.
+- Commits: source `e972a4466ed8053b0471eead932144a18ee91790`; test `a9443b1c9ee81d63ab80150ffe3650af78aff560`.
+- Final Research CI #41842908843 on test commit `a9443b1c9ee81d63ab80150ffe3650af78aff560`: SUCCESS; job `tests` SUCCESS; all 56 steps completed. Actual logs: aggregate L2 primitive suite 81/81 passed; runner suite 5/5 passed, including empty-archive and markout-boundary tests.
+- Static review of report serialization and CSV schema found no further reproducible defect: decimal values are serialized as strings, output is UTF-8 JSON, required CSV columns/aliases/row widths/IDs/flags and numeric fields fail closed, duplicate IDs and non-monotonic timestamps are checked across the full archive. No market data was downloaded and the runner's networked `main()` was not executed.
+- Current code/test HEAD before this documentation update: `a9443b1c9ee81d63ab80150ffe3650af78aff560`. PR #4 remains Draft/open; no merge/rebase/retarget.
+- No market PnL, archive downloads/collectors, Bybit private/account API, runner registration, paper/live orders, or main-branch changes.
+- Next safe task: read-only audit of historical instrument-spec and fee provenance artifacts already present in the branch; do not substitute current specs/fees for missing dated evidence.

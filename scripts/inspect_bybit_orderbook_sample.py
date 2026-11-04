@@ -2,6 +2,8 @@
 """Download and fully validate one Bybit L2 archive; retain only a compact report."""
 from __future__ import annotations
 
+import csv
+import gzip
 import hashlib
 import json
 import tempfile
@@ -13,6 +15,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 URL = "https://quote-saver.bycsi.com/orderbook/linear/AAVEUSDT/2025-09-02_AAVEUSDT_ob200.data.zip"
+TRADES_URL = "https://public.bybit.com/trading/AAVEUSDT/AAVEUSDT2025-09-02.csv.gz"
 SYMBOL = "AAVEUSDT"
 CHUNK = 1024 * 1024
 

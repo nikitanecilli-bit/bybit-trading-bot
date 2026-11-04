@@ -768,7 +768,7 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
     assert position.maintenance_margin_deduction == "0"
     assert position.risk_tier_max_leverage == "100"
     assert Decimal(position.initial_margin_usdt) == Decimal(str(position.size_usdt)) / Decimal("5")
-    assert Decimal(position.maintenance_margin_usdt) == Decimal(str(position.size_usdt)) * Decimal("0.01") - Decimal("500")
+    assert Decimal(position.maintenance_margin_usdt) == Decimal(str(position.size_usdt)) * Decimal("0.005")
 
 
 def test_engine_fails_closed_when_dated_risk_tier_is_missing_or_leverage_exceeded():

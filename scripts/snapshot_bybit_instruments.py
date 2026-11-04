@@ -296,17 +296,27 @@ def main() -> None:
     if args.pause < 0:
         parser.error("--pause cannot be negative")
 
+    page_observations: list[dict[str, Any]] = []
+    page_counts: dict[str, int] = {}
+
     def fetch(cursor: str | None, status: str):
+        page_counts[status] = page_counts.get(status, 0) + 1
+        request_started_at = _snapshot_timestamp(None)
         page, next_cursor = _request_page(
             args.base_url, args.category, cursor, status=status
         )
+        response_received_at = _snapshot_timestamp(None)
+        page_observations.append(build_page_observation(
+            status, page_counts[status], request_started_at,
+            response_received_at, page, next_cursor,
+        ))
         if next_cursor and args.pause:
             time.sleep(args.pause)
         return page, next_cursor
 
     collection_started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     rows = fetch_all_instruments(args.category, fetch)
-    snapshot = build_snapshot(rows, args.category, collection_started_at=collection_started_at)
+    snapshot = build_snapshot(\n        rows, args.category, collection_started_at=collection_started_at,\n        page_observations=page_observations,\n    )
     fetched = datetime.fromisoformat(snapshot["fetched_at"].replace("Z", "+00:00"))
     stamp = fetched.astimezone(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     output = Path(args.output_dir) / args.category / f"{stamp}.json"

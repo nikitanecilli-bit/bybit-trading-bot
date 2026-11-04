@@ -465,6 +465,16 @@ class OpenPositionState:
                 order = ExchangeOrderIdentity.from_dict(raw)
                 if order.symbol != self.symbol:
                     raise ExecutionIdentityError("exchange order symbol differs from local position")
+                if position_identity is not None:
+                    if order.position_idx != position_identity.position_idx:
+                        raise ExecutionIdentityError("exchange order positionIdx differs from position identity")
+                    is_closing_side = order.side != position_identity.side
+                    if is_closing_side and not order.reduce_only:
+                        raise ExecutionIdentityError("opposite-side order must be reduceOnly for this position")
+                    if not is_closing_side and order.reduce_only:
+                        raise ExecutionIdentityError("same-side order cannot be reduceOnly for this position")
+                    if order.close_on_trigger and not order.reduce_only:
+                        raise ExecutionIdentityError("closeOnTrigger order must be reduceOnly")
                 if order.order_id in orders:
                     raise ExecutionIdentityError("duplicate exchange order_id")
                 orders[order.order_id] = order

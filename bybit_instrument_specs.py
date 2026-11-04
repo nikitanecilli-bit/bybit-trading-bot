@@ -72,7 +72,10 @@ class InstrumentSpec:
         lot_filter = instrument.get("lotSizeFilter") or {}
         leverage_filter = instrument.get("leverageFilter") or {}
         symbol = str(instrument.get("symbol") or "").strip()
-        category = str(instrument.get("category") or "linear").strip().lower()
+        raw_category = instrument.get("category")
+        if not isinstance(raw_category, str) or not raw_category.strip():
+            raise ValueError("instrument category is required")
+        category = raw_category.strip().lower()
         if category != "linear":
             raise ValueError("InstrumentSpec only supports linear contracts")
         if not symbol:

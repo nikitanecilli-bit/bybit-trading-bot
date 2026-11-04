@@ -117,6 +117,17 @@ class InstrumentSpecTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "only supports linear"):
             InstrumentSpec.from_snapshot(broken)
 
+    def test_missing_or_malformed_category_fails_closed(self):
+        for value in (None, "", "   ", 1):
+            with self.subTest(category=value):
+                broken = {"instrument": dict(SNAPSHOT["instrument"])}
+                if value is None:
+                    broken["instrument"].pop("category")
+                else:
+                    broken["instrument"]["category"] = value
+                with self.assertRaisesRegex(ValueError, "instrument category is required"):
+                    InstrumentSpec.from_snapshot(broken)
+
     def test_non_trading_instrument_cannot_be_sized(self):
         broken = {"instrument": dict(SNAPSHOT["instrument"])}
         broken["instrument"]["status"] = "PendingOpen"

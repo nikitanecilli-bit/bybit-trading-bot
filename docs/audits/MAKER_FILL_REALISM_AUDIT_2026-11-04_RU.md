@@ -190,3 +190,59 @@ The archive pair is sufficient to prototype an aggregate L2 queue lower-bound mo
 This remains an aggregate L2 lower-bound approximation, not L3 queue reconstruction or exchange-confirmed fills. RPI/block trades, hidden liquidity, same-timestamp ordering and market impact still require careful handling.
 
 **Decision unchanged:** `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`. Data acquisition is now feasible and one matched day passed integrity checks. The next safe engineering step is a separate, deterministic queue-replay prototype with synthetic tests and a measured AAVE sample; only after that should it be connected to H1 strategy signals. No strategy PnL was run in this data-validation stage.
+
+
+## 6. Aggregate-L2 queue replay prototype — first measured run (2026-11-04)
+
+### 6.1 Implementation and deterministic tests
+
+Added an isolated prototype, deliberately not wired into the strategy engine:
+- `bybit_l2_queue_replay.py` — snapshot/delta reconstruction, passive order placement, queue-ahead initialization, opposing-aggressor trade consumption, partial fills and expiry.
+- `tests/test_bybit_l2_queue_replay.py` — 12 deterministic tests.
+- `scripts/run_bybit_l2_queue_replay.py` — bounded one-day AAVEUSDT probe using the matched L2 and public-trade archives.
+
+Confirmed semantics:
+- snapshot replaces the visible book; delta quantities are absolute level sizes; zero deletes the price level;
+- a passive Buy can only be filled by Sell aggressor prints at exactly its limit price; a passive Sell only by Buy aggressor prints at exactly its limit;
+- initial queue-ahead equals displayed size at the order's price at arrival;
+- only trades strictly after arrival and strictly before expiry can count; same-millisecond trades are excluded;
+- RPI-marked trades are excluded;
+- L2 cancellations/reductions never reduce queue-ahead; later additions are not added to queue-ahead;
+- marketable orders are rejected from this maker-only model;
+- partial fills are supported and order replay stops after full fill or expiry.
+
+The 12/12 synthetic tests passed. Research CI passed on both runs `#41812211150` and `#41812277499`.
+
+### 6.2 Four deterministic hypothetical orders on the real sample
+
+The runner replayed four independent, non-overlapping hypothetical orders:
+- arrival at +2h, +8h, +14h and +20h from the L2 archive start;
+- alternating Buy at best bid and Sell at best ask;
+- quantity 1 AAVE each; one-hour lifetime;
+- book state captured from the latest L2 event at or before arrival;
+- matching public trades replayed only after arrival.
+
+| Scenario | Side | Initial queue | Filled | Fill fraction | Time to first fill | Outcome |
+|---|---|---:|---:|---:|---:|---|
+| +2h | Buy | 173.71 | 0.58 / 1 | 58% | 134.6 s | Partial |
+| +8h | Sell | 2.60 | 1 / 1 | 100% | 1,219.2 s | Filled |
+| +14h | Buy | 6.39 | 1 / 1 | 100% | 2,070.4 s | Filled |
+| +20h | Sell | 0.47 | 0.33 / 1 | 33% | 1.5 s | Partial |
+
+All four book snapshots were only 2–98 ms old at their scheduled arrival. No RPI trade was encountered in these four replay windows.
+
+Full run: [GitHub Actions #41812277478](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41812277478). Artifact `bybit-orderbook-and-trades-sample-inspection` contains the raw compact JSON reports, including the queue-replay output. Archive SHA-256 hashes match section 5.2/5.3.
+
+**Interpretation limit:** these four hand-scheduled BBO orders are a mechanics smoke test, not a statistically meaningful fill-rate estimate, not strategy-signal replay, not evidence of maker profitability, and not a comparison against market execution. They demonstrate that the parser reconstructs a usable book and that trade prints can consume the modeled queue and produce partial/full fills under the stated assumptions.
+
+### 6.3 Remaining model limitations before strategy integration
+
+This first implementation is intentionally a conservative baseline, but not yet a production execution simulator:
+1. L2 cannot identify cancellations vs executions or determine whether cancelled quantity was ahead of/behind the hypothetical order. We therefore do not credit any cancellation; this can materially overstate queue-ahead after cancellations.
+2. New displayed size at the same price after our arrival is not added to queue-ahead. This assumes it joined behind us; hidden priority/refresh behavior is unknown.
+3. No exchange order-arrival latency, cancel latency, replace behavior, partial-fill fee accounting or adverse-selection markout is yet integrated.
+4. No spread crossing, market impact, order-size/depth constraints or Bybit tick/quantity-step validation is included.
+5. Trade and L2 matching-engine timestamps are close but not a full exchange sequence join. Same-millisecond prints are conservatively excluded; exact ordering is unresolved.
+6. One AAVEUSDT day and four hypothetical orders do not establish generalization across symbols or regimes.
+
+**Decision:** queue-replay mechanics have passed their first synthetic tests and one real-data smoke test. Keep `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` until latency, order sizing/spec validation, partial-fill lifecycle and adverse-selection analysis are implemented and tested. Do not rerun H1 PnL on this prototype yet.

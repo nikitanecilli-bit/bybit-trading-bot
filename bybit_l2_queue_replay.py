@@ -339,12 +339,22 @@ def iter_book_events(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict]:
 def capture_book_at(
     archive: Path, arrival_ts: int, symbol: str = "AAVEUSDT",
 ) -> tuple[OrderBook, int]:
+    arrival_ts = strict_int(arrival_ts, "arrival_ts")
+    if arrival_ts <= 0:
+        raise ValueError("arrival_ts must be positive")
     book = OrderBook()
+    previous_cts = None
     for event in iter_book_events(archive, symbol):
-        # Same-millisecond event ordering relative to our hypothetical order is
-        # unknowable without an exchange sequence for the order; exclude it.
-        if int(event["cts"]) >= arrival_ts:
-            break
+        cts = strict_int(event.get("cts"), "cts")
+        if cts <= 0:
+            raise ValueError("cts must be positive")
+        if previous_cts is not None and cts < previous_cts:
+            raise ValueError("non-monotonic cts in full order-book archive")
+        previous_cts = cts
+        # Keep scanning after arrival to validate archive chronology, but never
+        # apply same-millisecond or future events to the hypothetical book.
+        if cts >= arrival_ts:
+            continue
         book.apply(event)
     if book.last_cts is None:
         raise ValueError("no order-book snapshot at or before arrival")

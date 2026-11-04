@@ -313,6 +313,55 @@ class StatePersistenceTests(unittest.TestCase):
             )
             self.assertAlmostEqual(restored.risk_mgr.current_equity, risk.current_equity, places=4)
 
+    def test_tp1_trailing_stop_and_realized_leg_survive_restart_without_double_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "tp1-trailing-state.json"
+            cfg = engine.BotConfig()
+            position = sample_position()
+            position.tp1_hit = True
+            position.tp1_ts_ms = position.entry_ts + 3_600_000
+            position.realized_tp1_gross_usdt = 30.0
+            position.remaining_fraction = 0.5
+            position.stop_price = 102.0
+            position.max_favorable_px = 110.0
+            position.max_adverse_px = 98.0
+            position.tp1_maker = False
+            mark_price = 105.0
+            mark_ts = position.entry_ts + 7_200_000
+
+            source = engine.UnifiedQuantEngine.__new__(engine.UnifiedQuantEngine)
+            source.open_positions = {"BTCUSDT": position}
+            source._last_mark_prices = {"BTCUSDT": mark_price}
+            source._intrabar_mtm_marks = {}
+            source._intrabar_risk_marks = {}
+            source._intrabar_risk_marks_ts = mark_ts
+            source.funding_dir = None
+            expected_unrealized = source._unrealized_pnl_at_marks(mark_ts)
+            risk = engine.AdaptiveRiskManager(cfg)
+            risk.mark_to_market(expected_unrealized, mark_ts)
+
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {"BTCUSDT": position}, {}, 43,
+                last_mark_prices={"BTCUSDT": mark_price},
+            )
+            restored = engine.UnifiedQuantEngine(
+                restore_plan_b=True, state_path=str(path),
+            )
+            restored_position = restored.open_positions["BTCUSDT"]
+
+            self.assertEqual(restored_position.stop_price, 102.0)
+            self.assertEqual(restored_position.max_favorable_px, 110.0)
+            self.assertEqual(restored_position.tp1_hit, True)
+            self.assertEqual(restored_position.realized_tp1_gross_usdt, 30.0)
+            self.assertEqual(restored_position.remaining_fraction, 0.5)
+            self.assertEqual(restored_position.tp1_maker, False)
+            self.assertAlmostEqual(
+                restored._unrealized_pnl_at_marks(mark_ts), expected_unrealized, places=8,
+            )
+            self.assertAlmostEqual(
+                restored.risk_mgr.current_equity, risk.current_equity, places=4,
+            )
+
     def test_open_position_backup_without_last_mark_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "missing-mark.json"

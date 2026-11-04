@@ -126,6 +126,22 @@ class RiskLimitSnapshotTests(unittest.TestCase):
                 page_observations=[observation],
             )
 
+
+    def test_page_tier_counts_must_match_snapshot_rows(self):
+        observation = {
+            "page_index": 1,
+            "request_started_at": "2026-11-02T00:00:00.000Z",
+            "request_completed_at": "2026-11-02T00:00:00.100Z",
+            "tier_count": 2, "symbol_count": 1,
+            "symbols": ["BTCUSDT"], "has_next_page": False,
+        }
+        with self.assertRaisesRegex(ValueError, "tier counts do not match"):
+            build_snapshot(
+                [row()], "linear", "2026-11-02T00:00:01.000Z",
+                collection_started_at="2026-11-02T00:00:00.000Z",
+                page_observations=[observation],
+            )
+
     def test_default_snapshot_timestamp_has_millisecond_precision(self):
         snapshot = build_snapshot([row()], "linear")
         self.assertRegex(snapshot["fetched_at"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")

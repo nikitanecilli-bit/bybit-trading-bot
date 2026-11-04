@@ -13,6 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from instrument_spec_history import InstrumentSpecHistory
+from bybit_risk_tiers import RiskTierHistory
+
 
 def utc_ms(value: Any, field: str) -> int:
     if not isinstance(value, str) or not value:
@@ -246,19 +249,130 @@ def audit_directory(directory: Path) -> dict[str, Any]:
     }
 
 
+
+def audit_joint_market_state(
+    instrument_directory: Path, risk_directory: Path,
+) -> dict[str, Any]:
+    """Audit every distinct as-of pair selected by the joined runtime histories."""
+    instrument_files = sorted(instrument_directory.glob("*.json")) if instrument_directory.is_dir() else []
+    risk_files = sorted(risk_directory.glob("*.json")) if risk_directory.is_dir() else []
+    if not instrument_files or not risk_files:
+        return {
+            "status": "INCOMPLETE",
+            "instrument_snapshot_count": len(instrument_files),
+            "risk_tier_snapshot_count": len(risk_files),
+            "reason": "both dated linear instrument and risk-tier archives are required",
+            "skew_budget_recommendation_ms": None,
+        }
+
+    instrument_history = InstrumentSpecHistory.from_directory(instrument_directory, "linear")
+    risk_history = RiskTierHistory.from_directory(risk_directory, "linear")
+    boundaries = sorted({
+        item.fetched_at_ms for item in instrument_history.snapshots
+    } | {
+        item.fetched_at_ms for item in risk_history.snapshots
+    })
+    seen_pairs: set[tuple[int, int]] = set()
+    observations: list[dict[str, Any]] = []
+    for as_of_ts in boundaries:
+        eligible_instruments = [
+            item for item in instrument_history.snapshots
+            if item.fetched_at_ms <= as_of_ts
+        ]
+        eligible_risks = [
+            item for item in risk_history.snapshots
+            if item.fetched_at_ms <= as_of_ts
+        ]
+        if not eligible_instruments or not eligible_risks:
+            continue
+        instrument_snapshot = eligible_instruments[-1]
+        risk_snapshot = eligible_risks[-1]
+        pair = (instrument_snapshot.fetched_at_ms, risk_snapshot.fetched_at_ms)
+        if pair in seen_pairs:
+            continue
+        seen_pairs.add(pair)
+        trading_symbols = {
+            symbol for symbol, spec in instrument_snapshot.specs.items()
+            if spec.status == "Trading"
+        }
+        risk_symbols = set(risk_snapshot.tiers_by_symbol)
+        missing = sorted(trading_symbols - risk_symbols)
+        extra = sorted(risk_symbols - trading_symbols)
+        covered = len(trading_symbols & risk_symbols)
+        coverage = covered / len(trading_symbols) if trading_symbols else 0.0
+        tier_counts = [
+            len(risk_snapshot.tiers_by_symbol[symbol])
+            for symbol in sorted(trading_symbols & risk_symbols)
+        ]
+        observations.append({
+            "as_of_boundary_ms": as_of_ts,
+            "instrument_fetched_at_ms": instrument_snapshot.fetched_at_ms,
+            "risk_tiers_fetched_at_ms": risk_snapshot.fetched_at_ms,
+            "snapshot_skew_ms": abs(
+                instrument_snapshot.fetched_at_ms - risk_snapshot.fetched_at_ms
+            ),
+            "instrument_age_at_boundary_ms": as_of_ts - instrument_snapshot.fetched_at_ms,
+            "risk_tiers_age_at_boundary_ms": as_of_ts - risk_snapshot.fetched_at_ms,
+            "trading_instrument_count": len(trading_symbols),
+            "risk_tier_symbol_count": len(risk_symbols),
+            "trading_symbols_with_risk_tiers": covered,
+            "trading_symbol_risk_coverage": coverage,
+            "trading_symbols_missing_risk_tiers": missing,
+            "risk_only_symbols": extra,
+            "risk_tier_count_per_covered_symbol": _distribution(tier_counts),
+        })
+
+    skews = [item["snapshot_skew_ms"] for item in observations]
+    coverages = [item["trading_symbol_risk_coverage"] for item in observations]
+    return {
+        "status": "DATA_FOUND",
+        "instrument_snapshot_count": len(instrument_history.snapshots),
+        "risk_tier_snapshot_count": len(risk_history.snapshots),
+        "distinct_as_of_pairs": len(observations),
+        "snapshot_skew_ms": _distribution(skews),
+        "snapshot_skew_observations_ms": skews,
+        "trading_symbol_risk_coverage": _distribution(coverages),
+        "pairs_with_missing_trading_symbol_risk_tiers": sum(
+            bool(item["trading_symbols_missing_risk_tiers"]) for item in observations
+        ),
+        "pairs_with_zero_missing_trading_symbols": sum(
+            not item["trading_symbols_missing_risk_tiers"] for item in observations
+        ),
+        "observations": observations,
+        "skew_budget_recommendation_ms": None,
+        "skew_budget_note": (
+            "Observed skew is descriptive only. It does not establish safe freshness, "
+            "exchange-side atomicity, or acceptable strategy risk; no budget is inferred."
+        ),
+    }
+
+
+
 def build_report(root: Path) -> dict[str, Any]:
     targets = {
         "linear_universe": root / "data" / "universe_history" / "linear",
         "linear_instrument_specs": root / "data" / "instrument_specs" / "linear",
+        "linear_risk_tiers": root / "data" / "instrument_specs" / "risk_limits" / "linear",
     }
-    sections = {name: audit_directory(path) for name, path in targets.items()}
+    sections = {name: audit_directory(path) for name, path in targets.items()
+                if name != "linear_risk_tiers"}
+    joint = audit_joint_market_state(
+        targets["linear_instrument_specs"], targets["linear_risk_tiers"]
+    )
+    any_data = any(
+        len(list(path.glob("*.json"))) if path.is_dir() else 0
+        for path in targets.values()
+    )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "audit": "bybit_instrument_snapshot_temporal_coverage",
         "mode": "offline_only",
         "root": str(root),
-        "status": "NO_DATA" if not any(s["snapshot_count"] for s in sections.values()) else "DATA_FOUND",
+        "status": "NO_DATA" if not any_data else (
+            "DATA_FOUND" if joint["status"] == "DATA_FOUND" else "INCOMPLETE"
+        ),
         "sections": sections,
+        "joint_linear_market_state": joint,
         "interpretation": (
             "Observed snapshot spacing is not proof of continuous tradability. "
             "Collection intervals are non-atomic; missing transition events between "

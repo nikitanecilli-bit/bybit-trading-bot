@@ -653,8 +653,8 @@ def test_trade_archive_rejects_extra_csv_fields():
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "trades.csv.gz"
         with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
-            stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\\n")
-            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,False,False,unexpected\\n")
+            stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,False,False,unexpected\n")
         try:
             list(l2_module.iter_public_trades(path))
         except ValueError as exc:
@@ -668,8 +668,8 @@ def test_trade_archive_rejects_trade_id_with_surrounding_whitespace():
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "trades.csv.gz"
         with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
-            stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\\n")
-            stream.write("1756771200123,AAVEUSDT,Sell,10,100, match-1 ,False,False\\n")
+            stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100, match-1 ,False,False\n")
         try:
             list(l2_module.iter_public_trades(path))
         except ValueError as exc:

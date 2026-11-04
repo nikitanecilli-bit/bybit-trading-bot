@@ -1495,3 +1495,13 @@ No market PnL, new archive download/collector, private API, runner registration,
 - Research CI [#41928978081](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928978081) SUCCESS on commit `08afcdd6c16e6c32fa33198e2ff56c66023ce585`; all 58 workflow steps passed.
 - Scope note: normal CI ran the existing read-only CryptoFetch ZIP integrity/overlap audit and H-A preparation-manifest step against repository-resident archives. It streamed ZIP members for inspection; no new archives were downloaded and no files were extracted to disk. No market PnL replay/test, exchange API, collector, private account query, paper/live or sweep ran.
 - All data, liquidation-safety, strategy PnL, maker, paper and live gates remain BLOCKED.
+
+
+## 2026-11-05 — portfolio PnL and wallet-funding routing audit
+
+- Traced TP1 partial close through open MTM, final close, full lifecycle funding, remaining-margin funding allocation and realized/unrealized equity.
+- No confirmed double-counting or sign defect found in the deterministic TP1/funding/fee ledger. Existing tests cover exact remaining contract quantity, TP1 lifecycle, funding boundaries, close reconciliation and shared-capital equity.
+- Confirmed unresolved account-model gap: position margin is adjusted directly by allocated net funding, whereas exchange cash routing may use available balance first. Without wallet balance/account mode, the approximation can overstate or understate isolated liquidation risk depending on funding sign and wallet state.
+- Realized TP1 PnL enters portfolio realized equity but is not transferred automatically to remaining isolated position margin. Manual extra margin and auto-add margin are not tracked as a persisted lifecycle.
+- No code/formula changes made: the safe fix requires an explicit wallet/available-balance and account-mode ledger, not a guessed shortcut.
+- Detailed result recorded in accounting audit section 9. Data/strategy/account-level liquidation readiness remains BLOCKED. No PnL replay, market data fetch, exchange API, paper/live action or parameter sweep performed.

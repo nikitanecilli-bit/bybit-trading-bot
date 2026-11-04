@@ -84,7 +84,7 @@ class RiskLimitSnapshotTests(unittest.TestCase):
             snapshot = build_snapshot([row()], "linear")
             write_snapshot(snapshot, Path(directory) / "snapshot.json")
             history = RiskTierHistory.from_directory(directory)
-            tiers = history.get_tiers("BTCUSDT", 1793577601000)
+            tiers = history.get_tiers("BTCUSDT", history.snapshots[0].fetched_at_ms)
             self.assertEqual([tier.tier_id for tier in tiers], [1])
 
     def test_snapshot_timestamp_normalizes_offset_to_utc(self):

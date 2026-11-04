@@ -1077,3 +1077,14 @@ Classification: restored excursion-metric integrity only; no strategy PnL/backte
 - Merge base: ae599a2f3279e15fe27360662f94f0e7ef8db5be; compare main...research: diverged, 2,166 ahead / 36 behind.
 - PR #4: open, Draft, mergeable=false. No merge/rebase/reset/force-push; main unchanged.
 - Latest tested source/test commit: 4c7744c22180a97fa868547eac034cdf91b69491; CI #41854947672 SUCCESS, 57/57; state persistence 81 tests. Commits after this code/test head are documentation-only.
+
+
+## 57. Restore validates stop latches against drawdown thresholds — 2026-11-04
+
+A backup with current drawdown above emergency threshold but `kill_switch_triggered=false`, or current-day drawdown above daily stop but `daily_stop_triggered=false`, could pass restore and re-enable entries because `can_open_new_trade()` trusts those flags.
+
+Restore now requires kill switch true if max(current implied DD, historical max_drawdown_pct) reaches `emergency_kill_switch_pct`; historical max is included so recovery in equity cannot clear the latched emergency stop. For non-empty `current_day_str`, daily stop must be true if current daily DD reaches `daily_stop_loss_pct`.
+
+Three regressions: current emergency breach, historical emergency breach followed by recovery, current daily breach. Source CI #41861236015 SUCCESS 57/57; final CI #41861273155 on 669a7d66c50df5426e63c5490580b2d8bbc92f22 SUCCESS 57/57; persistence suite 84 tests.
+
+Known schema limit: an intraday daily-stop breach followed by recovery before backup cannot be independently reconstructed if the latch is corrupted, because no daily minimum-equity watermark is persisted. Runtime still persists latch transitions. Classification: risk-state integrity only; no strategy PnL/backtest/API/runner/paper/live or main changes.

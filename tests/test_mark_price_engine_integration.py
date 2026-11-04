@@ -131,7 +131,7 @@ class MarkPriceEngineIntegrationTests(unittest.TestCase):
         engine.liquidation_model_enabled = True
         engine.risk_tier_history = make_risk_history(close_ts)
         engine.instrument_spec_history = object()
-        engine.max_market_state_skew_ms = None
+        engine.max_market_state_skew_ms = 0
         engine._mark_price_candles = {"BTCUSDT": {
             ts: em.MarkPriceCandle(
                 ts, Decimal("99000"), Decimal("100450"),
@@ -147,7 +147,7 @@ class MarkPriceEngineIntegrationTests(unittest.TestCase):
                     pos, em.Candle(ts, 99000, 100500, 98500, 100000, 1), close_ts,
                 )
         joined.assert_called_once()
-        self.assertIsNone(joined.call_args.kwargs["max_snapshot_skew_ms"])
+        self.assertEqual(joined.call_args.kwargs["max_snapshot_skew_ms"], 0)
 
     def test_liquidation_margin_uses_only_remaining_share_of_pre_tp1_funding(self):
         engine = make_engine()

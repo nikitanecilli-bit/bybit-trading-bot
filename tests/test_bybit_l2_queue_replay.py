@@ -45,6 +45,19 @@ def test_snapshot_and_delta_are_absolute_level_updates_and_zero_deletes():
 
 
 
+
+def test_missing_orderbook_update_id_fails_closed():
+    b = OrderBook()
+    try:
+        b.apply({"type": "snapshot", "cts": 1000, "data": {
+            "seq": 1, "b": [["100", "5"]], "a": [["101", "5"]],
+        }})
+    except ValueError as exc:
+        assert "update ID" in str(exc)
+    else:
+        raise AssertionError("missing Bybit update ID must fail closed")
+
+
 def test_u1_restart_snapshot_resets_book_and_allows_new_sequence_epoch():
     b = book()
     b.apply({"type": "delta", "cts": 1100, "data": {

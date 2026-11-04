@@ -1017,7 +1017,7 @@ def test_orderbook_archive_rejects_duplicate_json_keys():
         with zipfile.ZipFile(archive, "w") as zf:
             zf.writestr("events.data", raw + chr(10))
         try:
-            list(iter_book_events(archive))
+            list(l2_module.iter_book_events(archive))
         except ValueError as exc:
             assert "duplicate JSON object key: u" in str(exc)
         else:

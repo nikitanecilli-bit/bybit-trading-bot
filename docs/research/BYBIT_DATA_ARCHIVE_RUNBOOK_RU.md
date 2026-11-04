@@ -101,6 +101,7 @@ Workflow публикует два артефакта: итоговый `h1_shar
 - Если расписание Bybit funding требует settlement точно в end_exclusive_ms, Mark Price архив включает одну дополнительную свечу с timestamp end_exclusive_ms. Она нужна только как точный Mark-open proxy для funding settlement на close boundary; торговый OHLCV ряд остаётся end-exclusive.
 - Coverage validator допускает только этот один дополнительный terminal Mark timestamp. Отсутствующая mark-свеча, extra timestamp в середине ряда или extra mark за пределами одной H1-свечи не допускаются.
 - Для terminal settlement Mark candle должен быть закрытым на момент архивации. Если граничная Mark-свеча ещё не закрылась, collector завершится ошибкой; не снижать это требование и не подменять её Last Price.
+- Если дополнительная terminal Mark-свеча недоступна/ещё не закрыта, collector удаляет частичные per-symbol CSV/manifest/schedule outputs; content-addressed instrument snapshots сохраняются и могут быть безопасно переиспользованы при повторе в том же output root.
 
 ## 10. Train-only top-5 selector v2 — одинаковая выборка кандидатов (2026-11-03)
 

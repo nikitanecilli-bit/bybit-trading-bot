@@ -931,6 +931,18 @@ def geometric_monthly_return_pct(net_pnl, starting_capital, start_ts, end_ts,
     }
 
 
+def resolve_market_state_skew_budget(environ=None):
+    """Read an explicit instrument/risk snapshot skew budget; never invent a default."""
+    env = os.environ if environ is None else environ
+    raw = env.get("BYBIT_MAX_MARKET_STATE_SKEW_MS")
+    if raw is None or not str(raw).strip():
+        return None
+    value = str(raw).strip()
+    if not value.isdecimal():
+        raise SystemExit("BYBIT_MAX_MARKET_STATE_SKEW_MS must be a non-negative integer")
+    return int(value)
+
+
 def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, end_frac,
                           min_vol, min_breakout_atr, cost_multiplier,
                           instrument_specs_dir, risk_tiers_dir,
@@ -960,6 +972,7 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
         risk_tiers_dir=risk_tiers_dir,
         funding_dir=funding_dir,
         mark_price_dir=mark_price_dir,
+        max_market_state_skew_ms=resolve_market_state_skew_budget(),
     )
     cfg = engine.cfg
     cfg.bot_version = (

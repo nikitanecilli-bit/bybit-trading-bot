@@ -134,3 +134,14 @@
 - Previous empty-archive correction remains: source `067109a14312c39ebd95ecf2eaede8d19375426c`; regression `54f30eeb095fb01998bf9d03b69c4ff2a1b40687`. CI for it is also unverified.
 - No PnL, archive downloads/collectors, API/account access, runner registration, paper/live orders, or main changes.
 - Next: inspect report serialization and public-trade CSV boundary cases; avoid duplicating existing chronology, duplicate-ID, flag, same-ms, and archive-tail checks. Retrieve actual CI job results before calling either new regression passed.
+
+
+## Session update — 2026-11-04 (complete post-arrival L2 validation)
+
+- Further static audit found that `capture_book_at()` previously validated chronology/`seq` beyond arrival but did not validate the full order-book payload there. Added a validation-only book seeded from the pre-arrival snapshot; future/same-ms events are validated without altering the returned pre-arrival state.
+- Regression covers a non-integer post-arrival update ID and a crossed post-arrival book.
+- Commits: `b79d827d7c6feadb7f4bf9f306fede7b5bd53f25` (source), `57f5263c7bbd5f123e19cd2be2f23c2a31765446` (test).
+- This follows the empty-stream TypeError correction: `067109a14312c39ebd95ecf2eaede8d19375426c` (source), `54f30eeb095fb01998bf9d03b69c4ff2a1b40687` (test).
+- The changed files were re-fetched and both corrections are present. The available commit-associated workflow lookup returned no runs for the latest test commit; both changes remain CI-unverified. Do not call tests passed.
+- No PnL, archive downloads/collectors, Bybit API/account access, runner registration, paper/live orders, or main-branch changes.
+- Next safe action: retrieve actual CI results if an Actions run becomes available. Until then, avoid stacking further queue-replay changes on top of unverified edits; continue only independent read-only review.

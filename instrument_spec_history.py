@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +17,12 @@ def _utc_ms(value: str) -> int:
         raise ValueError(f"invalid snapshot fetched_at timestamp: {value!r}") from exc
     if parsed.tzinfo is None:
         raise ValueError("snapshot fetched_at must include timezone")
-    return int(parsed.timestamp() * 1000)
+    if parsed.microsecond % 1000:
+        raise ValueError("snapshot fetched_at must have millisecond precision")
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    delta = parsed.astimezone(timezone.utc) - epoch
+    return ((delta.days * 86_400 + delta.seconds) * 1000
+            + delta.microseconds // 1000)
 
 
 @dataclass(frozen=True)
@@ -94,7 +99,8 @@ class InstrumentSpecHistory:
     def get_spec(self, symbol: str, as_of_ts: int, *,
                  max_age_ms: int | None = None,
                  require_trading: bool = True) -> InstrumentSpec:
-        as_of_ts = int(as_of_ts)
+        if isinstance(as_of_ts, bool) or not isinstance(as_of_ts, int):
+            raise ValueError("as_of_ts must be an integer millisecond timestamp")
         eligible = [snapshot for snapshot in self.snapshots
                     if snapshot.fetched_at_ms <= as_of_ts]
         if not eligible:

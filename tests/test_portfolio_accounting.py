@@ -724,18 +724,15 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
         mm_deduction = Decimal("500")
 
     class TierHistory:
-        def calculate_margin_requirements(self, symbol, as_of_ts, position_value, *, leverage, max_age_ms):
-            assert symbol == "BTCUSDT"
-            assert position_value <= Decimal("500000")
-            assert leverage == Decimal("5")
-            return type("Margin", (), {
-                "tier_id": 2, "risk_limit_value": Decimal("500000"),
-                "maintenance_margin_rate": Decimal("0.01"),
-                "mm_deduction": Decimal("500"), "leverage": leverage,
-                "max_leverage": Decimal("50"),
-                "initial_margin": position_value / leverage,
-                "maintenance_margin": position_value * Decimal("0.01") - Decimal("500"),
-            })()
+        def calculate_margin_requirements(self, *args, **kwargs):
+            raise AssertionError("joined entry path must not re-query risk history independently")
+
+    class JoinedTier:
+        tier_id = 2
+        risk_limit_value = Decimal("500000")
+        maintenance_margin_rate = Decimal("0.01")
+        mm_deduction = Decimal("500")
+        max_leverage = Decimal("50")
 
     e = make_engine()
     e.instrument_spec_history = InstrumentHistory()
@@ -752,7 +749,7 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
     e._prepare_pending_entry_risk_budgets()
     with patch.object(
         engine_mod, "get_linear_market_state",
-        return_value=SimpleNamespace(instrument_spec=spec, risk_tiers=()),
+        return_value=SimpleNamespace(instrument_spec=spec, risk_tiers=(JoinedTier(),)),
     ) as joined:
         assert e._try_fill_pending("BTCUSDT", bar)
     joined.assert_called_once()

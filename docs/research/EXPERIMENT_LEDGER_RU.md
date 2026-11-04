@@ -1202,7 +1202,14 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Static code comparison found that the standalone orderbook inspector accepted a delta before the first full snapshot and duplicate price levels within the same side of a snapshot/delta, while the primary OrderBook replay rejects both conditions.
 - Added fail-closed checks for delta-before-initial-snapshot and duplicate bid/ask price entries per event; added regression tests for the early delta and duplicate prices in both snapshot and delta.
 - Commit: 63458f9108e9de65c4b167d387d8d01cc3c8a607.
-- CI status: latest successful Research CI #41881215008 is on earlier commit af4ad6f. Run #41883538553 on b54e5cb was in progress and does not include this commit. Full suite and new tests are pending/unverified.
+- CI: first run #41883853144 on `63458f9` failed only in the new delta-before-snapshot test because the shared test event fixture lacked the inspector-required `ts` field; production inspector code compiled and the preceding L2 primitive suite passed. Added `ts` to the shared fixture in `2255e0f`. Research CI #41884060187 on `2255e0f` completed SUCCESS, job `tests` SUCCESS, 57/57 workflow steps; logs confirm aggregate-L2 82/82, runner/inspector 17/17, and PASS for both new ENG-EXEC-027 regressions. The fixture-only correction also validated ENG-EXEC-027 changes.
 - Protocol distinction: standard depth-specific Bybit orderbook WS and orderbook.full have different documented synchronization rules. Standard stream docs describe snapshot/delta, u=1 restart snapshots, and repeated same-u L1 snapshots; full-orderbook is delta-only and explicitly requires REST snapshot synchronization plus u+1 continuity. The current ob200 archive is treated as snapshot/delta depth archive; do not impose full-orderbook continuity rules without source-format evidence.
 - No archive download, PnL/backtest, collector, API, runner, paper/live order or main change. This is diagnostic integrity hardening only.
+## ENG-EXEC-028 — Match trade inspector aggressor-side parsing to replay (2026-11-04)
+
+- Static comparison found that the standalone trade inspector stripped surrounding whitespace from the CSV aggressor-side field before validation, while the primary replay accepts only exact `Buy` or `Sell` tokens. Thus a malformed row such as `" Buy "` could be reported as valid by the inspector but rejected by replay.
+- Added `validate_trade_side()` with exact-token validation and used it in the inspector; added regression coverage for canonical values and whitespace/case/type variants.
+- Code/test commit: `af667d267766f0491eb5c57b407f52d5cf46dab5`; shared L2 event fixture correction commit: `2255e0f67892d81e4575ae4ddbddc0747f676f1a`.
+- Research CI #41884060187 on `2255e0f` completed SUCCESS, 57/57 workflow steps; actual logs confirm `PASS test_trade_sample_inspector_matches_replay_exact_side_validation` and runner/inspector suite 17/17.
+- Diagnostic schema consistency only; no trade archive was downloaded, no PnL/backtest or strategy behavior changed, no API/runner/live action and no main change.
 

@@ -29,3 +29,13 @@
 ## Границы
 
 Изменение влияет только на parsing/validation входной спецификации. Торговая логика, sizing arithmetic, комиссии и исторические результаты не изменялись. Никакие Bybit API, collectors, archive downloads, market/PnL replay, private API или orders не запускались. `main` не изменён. Реальные исторические Bybit snapshots по-прежнему отсутствуют; исправление не открывает data/execution/PnL gates.
+
+
+## Дополнительная проверка символа
+
+Смежное поле `symbol` также ранее проходило через `str(...)`, поэтому числовое/boolean значение могло превращаться в строковый псевдо-символ. Исправлено в отдельном code/test commit [2c00abd](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/2c00abd10803030e6e4cc1536339afdbad544d05): теперь требуется явное непустое строковое поле symbol; отсутствующие, пустые, числовые и boolean значения отклоняются.
+
+- Research CI [#41892392949](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41892392949): SUCCESS; job `tests` SUCCESS.
+- Фактический лог `tests/test_bybit_instrument_specs.py`: **15/15 passed**, включая новые regressions для category и symbol.
+- Остальные затронутые CI steps (compile, snapshot collector, as-of history, exchange sizing integration) завершились SUCCESS.
+- Никакие внешние API, collectors или market data downloads не запускались этой задачей; CI выполнял только уже определённые repo checks.

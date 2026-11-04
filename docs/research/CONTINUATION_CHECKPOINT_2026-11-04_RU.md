@@ -1382,7 +1382,7 @@ Runner уже консервативно исключает same-ms book events 
 Архивы/API, тесты, replay, PnL/backtests, collectors, private API, runner и orders не запускались. `main` не изменён; PR #4 не слит.
 
 
-## 48. Normalized public-trade timestamps must be positive
+## 48. ENG-EXEC-041 — normalized public-trade timestamps must be positive
 
 Static audit of `apply_public_trade()` found that the primitive enforced integer timestamp type but not positivity. This differed from the archive timestamp parser and allowed zero/negative normalized timestamps to be silently ignored as pre-arrival records.
 

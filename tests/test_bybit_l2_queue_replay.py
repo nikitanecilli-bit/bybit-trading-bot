@@ -328,7 +328,7 @@ def test_missing_orderbook_update_id_fails_closed():
             "seq": 1, "b": [["100", "5"]], "a": [["101", "5"]],
         }})
     except ValueError as exc:
-        assert "update ID" in str(exc)
+        assert "u must be an integer" in str(exc)
     else:
         raise AssertionError("missing Bybit update ID must fail closed")
 

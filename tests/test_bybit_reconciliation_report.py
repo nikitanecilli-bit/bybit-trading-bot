@@ -70,6 +70,54 @@ def snapshot(position_rows=None, order_rows=None, execution_rows=None):
     }
 
 
+def upgrade_to_schema2(data):
+    data = copy.deepcopy(data)
+    data["schema_version"] = 2
+    endpoint_map = {
+        "positions": ("/v5/position/list", 200),
+        "active_orders": ("/v5/order/realtime", 50),
+        "order_history": ("/v5/order/history", 50),
+        "executions": ("/v5/execution/list", 100),
+    }
+    for field, (endpoint, limit) in endpoint_map.items():
+        groups = {}
+        for page in data["raw"][field]:
+            key = (page.get("interval_start_ms"), page.get("interval_end_ms"))
+            groups.setdefault(key, []).append(page)
+        for pages in groups.values():
+            for index, page in enumerate(pages):
+                params = {"category": "linear", "settleCoin": "USDT", "limit": limit}
+                if "interval_start_ms" in page:
+                    params.update({"startTime": page["interval_start_ms"],
+                                   "endTime": page["interval_end_ms"]})
+                if page["requested_cursor"]:
+                    params["cursor"] = page["requested_cursor"]
+                response = page["response"]
+                next_cursor = response["result"].get("nextPageCursor", "")
+                canonical = lambda value: json.dumps(
+                    value, ensure_ascii=False, sort_keys=True,
+                    separators=(",", ":"), allow_nan=False,
+                ).encode("utf-8")
+                page["page_provenance"] = {
+                    "endpoint": endpoint, "page_index": index,
+                    "request_started_at_ms": 1000 + index * 10,
+                    "request_completed_at_ms": 1005 + index * 10,
+                    "query_params": params,
+                    "query_params_sha256": hashlib.sha256(canonical(params)).hexdigest(),
+                    "requested_cursor_sha256": hashlib.sha256(page["requested_cursor"].encode()).hexdigest(),
+                    "next_cursor_sha256": hashlib.sha256(next_cursor.encode()).hexdigest(),
+                    "response_canonical_sha256": hashlib.sha256(canonical(response)).hexdigest(),
+                    "ret_code": response["retCode"],
+                    "row_count": len(response["result"]["list"]),
+                    "has_next_page": bool(next_cursor),
+                }
+    data["raw_sha256"] = hashlib.sha256(json.dumps(
+        data["raw"], ensure_ascii=False, sort_keys=True,
+        separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")).hexdigest()
+    return data
+
+
 def backup(positions=None, pending=None):
     return {
         "saved_at_utc": SAVED,
@@ -82,6 +130,29 @@ def backup(positions=None, pending=None):
 
 
 class ReportOnlyComparatorTests(unittest.TestCase):
+    def test_schema2_verifies_page_response_hash_and_query_provenance(self):
+        data = upgrade_to_schema2(snapshot())
+        report = build_report(backup(), data)
+        self.assertEqual(report["status"], "BLOCKED_UNSUPPORTED_LOCAL_MODEL")
+        tampered = copy.deepcopy(data)
+        tampered["raw"]["executions"][0]["page_provenance"]["response_canonical_sha256"] = "0" * 64
+        tampered["raw_sha256"] = hashlib.sha256(json.dumps(
+            tampered["raw"], ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"), allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        with self.assertRaisesRegex(ReportError, "response_canonical_sha256 mismatch"):
+            build_report(backup(), tampered)
+
+    def test_schema2_rejects_provenance_query_cursor_mismatch(self):
+        data = upgrade_to_schema2(snapshot())
+        data["raw"]["executions"][0]["page_provenance"]["query_params"]["cursor"] = "forged"
+        data["raw_sha256"] = hashlib.sha256(json.dumps(
+            data["raw"], ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"), allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        with self.assertRaisesRegex(ReportError, "query params mismatch cursor"):
+            build_report(backup(), data)
+
     def test_empty_exchange_state_still_blocks_resume_without_execution_ledger(self):
         report = build_report(backup(), snapshot())
         self.assertEqual(report["status"], "BLOCKED_UNSUPPORTED_LOCAL_MODEL")

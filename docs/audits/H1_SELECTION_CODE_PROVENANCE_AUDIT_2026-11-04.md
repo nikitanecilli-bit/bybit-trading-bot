@@ -91,6 +91,13 @@ Correction:
 
 This closes the identified static local-import omission. Dynamic imports, runtime-loaded plugins, external package versions, interpreter/environment differences and workflow-level behavior are separate provenance dimensions and are not claimed to be covered by Python import closure alone. No market PnL was run.
 
+Verification:
+- Research CI [#41813741606](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41813741606) completed **SUCCESS**, 58/58 workflow steps.
+- Both new dependency-closure regressions explicitly passed in `tests/test_h1_runner_execution_gate.py`.
+- The H1 runner execution-gate suite and H1 validation-manifest suite also completed successfully.
+- No market PnL, Bybit archive collection, private API request, paper order or live order was run.
+
+
 
 ## H1 replay variant-isolation and execution audit — 2026-11-04
 

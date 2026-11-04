@@ -52,6 +52,15 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
         self.assertEqual(str(before.tick_size), "0.1")
         self.assertEqual(str(after.tick_size), "0.01")
 
+    def test_as_of_inside_collection_window_uses_previous_completed_snapshot(self):
+        payload = json.loads((self.root / "b.json").read_text())
+        payload["collection_started_at"] = "2026-11-01T23:59:59.000Z"
+        (self.root / "b.json").write_text(json.dumps(payload), encoding="utf-8")
+        history = InstrumentSpecHistory.from_directory(self.root)
+        # The newer snapshot was not complete at this as-of instant.
+        spec = history.get_spec("BTCUSDT", 1_793_577_599_500)
+        self.assertEqual(str(spec.tick_size), "0.1")
+
     def test_uses_envelope_category_when_bybit_rows_omit_category(self):
         for filename in ("a.json", "b.json"):
             payload = json.loads((self.root / filename).read_text())

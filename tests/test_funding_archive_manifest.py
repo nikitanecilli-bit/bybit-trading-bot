@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from funding_archive_manifest import (
     attach_funding_settlement_schedule, record_funding_collection,
-    validate_funding_manifest, sha256_file,
+    validate_funding_manifest, validate_archive_funding_manifests, sha256_file,
 )
 
 
@@ -353,6 +353,104 @@ class FundingArchiveManifestTests(unittest.TestCase):
             required_start_ms=3_600_000, required_end_ms=7_200_000,
         )
         self.assertIn("query_window_not_fully_covered", report["errors"])
+
+
+    def test_archive_level_validator_uses_each_symbols_lifecycle_clipped_range(self):
+        archive_root = self.root / "archive"
+        funding_dir = archive_root / "funding"
+        snapshot_dir = archive_root / "instrument_snapshots"
+        funding_dir.mkdir(parents=True)
+        snapshot_dir.mkdir(parents=True)
+
+        csv_path = funding_dir / "BTCUSDT.csv"
+        csv_path.write_text(
+            "symbol,funding_timestamp_ms,funding_rate\\n"
+            "BTCUSDT,3600000,0.001\\n",
+            encoding="utf-8",
+        )
+        manifest_path = csv_path.with_suffix(csv_path.suffix + ".audit.json")
+        record_funding_collection(
+            csv_path, manifest_path, symbol="BTCUSDT", category="linear",
+            api_base="https://api.bybit.com",
+            requested_start_ms=3_600_000, requested_end_ms=7_199_999,
+            pages=[{
+                "request_start_ms": 3_600_000,
+                "request_end_ms": 7_199_999,
+                "response_rows": 1,
+                "first_ts": 3_600_000,
+                "last_ts": 3_600_000,
+                "complete": True,
+                "saturated": False,
+                "out_of_window_rows": 0,
+            }],
+            collected_at_ms=7_200_001,
+        )
+        snapshots = []
+        for timestamp in (3_600_000, 7_200_000):
+            path = snapshot_dir / f"{timestamp}.json"
+            fetched_at = datetime.fromtimestamp(
+                timestamp / 1000, tz=timezone.utc
+            ).isoformat().replace("+00:00", "Z")
+            path.write_text(json.dumps({
+                "schema_version": 1,
+                "source": "Bybit V5 GET /v5/market/instruments-info",
+                "category": "linear",
+                "fetched_at": fetched_at,
+                "count": 1,
+                "instruments": [{
+                    "symbol": "BTCUSDT",
+                    "fundingInterval": "60",
+                }],
+            }), encoding="utf-8")
+            snapshots.append(path)
+        attach_funding_settlement_schedule(
+            csv_path, manifest_path, symbol="BTCUSDT", category="linear",
+            required_start_ms=3_600_000, required_end_ms=7_199_999,
+            snapshot_paths=snapshots, snapshot_copy_dir=snapshot_dir,
+        )
+        (archive_root / "archive_manifest.json").write_text(json.dumps({
+            "category": "linear",
+            "interval": "60",
+            "results": [{
+                "symbol": "BTCUSDT",
+                "requested_start_ms": 3_600_000,
+                "requested_end_exclusive_ms": 10_800_000,
+                "start_ms": 3_600_000,
+                "end_exclusive_ms": 7_200_000,
+                "lifecycle_clipped": True,
+            }],
+        }), encoding="utf-8")
+
+        report = validate_archive_funding_manifests(
+            archive_root, ["BTCUSDT"],
+            requested_start_ms=3_600_000,
+            requested_end_exclusive_ms=10_800_000,
+        )
+        self.assertTrue(report["ok"], report)
+        self.assertTrue(report["results"][0]["settlement_schedule_verified"])
+
+    def test_archive_level_validator_rejects_mismatched_requested_range(self):
+        archive_root = self.root / "archive"
+        archive_root.mkdir()
+        (archive_root / "archive_manifest.json").write_text(json.dumps({
+            "category": "linear",
+            "interval": "60",
+            "results": [{
+                "symbol": "BTCUSDT",
+                "requested_start_ms": 3_600_000,
+                "requested_end_exclusive_ms": 7_200_000,
+                "start_ms": 3_600_000,
+                "end_exclusive_ms": 7_200_000,
+                "lifecycle_clipped": False,
+            }],
+        }), encoding="utf-8")
+        report = validate_archive_funding_manifests(
+            archive_root, ["BTCUSDT"],
+            requested_start_ms=3_600_000,
+            requested_end_exclusive_ms=10_800_000,
+        )
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["results"][0]["status"], "invalid_symbol_archive_range")
 
     def test_validator_accepts_complete_descending_saturated_page_chain(self):
         start_ms = 0

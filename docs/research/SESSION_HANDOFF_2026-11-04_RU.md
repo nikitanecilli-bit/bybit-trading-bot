@@ -170,3 +170,14 @@
 - Current code/test HEAD before this documentation update: `a9443b1c9ee81d63ab80150ffe3650af78aff560`. PR #4 remains Draft/open; no merge/rebase/retarget.
 - No market PnL, archive downloads/collectors, Bybit private/account API, runner registration, paper/live orders, or main-branch changes.
 - Next safe task: read-only audit of historical instrument-spec and fee provenance artifacts already present in the branch; do not substitute current specs/fees for missing dated evidence.
+
+
+## Session update — 2026-11-04 (dated exchange-spec and fee provenance audit)
+
+- Read-only repository inventory confirms `data/archives/` contains only `cryptofetch/`; `data/archives/bybit/`, `data/instrument_specs/`, and `data/risk_tiers/` do not exist (GitHub Contents API returned 404 for each absent path). No new archive was downloaded.
+- The code supports strict as-of loading of dated Bybit instrument and risk-tier snapshots, but there are no committed snapshot artifacts to instantiate those histories. Do not substitute current specs or fabricate historical values.
+- The L2 runner explicitly marks order-spec validation as `not_performed_no_verified_historical_snapshot` and fee accounting as `not_calculated_requires_account_fee_tier_per_fill`. Existing engine fee constants (maker 0.020%, taker 0.055%, taker slippage 0.0225% per leg) are model assumptions, not dated account-specific fee evidence. No account/API access was used.
+- Read-only audit of `docs/audits/EXECUTION_REALISM_READINESS_RU.md` confirms maker spread/queue/partial-fill latency and account-specific fee evidence remain missing; maker execution realism stays BLOCKED_FOR_STRATEGY_PNL.
+- PR #4 verified open + Draft. Its current head at the time of this check was `0f021573f4057bd046db2123c1dc0d0341a4c933` (documentation update), base merge-base `ae599a2f3279e15fe27360662f94f0e7ef8db5be`; do not merge/rebase/retarget.
+- No code change was justified by the artifact inventory. No market PnL, archive download/collector, private API/account access, runner registration, paper/live order, or main-branch change.
+- Next: preserve the blocker and continue only read-only provenance/code review until approved data becomes available; do not rerun known collectors or PnL.

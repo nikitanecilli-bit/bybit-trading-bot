@@ -2043,5 +2043,34 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertEqual(restored.exchange_execution_coverage, position.exchange_execution_coverage)
 
 
+    def test_plan_b_lock_rejects_symlink_without_touching_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            backup = Path(tmp) / "state.json"
+            target = Path(tmp) / "outside.lock"
+            target.write_text("do-not-touch", encoding="utf-8")
+            lock_path = Path(str(backup) + ".lock")
+            lock_path.symlink_to(target)
+            persistence = engine.PlanBStatePersistence(str(backup), enabled=True)
+            with self.assertRaises(OSError):
+                with persistence._exclusive_backup_lock():
+                    self.fail("symlink lock must not be followed")
+            self.assertEqual(target.read_text(encoding="utf-8"), "do-not-touch")
+
+    def test_plan_b_reconciliation_rejects_symlink_backup_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "real-state.json"
+            target.write_text(json.dumps({"sentinel": "unchanged"}), encoding="utf-8")
+            backup = Path(tmp) / "state.json"
+            backup.symlink_to(target)
+            persistence = engine.PlanBStatePersistence(str(backup), enabled=True)
+            with self.assertRaisesRegex(RuntimeError, "regular non-symlink"):
+                persistence.inspect_reconciliation_persistence(
+                    expected_backup_sha256="0" * 64,
+                    candidate_sha256="1" * 64,
+                )
+            self.assertTrue(backup.is_symlink())
+            self.assertEqual(json.loads(target.read_text(encoding="utf-8")), {"sentinel": "unchanged"})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

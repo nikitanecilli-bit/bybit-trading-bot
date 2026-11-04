@@ -139,9 +139,26 @@ def fetch_all_instruments(
         raise RuntimeError("Bybit returned an empty instrument universe")
     return [by_symbol[symbol] for symbol in sorted(by_symbol)]
 
+def _snapshot_timestamp(value: str | None) -> str:
+    if value is None:
+        parsed = datetime.now(timezone.utc)
+    else:
+        if not isinstance(value, str):
+            raise ValueError("snapshot fetched_at must be an ISO-8601 string")
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("snapshot fetched_at must be a valid ISO-8601 timestamp") from exc
+        if parsed.tzinfo is None:
+            raise ValueError("snapshot fetched_at must include timezone")
+        if parsed.microsecond % 1000:
+            raise ValueError("snapshot fetched_at must have millisecond precision")
+    return parsed.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
 def build_snapshot(rows: list[dict[str, Any]], category: str,
                    fetched_at: str | None = None) -> dict[str, Any]:
-    timestamp = fetched_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    timestamp = _snapshot_timestamp(fetched_at)
     symbols = [str(row.get("symbol") or "").strip().upper() for row in rows]
     if not rows or any(not symbol for symbol in symbols):
         raise ValueError("snapshot requires non-empty rows with symbols")

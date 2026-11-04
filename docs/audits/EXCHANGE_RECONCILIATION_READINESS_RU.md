@@ -209,3 +209,28 @@ Research CI [#41912294316](https://github.com/nikitanecilli-bit/bybit-trading-bo
 Tests: `tests/test_exchange_execution_identity.py` — 8 deterministic offline tests. CI status будет указан после завершения соответствующего workflow.
 
 Никаких API calls, credentials, collectors, live orders, archive downloads или PnL tests не запускалось. Live resume и strategy/execution/PnL gates остаются BLOCKED.
+
+
+## ENG-RECON-009 — persistence exchange identity + fill ledger
+
+Дата: 2026-11-05  
+Статус: локальный storage contract implemented; real execution integration отсутствует.
+
+### Изменения
+
+- `OpenPositionState` получил optional `exchange_position_identity`, `exchange_orders`, `exchange_executions`.
+- `set_exchange_position_identity()` проверяет соответствие symbol и side локальной позиции.
+- `record_exchange_order()` дедуплицирует точные повторы и допускает lifecycle updates существующего orderId (например, New -> PartiallyFilled) только если immutable identity fields не изменились: orderLinkId, symbol, side, positionIdx, original qty, reduceOnly и closeOnTrigger.
+- `record_exchange_execution()` идемпотентен по execId: точный повтор игнорируется, конфликтующая запись с тем же execId отклоняется.
+- При сериализации/восстановлении nested records проходят строгую типовую проверку. Повторные execId, несовпадающие symbol/side и неизвестные поля приводят к fail-closed ошибке.
+- Старые backup без трёх новых ключей продолжают восстанавливаться с пустыми order/execution collections и отсутствующей position identity.
+
+### Проверки
+
+Добавлены тесты round-trip через Plan B backup, order lifecycle update, exact duplicate fill idempotency, conflicting execId rejection, immutable order identity и legacy backup compatibility. Research CI run #41913042156 — результат будет добавлен после завершения.
+
+### Граница
+
+Методы вызываются только явно кодом/тестами. Текущий движок по-прежнему симулятор и не имеет реального Bybit order placement/fill handler. Он не генерирует exchange IDs сам и не синтезирует execId из локальных сделок. Поэтому существующие позиции без записанных exchange identity остаются не сверенными; наличие этих полей не означает reconciliation PASS.
+
+Ни API calls, credentials, collectors, live orders, archive downloads или market PnL tests не выполнялись. Live resume и strategy/execution/PnL gates остаются BLOCKED.

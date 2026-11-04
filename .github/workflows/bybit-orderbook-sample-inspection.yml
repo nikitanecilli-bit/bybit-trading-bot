@@ -6,6 +6,7 @@ on:
     branches: [research/market-regime-v1-main]
     paths:
       - 'scripts/inspect_bybit_orderbook_sample.py'
+      - 'scripts/inspect_bybit_trade_sample.py'
       - '.github/workflows/bybit-orderbook-sample-inspection.yml'
 
 permissions:
@@ -20,10 +21,14 @@ jobs:
         uses: actions/checkout@v4
       - name: Download and inspect one AAVEUSDT L2 archive
         run: python scripts/inspect_bybit_orderbook_sample.py
-      - name: Upload compact inspection report
+      - name: Download and inspect matching public trades archive
+        run: python scripts/inspect_bybit_trade_sample.py
+      - name: Upload compact inspection reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bybit-orderbook-sample-inspection
-          path: bybit_orderbook_sample_inspection.json
+          name: bybit-orderbook-and-trades-sample-inspection
+          path: |
+            bybit_orderbook_sample_inspection.json
+            bybit_trade_sample_inspection.json
           if-no-files-found: warn

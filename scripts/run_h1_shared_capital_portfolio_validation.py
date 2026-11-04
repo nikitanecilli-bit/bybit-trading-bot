@@ -1057,15 +1057,24 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
                 else 1.0 + ENTRY_OFFSET_BPS / 10000.0
             )
             spec_history = getattr(engine, "instrument_spec_history", None)
-            if spec_history is None:
-                raise RuntimeError("multi-bar Bybit limit wait requires dated instrument specs")
-            spec = spec_history.get_spec(
-                sym, int(candle.ts),
-                max_age_ms=getattr(
+            tier_history = getattr(engine, "risk_tier_history", None)
+            if spec_history is None or tier_history is None:
+                raise RuntimeError(
+                    "multi-bar Bybit limit wait requires dated instrument and risk-tier histories"
+                )
+            market_state = em.get_linear_market_state(
+                spec_history, tier_history, sym, int(candle.ts),
+                max_snapshot_skew_ms=getattr(engine, "max_market_state_skew_ms", None),
+                max_instrument_age_ms=getattr(
                     engine, "max_instrument_spec_age_ms",
                     30 * 24 * 60 * 60 * 1000,
                 ),
+                max_risk_tier_age_ms=getattr(
+                    engine, "max_risk_tier_age_ms",
+                    30 * 24 * 60 * 60 * 1000,
+                ),
             )
+            spec = market_state.instrument_spec
             sig["entry_price"] = round_limit_quote_to_bybit_tick(
                 spec, raw_limit_price, str(sig.get("direction", "long"))
             )

@@ -1505,3 +1505,14 @@ No market PnL, new archive download/collector, private API, runner registration,
 - Realized TP1 PnL enters portfolio realized equity but is not transferred automatically to remaining isolated position margin. Manual extra margin and auto-add margin are not tracked as a persisted lifecycle.
 - No code/formula changes made: the safe fix requires an explicit wallet/available-balance and account-mode ledger, not a guessed shortcut.
 - Detailed result recorded in accounting audit section 9. Data/strategy/account-level liquidation readiness remains BLOCKED. No PnL replay, market data fetch, exchange API, paper/live action or parameter sweep performed.
+
+
+## 2026-11-05 — wallet-ledger design boundary
+
+- Follow-up design formalized as a separate deterministic model, not an engine integration. The current position-level liquidation helper cannot infer available-balance funding routing from position state alone.
+- Proposed state is explicitly limited to one isolated USDT position: available balance, allocated position margin and open/closed lifecycle. Cross and Portfolio modes must be rejected, not approximated.
+- Every signed cashflow (positive receipt, negative payment) requires an injected allocation into available balance and position margin; the two allocations must conserve the exact cashflow. Missing routing policy must fail closed. No default policy is safe to invent.
+- Synthetic contract cases: funding payment covered by available balance; payment split across buckets as a policy test only; funding receipt into available balance; TP1 realized PnL to wallet without implicit margin transfer; manual margin add/remove as explicit internal transfers; close releases allocated margin exactly once, with realized close PnL accounted separately.
+- This design does not claim the split-payment policy or TP1 wallet destination as Bybit exchange behavior. Account-mode-specific funding priority, insufficient-balance handling, partial-close PnL destination, manual/auto-add margin lifecycle and liquidation release still require authoritative evidence.
+- Attempted to add a standalone implementation and tests, but the repository write operation was blocked by the connected GitHub security layer; no code file or test was committed. No code CI was run. No engine formulas or trading logic changed.
+- Next safe step is to validate the exchange semantics against authoritative account-mode documentation before permitting a routing adapter. Until then the existing position-level approximation and all account/liquidation/data/strategy/paper/live readiness gates remain BLOCKED.

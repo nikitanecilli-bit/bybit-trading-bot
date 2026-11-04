@@ -136,3 +136,24 @@
 - обновлять acceptance/readiness документы, не повышая статусы без реальных источников и доказательств.
 
 Не запускать Bybit API, collectors, архивы, PnL replay, paper/live, parameter sweeps или self-hosted runner. Не менять `main`, не сливать PR #4/#13.
+
+
+## 7. Follow-up integration audit — explicit snapshot-skew budget (P1, fixed)
+
+Static caller tracing found a real integration defect after the contract review:
+
+- `bybit_market_state.get_linear_market_state()` requires `max_snapshot_skew_ms` to be a non-negative integer and rejects `None`.
+- `UnifiedQuantEngine` defaults `max_market_state_skew_ms=None`; the strict H1 runner passes the value returned by `resolve_market_state_skew_budget()`.
+- Before this fix, the resolver returned `None` when `BYBIT_MAX_MARKET_STATE_SKEW_MS` was absent, and the H1 workflow did not pass that environment variable. Consequently, the strict joined instrument/risk path rejected entries (the `ValueError` was caught as a fail-closed entry rejection); restored positions could fail during market-state revalidation.
+- A portfolio accounting test asserted the mocked join received `None`, unintentionally pinning the unusable default rather than exercising the real helper contract.
+
+Correction:
+- `resolve_market_state_skew_budget()` now fails immediately with a clear error if the environment variable is missing/blank; it still accepts explicit zero and positive integer milliseconds and rejects non-integers/negative values.
+- H1 workflow_dispatch now requires `max_market_state_skew_ms` and passes it to `BYBIT_MAX_MARKET_STATE_SKEW_MS`.
+- The runner regression now asserts missing/blank values fail before replay.
+
+Verification:
+- Research CI [#41928296140](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928296140) completed SUCCESS on commit `6dffae15ac9d7525b329273b0de66a8a124c550b`.
+- Compile and deterministic test suite passed; H1 runner execution-gate tests and portfolio accounting/risk-budget tests passed. No market PnL runner was dispatched.
+
+Scope: this fixes a configuration/integration failure, not the historical snapshot effective-time limitation. No default skew was invented; the operator must choose and supply an explicit budget. Data and strategy readiness remain BLOCKED.

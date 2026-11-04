@@ -86,6 +86,7 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
     first_events, last_events = [], []
     max_bid_levels = max_ask_levels = 0
     first_snapshot = None
+    book_bids, book_asks = {}, {}
     rows = 0
 
     with zf.open(member, "r") as stream:
@@ -131,19 +132,33 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
                 raise ValueError(f"delta received before initial snapshot at row {rows + 1}")
             if update_id == 1 and kind != "snapshot":
                 raise ValueError(f"u=1 restart marker requires snapshot at row {rows + 1}")
+            if not isinstance(bids, list) or not isinstance(asks, list):
+                expected = "full bid/ask arrays" if kind == "snapshot" else "bid/ask change arrays"
+                raise ValueError(f"{kind} missing {expected} at row {rows + 1}")
+
+            next_bids = {} if kind == "snapshot" else dict(book_bids)
+            next_asks = {} if kind == "snapshot" else dict(book_asks)
+            for side, levels, candidate in (
+                ("bid", bids, next_bids), ("ask", asks, next_asks),
+            ):
+                seen_prices = set()
+                for level in levels:
+                    validate_level(level)
+                    price, qty = Decimal(str(level[0])), Decimal(str(level[1]))
+                    if price in seen_prices:
+                        raise ValueError(
+                            f"duplicate {side} price level in {kind} at row {rows + 1}"
+                        )
+                    seen_prices.add(price)
+                    if qty == 0:
+                        candidate.pop(price, None)
+                    else:
+                        candidate[price] = qty
+            if next_bids and next_asks and max(next_bids) >= min(next_asks):
+                raise ValueError(f"crossed reconstructed order book at row {rows + 1}")
+            book_bids, book_asks = next_bids, next_asks
+
             if kind == "snapshot":
-                if not isinstance(bids, list) or not isinstance(asks, list):
-                    raise ValueError(f"snapshot missing full bid/ask arrays at row {rows + 1}")
-                for side, levels in (("bid", bids), ("ask", asks)):
-                    seen_prices = set()
-                    for level in levels:
-                        validate_level(level)
-                        price = Decimal(str(level[0]))
-                        if price in seen_prices:
-                            raise ValueError(
-                                f"duplicate {side} price level in snapshot at row {rows + 1}"
-                            )
-                        seen_prices.add(price)
                 max_bid_levels = max(max_bid_levels, len(bids))
                 max_ask_levels = max(max_ask_levels, len(asks))
                 if first_snapshot is None:
@@ -153,19 +168,6 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
                         "best_bid": bids[0] if bids else None,
                         "best_ask": asks[0] if asks else None,
                     }
-            else:
-                if not isinstance(bids, list) or not isinstance(asks, list):
-                    raise ValueError(f"delta missing bid/ask change arrays at row {rows + 1}")
-                for side, levels in (("bid", bids), ("ask", asks)):
-                    seen_prices = set()
-                    for level in levels:
-                        validate_level(level)
-                        price = Decimal(str(level[0]))
-                        if price in seen_prices:
-                            raise ValueError(
-                                f"duplicate {side} price level in delta at row {rows + 1}"
-                            )
-                        seen_prices.add(price)
 
             item = {"type": kind, "ts": ts, "seq": seq, "u": update_id}
             if len(first_events) < 5:

@@ -182,6 +182,37 @@ def test_orderbook_inspector_rejects_u1_restart_marker_on_delta():
                 raise AssertionError("u=1 delta must be rejected by the inspector")
 
 
+def test_orderbook_inspector_rejects_crossed_snapshot_and_delta_books():
+    cases = [
+        (
+            [dict(event("snapshot", 1_000, 1, 1, "5"), data={
+                "s": "AAVEUSDT", "seq": 1, "u": 1,
+                "b": [["100", "5"]], "a": [["100", "5"]],
+            })],
+        ),
+        (
+            [
+                event("snapshot", 1_000, 1, 1, "5"),
+                dict(event("delta", 1_100, 2, 2, "6"), data={
+                    "s": "AAVEUSDT", "seq": 2, "u": 2,
+                    "b": [], "a": [["100", "5"]],
+                }),
+            ],
+        ),
+    ]
+    for (events,) in cases:
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / "crossed_book.zip"
+            write_book_archive(archive, events)
+            with zipfile.ZipFile(archive) as zf:
+                try:
+                    book_inspector.inspect_member(zf, "events.data")
+                except ValueError as exc:
+                    assert "crossed reconstructed order book" in str(exc)
+                else:
+                    raise AssertionError("crossed reconstructed order book must be rejected")
+
+
 def test_orderbook_inspector_rejects_duplicate_price_levels_in_snapshot_and_delta():
     cases = [
         (

@@ -1257,6 +1257,43 @@ class PlanBStatePersistence:
                 f"Не удалось сохранить резервное состояние в {self.backup_filepath!r}"
             ) from e
 
+    def inspect_reconciliation_persistence(
+        self, *, expected_backup_sha256: str, candidate_sha256: str,
+    ) -> str:
+        """Classify an interrupted reconciliation commit without rewriting state.
+
+        If the candidate is already present, fsync the parent directory again
+        before reporting it durable. This makes retry after lost acknowledgement
+        idempotent and closes the replace/acknowledgement crash window.
+        """
+        if not self.enabled:
+            raise RuntimeError("Plan B persistence is disabled")
+        for digest in (expected_backup_sha256, candidate_sha256):
+            if (not isinstance(digest, str) or len(digest) != 64
+                    or any(ch not in "0123456789abcdef" for ch in digest)):
+                raise ValueError("reconciliation SHA-256 is invalid")
+        with self._exclusive_backup_lock():
+            if not os.path.isfile(self.backup_filepath):
+                return "BACKUP_MISSING"
+            try:
+                with open(self.backup_filepath, "r", encoding="utf-8") as current_file:
+                    current_payload = json.load(current_file)
+                current_digest = self._canonical_backup_digest(current_payload)
+            except Exception as exc:
+                raise RuntimeError("cannot inspect reconciliation state: backup is unreadable") from exc
+            if current_digest == expected_backup_sha256:
+                return "BASE_UNCHANGED"
+            if current_digest != candidate_sha256:
+                return "CONFLICTING_STATE"
+
+            parent_dir = os.path.dirname(os.path.abspath(self.backup_filepath)) or "."
+            dir_fd = os.open(parent_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+            return "CANDIDATE_INSTALLED_DURABLE"
+
     def save_reconciliation_candidate(
         self, candidate: Dict[str, Any], *, expected_backup_sha256: str,
         risk_mgr: AdaptiveRiskManager,

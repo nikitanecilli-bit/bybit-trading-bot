@@ -159,6 +159,7 @@ def test_confirm_mode_requires_one_frozen_predeclared_config_and_selection_manif
             "H1_VALIDATION_MODE": "confirm",
             "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
             "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10",
+            "H1_FROZEN_STRATEGY_MODE": "d20_baseline",
         })
         design = resolve_validation_design(env)
     assert [fold[0] for fold in design["folds"]] == [3]
@@ -167,6 +168,40 @@ def test_confirm_mode_requires_one_frozen_predeclared_config_and_selection_manif
     assert design["cost_multipliers"] == [1.0, 1.5, 2.0]
     assert design["frozen_config"]["symbols"] == ["BNBUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
     assert design["frozen_config"]["selection_manifest_sha256"] == design["selection"]["sha256"]
+    assert design["frozen_config"]["strategy_mode"] == "d20_baseline"
+    assert design["frozen_config"]["strategy_modes"] == [
+        {"donchian_period": 20, "ema50_200_gate": False}
+    ]
+
+
+def test_confirm_mode_requires_matching_frozen_strategy_arm_set():
+    with tempfile.TemporaryDirectory() as tmp:
+        env = _selection_env(tmp)
+        env.update({
+            "H1_VALIDATION_MODE": "confirm",
+            "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
+            "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10",
+            "H1_DONCHIAN48_EMA_ABLATION": "1",
+            "H1_FROZEN_STRATEGY_MODE": "d20_d48_d48_ema",
+        })
+        design = resolve_validation_design(env)
+    assert design["frozen_config"]["strategy_mode"] == "d20_d48_d48_ema"
+    assert design["strategy_modes"] == ((20, False), (48, False), (48, True))
+    with tempfile.TemporaryDirectory() as tmp:
+        env = _selection_env(tmp)
+        env.update({
+            "H1_VALIDATION_MODE": "confirm",
+            "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
+            "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10",
+            "H1_DONCHIAN48_EMA_ABLATION": "1",
+            "H1_FROZEN_STRATEGY_MODE": "d20_baseline",
+        })
+        try:
+            resolve_validation_design(env)
+        except SystemExit as exc:
+            assert "does not match selected arm set" in str(exc)
+        else:
+            raise AssertionError("confirm mode must reject a mismatched strategy arm set")
 
 
 def test_selection_manifest_and_allowlist_must_match_exactly():
@@ -755,6 +790,7 @@ if __name__ == "__main__":
     for test in (
         test_explore_mode_uses_only_frozen_train_selected_top_five,
         test_confirm_mode_requires_one_frozen_predeclared_config_and_selection_manifest,
+        test_confirm_mode_requires_matching_frozen_strategy_arm_set,
         test_selection_manifest_and_allowlist_must_match_exactly,
         test_selection_manifest_direction_must_match_long_only_runner,
         test_selection_manifest_must_be_valid_and_successful,

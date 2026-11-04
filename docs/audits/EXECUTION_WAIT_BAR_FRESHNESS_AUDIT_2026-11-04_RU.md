@@ -28,15 +28,29 @@ Research CI: [#41807975436 — SUCCESS](https://github.com/nikitanecilli-bit/byb
 ## Регрессионная защита и CI
 
 - Добавлен тест последовательных попыток на нескольких свечах: guard меняется, `signal_origin_ts` остаётся неизменным.
-- В Research CI добавлена компиляция всех шести исправленных runners.
+- В Research CI добавлена компиляция всех исправленных runners.
 - В CI path filters добавлены эти файлы, чтобы их изменения запускали проверку.
-- Commit `adf057b`: compile step включает все семь исправленных runners; multi-bar lifecycle tests и полный Research CI завершились SUCCESS.
+- Commit `f1bc3ff`: compile step включает все 13 исправленных runners; multi-bar lifecycle tests и полный Research CI запущен для этого commit.
 
 ## Влияние на прежние результаты
 
-Любые результаты с `wait_bars > 1`, полученные шестью перечисленными runners до исправления, нельзя трактовать как честное сравнение TTL: фактическое ожидание могло завершаться на первой свече из-за stale guard. Это относится к механике эксперимента, а не доказывает, что PnL был завышен или занижен.
+Любые результаты с `wait_bars > 1`, полученные перечисленными runners до исправления, нельзя трактовать как честное сравнение TTL, если соответствующий запуск действительно использовал limit mode: фактическое ожидание могло завершаться на первой свече из-за stale guard. Это относится к механике эксперимента, а не доказывает, что PnL был завышен или занижен.
 
 В `run_h1_limit_fill_stress.py` дополнительно устранена отдельная ошибка: старая ветка не распознавала marketable open gap и применяла только intrabar penetration. Теперь используется общий классификатор с ценой открытия. В этом аудите старые результаты не пересчитывались, рыночный PnL replay не запускался. Перед повторным использованием нужно проверить наличие исторических workflow artifacts и перезапустить только действительно нужные эксперименты на корректной механике.
+
+## Дополнительные runners с реальным multi-bar limit path (2026-11-04)
+
+После расширения аудита исправлены ещё четыре runner:
+- `scripts/run_e09_h1_gate_factorial.py` — реально перебирает `market` и `limit`, поэтому limit-ветка E09 была затронута;
+- `scripts/run_e10_h1_body_gate_replication.py` — текущий main запускает только market mode; limit-ветка исправлена на будущее;
+- `scripts/run_h1_signal_quality_ablation.py` — фиксированное 3-bar limit ожидание, исправлены как fill-, так и no-touch вызовы движка;
+- `scripts/run_h1_signal_trade_diagnostics.py` — 3-bar limit execution для диагностики сделок.
+
+В E09/E10 и H1 diagnostics временной guard обновляется непосредственно перед каждой попыткой вызова движка. В signal-quality runner обновление выполняется также перед искусственным no-touch вызовом, чтобы движок корректно потреблял текущую свечу и не удалял сигнал как stale.
+
+Дополнительно E11/E13 optional limit paths исправлены ранее. Их исторические workflow #41361376448 и #41362217727 были market-only, поэтому их архивный PnL не затронут.
+
+Добавлен end-to-end regression `test_engine_accepts_limit_fill_on_third_wait_bar_and_preserves_origin_signal_ts`: два no-touch бара, fill на третьем, original signal timestamp сохранён. Все исправленные runners добавлены в compile step и CI path filters.
 
 ## Ограничения, не устранённые этим исправлением
 

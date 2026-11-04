@@ -464,3 +464,10 @@
 - This is a limited mechanical sanity model, not evidence of maker fill realism. It can miss price-through fills, but cancellation allocation is unknown; blindly crediting better-price prints could also overstate fills.
 - No code/test changes. Require synchronized L2/trade replay and confirmed timestamp/side semantics before changing fills. Note: `ENG_EXEC_037_PRICE_THROUGH_PASSIVE_REPLAY_BOUNDARY_RU.md`.
 - No tests, archives, network workflows, PnL, API, runner or orders. Maker gate remains closed; `main` unchanged; PR #4 remains Draft/unmerged.
+
+## 2026-11-04 — ENG-EXEC-038 cross-stream ordering boundary
+
+- Reviewed official Bybit docs: orderbook `cts` correlates with public-trade `T`; orderbook and publicTrade expose cross-sequence `seq`; REST recent-trade also returns `seq`.
+- Current historical pipeline uses L2 ZIP and daily public trade CSV.GZ. L2 parser retains `seq`, but trade normalization drops it; independent timestamp monotonicity checks do not establish cross-stream order. Equal-ms events remain ambiguous. Runner already excludes same-ms book events for arrival/markout and declares no same-ms fills.
+- No code change. Keep the conservative policy until trade `seq` availability in historical daily CSV is confirmed. Common ordering would not solve aggregate-L2 queue/cancel allocation.
+- Note: `ENG_EXEC_038_CROSS_STREAM_ORDERING_BOUNDARY_RU.md`. No API requests, archive downloads, tests, replay, PnL, collectors, runner or orders. Maker gate remains closed; `main` unchanged; PR #4 Draft/unmerged.

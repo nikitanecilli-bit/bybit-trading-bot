@@ -400,3 +400,27 @@ CI:
 - повторный run 41836302327: job tests завершился SUCCESS; 56/56 шагов job завершены успешно, включая Test conservative Bybit aggregate-L2 queue replay primitives.
 
 Это подтверждает deterministic parser/queue regression tests, но не доказывает полноту depth-200 архива, реальную maker очередь/L3 priority, delivery latency, cancel behavior, historical fee tier или совместимость BT/RPI конкретного публичного historical CSV. Не запускались новые Bybit archive downloads, strategy PnL, private API, paper/live orders. TRADE_ARCHIVE_FLAGS = UNVERIFIED_COMPATIBILITY и MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаются без изменений.
+
+
+## 20. Запрет queue placement на same-ms/future order-book state
+
+Статический audit показал, что place_passive_order() проверял пассивность цены и брал displayed queue из переданного OrderBook, но сам по себе не проверял timestamp этого состояния относительно arrival_ts. Поэтому прямой вызов primitive мог использовать состояние книги с cts == arrival_ts (неопределённый same-ms порядок) или cts > arrival_ts (будущая информация) и получить некорректную начальную очередь.
+
+Исправлено fail-closed:
+- timestamped order-book state обязателен (last_cts не None);
+- last_cts должен быть строго меньше arrival_ts; same-ms и future book states отклоняются;
+- runner уже строит arrival snapshots только из событий cts < arrival_ts, поэтому его корректные сценарии сохраняются.
+
+Добавлены regression tests для same-ms, future и untimestamped book state. Существующие тесты queue placement приведены к строгому pre-arrival контракту (arrival=1001 при snapshot cts=1000); тесты проверки spec constraints теперь достигают именно соответствующей проверки, а не падают раньше на timestamp guard.
+
+Изменения в research/market-regime-v1-main:
+- source commit: de899eaa18aac3d3d8256ff92f6ceea729e9217b;
+- new regression tests: 3a3e5676ba79d6c47990d63de4c3cc2c88730b3b;
+- test fixture alignment: f8f7b922e176ca5842c899760e3ef7b38a4a2a9a (текущая голова на момент обновления).
+
+CI:
+- source-only run 41836500038 завершился failure на старых тестовых ожиданиях, которые использовали book cts == arrival; это ожидаемое следствие нового строгого контракта и было исправлено в тестах;
+- run 41836504786 также предшествовал test fixture alignment;
+- полный run 41836556302 на commit f8f7b922e176ca5842c899760e3ef7b38a4a2a9a: job tests SUCCESS, 56/56 steps completed successfully; queue replay primitive test step SUCCESS.
+
+Это закрывает конкретную временную утечку на API уровне place_passive_order(), но не решает неизвестную непрерывность depth-200 update stream, отсутствие L3 priority, measured delivery/cancel latency и несовместимость/непроверенность historical BT/RPI CSV. Не запускались новые архивные загрузки, strategy PnL, private API, paper/live orders. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.

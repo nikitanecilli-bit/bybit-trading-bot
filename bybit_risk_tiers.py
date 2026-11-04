@@ -90,6 +90,8 @@ class RiskTierHistory:
                 raise ValueError(f"{path}: cannot read risk-tier snapshot") from exc
             if not isinstance(payload, dict) or payload.get("schema_version") != 1:
                 raise ValueError(f"{path}: unsupported risk-tier schema")
+            if payload.get("source") != "Bybit V5 GET /v5/market/risk-limit":
+                raise ValueError(f"{path}: invalid or missing Bybit risk-limit source")
             if payload.get("category") != category:
                 raise ValueError(f"{path}: expected {category} category")
             fetched_at = str(payload.get("fetched_at") or "")

@@ -1162,6 +1162,7 @@ class PlanBStatePersistence:
         if not self.enabled:
             return
         with self._exclusive_backup_lock():
+            self._assert_regular_backup_path()
             self._save_state_unlocked(
                 cfg, risk_mgr, open_positions, pending, trade_seq, last_mark_prices,
             )
@@ -1390,6 +1391,7 @@ class PlanBStatePersistence:
     def load_state(
         self, risk_mgr: AdaptiveRiskManager, *, log_restore: bool = True,
     ) -> Tuple[Dict[str, "OpenPositionState"], Dict[str, Dict], int]:
+        self._assert_regular_backup_path()
         if not os.path.exists(self.backup_filepath):
             return {}, {}, 0
         try:

@@ -1188,3 +1188,20 @@ Research CI run #41870649976 завершился SUCCESS: job completed, все
 - Не запускать collector и не загружать новые архивы в обход текущего ограничения. Возможный будущий WS capture — только после отдельного решения пользователя; до этого исторический maker replay остаётся заблокированным.
 
 Статус: MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL. Никакие REST/WS запросы к Bybit не выполнялись; проверялась только публичная документация. Main не менялся.
+
+## 65. Trade archive inspector использует общий строгий timestamp parser — 2026-11-04
+
+Статический аудит вспомогательного `scripts/inspect_bybit_trade_sample.py` выявил расхождение с основным queue replay parser: инспектор применял `float(timestamp)` и `round()`, поэтому sub-millisecond timestamp мог быть округлён до миллисекунды и попасть в отчёт как валидный. Основной `bybit_l2_queue_replay.iter_public_trades()` уже использовал Decimal parser с отказом при sub-millisecond precision.
+
+Исправление:
+- Инспектор импортирует и использует общий `parse_trade_timestamp_ms()` из `bybit_l2_queue_replay.py`; отдельная реализация преобразования timestamp удалена.
+- Добавлена регрессия для точного преобразования seconds и milliseconds, а также отказа для sub-millisecond, non-finite и non-positive значений.
+- Итоговая реализация едина для inspector и queue replay; CSV timestamp больше не проходит через binary float/rounding.
+
+CI:
+- Source-only #41872780436 на `96c3b6aecd56d734cc660541ff848ff0ef4cc954`: SUCCESS, все 57 workflow steps.
+- Тестовый run #41872788110 на `63ecbba28e040bc26953a3da611d7144fd52b3b1`: SUCCESS, все 57 workflow steps.
+- После refactor на общий parser промежуточный #41872989853 завершился failure: test по-прежнему обращался к локальному `parse_archive_timestamp_ms`, уже удалённому из inspector. Это был устаревший тестовый интерфейс, а не отказ parser; тест синхронизирован.
+- Финальный Research CI #41873039139 на `ec28763da6ade2635c31cd0111ae8c612625f23d`: SUCCESS, job `tests` SUCCESS, 57/57 workflow steps без failure. Фактический лог подтверждает runner/inspector suite 7/7 и aggregate-L2 primitive suite 81/81.
+
+Классификация: timestamp/provenance integrity для диагностического инструмента; не execution evidence и не PnL. Inspector не запускался с сетевой загрузкой; архивы не скачивались. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся неизменным из-за отсутствия достоверного historical BT flag в доступном AAVE CSV. Нет PnL/backtest, collectors, private API, runner, paper/live orders или изменений `main`.

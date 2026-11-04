@@ -931,3 +931,26 @@ Verification:
 - Actual logs confirm InstrumentSpecHistory **12/12 passed** and RiskTierHistory **17/17 passed**, including the new metadata type regressions.
 
 No Bybit collector/download, market PnL, private API/account access, runner registration, paper/live orders or main-branch changes. PR #4 remains Draft/open. Next: verify final branch/PR/CI state, then continue independent static execution-consumer review.
+
+
+## 46. Risk-tier isLowestRisk metadata must be an integer — 2026-11-04
+
+The risk-tier snapshot collector and history loader rejected booleans but accepted JSON floating-point values 1.0 and 0.0, because Python compares them equal to integers. The Bybit schema field is an integer flag.
+
+Correction:
+- Both collector and history loader now require isLowestRisk to be a non-bool integer exactly 0 or 1.
+- Added offline regression coverage in both collector and history-loader suites.
+
+Commits:
+- history loader source: a14f21c35bfe77674d3a7a3850396a6ecc2d781f;
+- history regression: 3e7047ddc19cff0543ab72fd1b42ce65df72236b;
+- collector source: 57796a8ecca249a482604a7e9b67dfa968cb9ff1;
+- collector regression: 715a7fe71350ff5ffd58b7bb7b1a232e6b7d57c6.
+
+Verification:
+- Research CI #41847652788 on 715a7fe71350ff5ffd58b7bb7b1a232e6b7d57c6: SUCCESS; job tests SUCCESS; all 57 workflow steps completed without failure.
+- Actual logs confirm both new float-flag regressions passed; collector suite 17/17, history suite 18/18.
+
+Read-only execution consumer review also traced optional exchange sizing, dated tier selection, exact contract quantity through partial exits/fees/funding/MTM. Documented limits remain: OHLC/L2 execution proxies, account-level tier aggregation, settlement-mark approximation, static/account-unspecific fees and no dated historical Bybit snapshots.
+
+No Bybit collection/download, PnL/backtest, private API/account access, runner registration, paper/live orders or main-branch changes. Continue static audit only; PnL gate remains closed.

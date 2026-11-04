@@ -1725,6 +1725,45 @@ def test_same_timestamp_close_batch_cannot_trip_kill_switch_by_symbol_order():
     assert win_first["kill_switch"] == loss_first["kill_switch"]
 
 
+
+def _run_finalization_close_order(order):
+    e = make_engine()
+    e.cfg.daily_stop_loss_pct = 99.0
+    e.cfg.emergency_kill_switch_pct = 0.12
+    e.risk_mgr.cfg = e.cfg
+    positions = {
+        "BTCUSDT": make_position(symbol="BTCUSDT", size=1_000.0),
+        "ETHUSDT": make_position(symbol="ETHUSDT", size=1_000.0),
+    }
+    e.open_positions = {symbol: positions[symbol] for symbol in order}
+    e._intrabar_mtm_marks.update({"BTCUSDT": 100.0, "ETHUSDT": 100.0})
+    e._intrabar_mtm_marks_ts = 1_800_003_600_000
+    bar_ts = 1_800_000_000_000
+    marks = {
+        "BTCUSDT": engine_mod.Candle(
+            bar_ts, 100.0, 102.0, 98.0, 99.0, 10.0,
+        ),
+        "ETHUSDT": engine_mod.Candle(
+            bar_ts, 100.0, 102.0, 98.0, 101.0, 10.0,
+        ),
+    }
+    e.finalize_open_positions(marks, exit_reason="end_of_test")
+    return {
+        "ledger": sorted((t.token, t.pnl_usdt, t.exit_reason) for t in e.closed_trades),
+        "realized_equity": round(e.risk_mgr.realized_equity, 4),
+        "current_equity": round(e.risk_mgr.current_equity, 4),
+        "max_drawdown_pct": round(e.risk_mgr.max_drawdown_pct, 6),
+        "kill_switch": e.risk_mgr.kill_switch_triggered,
+    }
+
+
+def test_end_of_test_finalization_is_order_independent_for_simultaneous_positions():
+    win_first = _run_finalization_close_order(["ETHUSDT", "BTCUSDT"])
+    loss_first = _run_finalization_close_order(["BTCUSDT", "ETHUSDT"])
+    assert win_first == loss_first
+    assert win_first["kill_switch"] is False
+
+
 if __name__ == "__main__":
     tests = [(name, value) for name, value in sorted(globals().items())
              if name.startswith("test_") and callable(value)]

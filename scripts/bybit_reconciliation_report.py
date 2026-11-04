@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from exchange_execution_identity import (
     ExchangeExecutionIdentity,
-    ExchangeExecutionIdentityError,
+    ExecutionIdentityError,
     ExchangeOrderIdentity,
     ExchangePositionIdentity,
 )
@@ -403,7 +403,7 @@ def build_execution_merge_plan(local_backup: dict[str, Any], snapshot: dict[str,
                 exec_map[execution.exec_id] = execution
             known_orders[symbol] = order_map
             known_execs[symbol] = exec_map
-        except (ValueError, TypeError, ExchangeExecutionIdentityError) as exc:
+        except (ValueError, TypeError, ExecutionIdentityError) as exc:
             if isinstance(exc, ReportError):
                 raise
             raise ReportError(f"local exchange ledger for {symbol} is invalid: {exc}") from exc

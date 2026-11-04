@@ -355,12 +355,19 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
         if rpi_flag is None:
             raise ValueError("trade archive is missing RPI flag; queue replay cannot safely classify prints")
         for row_no, row in enumerate(reader, 2):
+            if None in row:
+                raise ValueError(f"unexpected extra CSV fields at row {row_no}")
+            required_row_fields = required | {block_flag, rpi_flag}
+            if any(row.get(name) is None for name in required_row_fields):
+                raise ValueError(f"missing CSV field value at row {row_no}")
             if row.get("symbol") != symbol:
                 raise ValueError(f"unexpected trade symbol at CSV row {row_no}")
             timestamp_ms = parse_trade_timestamp_ms(row["timestamp"])
             trade_id = row.get("trdMatchID")
             if not isinstance(trade_id, str) or not trade_id.strip():
                 raise ValueError(f"missing public trade ID at CSV row {row_no}")
+            if trade_id != trade_id.strip():
+                raise ValueError(f"public trade ID has surrounding whitespace at CSV row {row_no}")
             yield {
                 "timestamp_ms": timestamp_ms,
                 "side": row["side"],

@@ -104,7 +104,10 @@ class RiskTierHistory:
                 payload = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
                 raise ValueError(f"{path}: cannot read risk-tier snapshot") from exc
-            if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+            if (not isinstance(payload, dict)
+                    or isinstance(payload.get("schema_version"), bool)
+                    or not isinstance(payload.get("schema_version"), int)
+                    or payload.get("schema_version") != 1):
                 raise ValueError(f"{path}: unsupported risk-tier schema")
             if payload.get("source") != "Bybit V5 GET /v5/market/risk-limit":
                 raise ValueError(f"{path}: invalid or missing Bybit risk-limit source")
@@ -115,7 +118,9 @@ class RiskTierHistory:
             rows = payload.get("tiers")
             if not isinstance(rows, list) or not rows:
                 raise ValueError(f"{path}: tiers must be a non-empty list")
-            if payload.get("tier_count") != len(rows):
+            if (isinstance(payload.get("tier_count"), bool)
+                    or not isinstance(payload.get("tier_count"), int)
+                    or payload.get("tier_count") != len(rows)):
                 raise ValueError(f"{path}: tier_count does not match rows")
             grouped: dict[str, list[RiskTier]] = {}
             seen: set[tuple[str, int]] = set()

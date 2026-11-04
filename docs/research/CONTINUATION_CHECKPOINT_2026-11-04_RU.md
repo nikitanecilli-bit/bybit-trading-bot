@@ -1205,3 +1205,25 @@ CI:
 - Финальный Research CI #41873039139 на `ec28763da6ade2635c31cd0111ae8c612625f23d`: SUCCESS, job `tests` SUCCESS, 57/57 workflow steps без failure. Фактический лог подтверждает runner/inspector suite 7/7 и aggregate-L2 primitive suite 81/81.
 
 Классификация: timestamp/provenance integrity для диагностического инструмента; не execution evidence и не PnL. Inspector не запускался с сетевой загрузкой; архивы не скачивались. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся неизменным из-за отсутствия достоверного historical BT flag в доступном AAVE CSV. Нет PnL/backtest, collectors, private API, runner, paper/live orders или изменений `main`.
+
+
+## 66. Trade archive inspector: fail-closed диагностика trade IDs — 2026-11-04
+
+Статический аудит `scripts/inspect_bybit_trade_sample.py` выявил, что inspector пропускал пустые/отсутствующие `trdMatchID` и ID с окружающими пробелами: счётчики дубликатов/уникальных ID не отражали эти строки. Основной replay parser такие строки отклоняет, поэтому диагностический отчёт должен явно показывать этот дефект данных.
+
+Исправлено:
+- Добавлен `classify_trade_id(value, seen_ids)`: `missing` для None/пустого/whitespace-only; `malformed` для surrounding whitespace; `duplicate` для повторного ID; `unique` для нового корректного ID.
+- Inspector теперь считает `missing_trade_id_count`, `malformed_trade_id_count`, `duplicate_trade_id_count`; сообщает `has_trade_id_column` и `trade_id_validation_status`.
+- Статус `valid` выставляется только если колонка существует и все три проблемных счётчика равны нулю.
+- Регрессия покрывает отсутствующее значение, пустую строку, whitespace-only, ID с окружающими пробелами, корректный уникальный ID и повтор.
+
+Коммиты:
+- Source: `bd2c0f9bc9fe2ad64044a4b9fe672ceb148950b3`.
+- Test: `6dcb9d8bc000778c09975dbd462c36545e23682c`.
+
+Проверка:
+- Source-only CI #41873380445: SUCCESS.
+- Final Research CI #41873425668 на test commit `6dcb9d8`: SUCCESS, job `tests` SUCCESS, 57/57 workflow steps.
+- Фактический лог: runner/inspector suite 9/9; aggregate-L2 primitive suite 81/81; portfolio accounting 54/54; state persistence 84/84. Новый test `test_trade_sample_inspector_classifies_missing_malformed_and_duplicate_ids` явно отмечен PASS.
+
+Классификация: улучшение качества диагностики historical CSV; не доказательство maker execution, fill rate или PnL. Inspector с сетевой загрузкой не запускался; новые архивы не скачивались. Исторический AAVE CSV по-прежнему не имеет BT/isBlockTrade, поэтому `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`. Никаких PnL/backtests, collectors, API, runner, paper/live orders или main changes.

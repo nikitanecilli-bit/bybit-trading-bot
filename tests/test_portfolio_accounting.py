@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 import json
 import tempfile
+from types import SimpleNamespace
+from unittest.mock import patch
 
 ENGINE_PATH = Path(__file__).resolve().parent.parent / "Bybit_Trading_Engine_v14_research.py"
 spec = importlib.util.spec_from_file_location("research_engine_accounting", ENGINE_PATH)
@@ -748,7 +750,13 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
         low=99.0, close=100.5, volume=10.0,
     )
     e._prepare_pending_entry_risk_budgets()
-    assert e._try_fill_pending("BTCUSDT", bar)
+    with patch.object(
+        engine_mod, "get_linear_market_state",
+        return_value=SimpleNamespace(instrument_spec=spec, risk_tiers=()),
+    ) as joined:
+        assert e._try_fill_pending("BTCUSDT", bar)
+    joined.assert_called_once()
+    assert joined.call_args.kwargs["max_snapshot_skew_ms"] is None
     position = e.open_positions["BTCUSDT"]
     assert position.risk_tier_id == 2
     assert position.risk_limit_value == "500000"

@@ -8,6 +8,10 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from decimal import Decimal
+from unittest.mock import patch
+
+import scripts.run_bybit_l2_queue_replay as runner
 from scripts.run_bybit_l2_queue_replay import (
     HOUR_MS, capture_book_states_at, capture_scenarios,
 )
@@ -121,6 +125,39 @@ def test_markout_capture_rejects_out_of_order_archive_after_last_target():
             assert "non-monotonic matching-engine timestamp" in str(exc)
         else:
             raise AssertionError("out-of-order tail must invalidate markout archive")
+
+
+def test_post_fill_markout_separates_spread_capture_from_mid_price_move():
+    results = [{
+        "fills": [{
+            "timestamp_ms": 2_000,
+            "side": "Buy",
+            "price": "99",
+            "quantity": "1",
+        }],
+    }]
+    states = {
+        2_000: {
+            "book_cts": 1_000,
+            "bids": {Decimal("99"): Decimal("5")},
+            "asks": {Decimal("101"): Decimal("5")},
+        },
+        3_000: {
+            "book_cts": 2_500,
+            "bids": {Decimal("100"): Decimal("5")},
+            "asks": {Decimal("102"): Decimal("5")},
+        },
+    }
+    with patch.object(runner, "capture_book_states_at", return_value=states):
+        runner.add_post_fill_markouts(Path("unused.zip"), results)
+
+    fill = results[0]["fills"][0]
+    markout = next(x for x in fill["post_fill_markout"] if x["horizon_ms"] == 1_000)
+    assert fill["pre_fill_book_state"]["mid_price"] == "100"
+    assert markout["signed_fill_to_future_mid_bps"] == str(Decimal("202.0202020202020202020202020"))
+    assert markout["signed_mid_move_from_pre_fill_bps"] == "100"
+    assert markout["pre_fill_mid_price"] == "100"
+
 
 if __name__ == "__main__":
     test_names = sorted(

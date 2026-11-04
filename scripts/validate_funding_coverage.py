@@ -123,7 +123,26 @@ def validate_coverage(
         mark_ts = _read_marks(mark_path)
         trade_ts = _read_trade_klines(trade_path) if trade_path is not None else None
         missing = sorted(funding_ts - mark_ts)
-        trade_mark_mismatch = sorted((trade_ts ^ mark_ts)) if trade_ts is not None else []
+        trade_mark_missing = set()
+        unexpected_extra_marks = set()
+        terminal_boundary_marks = set()
+        if trade_ts is not None:
+            trade_mark_missing = trade_ts - mark_ts
+            extra_marks = mark_ts - trade_ts
+            ordered_trade_ts = sorted(trade_ts)
+            if len(ordered_trade_ts) >= 2:
+                steps = {
+                    right - left
+                    for left, right in zip(ordered_trade_ts, ordered_trade_ts[1:])
+                }
+                if len(steps) == 1:
+                    terminal_boundary = ordered_trade_ts[-1] + next(iter(steps))
+                    terminal_boundary_marks = extra_marks & {terminal_boundary}
+            # One extra Mark candle is permitted only at the exact close
+            # boundary after the final trade H1 candle. It supplies the
+            # settlement mark at that instant without extending trade OHLCV.
+            unexpected_extra_marks = extra_marks - terminal_boundary_marks
+        trade_mark_mismatch = sorted(trade_mark_missing | unexpected_extra_marks)
         row = {
             "symbol": symbol,
             "funding_events": len(funding_ts),
@@ -132,6 +151,7 @@ def validate_coverage(
             "missing_events": len(missing),
             "trade_candles": len(trade_ts) if trade_ts is not None else None,
             "trade_mark_timestamp_mismatch": len(trade_mark_mismatch),
+            "terminal_boundary_mark_candles": len(terminal_boundary_marks),
             "first_funding_ts": min(funding_ts) if funding_ts else None,
             "last_funding_ts": max(funding_ts) if funding_ts else None,
             "status": "ok" if funding_ts and not missing and not trade_mark_mismatch else "incomplete",

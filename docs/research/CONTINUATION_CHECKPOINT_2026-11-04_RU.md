@@ -1372,3 +1372,11 @@ Runner уже консервативно исключает same-ms book events 
 Наш parser отбрасывает trade `seq`, даже если колонка присутствует. Тестовые CSV fixtures без `seq` синтетические; реального проверенного raw header в repo нет. Код не менялся. Считать cross-stream `seq` в historical CSV недоступным/неподтверждённым, сохранить no-same-ms-fill. Для закрытия вопроса нужен provenance-labelled sample или отдельное одобренное получение данных. Note: `ENG_EXEC_039_HISTORICAL_TRADE_CSV_SEQ_AVAILABILITY_RU.md`.
 
 Статический аудит и публичная документация; архивы/API/collectors, тесты, replay, PnL, runner и orders не запускались. Maker gate закрыт; `main` не изменён; PR #4 не слит.
+
+## 42. L2/public trade double-count audit (ENG-EXEC-040)
+
+Текущая модель не списывает очередь дважды через L2 delta и public trade: начальная очередь берётся из pre-arrival L2 snapshot; после arrival L2 reductions не уменьшают queue-ahead; это делают только подходящие public trades. Duplicate trade IDs отклоняются, повторный replay того же архива идемпотентен.
+
+Это не доказывает точность fills: отсутствует cross-stream event identity/sequence reconciliation, а aggregate L2 не позволяет разделить executions и cancellations. Не добавлять L2 reduction consumption без reconciliation — возможен двойной учёт тех же execution, уже присутствующих в trades. Код не менялся; single-source public-trade consumption сохраняется. Maker realism заблокирован. Note: `ENG_EXEC_040_L2_TRADE_VOLUME_DOUBLE_COUNT_AUDIT_RU.md`.
+
+Архивы/API, тесты, replay, PnL/backtests, collectors, private API, runner и orders не запускались. `main` не изменён; PR #4 не слит.

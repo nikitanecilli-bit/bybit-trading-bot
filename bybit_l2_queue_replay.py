@@ -57,10 +57,11 @@ class OrderBook:
         # ordering signal; do not infer that its ordering epoch also reset.
         if self.last_seq is not None and seq < self.last_seq:
             raise ValueError("non-monotonic cross sequence")
-        if kind == "snapshot":
-            self.bids.clear()
-            self.asks.clear()
-        for key, book_side in (("b", self.bids), ("a", self.asks)):
+        # Build and validate the candidate state before mutating the live book.
+        # A malformed delta/snapshot must not leave a partially applied book.
+        next_bids = {} if kind == "snapshot" else dict(self.bids)
+        next_asks = {} if kind == "snapshot" else dict(self.asks)
+        for key, book_side in (("b", next_bids), ("a", next_asks)):
             levels = data.get(key)
             if not isinstance(levels, list):
                 raise ValueError(f"missing {key} levels")
@@ -74,9 +75,10 @@ class OrderBook:
                     book_side.pop(price, None)
                 else:
                     book_side[price] = qty
-        self.last_cts, self.last_seq, self.last_u = cts, seq, update_id
-        if self.bids and self.asks and max(self.bids) >= min(self.asks):
+        if next_bids and next_asks and max(next_bids) >= min(next_asks):
             raise ValueError("crossed reconstructed order book")
+        self.bids, self.asks = next_bids, next_asks
+        self.last_cts, self.last_seq, self.last_u = cts, seq, update_id
 
     def best_bid(self) -> tuple[Decimal, Decimal]:
         if not self.bids:

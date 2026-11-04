@@ -48,6 +48,17 @@ def block_trade_flag_columns(fields: list[str]) -> list[str]:
     """Return supported Bybit block-trade flag columns in stable order."""
     return [name for name in ("isBlockTrade", "BT") if name in fields]
 
+def classify_trade_id(value: object, seen_ids: set[str]) -> str:
+    """Classify a CSV trade ID using the queue replay strict identity rules."""
+    if not isinstance(value, str) or not value.strip():
+        return "missing"
+    if value != value.strip():
+        return "malformed"
+    if value in seen_ids:
+        return "duplicate"
+    seen_ids.add(value)
+    return "unique"
+
 
 def main() -> int:
     report = {
@@ -68,7 +79,7 @@ def main() -> int:
 
         side_counts = Counter()
         ts_min = ts_max = previous_ts = None
-        nonmonotonic = duplicate_ids = rows = 0
+        nonmonotonic = duplicate_ids = missing_trade_ids = malformed_trade_ids = rows = 0
         before_book = after_book = within_book = 0
         rpi_counts = Counter()
         seen_ids = set()
@@ -107,11 +118,13 @@ def main() -> int:
                 rpi_value = row.get("RPI", row.get("isRPITrade"))
                 if rpi_value is not None:
                     rpi_counts[str(rpi_value)] += 1
-                trade_id = row.get("trdMatchID")
-                if trade_id:
-                    if trade_id in seen_ids:
-                        duplicate_ids += 1
-                    seen_ids.add(trade_id)
+                trade_id_status = classify_trade_id(row.get("trdMatchID"), seen_ids)
+                if trade_id_status == "duplicate":
+                    duplicate_ids += 1
+                elif trade_id_status == "missing":
+                    missing_trade_ids += 1
+                elif trade_id_status == "malformed":
+                    malformed_trade_ids += 1
                 side_counts[side] += 1
                 total_size += qty
                 total_notional += qty * price
@@ -126,6 +139,14 @@ def main() -> int:
             "duration_hours": round((ts_max - ts_min) / 3_600_000, 4),
             "nonmonotonic_timestamp_count": nonmonotonic,
             "duplicate_trade_id_count": duplicate_ids,
+            "missing_trade_id_count": missing_trade_ids,
+            "malformed_trade_id_count": malformed_trade_ids,
+            "has_trade_id_column": "trdMatchID" in fields,
+            "trade_id_validation_status": (
+                "valid" if "trdMatchID" in fields and not (
+                    duplicate_ids or missing_trade_ids or malformed_trade_ids
+                ) else "invalid_or_incomplete"
+            ),
             "unique_trade_ids": len(seen_ids),
             "aggressor_side_counts": dict(side_counts),
             "total_contract_size": str(total_size),

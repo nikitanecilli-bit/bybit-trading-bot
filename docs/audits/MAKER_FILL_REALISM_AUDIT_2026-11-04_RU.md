@@ -198,7 +198,7 @@ This remains an aggregate L2 lower-bound approximation, not L3 queue reconstruct
 
 Added an isolated prototype, deliberately not wired into the strategy engine:
 - `bybit_l2_queue_replay.py` — snapshot/delta reconstruction, passive order placement, queue-ahead initialization, opposing-aggressor trade consumption, partial fills and expiry.
-- `tests/test_bybit_l2_queue_replay.py` — 12 deterministic tests.
+- `tests/test_bybit_l2_queue_replay.py` — 14 deterministic tests.
 - `scripts/run_bybit_l2_queue_replay.py` — bounded one-day AAVEUSDT probe using the matched L2 and public-trade archives.
 
 Confirmed semantics:
@@ -211,7 +211,7 @@ Confirmed semantics:
 - marketable orders are rejected from this maker-only model;
 - partial fills are supported and order replay stops after full fill or expiry.
 
-The 12/12 synthetic tests passed. Research CI passed on both runs `#41812211150` and `#41812277499`.
+The 14/14 synthetic tests passed. Research CI passed on both runs `#41812211150` and `#41812277499`.
 
 ### 6.2 Four deterministic hypothetical orders on the real sample
 
@@ -231,7 +231,21 @@ The runner replayed four independent, non-overlapping hypothetical orders:
 
 All four book snapshots were only 2–98 ms old at their scheduled arrival. No RPI trade was encountered in these four replay windows.
 
-Full run: [GitHub Actions #41812277478](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41812277478). Artifact `bybit-orderbook-and-trades-sample-inspection` contains the raw compact JSON reports, including the queue-replay output. Archive SHA-256 hashes match section 5.2/5.3.
+Full run: [GitHub Actions #41812777222](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41812777222). Artifact `bybit-orderbook-and-trades-sample-inspection` contains the raw compact JSON reports, including the queue-replay output. Archive SHA-256 hashes match section 5.2/5.3.
+
+### 6.3 First-fill adverse-selection markout probe
+
+The runner now captures the reconstructed L2 midpoint 1s, 5s, 30s and 60s after each order's first fill. Signed markout is positive when the midpoint moves in the maker's favor and negative when it moves against the maker. It is measured from the first fill price, not volume-weighted across subsequent partial fills.
+
+| Horizon after first fill | Mean signed markout | Negative scenarios |
+|---|---:|---:|
+| 1 second | -2.73 bps | 3/4 |
+| 5 seconds | -0.58 bps | 2/4 |
+| 30 seconds | +3.11 bps | 2/4 |
+| 60 seconds | +4.09 bps | 0/4 |
+
+This tiny four-order probe shows a potentially adverse immediate post-fill move, followed by positive average markout at 30–60 seconds. It is not statistically meaningful and cannot establish a stable adverse-selection premium. The result is enough to justify measuring markout in the next prototype stage; it is not enough to tune latency, order placement or exit rules.
+
 
 **Interpretation limit:** these four hand-scheduled BBO orders are a mechanics smoke test, not a statistically meaningful fill-rate estimate, not strategy-signal replay, not evidence of maker profitability, and not a comparison against market execution. They demonstrate that the parser reconstructs a usable book and that trade prints can consume the modeled queue and produce partial/full fills under the stated assumptions.
 

@@ -1348,3 +1348,11 @@ Source `86a0590f`, `68ee303e`; tests `8311daa4`, `82852d6f`. Research CI run `41
 Статический аудит выявил, что L2 inspector может завершить сканирование с `status: success`, одновременно указав `missing_cts_count > 0`; replay требует `cts` для каждого события. Также inspector не вводит archive-wide monotonicity rule для `u`, тогда как replay `OrderBook.apply()` отклоняет non-reset regressions `u`. Это различие не следует считать автоматически дефектом: ENG-EXEC-031 намеренно не закрепляет неподтверждённую универсальную семантику `u`.
 
 Код не менялся. Не трактовать scan success как replay readiness; не ослаблять replay и не ужесточать inspector без подтверждения формата архива. Следующий шаг — определить explicit L2 replay compatibility dimensions после проверки источника/контракта. Note: `ENG_EXEC_036_L2_INSPECTOR_REPLAY_COMPATIBILITY_RU.md`. Архивы/network workflow/PnL/API/runner/orders не запускались; maker gate закрыт.
+
+## 39. Price-through trades and passive replay boundary (ENG-EXEC-037)
+
+Текущий aggregate-L2 replay уменьшает очередь и создаёт fill только по opposing-aggressor trade с ценой, строго равной лимиту. Prints по более выгодной цене игнорируются. Постановка заявки фиксирует начальную очередь; последующие L2 deletions, проход цены через лимит и повторное появление уровня не меняют состояние заявки. Существующие тесты явно закрепляют эти ограничения.
+
+Это ограниченная механическая модель, а не maker execution evidence. Возможен недосчёт price-through исполнений, но объём отмен впереди/позади заявки неизвестен; автоматически засчитывать better-price prints было бы необоснованно. Код/тесты не менялись. Нужна синхронная реконструкция L2+trades с подтверждённой семантикой порядка событий и fail-closed обработкой неоднозначностей. Note: `ENG_EXEC_037_PRICE_THROUGH_PASSIVE_REPLAY_BOUNDARY_RU.md`.
+
+Только статический аудит. Тесты, архивы, queue replay, PnL/backtests, collectors/network workflows, API, runner и orders не запускались. Maker gate закрыт; `main` не изменён; PR #4 не слит.

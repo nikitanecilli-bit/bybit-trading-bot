@@ -1139,6 +1139,27 @@ class PlanBStatePersistence:
                     )
                 if not math.isclose(fraction, expected_remaining, rel_tol=0.0, abs_tol=1e-9):
                     raise ValueError(f"позиция {sym}: tp1_hit и remaining_fraction противоречат друг другу")
+                if tp1_hit:
+                    if pos_dict.get("exchange_sized", False):
+                        tp1_qty_for_pnl = parsed_qty["tp1_contract_qty"]
+                        expected_tp1_gross = round(
+                            float(tp1_qty_for_pnl * abs(Decimal(str(tp1)) - Decimal(str(entry)))),
+                            4,
+                        )
+                    else:
+                        closed_fraction = 1.0 - fraction
+                        expected_tp1_gross = round(
+                            pos_dict["size_usdt"] * closed_fraction
+                            * abs(tp1 - entry) / entry,
+                            4,
+                        )
+                    if not math.isclose(
+                        realized_tp1, expected_tp1_gross, rel_tol=0.0, abs_tol=1e-4
+                    ):
+                        raise ValueError(
+                            f"позиция {sym}: realized_tp1_gross_usdt не соответствует "
+                            "TP1 price и закрытому количеству"
+                        )
                 tp1_ts = pos_dict.get("tp1_ts_ms")
                 if tp1_ts is not None:
                     if isinstance(tp1_ts, bool) or not isinstance(tp1_ts, int) or tp1_ts <= 0:

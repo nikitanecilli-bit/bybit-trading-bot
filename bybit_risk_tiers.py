@@ -10,6 +10,8 @@ from typing import Any
 
 
 def _d(value: Any, field: str) -> Decimal:
+    if isinstance(value, bool):
+        raise ValueError(f"invalid {field}")
     try:
         result = Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError) as exc:
@@ -126,14 +128,17 @@ class RiskTierHistory:
                 if key in seen:
                     raise ValueError(f"{path}: duplicate tier {key}")
                 seen.add(key)
+                lowest = row.get("isLowestRisk")
+                if isinstance(lowest, bool) or lowest not in (0, 1):
+                    raise ValueError(f"{path}: isLowestRisk must be integer 0 or 1")
+                deduction_raw = row.get("mmDeduction")
+                if deduction_raw in (None, "") and lowest != 1:
+                    raise ValueError(f"{path}: missing mmDeduction for non-lowest tier {symbol}")
                 risk_limit = _d(row.get("riskLimitValue"), "riskLimitValue")
                 mmr = _d(row.get("maintenanceMargin"), "maintenanceMargin")
                 imr = _d(row.get("initialMargin"), "initialMargin")
                 max_lev = _d(row.get("maxLeverage"), "maxLeverage")
-                deduction = _d(row.get("mmDeduction") or "0", "mmDeduction")
-                lowest = row.get("isLowestRisk")
-                if isinstance(lowest, bool) or lowest not in (0, 1):
-                    raise ValueError(f"{path}: isLowestRisk must be integer 0 or 1")
+                deduction = _d("0" if deduction_raw in (None, "") else deduction_raw, "mmDeduction")
                 if min(risk_limit, mmr, imr, max_lev) <= 0 or deduction < 0:
                     raise ValueError(f"{path}: risk tier values outside valid range")
                 grouped.setdefault(symbol, []).append(RiskTier(

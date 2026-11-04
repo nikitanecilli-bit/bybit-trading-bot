@@ -386,9 +386,12 @@ def test_u1_restart_snapshot_replaces_book_and_preserves_cross_sequence_order():
 
 def test_u1_restart_snapshot_does_not_bypass_cross_sequence_ordering():
     b = book()
+    b.apply({"type": "delta", "cts": 1050, "data": {
+        "u": 2, "seq": 2, "b": [["100", "6"]], "a": [],
+    }})
     try:
         b.apply({"type": "snapshot", "cts": 1100, "data": {
-            "u": 1, "seq": 0, "b": [["98", "4"]], "a": [["99", "6"]],
+            "u": 1, "seq": 1, "b": [["98", "4"]], "a": [["99", "6"]],
         }})
     except ValueError as exc:
         assert "non-monotonic cross sequence" in str(exc)

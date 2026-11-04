@@ -344,15 +344,22 @@ def capture_book_at(
         raise ValueError("arrival_ts must be positive")
     book = OrderBook()
     previous_cts = None
+    previous_seq = None
     for event in iter_book_events(archive, symbol):
         cts = strict_int(event.get("cts"), "cts")
+        seq = strict_int(event["data"].get("seq"), "seq")
         if cts <= 0:
             raise ValueError("cts must be positive")
+        if seq <= 0:
+            raise ValueError("seq must be positive")
         if previous_cts is not None and cts < previous_cts:
             raise ValueError("non-monotonic cts in full order-book archive")
+        if previous_seq is not None and seq < previous_seq:
+            raise ValueError("non-monotonic seq in full order-book archive")
         previous_cts = cts
-        # Keep scanning after arrival to validate archive chronology, but never
-        # apply same-millisecond or future events to the hypothetical book.
+        previous_seq = seq
+        # Keep scanning after arrival to validate archive chronology and cross
+        # sequence ordering, but never apply same-ms/future events to the book.
         if cts >= arrival_ts:
             continue
         book.apply(event)

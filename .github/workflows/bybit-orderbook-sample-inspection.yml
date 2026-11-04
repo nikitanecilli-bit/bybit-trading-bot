@@ -2,15 +2,6 @@ name: Bybit order-book sample integrity inspection
 
 on:
   workflow_dispatch:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - 'scripts/inspect_bybit_orderbook_sample.py'
-      - 'scripts/inspect_bybit_trade_sample.py'
-      - 'bybit_l2_queue_replay.py'
-      - 'scripts/run_bybit_l2_queue_replay.py'
-      - 'tests/test_bybit_l2_queue_replay.py'
-      - '.github/workflows/bybit-orderbook-sample-inspection.yml'
 
 permissions:
   contents: read

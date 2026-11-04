@@ -137,7 +137,8 @@ def validate_coverage(
                 }
                 if len(steps) == 1:
                     terminal_boundary = ordered_trade_ts[-1] + next(iter(steps))
-                    terminal_boundary_marks = extra_marks & {terminal_boundary}
+                    # The terminal Mark candle is justified only by a settlement at that exact boundary.
+                    terminal_boundary_marks = extra_marks & {terminal_boundary} & funding_ts
             # One extra Mark candle is permitted only at the exact close
             # boundary after the final trade H1 candle. It supplies the
             # settlement mark at that instant without extending trade OHLCV.

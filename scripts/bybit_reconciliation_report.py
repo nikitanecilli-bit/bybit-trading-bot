@@ -588,6 +588,15 @@ def persist_execution_merge_plan(
     base_digest = plan.get("base_backup_sha256")
     if not isinstance(base_digest, str):
         raise ReportError("execution merge plan lacks base backup digest")
+    if candidate_digest == base_digest:
+        return {
+            "status": "NO_NEW_EXECUTIONS",
+            "persisted_backup_sha256": base_digest,
+            "inserted": 0,
+            "execution_history_complete": False,
+            "reconciliation_pass": False,
+            "live_resume_allowed": False,
+        }
 
     try:
         observed = persistence.inspect_reconciliation_persistence(

@@ -10,7 +10,7 @@ import gzip
 import json
 import zipfile
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Iterator
 
@@ -18,7 +18,10 @@ ZERO = Decimal("0")
 
 
 def dec(value: object) -> Decimal:
-    result = Decimal(str(value))
+    try:
+        result = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError(f"invalid decimal: {value!r}") from exc
     if not result.is_finite():
         raise ValueError(f"non-finite decimal: {value!r}")
     return result

@@ -132,3 +132,13 @@ CI: run [41901402434](https://github.com/nikitanecilli-bit/bybit-trading-bot/act
 - Research CI [#41902627575](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41902627575): **SUCCESS**, полный job завершился успешно. Проверка `Test as-of Bybit risk-tier history and selection` прошла.
 - Результат подтверждает выбор сохранённого снимка по `fetched_at`, но не покрывает неизвестные изменения risk tiers между снимками. Не выполняется интерполяция и не предполагается, что снимок атомарен на стороне биржи.
 - Только offline tests; API, collectors, архивы, live orders и market PnL tests не запускались.
+
+## ENG-DATA-015 — согласование instrument specs и risk tiers по времени
+
+- Добавлен `bybit_market_state.py` с `get_linear_market_state()`: единая точка получения linear instrument spec и полной risk-tier ladder для одного `as_of_ts`.
+- Компонент выбирает только последние завершённые снимки не позже `as_of_ts`; будущие снимки не используются. Обязателен явный бюджет `max_snapshot_skew_ms`; при превышении разницы между `fetched_at` инструментов и risk tiers функция завершается fail-closed. Опционально задаются независимые пределы давности каждого источника.
+- Возвращаемая структура содержит оба времени наблюдения и `snapshot_skew_ms`, чтобы downstream-код мог сохранять provenance. Для instrument spec сохраняется проверка статуса Trading; для risk tiers возвращается полная лестница.
+- Добавлены 5 offline tests: успешное согласование в пределах skew budget, превышение skew, будущий risk snapshot, stale risk snapshot и валидация skew budget.
+- Research CI [#41903071454](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41903071454): **SUCCESS**, 59/59 шагов.
+- Важное ограничение: `fetched_at` — время завершения клиентского сбора, не общий серверный snapshot token. Даже нулевой skew не доказывает атомарность ответов Bybit или синхронность данных внутри последовательной пагинации. Порог skew должен быть обоснован отдельно; здесь не назначается произвольное production-значение.
+- Только offline CI. Реальные API requests, collectors, archive downloads, live orders и market PnL tests не запускались.

@@ -26,7 +26,7 @@ from scripts.run_h1_shared_capital_portfolio_validation import (
     _directory_file_manifest,
     _file_manifest_record,
     _manifest_path,
-    H1_REPLAY_CODE_PATHS, resolve_h1_replay_code_paths,
+    H1_REPLAY_CODE_PATHS, VOLUME_LOOKBACK_PERIOD, resolve_h1_replay_code_paths,
     load_bybit_h1_datasets,
     resolve_bybit_kline_dir,
     resolve_execution_snapshot_dirs,
@@ -42,6 +42,7 @@ MIN_VOLUME_RATIO = 1.6
 MIN_BREAKOUT_ATR = 0.10
 COST_MULTIPLIER = 2.0
 PROTOCOL = "h1-top5-train-only-v2"
+SELECTION_DONCHIAN_PERIOD = 20
 
 
 def rank_candidates(rows, min_trades=MIN_TRADES):
@@ -301,6 +302,7 @@ def select_train_only(
                 MIN_VOLUME_RATIO, MIN_BREAKOUT_ATR, COST_MULTIPLIER,
                 instrument_specs_dir, risk_tiers_dir,
                 funding_dir, mark_price_dir, kline_dir,
+                donchian_period=SELECTION_DONCHIAN_PERIOD,
             )
             result.update({
                 "symbol": symbol,
@@ -408,6 +410,8 @@ def select_train_only(
         },
         "strategy_config": {
             "direction": "long_only",
+            "donchian_period": SELECTION_DONCHIAN_PERIOD,
+            "volume_lookback_period": VOLUME_LOOKBACK_PERIOD,
             "min_volume_ratio": MIN_VOLUME_RATIO,
             "min_breakout_atr": MIN_BREAKOUT_ATR,
             "cost_multiplier": COST_MULTIPLIER,

@@ -115,6 +115,26 @@ class SnapshotCollectorTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "timezone|millisecond precision"):
                     build_snapshot([{"symbol": "BTCUSDT"}], "linear", value)
 
+    def test_default_snapshot_round_trips_through_as_of_history_loader(self):
+        from instrument_spec_history import InstrumentSpecHistory
+        instrument = {
+            "symbol": "BTCUSDT", "status": "Trading", "category": "linear",
+            "priceFilter": {"minPrice": "0.01", "maxPrice": "1000000", "tickSize": "0.1"},
+            "lotSizeFilter": {
+                "qtyStep": "0.001", "minOrderQty": "0.001", "maxOrderQty": "100",
+                "maxMktOrderQty": "50", "minNotionalValue": "5",
+            },
+            "leverageFilter": {
+                "minLeverage": "1", "maxLeverage": "50", "leverageStep": "0.01",
+            },
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            snapshot = build_snapshot([instrument], "linear")
+            write_snapshot(snapshot, Path(directory) / "snapshot.json")
+            history = InstrumentSpecHistory.from_directory(directory)
+            spec = history.get_spec("BTCUSDT", 1793577601000)
+            self.assertEqual(spec.symbol, "BTCUSDT")
+
     def test_snapshot_timestamp_normalizes_offset_to_utc(self):
         snapshot = build_snapshot(
             [{"symbol": "BTCUSDT"}], "linear", "2026-11-02T03:00:00.123+03:00"

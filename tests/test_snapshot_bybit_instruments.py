@@ -98,11 +98,11 @@ class SnapshotCollectorTests(unittest.TestCase):
         self.assertIsNone(collector._validate_next_cursor(""))
     def test_snapshot_has_provenance_and_exact_timestamp(self):
         snapshot = build_snapshot(
-            [{"symbol": "BTCUSDT"}], "linear", "2026-11-02T00:00:00Z"
+            [{"symbol": "BTCUSDT"}], "linear", "2026-11-02T00:00:00.000Z"
         )
         self.assertEqual(snapshot["schema_version"], 1)
         self.assertEqual(snapshot["count"], 1)
-        self.assertEqual(snapshot["fetched_at"], "2026-11-02T00:00:00Z")
+        self.assertEqual(snapshot["fetched_at"], "2026-11-02T00:00:00.000Z")
         self.assertIn("instruments-info", snapshot["source"])
 
     def test_default_snapshot_timestamp_has_millisecond_precision(self):
@@ -127,7 +127,7 @@ class SnapshotCollectorTests(unittest.TestCase):
 
     def test_atomic_writer_round_trips_json(self):
         snapshot = build_snapshot([{"symbol": "BTCUSDT"}], "linear",
-                                  "2026-11-02T00:00:00Z")
+                                  "2026-11-02T00:00:00.000Z")
         with tempfile.TemporaryDirectory() as directory:
             path = write_snapshot(snapshot, Path(directory) / "linear" / "test.json")
             self.assertEqual(json.loads(path.read_text(encoding="utf-8")), snapshot)

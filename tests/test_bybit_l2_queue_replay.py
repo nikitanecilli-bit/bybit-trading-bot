@@ -550,10 +550,43 @@ def test_trade_archive_parses_block_trade_and_rpi_flags():
         path = Path(tmp) / "trades.csv.gz"
         with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
             stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\n")
-            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,True,False\n")
+            stream.write("1756771200.123,AAVEUSDT,Sell,10,100,match-1,True,False\n")
         rows = list(l2_module.iter_public_trades(path))
+    assert rows[0]["timestamp_ms"] == 1756771200123
     assert rows[0]["block_trade"] is True
     assert rows[0]["rpi"] is False
+
+
+
+def test_replay_rejects_fractional_timestamp_and_rolls_back_order():
+    o = order(qty="2")
+    events = [{**trade(1100.5, "Sell", "100", "10"), "trade_id": "bad-time"}]
+    original = l2_module.iter_public_trades
+    l2_module.iter_public_trades = lambda *_args: iter(events)
+    try:
+        try:
+            l2_module.replay_public_trades(o, Path("unused.csv.gz"))
+        except ValueError as exc:
+            assert "must be an integer" in str(exc)
+        else:
+            raise AssertionError("fractional replay timestamp must fail closed")
+    finally:
+        l2_module.iter_public_trades = original
+    assert o.queue_ahead_remaining == D("5")
+    assert o.filled == D("0")
+    assert o.processed_trade_ids == set()
+
+
+def test_passive_order_rejects_fractional_arrival_timestamp():
+    try:
+        place_passive_order(
+            book(), side="Buy", price=D("100"), quantity=D("1"),
+            arrival_ts=1000.5, expiry_ts=5000,
+        )
+    except ValueError as exc:
+        assert "arrival_ts must be an integer" in str(exc)
+    else:
+        raise AssertionError("fractional order arrival must fail closed")
 
 
 def test_trade_at_or_before_arrival_is_never_credited():

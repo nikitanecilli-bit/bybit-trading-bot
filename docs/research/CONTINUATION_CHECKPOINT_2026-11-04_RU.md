@@ -846,3 +846,26 @@ Verification:
 - Intermediate CI #41844055151 failed only because the newly added timezone test contained an incorrect expected epoch; the UTC-normalization implementation was retained and the fixture corrected before the final green run.
 
 No Bybit data collection, market PnL, private API/account access, runner registration, paper/live orders, or main-branch changes. PR #4 remains Draft/open. Continue with read-only point-in-time contract audit; strategy PnL remains blocked by missing dated snapshots and execution evidence.
+
+
+## 42. Bybit snapshot collectors now emit timestamps accepted by as-of loaders — 2026-11-04
+
+Static audit found that both Bybit snapshot collectors used `datetime.now(timezone.utc).isoformat()` by default, which emits arbitrary microsecond precision. The corresponding `InstrumentSpecHistory` and `RiskTierHistory` loaders deliberately reject timestamps not aligned to milliseconds. Thus a collector could create a snapshot that its own history loader would reject.
+
+Correction:
+- Both `scripts/snapshot_bybit_instruments.py` and `scripts/snapshot_bybit_risk_limits.py` now emit canonical UTC timestamps with exactly millisecond precision.
+- Explicit timestamps must be valid timezone-aware ISO-8601 values aligned to milliseconds; they are normalized to UTC.
+- Added offline tests for default precision, naive/sub-millisecond rejection, offset normalization and full collector-to-history round-trip (build, write, load, as-of lookup).
+
+Commits:
+- instrument collector source: `36686cb65a5dfc7d9adf6ec63e04c3a2fc1ae272`;
+- risk-limit collector source: `5c99ecb47f734406ed6e8c925093f60e688990d8`;
+- instrument collector tests: `3277c7c038a295bea6a6123decc3426d63d1a7d6`;
+- risk-limit collector tests: `729bc1a18d676e5c4dee81e3e29db37bbb21949f`.
+
+Verification:
+- Intermediate runs exposed only test-fixture expectation mistakes (canonical `.000Z` formatting and using an as-of timestamp earlier than the generated snapshot). Both fixtures were corrected; no collector network call occurred.
+- Final Research CI #41845297286 on `729bc1a18d676e5c4dee81e3e29db37bbb21949f`: SUCCESS; job `tests` SUCCESS; 57 completed workflow steps, no failed steps.
+- Actual logs confirm `tests/test_snapshot_bybit_instruments.py` **17/17 passed** and `tests/test_snapshot_bybit_risk_limits.py` **16/16 passed**, including both generated-snapshot round-trip tests.
+
+No Bybit collectors or downloads, market PnL, private API/account access, runner registration, paper/live orders, or main-branch changes. PR #4 remains Draft/open. Continue read-only data-contract review; strategy PnL remains blocked by missing dated exchange snapshots and execution evidence.

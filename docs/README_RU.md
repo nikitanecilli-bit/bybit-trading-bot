@@ -45,6 +45,7 @@
 - `reports/` — исторические backtest, holdout и диагностические отчёты.
 - `research/` — журнал экспериментов, протокол исследований, шаблоны, матрица тестового покрытия и исследовательский план.
 - [ENG-EXEC-041 — positive trade timestamp guard](research/ENG_EXEC_041_NONPOSITIVE_TRADE_TIMESTAMP_RU.md) — строгая положительная integer-ms валидация нормализованных public trades.
+- [ENG-EXEC-042 — explicit instrument category validation](research/ENG_EXEC_042_EXPLICIT_INSTRUMENT_CATEGORY_RU.md) — отсутствующая/пустая категория не может неявно стать `linear`.
 
 ## Последние исследовательские результаты
 

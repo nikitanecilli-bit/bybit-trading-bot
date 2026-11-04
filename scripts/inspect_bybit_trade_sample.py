@@ -16,7 +16,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from bybit_l2_queue_replay import parse_trade_timestamp_ms
+from bybit_l2_queue_replay import parse_exchange_bool, parse_trade_timestamp_ms
 
 URL = "https://public.bybit.com/trading/AAVEUSDT/AAVEUSDT2025-09-02.csv.gz"
 SYMBOL = "AAVEUSDT"
@@ -60,6 +60,24 @@ def classify_trade_id(value: object, seen_ids: set[str]) -> str:
     return "unique"
 
 
+def classify_boolean_flag_aliases(row: dict, columns: list[str], field: str) -> str:
+    """Validate all supported flag aliases using the replay parser's bool contract."""
+    if not columns:
+        return "missing"
+    values = set()
+    for name in columns:
+        raw = row.get(name)
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            return "missing"
+        try:
+            values.add(parse_exchange_bool(raw, field))
+        except ValueError:
+            return "malformed"
+    if len(values) != 1:
+        return "conflict"
+    return "true" if next(iter(values)) else "false"
+
+
 def main() -> int:
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -82,6 +100,8 @@ def main() -> int:
         nonmonotonic = duplicate_ids = missing_trade_ids = malformed_trade_ids = rows = 0
         before_book = after_book = within_book = 0
         rpi_counts = Counter()
+        block_flag_status_counts = Counter()
+        rpi_flag_status_counts = Counter()
         seen_ids = set()
         total_size = Decimal("0")
         total_notional = Decimal("0")
@@ -93,6 +113,8 @@ def main() -> int:
             missing = sorted(required - set(fields))
             if missing:
                 raise ValueError(f"trade CSV missing required columns: {missing}")
+            block_flags = block_trade_flag_columns(fields)
+            rpi_flags = [name for name in ("RPI", "isRPITrade") if name in fields]
             for row in reader:
                 if row.get("symbol") != SYMBOL:
                     raise ValueError(f"unexpected trade symbol: {row.get('symbol')!r}")
@@ -118,6 +140,12 @@ def main() -> int:
                 rpi_value = row.get("RPI", row.get("isRPITrade"))
                 if rpi_value is not None:
                     rpi_counts[str(rpi_value)] += 1
+                block_flag_status_counts[classify_boolean_flag_aliases(
+                    row, block_flags, "block trade",
+                )] += 1
+                rpi_flag_status_counts[classify_boolean_flag_aliases(
+                    row, rpi_flags, "RPI",
+                )] += 1
                 trade_id_status = classify_trade_id(row.get("trdMatchID"), seen_ids)
                 if trade_id_status == "duplicate":
                     duplicate_ids += 1
@@ -130,7 +158,11 @@ def main() -> int:
                 total_notional += qty * price
                 rows += 1
 
-        block_flags = block_trade_flag_columns(fields)
+        def flags_valid(columns: list[str], counts: Counter) -> bool:
+            return bool(columns) and not any(
+                counts.get(status, 0) for status in ("missing", "malformed", "conflict")
+            )
+
         report["validation"] = {
             "rows": rows,
             "columns": fields,
@@ -151,10 +183,14 @@ def main() -> int:
             "aggressor_side_counts": dict(side_counts),
             "total_contract_size": str(total_size),
             "total_contract_notional_usdt": str(total_notional),
-            "has_rpi_flag": "RPI" in fields or "isRPITrade" in fields,
+            "has_rpi_flag": bool(rpi_flags),
             "rpi_flag_value_counts": dict(rpi_counts),
+            "rpi_flag_status_counts": dict(rpi_flag_status_counts),
+            "rpi_flag_validation_status": "valid" if flags_valid(rpi_flags, rpi_flag_status_counts) else "invalid_or_incomplete",
             "has_block_trade_flag": bool(block_flags),
             "block_trade_flag_columns": block_flags,
+            "block_trade_flag_status_counts": dict(block_flag_status_counts),
+            "block_trade_flag_validation_status": "valid" if flags_valid(block_flags, block_flag_status_counts) else "invalid_or_incomplete",
             "matching_engine_cts_min_ms": cts_min,
             "matching_engine_cts_max_ms": cts_max,
             "trades_before_book_cts_start": before_book,

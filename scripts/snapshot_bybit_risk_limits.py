@@ -205,7 +205,7 @@ def _snapshot_timestamp(value: str | None) -> str:
 
 
 def validate_page_observations(
-    observations: Any, *, expected_symbols: set[str],
+    observations: Any, *, expected_symbols: set[str], expected_tier_count: int,
     collection_started_at: str, fetched_at: str,
 ) -> list[dict[str, Any]]:
     if not isinstance(observations, list) or not observations:
@@ -260,9 +260,7 @@ def validate_page_observations(
         previous_completed = request_completed
     if observed_symbols != expected_symbols:
         raise ValueError("risk page symbols do not match snapshot tiers")
-    if sum(item["tier_count"] for item in validated) != sum(
-        item["tier_count"] for item in observations
-    ):
+    if sum(item["tier_count"] for item in validated) != expected_tier_count:
         raise ValueError("risk page tier counts do not match snapshot tiers")
     return validated
 

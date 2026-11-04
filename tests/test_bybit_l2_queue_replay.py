@@ -520,8 +520,8 @@ def test_trade_archive_requires_block_trade_flag():
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "trades.csv.gz"
         with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
-            stream.write("timestamp,symbol,side,size,price,trdMatchID\\n")
-            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1\\n")
+            stream.write("timestamp,symbol,side,size,price,trdMatchID\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1\n")
         try:
             list(l2_module.iter_public_trades(path))
         except ValueError as exc:
@@ -535,8 +535,8 @@ def test_trade_archive_parses_block_trade_and_rpi_flags():
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "trades.csv.gz"
         with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
-            stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\\n")
-            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,True,False\\n")
+            stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,True,False\n")
         rows = list(l2_module.iter_public_trades(path))
     assert rows[0]["block_trade"] is True
     assert rows[0]["rpi"] is False

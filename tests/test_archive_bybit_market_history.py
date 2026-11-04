@@ -166,6 +166,87 @@ class BybitMarketHistoryTests(unittest.TestCase):
                         instrument_snapshot_paths=snapshot_paths,
                     )
 
+    def test_archive_symbol_cleans_partial_outputs_when_terminal_mark_is_unavailable(self):
+        hour = 3_600_000
+        with tempfile.TemporaryDirectory() as tmp:
+            def fake_funding(symbol, start_ms, end_ms, *, base_url, pause, audit_pages):
+                audit_pages.append({
+                    "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
+                    "response_rows": 2, "first_ts": start_ms, "last_ts": end_ms - 1,
+                    "complete": True, "saturated": False,
+                })
+                return [
+                    {"symbol": symbol, "funding_timestamp_ms": start_ms, "funding_rate": "0.001"},
+                    {"symbol": symbol, "funding_timestamp_ms": end_ms - 1, "funding_rate": "0.002"},
+                ]
+
+            candle = {
+                "symbol": "BTCUSDT", "timestamp_ms": hour,
+                "open": "100", "high": "102", "low": "99", "close": "101",
+                "volume": "10", "turnover": "1010",
+            }
+            marks = [
+                {
+                    "symbol": "BTCUSDT", "timestamp_ms": hour,
+                    "open": "100", "high": "102", "low": "99", "close": "101",
+                },
+                {
+                    "symbol": "BTCUSDT", "timestamp_ms": hour * 2,
+                    "open": "101", "high": "103", "low": "100", "close": "102",
+                },
+            ]
+            snapshot_dir = Path(tmp) / "source_snapshots"
+            snapshot_dir.mkdir()
+            snapshot_paths = []
+            for stamp in (hour - 1, hour * 2):
+                snapshot_path = snapshot_dir / f"{stamp}.json"
+                fetched_at = datetime.fromtimestamp(
+                    stamp / 1000, tz=timezone.utc
+                ).isoformat().replace("+00:00", "Z")
+                snapshot_path.write_text(json.dumps({
+                    "schema_version": 1,
+                    "source": "Bybit V5 GET /v5/market/instruments-info",
+                    "category": "linear",
+                    "fetched_at": fetched_at,
+                    "count": 1,
+                    "instruments": [{"symbol": "BTCUSDT", "fundingInterval": "60"}],
+                }), encoding="utf-8")
+                snapshot_paths.append(snapshot_path)
+
+            with (
+                patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=fake_funding),
+                patch("scripts.archive_bybit_market_history.fetch_trade_klines", return_value=[candle]),
+                patch(
+                    "scripts.archive_bybit_market_history.fetch_mark_klines",
+                    side_effect=RuntimeError("terminal Mark candle is not closed"),
+                ),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "terminal Mark candle"):
+                    archive_symbol(
+                        "BTCUSDT", hour, hour * 2, tmp, "60", pause=0,
+                        instrument_snapshot_paths=snapshot_paths,
+                    )
+
+            funding_path = Path(tmp) / "funding" / "BTCUSDT.csv"
+            manifest_path = funding_path.with_suffix(".csv.audit.json")
+            schedule_path = Path(tmp) / "funding" / "BTCUSDT.schedule.json"
+            self.assertFalse(funding_path.exists())
+            self.assertFalse(manifest_path.exists())
+            self.assertFalse(schedule_path.exists())
+
+            # A retry in the same root can reuse content-addressed snapshots.
+            with (
+                patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=fake_funding),
+                patch("scripts.archive_bybit_market_history.fetch_trade_klines", return_value=[candle]),
+                patch("scripts.archive_bybit_market_history.fetch_mark_klines", return_value=marks),
+            ):
+                result = archive_symbol(
+                    "BTCUSDT", hour, hour * 2, tmp, "60", pause=0,
+                    instrument_snapshot_paths=snapshot_paths,
+                )
+            self.assertTrue(Path(result["funding_file"]).is_file())
+            self.assertTrue(Path(result["mark_file"]).is_file())
+
     def test_funding_still_fails_if_minimum_window_is_saturated(self):
         def fetch(a, b):
             return [{"symbol": "BTCUSDT", "fundingRateTimestamp": str(a),

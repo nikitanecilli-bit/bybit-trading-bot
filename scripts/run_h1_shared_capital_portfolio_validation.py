@@ -507,6 +507,27 @@ def validate_selection_cutoff(selection, first_scored_timestamp_ms):
         )
 
 
+def resolve_frozen_strategy_mode(env, strategy_modes):
+    """Require the confirm run's explicit frozen arm-set to match its toggles."""
+    names = {
+        "d20_baseline": ((20, False),),
+        "d20_ema50_200": ((20, False), (20, True)),
+        "d20_d48_d48_ema": ((20, False), (48, False), (48, True)),
+    }
+    selected = str(env.get("H1_FROZEN_STRATEGY_MODE", "")).strip().lower()
+    if selected not in names:
+        raise SystemExit(
+            "confirm mode requires H1_FROZEN_STRATEGY_MODE: "
+            "d20_baseline, d20_ema50_200, or d20_d48_d48_ema"
+        )
+    if tuple(strategy_modes) != names[selected]:
+        raise SystemExit(
+            f"frozen strategy mode {selected!r} does not match selected arm set "
+            f"{tuple(strategy_modes)!r}"
+        )
+    return selected
+
+
 def resolve_validation_design(environ=None):
     """Separate train-only universe selection, exploratory folds and final confirmation."""
     env = os.environ if environ is None else environ
@@ -514,6 +535,7 @@ def resolve_validation_design(environ=None):
     if mode not in {"explore", "confirm"}:
         raise SystemExit("H1_VALIDATION_MODE must be 'explore' or 'confirm'")
     selection = load_frozen_selection_manifest(env)
+    strategy_modes = resolve_donchian_variant_modes(env)
     if mode == "explore":
         return {
             "mode": mode,
@@ -521,6 +543,7 @@ def resolve_validation_design(environ=None):
             "volume_thresholds": list(VOL_THRESHOLDS),
             "breakout_atr_thresholds": list(BREAKOUT_ATR_THRESHOLDS),
             "cost_multipliers": list(COST_MULTIPLIERS),
+            "strategy_modes": strategy_modes,
             "frozen_config": None,
             "selection": selection,
         }
@@ -536,13 +559,20 @@ def resolve_validation_design(environ=None):
         raise SystemExit(f"frozen volume threshold must be one of {VOL_THRESHOLDS}")
     if not math.isfinite(breakout) or breakout not in BREAKOUT_ATR_THRESHOLDS:
         raise SystemExit(f"frozen breakout ATR threshold must be one of {BREAKOUT_ATR_THRESHOLDS}")
+    frozen_strategy_mode = resolve_frozen_strategy_mode(env, strategy_modes)
     return {
         "mode": mode,
         "folds": FOLDS[2:],
         "volume_thresholds": [volume],
         "breakout_atr_thresholds": [breakout],
         "cost_multipliers": list(COST_MULTIPLIERS),
+        "strategy_modes": strategy_modes,
         "frozen_config": {
+            "strategy_mode": frozen_strategy_mode,
+            "strategy_modes": [
+                {"donchian_period": period, "ema50_200_gate": ema}
+                for period, ema in strategy_modes
+            ],
             "min_volume_ratio": volume,
             "min_breakout_atr": breakout,
             "symbols": selection["symbols"],
@@ -1418,7 +1448,7 @@ def main():
     print(f"Aligned H1 portfolio: {len(symbols)} symbols, {len(timestamps)} common bars")
     print(f"Archive sources: {len(set(archives.values()))}; starting capital={STARTING_CAPITAL:.0f} USDT")
     design = resolve_validation_design()
-    strategy_modes = resolve_donchian_variant_modes()
+    strategy_modes = design["strategy_modes"]
     ema_gate_enabled = any(use_ema for _, use_ema in strategy_modes)
     design["ema50_200_gate_enabled"] = ema_gate_enabled
     design["donchian48_ema_ablation_enabled"] = (

@@ -94,6 +94,27 @@ def trade_timestamp_order_status(nonmonotonic_count: int) -> str:
     return "valid" if nonmonotonic_count == 0 else "invalid"
 
 
+
+def trade_archive_replay_compatibility_status(
+    timestamp_status: str,
+    trade_id_status: str,
+    rpi_status: str,
+    block_trade_status: str,
+) -> str:
+    """Summarize whether the scanned archive meets queue-replay input requirements."""
+    required_statuses = (
+        timestamp_status,
+        trade_id_status,
+        rpi_status,
+        block_trade_status,
+    )
+    return (
+        "valid"
+        if all(status == "valid" for status in required_statuses)
+        else "invalid_or_incomplete"
+    )
+
+
 def validate_trade_side(value: object) -> str:
     """Validate the exact public-trade aggressor-side token; do not trim/coerce."""
     if value not in ("Buy", "Sell"):
@@ -209,6 +230,19 @@ def main() -> int:
                 counts.get(status, 0) for status in ("missing", "malformed", "conflict")
             )
 
+        timestamp_status = trade_timestamp_order_status(nonmonotonic)
+        trade_id_status = (
+            "valid" if "trdMatchID" in fields and not (
+                duplicate_ids or missing_trade_ids or malformed_trade_ids
+            ) else "invalid_or_incomplete"
+        )
+        rpi_status = "valid" if flags_valid(rpi_flags, rpi_flag_status_counts) else "invalid_or_incomplete"
+        block_trade_status = (
+            "valid" if flags_valid(block_flags, block_flag_status_counts) else "invalid_or_incomplete"
+        )
+        replay_compatibility_status = trade_archive_replay_compatibility_status(
+            timestamp_status, trade_id_status, rpi_status, block_trade_status,
+        )
         report["validation"] = {
             "rows": rows,
             "columns": fields,
@@ -216,16 +250,12 @@ def main() -> int:
             "timestamp_max_ms": ts_max,
             "duration_hours": round((ts_max - ts_min) / 3_600_000, 4),
             "nonmonotonic_timestamp_count": nonmonotonic,
-            "timestamp_order_validation_status": trade_timestamp_order_status(nonmonotonic),
+            "timestamp_order_validation_status": timestamp_status,
             "duplicate_trade_id_count": duplicate_ids,
             "missing_trade_id_count": missing_trade_ids,
             "malformed_trade_id_count": malformed_trade_ids,
             "has_trade_id_column": "trdMatchID" in fields,
-            "trade_id_validation_status": (
-                "valid" if "trdMatchID" in fields and not (
-                    duplicate_ids or missing_trade_ids or malformed_trade_ids
-                ) else "invalid_or_incomplete"
-            ),
+            "trade_id_validation_status": trade_id_status,
             "unique_trade_ids": len(seen_ids),
             "aggressor_side_counts": dict(side_counts),
             "total_contract_size": str(total_size),
@@ -233,11 +263,12 @@ def main() -> int:
             "has_rpi_flag": bool(rpi_flags),
             "rpi_flag_value_counts": dict(rpi_counts),
             "rpi_flag_status_counts": dict(rpi_flag_status_counts),
-            "rpi_flag_validation_status": "valid" if flags_valid(rpi_flags, rpi_flag_status_counts) else "invalid_or_incomplete",
+            "rpi_flag_validation_status": rpi_status,
             "has_block_trade_flag": bool(block_flags),
             "block_trade_flag_columns": block_flags,
             "block_trade_flag_status_counts": dict(block_flag_status_counts),
-            "block_trade_flag_validation_status": "valid" if flags_valid(block_flags, block_flag_status_counts) else "invalid_or_incomplete",
+            "block_trade_flag_validation_status": block_trade_status,
+            "queue_replay_compatibility_status": replay_compatibility_status,
             "matching_engine_cts_min_ms": cts_min,
             "matching_engine_cts_max_ms": cts_max,
             "trades_before_book_cts_start": before_book,

@@ -1251,3 +1251,11 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Extracted the inspector's validated reader for deterministic testing. Added regressions for malformed unterminated quoted optional fields in both parser paths.
 - Inspector commit `d78720991bf6a72efa05310b878505dcd5bf1123`; core commit `81f58d0b48705ed1e5f2db36ba80ca42c0feb50a`; tests `13f32dbc2db3e686549866a14998a0c31cf659a6` + fixture correction `5f6c245de6bbd82cd280d4db750b8e3d1434c867`, inspector test `06544878931c0daa1117980c63eb01885c8e338e` + correction `9302114d0199097d834fecf112f2c6d74ec931d7`.
 - Local stdlib parser reproduction confirms strict mode rejects the malformed fixture. CI not confirmed. No archives, collectors, PnL, API, runner or orders.
+
+## ENG-EXEC-035 — Explicit queue-replay compatibility and empty-archive handling (2026-11-04)
+
+- Added aggregate `queue_replay_compatibility_status` so a completed scan is not confused with replay-ready data. It requires monotonic timestamps, valid unique trade IDs, valid RPI and block-trade flags, and at least one data row.
+- Header-only archives now have `duration_hours: null` and `invalid_or_incomplete` replay compatibility.
+- Source `86a0590f`, `68ee303e`; tests `8311daa4`, `82852d6f`.
+- Research CI run `41888048946` on `82852d6` passed. An intermediate run failed because the test call had not yet been updated for the added row_count parameter; the next commit fixed it and passed.
+- No archives, collectors, market PnL, API, runner or orders.

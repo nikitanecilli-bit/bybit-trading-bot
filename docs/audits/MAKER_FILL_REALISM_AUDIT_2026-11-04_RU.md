@@ -84,3 +84,16 @@ If complete L2/trade history is unavailable, report bounded scenarios only (e.g.
 `MAKER_EXECUTION_REALISM = BLOCKED`
 
 Continue using maker scenarios only as sensitivity bounds. Next work should focus on obtaining Bybit-native order-book/trade history or establishing a transparent fill-rate bound; do not run another strategy parameter sweep to compensate for missing execution evidence.
+
+
+## Newly identified official Bybit historical-data route
+
+The previous blocker should be refined: the repository has no order-book/trade archive collector and the existing REST download attempts returned HTTP 403 from GitHub Actions, but Bybit's official documentation points to a separate historical-data download portal.
+
+- Bybit V5 `Get Recent Public Trades` explicitly says archived historical trades can be downloaded from the website: https://bybit-exchange.github.io/docs/v5/market/recent-trade
+- Bybit's official guide says historical public market data is downloadable as CSV and includes order-book snapshots, K-line, trade and funding data: https://www.bybit.com/en/learn/bybit-guide/how-to-create-a-bybit-api-key
+- Portal: https://www.bybit.com/en/derivative-activity/history-data
+
+This is a promising non-API-key route and may avoid the GitHub Actions REST-host 403. **Availability is not yet verified** for the exact linear symbols, date ranges, depth granularity, update cadence, and file formats needed by our frozen H1 universe. The portal page is dynamically rendered in the accessible web view, so no downloadable dataset has been claimed or committed.
+
+Next safe acquisition step: inspect the portal's product/category filters, then download a small representative BTCUSDT + one lower-liquidity target-symbol sample for a short date window. Validate schema, timestamps, sequence/update IDs, coverage and file hashes before attempting a full universe export. Do not treat a single order-book snapshot per minute as a queue replay; the feed cadence must be sufficient to reconstruct order arrival and consumption around each hypothetical order.

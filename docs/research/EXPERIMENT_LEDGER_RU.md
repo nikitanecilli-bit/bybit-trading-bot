@@ -1297,3 +1297,13 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - This does not validate fill realism: no cross-stream event identity/sequence reconciliation; aggregate L2 changes cannot be allocated to executions vs cancellations; same-ms ambiguity and historical CSV trade seq uncertainty remain. Do not add L2 reduction consumption without reconciliation; it could double-count executions already present in trades.
 - Decision: no code change; keep single-source public-trade consumption and L2 pre-arrival snapshot role. Maker realism remains blocked. Note: `docs/research/ENG_EXEC_040_L2_TRADE_VOLUME_DOUBLE_COUNT_AUDIT_RU.md`.
 - No archives/API, tests, replay, PnL/backtests, collectors, private API, runner or orders. `main` unchanged; PR #4 Draft/unmerged.
+
+
+## ENG-EXEC-041 — positive timestamps for normalized public trades (2026-11-04)
+
+- Confirmed validation gap: `apply_public_trade()` enforced integer type but accepted timestamp 0/negative as an out-of-window event and returned silently. The archive parser already requires positive timestamps.
+- Fix: reject non-positive normalized trade timestamps before temporal filtering.
+- Regression: zero and negative timestamp cases; queue-ahead and filled quantity remain unchanged.
+- Code/test commit: `ed2d35551496eb56e1298420507fbaed735e6b29`.
+- CI: [Research engine checks #41891208250](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41891208250), SUCCESS; aggregate-L2 primitive tests 85/85; L2 runner/inspector step 26/26; all workflow steps successful.
+- Decision: ACCEPT as a deterministic input-validation guardrail; not market/PnL evidence. No archive download, collector, API/account access, runner registration, paper/live orders or main changes. Maker execution gate remains blocked.

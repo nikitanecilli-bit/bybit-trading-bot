@@ -484,3 +484,14 @@
 - Static audit confirms initial queue-ahead is seeded from pre-arrival L2; after arrival L2 deltas do not consume it. Eligible public trades alone consume queue. Duplicate trade IDs fail closed and repeated archive replay is idempotent.
 - No direct L2+trade double consumption exists in current implementation because L2 reductions are not a consumption input. This is not cross-stream correctness: there is no event identity/sequence reconciliation and aggregate L2 cannot distinguish executions from cancellations.
 - Keep single-source trade consumption; do not add L2 reduction consumption without reconciliation. No code changes or runtime tests/data operations. Maker realism blocked. Note: `ENG_EXEC_040_L2_TRADE_VOLUME_DOUBLE_COUNT_AUDIT_RU.md`.
+
+
+## Session update — 2026-11-04 (ENG-EXEC-041 positive trade timestamp guard)
+
+- Static audit found a boundary mismatch in `apply_public_trade()`: it required an integer timestamp before temporal filtering but did not require it to be positive. A direct normalized-event call with timestamp `0` or a negative integer was silently treated as pre-arrival, unlike `parse_trade_timestamp_ms()`, which rejects non-positive values.
+- Added an explicit positive-millisecond guard before side/price/flag validation and before the active-window early return.
+- Added regression coverage for both zero and negative timestamps; the test confirms the order's queue and filled quantity remain unchanged.
+- Code/test commit: `ed2d35551496eb56e1298420507fbaed735e6b29`.
+- Research CI [#41891208250](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41891208250): SUCCESS; job `tests` SUCCESS. Actual log confirms aggregate-L2 primitive suite **85/85 passed**, including `test_apply_public_trade_rejects_non_positive_timestamp_without_mutation`; L2 runner/inspector step SUCCESS (26/26, including 5 runner tests); all workflow steps completed successfully.
+- This is deterministic input-validation work only. No market PnL/backtest, archive download, collector, private API/account access, runner registration, paper/live orders, or `main` changes. Maker execution gate remains `BLOCKED_FOR_STRATEGY_PNL`.
+- Next safe task: continue independent read-only review of execution-input/report invariants; do not rerun the L2 sample or relax the external-data/PnL gates.

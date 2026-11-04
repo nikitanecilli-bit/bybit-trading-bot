@@ -1380,3 +1380,20 @@ Runner уже консервативно исключает same-ms book events 
 Это не доказывает точность fills: отсутствует cross-stream event identity/sequence reconciliation, а aggregate L2 не позволяет разделить executions и cancellations. Не добавлять L2 reduction consumption без reconciliation — возможен двойной учёт тех же execution, уже присутствующих в trades. Код не менялся; single-source public-trade consumption сохраняется. Maker realism заблокирован. Note: `ENG_EXEC_040_L2_TRADE_VOLUME_DOUBLE_COUNT_AUDIT_RU.md`.
 
 Архивы/API, тесты, replay, PnL/backtests, collectors, private API, runner и orders не запускались. `main` не изменён; PR #4 не слит.
+
+
+## 48. Normalized public-trade timestamps must be positive
+
+Static audit of `apply_public_trade()` found that the primitive enforced integer timestamp type but not positivity. This differed from the archive timestamp parser and allowed zero/negative normalized timestamps to be silently ignored as pre-arrival records.
+
+Correction:
+- Reject `timestamp_ms <= 0` before temporal filtering.
+- Add one regression covering both zero and negative timestamps and verifying no queue/fill mutation.
+
+Code/test commit: `ed2d35551496eb56e1298420507fbaed735e6b29`.
+
+Verification:
+- Research CI [#41891208250](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41891208250): SUCCESS; job `tests` SUCCESS.
+- Actual logs: aggregate-L2 primitive suite **85/85 passed**; L2 runner/inspector step **26/26 passed**; all workflow steps succeeded.
+
+No market PnL, new archive download/collector, private API, runner registration, paper/live orders or main changes. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains unchanged.

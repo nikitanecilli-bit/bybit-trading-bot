@@ -70,10 +70,83 @@ def _page_tuples(pages: Any, field: str) -> list[tuple[str, dict[str, Any]]]:
     return result
 
 
+def _validate_page_provenance(pages: list[dict[str, Any]], field: str,
+                              endpoint: str, *, interval_scoped: bool = False) -> None:
+    """Verify schema-v2 page provenance against the stored canonical responses."""
+    groups: dict[tuple, list[dict[str, Any]]] = {}
+    for index, page in enumerate(pages):
+        key = (page.get("interval_start_ms"), page.get("interval_end_ms")) if interval_scoped else ()
+        groups.setdefault(key, []).append(page)
+    for group_key, group in groups.items():
+        previous_completed = None
+        previous_next_cursor_hash = None
+        for page_index, page in enumerate(group):
+            provenance = page.get("page_provenance")
+            response = page.get("response")
+            cursor = page.get("requested_cursor")
+            if not isinstance(provenance, dict) or not isinstance(response, dict) or not isinstance(cursor, str):
+                raise ReportError(f"snapshot raw.{field} page provenance is missing or malformed")
+            expected_keys = {
+                "endpoint", "page_index", "request_started_at_ms", "request_completed_at_ms",
+                "query_params", "query_params_sha256", "requested_cursor_sha256",
+                "next_cursor_sha256", "response_canonical_sha256", "ret_code", "row_count",
+                "has_next_page",
+            }
+            if set(provenance) != expected_keys:
+                raise ReportError(f"snapshot raw.{field} page provenance fields mismatch")
+            if provenance["endpoint"] != endpoint or provenance["page_index"] != page_index:
+                raise ReportError(f"snapshot raw.{field} page provenance endpoint/index mismatch")
+            started, completed = provenance["request_started_at_ms"], provenance["request_completed_at_ms"]
+            for name, value in (("request_started_at_ms", started), ("request_completed_at_ms", completed),
+                                ("page_index", provenance["page_index"]), ("row_count", provenance["row_count"])):
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    raise ReportError(f"snapshot raw.{field} provenance {name} is invalid")
+            if started <= 0 or completed < started:
+                raise ReportError(f"snapshot raw.{field} provenance request time bounds are invalid")
+            if previous_completed is not None and started < previous_completed:
+                raise ReportError(f"snapshot raw.{field} page requests overlap or are out of order")
+            params = provenance["query_params"]
+            if not isinstance(params, dict) or params.get("cursor", "") != cursor:
+                raise ReportError(f"snapshot raw.{field} provenance query params mismatch cursor")
+            hashes = {
+                "query_params_sha256": hashlib.sha256(_canonical_json_bytes(params)).hexdigest(),
+                "requested_cursor_sha256": hashlib.sha256(cursor.encode("utf-8")).hexdigest(),
+                "response_canonical_sha256": hashlib.sha256(_canonical_json_bytes(response)).hexdigest(),
+            }
+            for name, expected in hashes.items():
+                if provenance.get(name) != expected:
+                    raise ReportError(f"snapshot raw.{field} provenance {name} mismatch")
+            result = response.get("result")
+            if not isinstance(result, dict) or not isinstance(result.get("list"), list):
+                raise ReportError(f"snapshot raw.{field} response list is malformed")
+            next_cursor = result.get("nextPageCursor", "")
+            if not isinstance(next_cursor, str):
+                raise ReportError(f"snapshot raw.{field} next cursor is malformed")
+            next_hash = hashlib.sha256(next_cursor.encode("utf-8")).hexdigest()
+            if provenance.get("next_cursor_sha256") != next_hash:
+                raise ReportError(f"snapshot raw.{field} provenance next cursor hash mismatch")
+            if provenance.get("ret_code") != response.get("retCode") or response.get("retCode") != 0:
+                raise ReportError(f"snapshot raw.{field} provenance retCode mismatch")
+            if provenance.get("row_count") != len(result["list"]):
+                raise ReportError(f"snapshot raw.{field} provenance row count mismatch")
+            has_next = bool(next_cursor)
+            if provenance.get("has_next_page") is not has_next:
+                raise ReportError(f"snapshot raw.{field} provenance continuation mismatch")
+            if previous_next_cursor_hash is not None and previous_next_cursor_hash != hashes["requested_cursor_sha256"]:
+                raise ReportError(f"snapshot raw.{field} provenance cursor chain mismatch")
+            if page_index < len(group) - 1 and not has_next:
+                raise ReportError(f"snapshot raw.{field} provenance terminates before final page")
+            if page_index == len(group) - 1 and has_next:
+                raise ReportError(f"snapshot raw.{field} provenance has no terminal page")
+            previous_completed = completed
+            previous_next_cursor_hash = next_hash
+
+
 def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tuple[tuple, tuple, tuple]:
     if not isinstance(snapshot, dict):
         raise ReportError("exchange snapshot root must be an object")
-    if snapshot.get("schema_version") != 1:
+    schema_version = snapshot.get("schema_version")
+    if schema_version not in (1, 2):
         raise ReportError("unsupported exchange snapshot schema_version")
     if snapshot.get("category") != "linear" or snapshot.get("settle_coin") != "USDT":
         raise ReportError("snapshot is not scoped to Bybit linear/USDT")
@@ -94,6 +167,11 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tupl
     execution_pages = raw["executions"]
     if not isinstance(execution_pages, list) or not execution_pages:
         raise ReportError("snapshot raw.executions must be a non-empty page list")
+    if schema_version == 2:
+        _validate_page_provenance(raw["positions"], "positions", "/v5/position/list")
+        _validate_page_provenance(raw["active_orders"], "active_orders", "/v5/order/realtime")
+        _validate_page_provenance(history_pages, "order_history", "/v5/order/history", interval_scoped=True)
+        _validate_page_provenance(execution_pages, "executions", "/v5/execution/list", interval_scoped=True)
 
     try:
         positions = parse_position_pages(position_pages)

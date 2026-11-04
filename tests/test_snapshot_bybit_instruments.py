@@ -144,6 +144,18 @@ class SnapshotCollectorTests(unittest.TestCase):
             spec = history.get_spec("BTCUSDT", history.snapshots[0].fetched_at_ms)
             self.assertEqual(spec.symbol, "BTCUSDT")
 
+    def test_collection_interval_is_recorded_and_ordered(self):
+        snapshot = build_snapshot(
+            [{"symbol": "BTCUSDT"}], "linear",
+            "2026-11-02T00:00:02.000Z", "2026-11-02T00:00:01.000Z",
+        )
+        self.assertEqual(snapshot["collection_started_at"], "2026-11-02T00:00:01.000Z")
+        with self.assertRaisesRegex(ValueError, "cannot be after"):
+            build_snapshot(
+                [{"symbol": "BTCUSDT"}], "linear",
+                "2026-11-02T00:00:01.000Z", "2026-11-02T00:00:02.000Z",
+            )
+
     def test_snapshot_timestamp_normalizes_offset_to_utc(self):
         snapshot = build_snapshot(
             [{"symbol": "BTCUSDT"}], "linear", "2026-11-02T03:00:00.123+03:00"

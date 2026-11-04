@@ -1254,10 +1254,12 @@ def build_validation_manifest(
     repo_root = Path(__file__).resolve().parents[1]
     code_files = [
         _file_manifest_record(repo_root / relative)
-        for relative in resolve_h1_replay_code_paths(
-            repo_root, [*H1_REPLAY_CODE_PATHS, ".github/workflows/h1-shared-capital-portfolio-validation.yml"]
-        )
+        for relative in resolve_h1_replay_code_paths(repo_root)
     ]
+    workflow_path = repo_root / ".github/workflows/h1-shared-capital-portfolio-validation.yml"
+    if not workflow_path.is_file():
+        raise SystemExit("Missing required H1 validation workflow definition")
+    code_files.append(_file_manifest_record(workflow_path))
 
     allowlist = sorted({
         item.strip().upper()

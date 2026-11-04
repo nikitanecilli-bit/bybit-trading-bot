@@ -236,7 +236,7 @@ def place_passive_order(
 
 
 def apply_public_trade(order: PassiveOrder, trade: dict) -> None:
-    ts = int(trade["timestamp_ms"])
+    ts = strict_int(trade.get("timestamp_ms"), "public trade timestamp_ms")
     if ts <= order.arrival_ts or ts >= order.expiry_ts or order.complete:
         return
     side = str(trade["side"])
@@ -337,8 +337,7 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
         for row_no, row in enumerate(reader, 2):
             if row.get("symbol") != symbol:
                 raise ValueError(f"unexpected trade symbol at CSV row {row_no}")
-            raw_ts = float(row["timestamp"])
-            timestamp_ms = int(round(raw_ts if raw_ts > 1_000_000_000_000 else raw_ts * 1000))
+            timestamp_ms = parse_trade_timestamp_ms(row["timestamp"])
             yield {
                 "timestamp_ms": timestamp_ms,
                 "side": row["side"],
@@ -359,7 +358,7 @@ def replay_public_trades(order: PassiveOrder, archive: Path, symbol: str = "AAVE
         processed_trade_ids=set(previously_processed_ids),
     )
     for trade in iter_public_trades(archive, symbol):
-        ts = trade["timestamp_ms"]
+        ts = strict_int(trade.get("timestamp_ms"), "public trade timestamp_ms")
         if previous_ts is not None and ts < previous_ts:
             raise ValueError("non-monotonic public trade timestamps")
         previous_ts = ts

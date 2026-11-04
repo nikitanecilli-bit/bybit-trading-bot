@@ -1328,3 +1328,98 @@ class StatePersistenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+    def test_exchange_identity_position_orders_and_executions_round_trip(self):
+        from exchange_execution_identity import (
+            ExchangeExecutionIdentity, ExchangeOrderIdentity, ExchangePositionIdentity,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "exchange-identities.json"
+            cfg = engine.BotConfig()
+            risk = engine.AdaptiveRiskManager(cfg)
+            position = sample_position()
+            position.set_exchange_position_identity(ExchangePositionIdentity(
+                "linear", "USDT", "BTCUSDT", 0, "one_way", "Buy",
+                "0.010", "100.00", "entry-order-1", "bot-entry-1",
+            ))
+            initial_order = ExchangeOrderIdentity(
+                "stop-order-1", "bot-stop-1", "BTCUSDT", "Sell", 0,
+                "0.010", "0.010", "0", "New", True, True, "95.00",
+            )
+            self.assertTrue(position.record_exchange_order(initial_order))
+            self.assertFalse(position.record_exchange_order(initial_order))
+            updated_order = ExchangeOrderIdentity(
+                "stop-order-1", "bot-stop-1", "BTCUSDT", "Sell", 0,
+                "0.010", "0.006", "0.004", "PartiallyFilled", True, True, "95.00",
+            )
+            self.assertTrue(position.record_exchange_order(updated_order))
+            execution = ExchangeExecutionIdentity(
+                "exec-1", "stop-order-1", "bot-stop-1", "BTCUSDT",
+                "Sell", "0.004", "95.00", position.entry_ts + 1000, "-0.01",
+            )
+            self.assertTrue(position.record_exchange_execution(execution))
+            self.assertFalse(position.record_exchange_execution(execution))
+
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {"BTCUSDT": position}, {}, 7,
+                last_mark_prices={"BTCUSDT": 100.0},
+            )
+            restored = engine.PlanBStatePersistence(str(path)).load_state(
+                engine.AdaptiveRiskManager(cfg)
+            )[0]["BTCUSDT"]
+            self.assertEqual(restored.exchange_position_identity, position.exchange_position_identity)
+            self.assertEqual(restored.exchange_orders, [updated_order.to_dict()])
+            self.assertEqual(restored.exchange_executions, [execution.to_dict()])
+
+    def test_exchange_execution_duplicate_id_with_conflicting_payload_is_rejected(self):
+        from exchange_execution_identity import ExchangeExecutionIdentity
+        position = sample_position()
+        first = ExchangeExecutionIdentity(
+            "exec-dup", "order-1", "", "BTCUSDT", "Buy",
+            "0.1", "100", position.entry_ts + 1,
+        )
+        conflicting = ExchangeExecutionIdentity(
+            "exec-dup", "order-1", "", "BTCUSDT", "Buy",
+            "0.2", "100", position.entry_ts + 1,
+        )
+        self.assertTrue(position.record_exchange_execution(first))
+        with self.assertRaisesRegex(ValueError, "conflicting duplicate"):
+            position.record_exchange_execution(conflicting)
+
+    def test_exchange_order_update_cannot_change_order_identity(self):
+        from exchange_execution_identity import ExchangeOrderIdentity
+        position = sample_position()
+        first = ExchangeOrderIdentity(
+            "order-1", "link-1", "BTCUSDT", "Sell", 0,
+            "1", "1", "0", "New", True, True,
+        )
+        changed_identity = ExchangeOrderIdentity(
+            "order-1", "link-1", "BTCUSDT", "Buy", 0,
+            "1", "1", "0", "New", True, True,
+        )
+        position.record_exchange_order(first)
+        with self.assertRaisesRegex(ValueError, "identity fields changed"):
+            position.record_exchange_order(changed_identity)
+
+    def test_legacy_backup_without_exchange_identity_fields_remains_readable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "legacy-exchange-fields.json"
+            cfg = engine.BotConfig()
+            risk = engine.AdaptiveRiskManager(cfg)
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {"BTCUSDT": sample_position()}, {}, 3,
+                last_mark_prices={"BTCUSDT": 100.0},
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            raw = payload["open_positions"]["BTCUSDT"]
+            raw.pop("exchange_position_identity", None)
+            raw.pop("exchange_orders", None)
+            raw.pop("exchange_executions", None)
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            restored = engine.PlanBStatePersistence(str(path)).load_state(
+                engine.AdaptiveRiskManager(cfg)
+            )[0]["BTCUSDT"]
+            self.assertIsNone(restored.exchange_position_identity)
+            self.assertEqual(restored.exchange_orders, [])
+            self.assertEqual(restored.exchange_executions, [])

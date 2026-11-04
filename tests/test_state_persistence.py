@@ -1778,6 +1778,11 @@ class StatePersistenceTests(unittest.TestCase):
     def test_execution_batch_merge_conflict_or_invalid_row_rolls_back_entire_batch(self):
         from exchange_execution_identity import ExchangeExecutionIdentity
         position = sample_position()
+        from exchange_execution_identity import ExchangeOrderIdentity
+        position.record_exchange_order(ExchangeOrderIdentity(
+            "entry-order", "", "BTCUSDT", "Buy", 0,
+            "0.3", "0.2", "0.1", "PartiallyFilled", False, False,
+        ))
         valid = ExchangeExecutionIdentity(
             "batch-valid", "entry-order", "", "BTCUSDT", "Buy",
             "0.1", "100", position.entry_ts + 1,

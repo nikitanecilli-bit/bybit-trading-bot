@@ -134,6 +134,46 @@ class ExchangeExecutionIdentity:
 
 
 @dataclass(frozen=True)
+class ExchangeExecutionCoverage:
+    """Caller-attested, half-open execution-history query window [start, end)."""
+    coverage_id: str
+    symbol: str
+    window_start_ms: int
+    window_end_ms: int
+    page_count: int
+    pagination_complete: bool
+    terminal_page_seen: bool
+
+    def __post_init__(self) -> None:
+        _text(self.coverage_id, "coverage_id")
+        _text(self.symbol, "symbol")
+        _integer(self.window_start_ms, "window_start_ms", minimum=1)
+        _integer(self.window_end_ms, "window_end_ms", minimum=1)
+        if self.window_end_ms <= self.window_start_ms:
+            raise ExecutionIdentityError("coverage window_end_ms must exceed window_start_ms")
+        _integer(self.page_count, "page_count", minimum=1)
+        if not isinstance(self.pagination_complete, bool) or not isinstance(self.terminal_page_seen, bool):
+            raise ExecutionIdentityError("coverage pagination flags must be booleans")
+        if self.pagination_complete and not self.terminal_page_seen:
+            raise ExecutionIdentityError("complete pagination requires terminal page observation")
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> "ExchangeExecutionCoverage":
+        if not isinstance(value, Mapping):
+            raise ExecutionIdentityError("execution coverage must be an object")
+        expected = set(cls.__dataclass_fields__)
+        if set(value) != expected:
+            raise ExecutionIdentityError(
+                f"execution coverage fields mismatch: missing={sorted(expected-set(value))}, "
+                f"unknown={sorted(set(value)-expected)}"
+            )
+        return cls(**dict(value))
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ExchangeOrderIdentity:
     order_id: str
     order_link_id: str

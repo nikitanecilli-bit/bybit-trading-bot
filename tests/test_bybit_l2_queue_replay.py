@@ -66,7 +66,7 @@ def test_invalid_delta_is_atomic_and_does_not_partially_mutate_book():
         b.apply({"type": "delta", "cts": 1100, "data": {
             "seq": 2, "u": 2, "b": [["100", "7"], ["bad-price", "1"]], "a": [],
         }})
-    except Exception:
+    except ValueError:
         pass
     else:
         raise AssertionError("malformed delta must fail")

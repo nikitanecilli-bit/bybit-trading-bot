@@ -246,3 +246,19 @@ Validation:
 No H1 market PnL, API/account access or orders were performed. Next step is to
 replay actual H1 limit prices against L2/trade archives for the frozen Top-5
 symbols and scored windows, then compare queue-aware fills with OHLC assumptions.
+
+
+## Confirmation-mode strategy arm freeze — 2026-11-04
+
+A further control-flow audit found that confirm mode froze the volume and breakout thresholds but did not require an explicit frozen strategy arm set. The workflow toggles could therefore select D20 baseline, D20+EMA, or the three-arm D20/D48/D48+EMA design without the confirm-mode guard proving which arm set had been frozen.
+
+Correction:
+- Confirm mode now requires `H1_FROZEN_STRATEGY_MODE` with one of `d20_baseline`, `d20_ema50_200`, or `d20_d48_d48_ema`.
+- The selected workflow toggles must exactly match that declared arm set; mismatches fail closed.
+- The frozen configuration records the strategy mode and explicit Donchian/EMA arms in the validation manifest.
+- Explore mode remains unchanged and can run the selected paired experiment design on folds 1–2.
+
+Verification:
+- Research CI [#41814790870](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41814790870) completed **SUCCESS**, 58/58 workflow steps.
+- Tests for valid frozen mode, missing frozen mode, invalid thresholds and mismatched arm sets passed.
+- No H1 market PnL replay was run.

@@ -80,6 +80,8 @@ class OrderBook:
             raise ValueError("seq must be positive")
         if update_id <= 0:
             raise ValueError("u must be positive")
+        if self.last_u is None and kind != "snapshot":
+            raise ValueError("order-book stream must begin with a full snapshot")
         reset_snapshot = update_id == 1
         if reset_snapshot and kind != "snapshot":
             raise ValueError("u=1 restart marker requires a full snapshot for this archive format")

@@ -364,8 +364,8 @@ class FundingArchiveManifestTests(unittest.TestCase):
 
         csv_path = funding_dir / "BTCUSDT.csv"
         csv_path.write_text(
-            "symbol,funding_timestamp_ms,funding_rate\\n"
-            "BTCUSDT,3600000,0.001\\n",
+            "symbol,funding_timestamp_ms,funding_rate\n"
+            "BTCUSDT,3600000,0.001\n",
             encoding="utf-8",
         )
         manifest_path = csv_path.with_suffix(csv_path.suffix + ".audit.json")

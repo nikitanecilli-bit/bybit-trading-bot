@@ -1058,3 +1058,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Межуточные CI запуски завершались fail только из-за неверного regex в новом тесте (ошибка была обёрнута contextual ValueError); ожидание теста исправлено, финальный CI зелёный.
 - Классификация: data/accounting contract guardrail; не рыночный эксперимент и не PnL evidence. No market replay, archive download, private API, paper/live orders.
 - Остаточные блокеры не меняются: историческая полнота funding schedule и exact settlement mark не доказаны; maker fill realism и account-specific costs не подтверждены.
+
+
+## ENG-EXEC-015 — TP1 remainder minNotional at short TP2 (2026-11-04)
+
+- Дефект: TP1 exchange-sized остаток проверялся по min(stop, entry), не включая TP2. Для short TP2 может быть ниже обеих цен; остаток мог пройти TP1, но нарушить minNotionalValue на плановом TP2 close.
+- Исправление: lowest planned exit = min(stop_price, entry_price, tp2_price); остаток проверяется по этой цене, TP1-часть — по TP1 цене.
+- Регрессия: 0.5 контракта * TP1 90 = 45 (ровно minNotional), остаток 0.5 * TP2 80 = 40 (ниже minNotional 45). Старый код принимал TP1; новый отклоняет без изменения состояния.
+- Final Research CI #41850162961, commit e01a53868885f5ac79f2ad3d3cfa3179e7207b1a: SUCCESS, 57/57 steps; MarkPriceEngineIntegrationTests 9/9; новая регрессия подтверждена в логе.
+- Классификация: exchange validity guardrail, не PnL evidence. No market replay, data downloads, private API, runner, paper/live orders.

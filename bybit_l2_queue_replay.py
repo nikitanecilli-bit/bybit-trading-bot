@@ -344,20 +344,16 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
         fields = set(fieldnames)
         if not required.issubset(fields):
             raise ValueError("trade archive is missing required columns")
-        block_flag = "isBlockTrade" if "isBlockTrade" in fields else (
-            "BT" if "BT" in fields else None
-        )
-        if block_flag is None:
+        block_flags = [name for name in ("isBlockTrade", "BT") if name in fields]
+        if not block_flags:
             raise ValueError("trade archive is missing block-trade flag; queue replay cannot safely classify prints")
-        rpi_flag = "RPI" if "RPI" in fields else (
-            "isRPITrade" if "isRPITrade" in fields else None
-        )
-        if rpi_flag is None:
+        rpi_flags = [name for name in ("RPI", "isRPITrade") if name in fields]
+        if not rpi_flags:
             raise ValueError("trade archive is missing RPI flag; queue replay cannot safely classify prints")
         for row_no, row in enumerate(reader, 2):
             if None in row:
                 raise ValueError(f"unexpected extra CSV fields at row {row_no}")
-            required_row_fields = required | {block_flag, rpi_flag}
+            required_row_fields = required | set(block_flags) | set(rpi_flags)
             if any(row.get(name) is None for name in required_row_fields):
                 raise ValueError(f"missing CSV field value at row {row_no}")
             if row.get("symbol") != symbol:
@@ -368,13 +364,23 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
                 raise ValueError(f"missing public trade ID at CSV row {row_no}")
             if trade_id != trade_id.strip():
                 raise ValueError(f"public trade ID has surrounding whitespace at CSV row {row_no}")
+            block_values = {
+                parse_exchange_bool(row[name], "block trade") for name in block_flags
+            }
+            rpi_values = {
+                parse_exchange_bool(row[name], "RPI") for name in rpi_flags
+            }
+            if len(block_values) != 1:
+                raise ValueError(f"conflicting block-trade flag aliases at CSV row {row_no}")
+            if len(rpi_values) != 1:
+                raise ValueError(f"conflicting RPI flag aliases at CSV row {row_no}")
             yield {
                 "timestamp_ms": timestamp_ms,
                 "side": row["side"],
                 "price": row["price"],
                 "size": row["size"],
-                "rpi": parse_exchange_bool(row[rpi_flag], "RPI"),
-                "block_trade": parse_exchange_bool(row[block_flag], "block trade"),
+                "rpi": next(iter(rpi_values)),
+                "block_trade": next(iter(block_values)),
                 "trade_id": trade_id,
             }
 

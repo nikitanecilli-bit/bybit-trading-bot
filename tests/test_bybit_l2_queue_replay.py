@@ -678,6 +678,36 @@ def test_trade_archive_rejects_trade_id_with_surrounding_whitespace():
             raise AssertionError("padded trade IDs must be rejected")
 
 
+def test_trade_archive_rejects_conflicting_block_flag_aliases():
+    import gzip
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "trades.csv.gz"
+        with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
+            stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,BT,RPI\\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,False,True,False\\n")
+        try:
+            list(l2_module.iter_public_trades(path))
+        except ValueError as exc:
+            assert "conflicting block-trade flag aliases" in str(exc)
+        else:
+            raise AssertionError("conflicting block-trade aliases must be rejected")
+
+
+def test_trade_archive_rejects_conflicting_rpi_flag_aliases():
+    import gzip
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "trades.csv.gz"
+        with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
+            stream.write("timestamp,symbol,side,size,price,trdMatchID,BT,RPI,isRPITrade\\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,False,False,True\\n")
+        try:
+            list(l2_module.iter_public_trades(path))
+        except ValueError as exc:
+            assert "conflicting RPI flag aliases" in str(exc)
+        else:
+            raise AssertionError("conflicting RPI aliases must be rejected")
+
+
 def test_trade_archive_parses_block_trade_and_rpi_flags():
     import gzip
     with tempfile.TemporaryDirectory() as tmp:

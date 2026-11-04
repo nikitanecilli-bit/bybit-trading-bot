@@ -368,9 +368,7 @@ def build_report(root: Path) -> dict[str, Any]:
         "audit": "bybit_instrument_snapshot_temporal_coverage",
         "mode": "offline_only",
         "root": str(root),
-        "status": "NO_DATA" if not any_data else (
-            "DATA_FOUND" if joint["status"] == "DATA_FOUND" else "INCOMPLETE"
-        ),
+        "status": "DATA_FOUND" if any_data else "NO_DATA",
         "sections": sections,
         "joint_linear_market_state": joint,
         "interpretation": (

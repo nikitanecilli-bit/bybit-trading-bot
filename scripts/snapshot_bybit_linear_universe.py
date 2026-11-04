@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from scripts.snapshot_bybit_instruments import (
-    DEFAULT_BASE_URL, _request_page, _snapshot_timestamp, _validate_base_url, write_snapshot,
+    DEFAULT_BASE_URL, _request_page, _snapshot_timestamp, _validate_base_url,\n    build_page_observation, validate_page_observations, write_snapshot,
 )
 
 # API Explorer status filters; the default query additionally returns PendingOpen.
@@ -145,6 +145,7 @@ def is_linear_usdt_perpetual_within_lifecycle_at(row: dict[str, Any], timestamp_
 def build_universe_snapshot(
     rows: list[dict[str, Any]], status_counts: dict[str, int], fetched_at: str | None = None,
     collection_started_at: str | None = None,
+    page_observations: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if not isinstance(rows, list) or not rows or any(not isinstance(row, dict) for row in rows):
         raise ValueError("universe snapshot requires non-empty instrument objects")
@@ -178,6 +179,8 @@ def build_universe_snapshot(
     }
     if started_at is not None:
         snapshot["collection_started_at"] = started_at
+    if page_observations is not None:
+        snapshot["page_observations"] = validate_page_observations(page_observations)
     return snapshot
 
 
@@ -191,15 +194,26 @@ def main() -> None:
         parser.error("--pause cannot be negative")
     _validate_base_url(args.base_url)
 
+    page_observations: list[dict[str, Any]] = []
+    page_counts: Counter[str] = Counter()
+
     def fetch_page(status: str | None, cursor: str | None):
+        status_filter = status or "default"
+        page_counts[status_filter] += 1
+        request_started_at = _snapshot_timestamp(None)
         rows, next_cursor = _request_page(args.base_url, "linear", cursor, status=status)
+        response_received_at = _snapshot_timestamp(None)
+        page_observations.append(build_page_observation(
+            status_filter, page_counts[status_filter], request_started_at,
+            response_received_at, rows, next_cursor,
+        ))
         if next_cursor and args.pause:
             time.sleep(args.pause)
         return rows, next_cursor
 
     collection_started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     rows, counts = fetch_linear_universe(fetch_page)
-    snapshot = build_universe_snapshot(rows, counts, collection_started_at=collection_started_at)
+    snapshot = build_universe_snapshot(\n        rows, counts, collection_started_at=collection_started_at,\n        page_observations=page_observations,\n    )
     fetched = datetime.fromisoformat(snapshot["fetched_at"].replace("Z", "+00:00"))
     stamp = fetched.astimezone(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     output = Path(args.output_dir) / "linear" / f"{stamp}.json"

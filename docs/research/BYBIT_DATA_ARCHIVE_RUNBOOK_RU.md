@@ -83,14 +83,24 @@ Workflow публикует два артефакта: итоговый `h1_shar
 ## 8. Статическая перепроверка 2026-11-03
 
 - Collector YAML в `main` существует и остаётся manual-only. В доступной GitHub-интеграции этой сессии нет операции `workflow_dispatch` и нет чтения списка зарегистрированных self-hosted runners; поэтому фактический запуск и runner availability не подтверждены.
-- Archive downloader запрашивает Bybit V5 trade klines, funding history и mark-price klines, использует end-exclusive UTC диапазон, проверяет alignment/полноту H1 grid, режет запросы на bounded windows и атомарно пишет CSV. Funding pagination рекурсивно делит насыщенные 200-row windows.
-- Coverage gate проверяет наличие funding событий, mark candles на каждом funding timestamp и полное совпадение timestamp sets trade/mark H1. Это необходимая проверка целостности, но не проверка корректности самих рыночных цен/ставок и не доказательство exchange fills.
+- Archive downloader сохраняет trade H1 candles в диапазоне [start, end_exclusive), но funding history проверяет включительно до end_exclusive, поскольку settlement может произойти ровно на закрытии последней свечи. Если dated funding schedule содержит settlement на этой границе, дополнительно запрашивается Mark Price candle с open timestamp=end_exclusive; этот дополнительный mark не расширяет торговый OHLCV диапазон. Запросы режутся на bounded windows, CSV пишутся атомарно, насыщенные 200-row funding pages рекурсивно делятся.
+- Coverage gate проверяет наличие funding событий, mark candles на каждом funding timestamp, полное покрытие trade H1 marks и допускает ровно один дополнительный Mark candle только на точном terminal close boundary последней trade-свечи. Любые пропуски или дополнительные timestamps в других местах блокируют preflight. Это проверка целостности, а не доказательство корректности самих рыночных цен/ставок или exchange fills.
 - Instrument/risk-limit snapshots являются point-in-time наблюдениями; они не восстанавливают исторические параметры до первого сохранённого снимка.
 - Никаких новых PnL запусков не выполнялось: Bybit archive и датированные snapshots пока отсутствуют. Следующий реальный эксперимент не запускать до появления этих данных.
 
 
 **Детерминированные collector tests:** Research CI [#41689536499 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41689536499) выполнен на исследовательской ветке; все шаги успешны, включая instrument snapshot collector, risk-limit snapshot collector, market-history archive collector и funding/mark coverage preflight. Это offline/mock tests, не сетевой сбор реальных Bybit данных.
 
+
+
+
+### Funding boundary semantics — уточнение от 2026-11-04
+
+- end_exclusive_ms остаётся границей trade H1 OHLCV: последняя торговая свеча начинается в end_exclusive_ms - 1h и закрывается в end_exclusive_ms.
+- Funding endpoint запрашивается до end_exclusive_ms включительно (endTime=end_exclusive_ms), а sidecar и dated settlement schedule должны подтверждать query/schedule coverage до этой же точки.
+- Если расписание Bybit funding требует settlement точно в end_exclusive_ms, Mark Price архив включает одну дополнительную свечу с timestamp end_exclusive_ms. Она нужна только как точный Mark-open proxy для funding settlement на close boundary; торговый OHLCV ряд остаётся end-exclusive.
+- Coverage validator допускает только этот один дополнительный terminal Mark timestamp. Отсутствующая mark-свеча, extra timestamp в середине ряда или extra mark за пределами одной H1-свечи не допускаются.
+- Для terminal settlement Mark candle должен быть закрытым на момент архивации. Если граничная Mark-свеча ещё не закрылась, collector завершится ошибкой; не снижать это требование и не подменять её Last Price.
 
 ## 10. Train-only top-5 selector v2 — одинаковая выборка кандидатов (2026-11-03)
 

@@ -14,6 +14,7 @@ sys.path.insert(0, str(repo_root))
 sys.path.insert(0, str(repo_root / "scripts"))
 
 import Bybit_Trading_Engine_v14_research as em
+import run_bybit_h1_long_only_holdout as bybit_holdout
 from funding_archive_manifest import record_funding_collection, sha256_file
 
 
@@ -928,4 +929,32 @@ def test_h1_limit_wait_spec_fails_closed_without_both_histories():
         assert "instrument and risk-tier histories" in str(exc)
     else:
         raise AssertionError("limit wait accepted without joined risk-tier history")
+
+def test_bybit_holdout_requires_dated_instrument_and_risk_metadata():
+    try:
+        bybit_holdout.run(
+            data_dir="missing-data",
+            instrument_specs_dir=None,
+            risk_tiers_dir=None,
+            max_market_state_skew_ms=None,
+        )
+    except ValueError as exc:
+        assert "dated --instrument-specs-dir and --risk-tiers-dir" in str(exc)
+    else:
+        raise AssertionError("Bybit holdout accepted missing joined market metadata")
+
+
+def test_bybit_holdout_requires_explicit_valid_skew_budget():
+    for value in (None, True, -1, 1.5):
+        try:
+            bybit_holdout.run(
+                data_dir="missing-data",
+                instrument_specs_dir="specs",
+                risk_tiers_dir="tiers",
+                max_market_state_skew_ms=value,
+            )
+        except ValueError as exc:
+            assert "explicit non-negative integer" in str(exc)
+        else:
+            raise AssertionError(f"invalid market-state skew budget accepted: {value!r}")
 

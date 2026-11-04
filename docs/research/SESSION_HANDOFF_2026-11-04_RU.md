@@ -6,12 +6,12 @@
 
 - Репозиторий: `nikitanecilli-bit/bybit-trading-bot` (private).
 - Рабочая ветка: `research/market-regime-v1-main`.
-- Последний code/test commit: `b54e5cb90393b4334e736b4e96db7b7bfdefac7d` — duplicate-JSON-key rejection in the standalone orderbook archive inspector; added regression test in `tests/test_run_bybit_l2_queue_replay.py`.
-- Последний подтверждённый CI: [Research engine checks #41881215008](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41881215008), commit `af4ad6f`; SUCCESS, 57/57 workflow steps. Он предшествует `b54e5cb`; для нового коммита GitHub Actions run пока не обнаружен, поэтому новую regression и полный suite считать pending/unverified.
+- Последний code/test commit: `63458f9108e9de65c4b167d387d8d01cc3c8a607` — standalone L2 inspector now rejects delta-before-snapshot and duplicate price levels in snapshot/delta; two regression tests added.
+- Последний подтверждённый CI SUCCESS: [Research engine checks #41881215008](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41881215008), commit `af4ad6f`, 57/57 workflow steps. Более поздний run #41883538553 на `b54e5cb` был `in_progress` на момент handoff; он не включает commit `63458f9`. Для `63458f9` отдельный CI ещё не подтверждён; новые regression/full suite pending.
 - В предыдущем CI #41875905360 до новой regression: aggregate-L2 primitive tests 81/81; runner/inspector suite 9/9; portfolio accounting 54/54; state persistence 84/84. В новом CI #41881215008 эти L2 suites расширились до 82/82 и 13/13 соответственно.
 - Предыдущая неудачная попытка #41872989853 была вызвана устаревшим тестом после перехода trade inspector на общий `parse_trade_timestamp_ms`; тест синхронизирован в `ec28763`, после чего полные CI #41873039139, #41873425668, #41874277483, #41875093214 и #41875905360 прошли.
 - PR #4: открыт, Draft, base `main`, head = текущая research-ветка; последний ответ GitHub по `mergeable` был `null` (не вычислено), не трактовать это как false/true. Не сливать автоматически.
-- Последнее сравнение с `main` на snapshot `d9f6d6a`: diverged, 2225 commits ahead / 36 behind. Main HEAD на момент сверки: `c87612207d145af433394f0ea992f2d29eba28d5`; merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. После snapshot добавлен code/test commit `b54e5cb` и обновления handoff/ledger, включая последнее `ac9746f`; точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
+- Последнее сравнение с `main` на snapshot `d9f6d6a`: diverged, 2225 commits ahead / 36 behind. Main HEAD на момент сверки: `c87612207d145af433394f0ea992f2d29eba28d5`; merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. После snapshot добавлены code/test commits `b54e5cb` и `63458f9`, а также обновления handoff/ledger; точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
 - `main` не менять. Не делать wholesale merge/rebase research branch. Использовать только reviewed selective PR/cherry-pick при отдельном обосновании.
 - В репозитории есть отдельная ветка `Audit` и `chore/main-repository-organization`; не предполагать, что они слиты или актуальны без проверки.
 
@@ -389,6 +389,16 @@
 - Source-only CI #41875836674 SUCCESS, 57/57; final CI #41875905360 на `1b50c9d`: SUCCESS, 57/57. Фактический лог подтверждает strict orderbook inspector regression; inspector/runner suite 9/9 и aggregate-L2 primitives 81/81.
 - Это timestamp/sequence integrity guardrail диагностического инструмента, не execution evidence и не PnL. Inspector не запускался с сетевой загрузкой; новые архивы не скачивались. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся.
 - Нет PnL/backtests, collectors, API, runner, paper/live orders или изменений `main`.
+
+## Session update — align standalone L2 inspector with replay invariants (2026-11-04)
+
+- Static comparison found two integrity gaps in scripts/inspect_bybit_orderbook_sample.py: it accepted a delta before the first full snapshot, and it accepted duplicate price levels within the same bid/ask side of a snapshot or delta. The primary OrderBook replay rejects delta-before-snapshot and duplicate side/price entries.
+- The inspector now rejects delta-before-initial-snapshot and duplicate price levels separately for bids/asks in both snapshots and deltas.
+- Added regression coverage for delta-before-snapshot and duplicate price levels in snapshot and delta.
+- Code/test commit: 63458f9108e9de65c4b167d387d8d01cc3c8a607.
+- CI: run #41883538553 on prior commit b54e5cb was still in_progress when checked; it does not include this commit. No successful CI for 63458f9 yet. New regressions and full suite remain pending/unverified.
+- Official Bybit docs were reviewed to avoid conflating standard depth-specific orderbook streams with orderbook.full. The standard stream docs describe snapshots/deltas, u=1 restart snapshots, and same-u repeated L1 snapshots; the full-orderbook docs specify a separate delta-only REST-sync protocol and consecutive u continuity. Do not impose full-orderbook u+1 rules on the ob200 archive absent evidence that it uses that feed format.
+- Diagnostic archive integrity only; no queue-fill semantics, data archives, PnL, strategy parameters, collectors, API, runner, paper/live orders or main changes.
 
 ## Session update — duplicate JSON-key rejection in standalone orderbook inspector (2026-11-04)
 

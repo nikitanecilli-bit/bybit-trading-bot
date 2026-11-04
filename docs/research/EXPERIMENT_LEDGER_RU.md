@@ -1197,4 +1197,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Commit: b54e5cb90393b4334e736b4e96db7b7bfdefac7d.
 - CI status: no GitHub Actions run for this commit was visible at handoff time. The latest confirmed Research CI #41881215008 on af4ad6f predates this change. New regression and full suite are pending/unverified; do not infer success from test presence.
 - This is diagnostic archive-integrity hardening only. The primary replay reader already rejected duplicate JSON keys; no replay fill semantics, datasets, PnL or strategy engine changed. No archives were downloaded; no collectors, PnL/backtests, API, runner, paper/live orders, or main changes.
+## ENG-EXEC-027 — Align standalone L2 inspector with replay book invariants (2026-11-04)
+
+- Static code comparison found that the standalone orderbook inspector accepted a delta before the first full snapshot and duplicate price levels within the same side of a snapshot/delta, while the primary OrderBook replay rejects both conditions.
+- Added fail-closed checks for delta-before-initial-snapshot and duplicate bid/ask price entries per event; added regression tests for the early delta and duplicate prices in both snapshot and delta.
+- Commit: 63458f9108e9de65c4b167d387d8d01cc3c8a607.
+- CI status: latest successful Research CI #41881215008 is on earlier commit af4ad6f. Run #41883538553 on b54e5cb was in progress and does not include this commit. Full suite and new tests are pending/unverified.
+- Protocol distinction: standard depth-specific Bybit orderbook WS and orderbook.full have different documented synchronization rules. Standard stream docs describe snapshot/delta, u=1 restart snapshots, and repeated same-u L1 snapshots; full-orderbook is delta-only and explicitly requires REST snapshot synchronization plus u+1 continuity. The current ob200 archive is treated as snapshot/delta depth archive; do not impose full-orderbook continuity rules without source-format evidence.
+- No archive download, PnL/backtest, collector, API, runner, paper/live order or main change. This is diagnostic integrity hardening only.
 

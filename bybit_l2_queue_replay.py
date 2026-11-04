@@ -253,21 +253,25 @@ def place_passive_order(
 
 
 def apply_public_trade(order: PassiveOrder, trade: dict) -> None:
+    # Validate the normalized event before temporal filtering. The archive
+    # reader already validates every row, but direct primitive calls must not
+    # silently hide malformed events outside the order's active window.
     ts = strict_int(trade.get("timestamp_ms"), "public trade timestamp_ms")
-    if ts <= order.arrival_ts or ts >= order.expiry_ts or order.complete:
-        return
     side = str(trade["side"])
     if side not in ("Buy", "Sell"):
         raise ValueError(f"unknown trade side: {side!r}")
     price, qty = dec(trade["price"]), dec(trade["size"])
     if price <= ZERO or qty <= ZERO:
         raise ValueError("public trade price and size must be positive")
-    # Normalized public-trade events must carry both classification flags.
     # Missing metadata is unknown, not equivalent to a confirmed False value.
-    if parse_exchange_bool(trade.get("block_trade"), "block trade"):
+    block_trade = parse_exchange_bool(trade.get("block_trade"), "block trade")
+    rpi_trade = parse_exchange_bool(trade.get("rpi"), "RPI")
+    if ts <= order.arrival_ts or ts >= order.expiry_ts or order.complete:
+        return
+    if block_trade:
         order.block_trade_excluded_count += 1
         return
-    if parse_exchange_bool(trade.get("rpi"), "RPI"):
+    if rpi_trade:
         order.rpi_excluded_count += 1
         return
     if price != order.price:

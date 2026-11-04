@@ -877,6 +877,37 @@ def test_expired_or_completed_order_ignores_later_trades():
     assert o.filled == 0
 
 
+def test_apply_public_trade_validates_normalized_rows_outside_active_window():
+    expired = order()
+    malformed_expired = {
+        **trade(5000, "Sell", "100", "1"),
+        "rpi": "unknown",
+    }
+    try:
+        apply_public_trade(expired, malformed_expired)
+    except ValueError as exc:
+        assert "invalid RPI boolean flag" in str(exc)
+    else:
+        raise AssertionError("malformed normalized trade after expiry must fail closed")
+    assert expired.filled == D("0")
+    assert expired.queue_ahead_remaining == D("5")
+
+    completed = order()
+    apply_public_trade(completed, trade(1100, "Sell", "100", "6"))
+    assert completed.complete
+    malformed_completed = {
+        **trade(1200, "Sell", "100", "1"),
+        "block_trade": "unknown",
+    }
+    try:
+        apply_public_trade(completed, malformed_completed)
+    except ValueError as exc:
+        assert "invalid block trade boolean flag" in str(exc)
+    else:
+        raise AssertionError("malformed normalized trade after completion must fail closed")
+    assert completed.filled == D("5")
+
+
 def test_rpi_trade_does_not_consume_queue_or_fill():
     o = order()
     apply_public_trade(o, trade(1100, "Sell", "100", "100", rpi="1"))

@@ -442,3 +442,8 @@ This correction applies to synchronized historical replay (dense and sparse). It
 The finalizer previously closed every remaining position sequentially and evaluated drawdown after each close, creating the same artificial transient equity path at the common terminal timestamp. It now defers close-level risk evaluation across the finalization set, then reconciles equity and evaluates risk once after all final exits. It also persists the final reconciled state. The pre-finalization adverse portfolio mark is still evaluated as a single portfolio snapshot.
 
 Regression: test_end_of_test_finalization_is_order_independent_for_simultaneous_positions. Research CI #41822118438 — SUCCESS, including the new finalization-order regression and sparse replay suite.
+### Post-batch kill-switch residual flatten regression
+
+Added test_post_batch_kill_switch_flattens_residual_positions_order_independently. It leaves one position open while a second time-stop close pushes the reconciled portfolio snapshot across the emergency threshold. Both symbol orders now produce the same ledger, final equity and drawdown; the remaining position is closed with kill_switch reason. The simultaneous-close regression also explicitly compares max drawdown.
+
+Research CI #41822512553 — SUCCESS on code/test commit 230b13261a05d3c6c787d4ab889e43c450c5e4f2. All 55 numbered steps and cleanup completed successfully.

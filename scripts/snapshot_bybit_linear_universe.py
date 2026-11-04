@@ -24,10 +24,17 @@ SYMBOL_RE = re.compile(r"^[A-Z0-9]{2,30}$")
 
 
 def _timestamp_ms(value: Any, field: str, *, allow_zero: bool) -> int:
-    try:
-        parsed = int(str(value))
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"invalid {field}") from exc
+    # Bybit returns millisecond timestamps as decimal strings. Accept integer
+    # JSON values for offline fixtures, but reject bools, floats and coercions
+    # such as whitespace or a leading plus sign.
+    if isinstance(value, bool):
+        raise ValueError(f"invalid {field}")
+    if isinstance(value, int):
+        parsed = value
+    elif isinstance(value, str) and re.fullmatch(r"[0-9]+", value):
+        parsed = int(value)
+    else:
+        raise ValueError(f"invalid {field}")
     if parsed < 0 or (parsed == 0 and not allow_zero):
         raise ValueError(f"invalid {field}")
     return parsed
@@ -111,7 +118,13 @@ def fetch_linear_universe(
 
 
 def is_linear_usdt_perpetual_within_lifecycle_at(row: dict[str, Any], timestamp_ms: int) -> bool:
-    """Check launch/delivery bounds, not temporary exchange trading availability."""
+    """Check lifecycle bounds, not current tradability.
+
+    Bybit documents deliveryTime=0 for perpetuals without a scheduled
+    delivery/delisting boundary. Treat that as open-ended only for a Trading
+    perpetual. A terminal/in-progress terminal status with no positive
+    boundary is ambiguous and is excluded rather than assigned an invented
+    historical end time.
     if timestamp_ms < 0:
         raise ValueError("timestamp_ms must be non-negative")
     if row.get("contractType") != "LinearPerpetual":

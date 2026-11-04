@@ -17,6 +17,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bybit_l2_queue_replay import parse_exchange_bool, parse_trade_timestamp_ms
+from report_io import write_json_report
 
 URL = "https://public.bybit.com/trading/AAVEUSDT/AAVEUSDT2025-09-02.csv.gz"
 SYMBOL = "AAVEUSDT"
@@ -224,7 +225,7 @@ def main() -> int:
         }
     report["status"] = "success"
     output = Path("bybit_trade_sample_inspection.json")
-    output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    write_json_report(output, report)
     print(json.dumps(report, indent=2))
     return 0
 

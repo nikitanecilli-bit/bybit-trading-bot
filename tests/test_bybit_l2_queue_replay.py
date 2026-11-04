@@ -203,6 +203,45 @@ def test_per_fill_fee_ledger_uses_each_supplied_rate_and_allows_explicit_rebate(
     assert ledger[1]["fee"] == D("-0.00200")
 
 
+
+def test_post_fill_markouts_are_attached_to_each_partial_fill():
+    fills = [
+        {"timestamp_ms": 1000, "side": "Buy", "price": "100", "quantity": "1"},
+        {"timestamp_ms": 2000, "side": "Buy", "price": "100", "quantity": "2"},
+    ]
+    result = {"fills": fills}
+    original = l2_runner.capture_book_states_at
+    def fake_states(_archive, targets):
+        return {
+            target: {
+                "book_cts": target - 100,
+                "bids": {D("100.1"): D("5")},
+                "asks": {D("100.3"): D("5")},
+            }
+            for target in targets
+        }
+    l2_runner.capture_book_states_at = fake_states
+    try:
+        l2_runner.add_post_fill_markouts(Path("unused.zip"), [result])
+    finally:
+        l2_runner.capture_book_states_at = original
+    assert len(fills[0]["post_fill_markout"]) == 4
+    assert len(fills[1]["post_fill_markout"]) == 4
+    assert fills[0]["post_fill_markout"][0]["signed_mid_markout_bps"] == "20.00"
+    assert fills[1]["post_fill_markout"][0]["signed_mid_markout_bps"] == "20.00"
+
+
+def test_no_fill_scenario_has_no_per_fill_markouts():
+    result = {"fills": []}
+    original = l2_runner.capture_book_states_at
+    l2_runner.capture_book_states_at = lambda *_args: {}
+    try:
+        l2_runner.add_post_fill_markouts(Path("unused.zip"), [result])
+    finally:
+        l2_runner.capture_book_states_at = original
+    assert result["fills"] == []
+
+
 def test_snapshot_and_delta_are_absolute_level_updates_and_zero_deletes():
     b = book()
     b.apply({"type": "delta", "cts": 1100, "data": {

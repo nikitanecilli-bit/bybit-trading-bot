@@ -230,8 +230,8 @@ def test_post_fill_markouts_are_attached_to_each_partial_fill():
         l2_runner.capture_book_states_at = original
     assert len(fills[0]["post_fill_markout"]) == 4
     assert len(fills[1]["post_fill_markout"]) == 4
-    assert fills[0]["post_fill_markout"][0]["signed_mid_markout_bps"] == "20.00"
-    assert fills[1]["post_fill_markout"][0]["signed_mid_markout_bps"] == "20.00"
+    assert D(fills[0]["post_fill_markout"][0]["signed_mid_markout_bps"]) == D("20")
+    assert D(fills[1]["post_fill_markout"][0]["signed_mid_markout_bps"]) == D("20")
 
 
 def test_no_fill_scenario_has_no_per_fill_markouts():

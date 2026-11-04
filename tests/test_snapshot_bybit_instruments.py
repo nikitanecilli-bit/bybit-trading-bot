@@ -10,7 +10,7 @@ from pathlib import Path
 
 import scripts.snapshot_bybit_instruments as collector
 from scripts.snapshot_bybit_instruments import (
-    build_snapshot, fetch_all_instruments, write_snapshot,
+    build_page_observation, build_snapshot, fetch_all_instruments, write_snapshot,
 )
 
 
@@ -105,6 +105,59 @@ class SnapshotCollectorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "nextPageCursor must be a string"):
             collector._validate_next_cursor(123)
         self.assertIsNone(collector._validate_next_cursor(""))
+
+    def test_page_observation_records_request_window_and_symbols(self):
+        observation = build_page_observation(
+            "Trading", 1, "2026-11-02T00:00:00.000Z",
+            "2026-11-02T00:00:00.250Z",
+            [{"symbol": "ethusdt"}, {"symbol": "BTCUSDT"}], "cursor",
+        )
+        self.assertEqual(observation["status_filter"], "Trading")
+        self.assertEqual(observation["page_index"], 1)
+        self.assertEqual(observation["row_count"], 2)
+        self.assertEqual(observation["symbols"], ["BTCUSDT", "ETHUSDT"])
+        self.assertTrue(observation["has_next_page"])
+
+    def test_page_observation_rejects_bad_window_and_duplicate_symbols(self):
+        with self.assertRaisesRegex(ValueError, "cannot be after"):
+            build_page_observation(
+                "Trading", 1, "2026-11-02T00:00:01.000Z",
+                "2026-11-02T00:00:00.000Z", [{"symbol": "BTCUSDT"}], None,
+            )
+        with self.assertRaisesRegex(ValueError, "duplicate symbols"):
+            build_page_observation(
+                "Trading", 1, "2026-11-02T00:00:00.000Z",
+                "2026-11-02T00:00:00.000Z",
+                [{"symbol": "BTCUSDT"}, {"symbol": "BTCUSDT"}], None,
+            )
+
+    def test_snapshot_round_trips_validated_page_observations(self):
+        observation = build_page_observation(
+            "Trading", 1, "2026-11-02T00:00:00.000Z",
+            "2026-11-02T00:00:00.250Z", [{"symbol": "BTCUSDT"}], None,
+        )
+        snapshot = build_snapshot(
+            [{"symbol": "BTCUSDT"}], "linear",
+            "2026-11-02T00:00:01.000Z", "2026-11-02T00:00:00.000Z",
+            [observation],
+        )
+        self.assertEqual(snapshot["page_observations"], [observation])
+
+    def test_snapshot_rejects_non_chronological_page_observations(self):
+        observations = [
+            build_page_observation("Trading", 1, "2026-11-02T00:00:01.000Z",
+                                   "2026-11-02T00:00:02.000Z",
+                                   [{"symbol": "BTCUSDT"}], None),
+            build_page_observation("Closed", 1, "2026-11-02T00:00:00.000Z",
+                                   "2026-11-02T00:00:00.500Z",
+                                   [{"symbol": "OLDUSDT"}], None),
+        ]
+        with self.assertRaisesRegex(ValueError, "not chronological"):
+            build_snapshot(
+                [{"symbol": "BTCUSDT"}, {"symbol": "OLDUSDT"}], "linear",
+                "2026-11-02T00:00:03.000Z", page_observations=observations,
+            )
+
     def test_snapshot_has_provenance_and_exact_timestamp(self):
         snapshot = build_snapshot(
             [{"symbol": "BTCUSDT"}], "linear", "2026-11-02T00:00:00.000Z"

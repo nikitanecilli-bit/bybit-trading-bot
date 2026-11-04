@@ -1588,6 +1588,7 @@ class UnifiedQuantEngine:
         self._intrabar_mtm_marks.clear()
         self._intrabar_mtm_marks_ts = None
         self._intrabar_liquidation_exits.clear()
+        self._defer_close_risk_evaluation = False
         self._bar_entry_risk_budgets.clear()
         self._bar_entry_equity = None
         self._state_restored = False
@@ -2831,6 +2832,9 @@ def run_sparse_simulation_pass(
         )
         if force_flatten is not None:
             force_flatten(bar_close_ts)
+        persist = getattr(engine, "_persist", None)
+        if persist is not None:
+            persist()
 
         signal_context = (
             signal_context_provider(bar_close_ts, histories, engine.cfg)
@@ -2923,6 +2927,7 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
         # post-execution portfolio snapshot trips the emergency kill-switch.
         engine._update_mark_to_market(bar_close_ts)
         engine._force_flatten_open_positions_after_kill_switch(bar_close_ts)
+        engine._persist()
 
         # Discover every eligible signal from the same post-execution portfolio
         # state. Position-slot priority is applied to the complete pending batch

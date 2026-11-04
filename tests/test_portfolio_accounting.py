@@ -727,7 +727,14 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
         def calculate_margin_requirements(self, *args, **kwargs):
             raise AssertionError("joined entry path must not re-query risk history independently")
 
-    class JoinedTier:
+    class JoinedTier1:
+        tier_id = 1
+        risk_limit_value = Decimal("100000")
+        maintenance_margin_rate = Decimal("0.005")
+        mm_deduction = Decimal("0")
+        max_leverage = Decimal("100")
+
+    class JoinedTier2:
         tier_id = 2
         risk_limit_value = Decimal("500000")
         maintenance_margin_rate = Decimal("0.01")
@@ -749,17 +756,17 @@ def test_engine_enforces_dated_risk_tier_and_persists_selected_tier():
     e._prepare_pending_entry_risk_budgets()
     with patch.object(
         engine_mod, "get_linear_market_state",
-        return_value=SimpleNamespace(instrument_spec=spec, risk_tiers=(JoinedTier(),)),
+        return_value=SimpleNamespace(instrument_spec=spec, risk_tiers=(JoinedTier1(), JoinedTier2())),
     ) as joined:
         assert e._try_fill_pending("BTCUSDT", bar)
     joined.assert_called_once()
     assert joined.call_args.kwargs["max_snapshot_skew_ms"] is None
     position = e.open_positions["BTCUSDT"]
-    assert position.risk_tier_id == 2
-    assert position.risk_limit_value == "500000"
-    assert position.maintenance_margin_rate == "0.01"
-    assert position.maintenance_margin_deduction == "500"
-    assert position.risk_tier_max_leverage == "50"
+    assert position.risk_tier_id == 1
+    assert position.risk_limit_value == "100000"
+    assert position.maintenance_margin_rate == "0.005"
+    assert position.maintenance_margin_deduction == "0"
+    assert position.risk_tier_max_leverage == "100"
     assert Decimal(position.initial_margin_usdt) == Decimal(str(position.size_usdt)) / Decimal("5")
     assert Decimal(position.maintenance_margin_usdt) == Decimal(str(position.size_usdt)) * Decimal("0.01") - Decimal("500")
 

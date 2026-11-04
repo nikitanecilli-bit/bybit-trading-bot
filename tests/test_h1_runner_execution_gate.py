@@ -89,6 +89,7 @@ from run_h1_shared_capital_portfolio_validation import (
     resolve_validation_design, load_frozen_selection_manifest, resolve_h1_replay_code_paths,
     validate_selection_cutoff, validate_selection_provenance, runtime_provenance,
     selection_validation_boundary, geometric_monthly_return_pct,
+    resolve_market_state_skew_budget,
 )
 
 
@@ -881,3 +882,16 @@ if __name__ == "__main__":
     ):
         test()
         print(f"PASS {test.__name__}")
+
+
+def test_market_state_skew_budget_requires_explicit_nonnegative_integer():
+    assert resolve_market_state_skew_budget({}) is None
+    assert resolve_market_state_skew_budget({"BYBIT_MAX_MARKET_STATE_SKEW_MS": "0"}) == 0
+    assert resolve_market_state_skew_budget({"BYBIT_MAX_MARKET_STATE_SKEW_MS": "1500"}) == 1500
+    for value in ("-1", "1.5", "true", "  +2 "):
+        try:
+            resolve_market_state_skew_budget({"BYBIT_MAX_MARKET_STATE_SKEW_MS": value})
+        except SystemExit as exc:
+            assert "non-negative integer" in str(exc)
+        else:
+            raise AssertionError(f"invalid skew budget accepted: {value!r}")

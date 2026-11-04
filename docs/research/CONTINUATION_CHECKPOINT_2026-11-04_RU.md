@@ -341,3 +341,20 @@ Test-only repair commits: e1bd0e6acf5ddc534cb1531f168483bb4abd2a0e, 2f9fb8fff4f0
 Это подтверждает корректность текущих deterministic parser/queue primitive tests в GitHub CI, но не подтверждает реальную maker execution: aggregate L2 без L3, latency/cancel model, verified historical instrument spec и подтверждённого historical BT/RPI trade archive остаётся proxy. Не запускались новые Bybit archive downloads, strategy PnL, private API, paper/live orders. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся без изменений.
 
 Branch compare после изменений: research/market-regime-v1-main diverged from main, 2009 ahead / 36 behind. `main` не менялся; wholesale merge/rebase не выполнять.
+
+
+## 17. Depth-200 event continuity and historical replay completeness
+
+Повторно проверены `capture_scenarios()`, `capture_book_states_at()`, `capture_book_at()` и `iter_book_events()`.
+
+Подтверждено статическим анализом:
+- Arrival snapshots исключают все book events с `cts >= arrival_ts`; несколько событий с одной миллисекундой не упорядочиваются предположительно.
+- Markout snapshots также используют состояние до первого события с `cts >= target`; если архив не содержит состояния на горизонте, runner помечает `no_book_state`, а не подставляет будущие данные.
+- `iter_book_events()` проверяет JSON object/data, symbol и строгий integer `cts`; `OrderBook.apply()` проверяет положительные `u`/`seq`/`cts`, non-decreasing `seq`/`cts`, snapshot initialization и корректность reconstructed book.
+- Runner не проверяет непрерывность `u` через `u+1`. Это намеренно: официальная стандартная orderbook документация описывает `u` как Update ID, `seq` как cross sequence и restart marker `u=1`, но не публикует явное правило непрерывности для depth-200 historical archive. Отдельная документация Full Orderbook задаёт consecutive `u` для другого потока и не может без подтверждения использоваться как контракт depth-200.
+
+Оставшийся существенный риск: если исторический depth-200 архив потерял промежуточные delta records, текущие проверки могут не обнаружить пропуск и восстановленный book может стать неполным/неверным. `seq` в стандартной документации предназначен для сравнения/упорядочивания, но не объявлен consecutive для этого потока. По этой причине отсутствие `u+1` validation не является подтверждением непрерывности архива. Требуется официальный контракт именно для исторического depth-200 файла либо независимый integrity manifest/sequence proof. Не добавлять произвольное continuity правило без такого контракта.
+
+Временные и markout проверки подтверждают только корректность обработки имеющихся записей, но не полноту самого архива. Следовательно, aggregate-L2 queue replay остаётся research proxy и не получает допуска к strategy PnL. Новые архивы не скачивались; runner не запускался; private API, orders и PnL не использовались. Предыдущий terminal CI run 41835268896 подтвердил 60/60 deterministic queue primitive tests на commit e7f4174; этот checkpoint update не меняет тестовый код.
+
+Источники документации (проверены 2026-11-04): стандартный public orderbook https://bybit-exchange.github.io/docs/v5/websocket/public/orderbook; отдельный Full Orderbook https://bybit-exchange.github.io/docs/v5/websocket/public/full-ob.

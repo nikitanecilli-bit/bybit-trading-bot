@@ -87,6 +87,20 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "expected category"):
             InstrumentSpecHistory.from_directory(self.root)
 
+    def test_as_of_timestamp_must_be_strict_integer_milliseconds(self):
+        history = InstrumentSpecHistory.from_directory(self.root)
+        for value in (1_793_577_600_000.5, True, "1793577600000"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "as_of_ts must be an integer"):
+                    history.get_spec("BTCUSDT", value)
+
+    def test_snapshot_timestamp_rejects_submillisecond_precision(self):
+        payload = json.loads((self.root / "a.json").read_text())
+        payload["fetched_at"] = "2026-11-01T00:00:00.000500Z"
+        (self.root / "a.json").write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "millisecond precision"):
+            InstrumentSpecHistory.from_directory(self.root)
+
     def test_snapshot_count_must_match_rows(self):
         payload = json.loads((self.root / "a.json").read_text())
         payload["count"] = 999

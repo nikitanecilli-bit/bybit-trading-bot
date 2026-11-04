@@ -59,6 +59,12 @@ class RiskLimitSnapshotTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "integer 0 or 1"):
             validate_tier(bad)
 
+    def test_rejects_float_is_lowest_risk(self):
+        bad = row()
+        bad["isLowestRisk"] = 1.0
+        with self.assertRaisesRegex(ValueError, "isLowestRisk must be integer 0 or 1"):
+            validate_tier(bad)
+
     def test_snapshot_is_timestamped_and_counts_symbols_and_tiers(self):
         snapshot = build_snapshot(
             [row("BTCUSDT"), row("BTCUSDT", 2, "500000", mm="0.01", im="0.02", lowest=0, leverage="50", deduction="1000"), row("ETHUSDT")],

@@ -181,7 +181,10 @@ def build_universe_snapshot(
     if started_at is not None:
         snapshot["collection_started_at"] = started_at
     if page_observations is not None:
-        snapshot["page_observations"] = validate_page_observations(page_observations)
+        snapshot["page_observations"] = validate_page_observations(
+            page_observations, expected_symbols=set(symbols),
+            collection_started_at=started_at, fetched_at=timestamp,
+        )
     return snapshot
 
 

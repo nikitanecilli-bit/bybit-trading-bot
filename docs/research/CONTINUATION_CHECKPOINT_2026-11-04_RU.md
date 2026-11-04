@@ -137,3 +137,18 @@ Next static audit items remain: order-spec/tick/qty validation, per-fill fee and
 CI state: combined commit status and available commit-workflow lookup returned no runs/statuses for these push commits. The available wrapper only exposes PR-triggered runs. Therefore tests are committed but execution is NOT independently verified in this session; do not claim 25/25 passed. No local runner was available in this tool context.
 
 Next: obtain a terminal Research CI result through Actions UI/API with push-run visibility; then continue order-spec validation and duplicate trade-ID audit. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains unchanged. No strategy PnL, data re-download, private API or live order was used.
+## 12. Public-trade identity and replay atomicity
+
+Дополнительный audit показал, что CSV reader сохранял `trdMatchID`, но queue replay никак не проверял его уникальность. Повтор одной и той же public trade строки мог дважды уменьшить очередь и создать завышенный fill.
+
+Исправлено:
+- `trdMatchID` теперь обязательная колонка trade archive schema.
+- Replay отклоняет пустой/missing trade ID и повтор ID в пределах используемого интервала ордера.
+- Replay выполняется на копии PassiveOrder и коммитит её состояние только после успешного прохода; при duplicate/missing ID или timestamp error исходный order state не меняется.
+- Добавлены два regression tests: duplicate ID и missing ID; оба проверяют отсутствие частичной мутации исходной заявки при отказе.
+
+Последние commits: source `624b78dd470b8d3910af67952a66add4ad74cb17`, test `59f5664a6842e6e7515025a255fd83b2945af138`, atomic replay source `0ed49682d5f049bd231606db6ed11e2e5b5c416a`, test `ef20e9e2af27f8e2f3bd16f03e2c40264fe78094`.
+
+Queue test file содержит 27 test functions; duplicate `u` fixture keys отсутствуют. Как и для предыдущих правок, test execution в текущей сессии не подтвержден: доступный GitHub workflow-run wrapper фильтрует PR-triggered runs и не показывает push runs. Не заявлять 27/27 passed до проверки terminal CI.
+
+Следующий engineering gate: order-spec validation (tickSize, qtyStep, minOrderQty, minNotional) и measured latency/cancel assumptions. Per-fill VWAP/fee/markout accounting остаётся не реализованным. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`; никаких новых PnL, архивных загрузок, private API или ордеров.

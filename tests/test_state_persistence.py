@@ -103,6 +103,7 @@ class StatePersistenceTests(unittest.TestCase):
             position.tp1_hit = True
             position.tp1_ts_ms = position.entry_ts + 3_600_000
             position.remaining_fraction = 0.5
+            position.realized_tp1_gross_usdt = 30.0
             position.tp1_maker = False
 
             engine.PlanBStatePersistence(str(path), enabled=True).save_state(

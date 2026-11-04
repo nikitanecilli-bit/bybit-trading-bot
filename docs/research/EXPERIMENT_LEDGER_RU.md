@@ -1237,3 +1237,10 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Current research branch HEAD when recorded: `118acb07cec55e692cb3dd3adeeb01536426e27f`.
 - CI not yet confirmed for this change: combined commit status returned no check records. This is a code change, not a completed test result.
 - No data collection/download, network inspector workflow, market PnL/backtest, private API, runner, paper/live orders or main change. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains.
+
+## ENG-EXEC-033 — Explicit trade timestamp ordering validity (2026-11-04)
+
+- Trade inspector counted nonmonotonic timestamps but did not expose an explicit validity status, while replay rejects timestamp regressions. Added `timestamp_order_validation_status` to distinguish a successful scan from replay-order compatibility: valid only when the count is zero.
+- Added strict count classifier and deterministic valid/invalid/malformed-input regression.
+- Source commit `0c4cf2e2504d69d31d3113b0f408f2b236c3db09`; test commit `6fc17e4d7f3274a8d4a609b845d658fd8010df15`.
+- CI not confirmed; combined status returned no check records. No archives, collectors, market PnL, API, runner or orders. Maker execution gate remains blocked.

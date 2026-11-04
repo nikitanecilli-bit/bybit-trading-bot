@@ -1038,3 +1038,14 @@ Both cumulative funding helpers now reject inconsistent lifecycle state: TP1 fal
 The funding test fixture's default was corrected from a half-size remainder to full quantity when TP1 is false. Added three regressions (partial quantity without TP1, TP1 true without reduction, exact partial contract quantity without TP1). Final CI #41853410298 on 0cf45d16809a04e2653325934b37723b009097d0: SUCCESS 57/57; log confirms all three tests and funding suite 28/28. An intermediate source-only run failed because it checked out the previous fixture, which contradicted the new invariant; corrected fixture and rerun passed.
 
 Classification: accounting/state-integrity guardrail only; not strategy/PnL evidence. No market-data, PnL, API, runner, paper/live or main changes.
+
+
+## 54. Restore must verify realized TP1 gross against closed leg — 2026-11-04
+
+Restore previously trusted any finite, nonnegative `realized_tp1_gross_usdt` once TP1 was marked hit. Since this field is directly included in MTM/final PnL, a stale or modified backup could inject arbitrary realized gross.
+
+Now `load_state()` recomputes expected TP1 gross from actual closed quantity and TP1 price: exact `tp1_contract_qty * abs(tp1-entry)` for exchange-sized positions; legacy `size_usdt * (1-remaining_fraction) * abs(tp1-entry)/entry` otherwise. Comparison follows 4-decimal engine rounding (1e-4 tolerance).
+
+Added corrupted legacy backup regression (stored 31 vs expected 30). Updated exchange-sized fixtures to exact contract gross 3 (0.5 contract * 6 price delta), and legacy TP1 liquidity fixture to its valid 30 gross. Final CI #41854119883 on f42979860d97090120ee3a8aed79d59695d441ee SUCCESS 57/57; persistence suite 78 tests; log confirms both valid round-trips and corrupted-gross rejection. Earlier two runs failed only on stale fixtures; final full workflow green.
+
+Classification: persisted PnL integrity, not profitability evidence. No market PnL/backtest/API/runner/paper/live or main changes.

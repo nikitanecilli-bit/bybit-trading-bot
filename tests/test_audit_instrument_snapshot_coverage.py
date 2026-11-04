@@ -23,6 +23,7 @@ def write_snapshot(root: Path, name: str, fetched_at: str, instruments: list[dic
     }
     if started_at is not None:
         payload["collection_started_at"] = started_at
+    root.mkdir(parents=True, exist_ok=True)
     (root / name).write_text(json.dumps(payload), encoding="utf-8")
 
 

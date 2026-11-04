@@ -1289,3 +1289,11 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Repo parser requires timestamp/symbol/side/size/price/trdMatchID + block/RPI flags; it tolerates extra columns but drops trade `seq` from normalized records. Existing no-seq test fixtures are synthetic, not real archive evidence. No verified raw historical CSV header is stored in repo.
 - Decision: no code change; treat historical CSV cross-stream `seq` as unavailable/unverified. Keep no-same-ms fills. A provenance-labelled existing raw sample may settle schema for its period; otherwise a separate approved acquisition would be required. No archive/API requests, tests, replay, PnL, collectors, runner or orders. Maker gate remains blocked.
 - Note: `docs/research/ENG_EXEC_039_HISTORICAL_TRADE_CSV_SEQ_AVAILABILITY_RU.md`.
+
+## ENG-EXEC-040 — L2/public-trade volume double-count audit (2026-11-04)
+
+- Static code audit: initial queue-ahead comes from pre-arrival L2 snapshot; after arrival L2 deltas do not consume queue. Only eligible public trades at exact order price/opposing aggressor consume queue. Duplicate trade IDs are rejected and replaying the same archive is idempotent.
+- No direct double consumption of the same volume via L2 reduction plus trade print was found, because L2 reductions are not a consumption input at all.
+- This does not validate fill realism: no cross-stream event identity/sequence reconciliation; aggregate L2 changes cannot be allocated to executions vs cancellations; same-ms ambiguity and historical CSV trade seq uncertainty remain. Do not add L2 reduction consumption without reconciliation; it could double-count executions already present in trades.
+- Decision: no code change; keep single-source public-trade consumption and L2 pre-arrival snapshot role. Maker realism remains blocked. Note: `docs/research/ENG_EXEC_040_L2_TRADE_VOLUME_DOUBLE_COUNT_AUDIT_RU.md`.
+- No archives/API, tests, replay, PnL/backtests, collectors, private API, runner or orders. `main` unchanged; PR #4 Draft/unmerged.

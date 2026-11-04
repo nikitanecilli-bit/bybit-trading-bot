@@ -11,7 +11,9 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.audit_instrument_snapshot_coverage import audit_directory, build_report, main
+from scripts.audit_instrument_snapshot_coverage import (
+    audit_directory, audit_joint_market_state, build_report, main,
+)
 
 
 def write_snapshot(root: Path, name: str, fetched_at: str, instruments: list[dict],
@@ -35,10 +37,85 @@ def write_snapshot(root: Path, name: str, fetched_at: str, instruments: list[dic
 
 
 def instrument(symbol: str, status: str = "Trading") -> dict:
-    return {"symbol": symbol, "status": status}
+    base = symbol.removesuffix("USDT")
+    return {
+        "symbol": symbol, "status": status, "category": "linear",
+        "contractType": "LinearPerpetual", "baseCoin": base,
+        "quoteCoin": "USDT", "settleCoin": "USDT",
+        "priceFilter": {"minPrice": "0.01", "maxPrice": "1000000", "tickSize": "0.1"},
+        "lotSizeFilter": {
+            "qtyStep": "0.001", "minOrderQty": "0.001",
+            "maxOrderQty": "100", "maxMktOrderQty": "50",
+            "minNotionalValue": "5",
+        },
+        "leverageFilter": {
+            "minLeverage": "1", "maxLeverage": "50", "leverageStep": "0.01",
+        },
+    }
+
+
+def write_risk_snapshot(root: Path, name: str, fetched_at: str,
+                        symbols: tuple[str, ...]) -> None:
+    tiers = []
+    for symbol in symbols:
+        tiers.append({
+            "symbol": symbol, "id": 1, "riskLimitValue": "100000",
+            "maintenanceMargin": "0.005", "initialMargin": "0.01",
+            "maxLeverage": "100", "isLowestRisk": 1, "mmDeduction": "0",
+        })
+    payload = {
+        "schema_version": 1,
+        "source": "Bybit V5 GET /v5/market/risk-limit",
+        "category": "linear", "fetched_at": fetched_at,
+        "symbol_count": len(symbols), "tier_count": len(tiers), "tiers": tiers,
+    }
+    root.mkdir(parents=True, exist_ok=True)
+    (root / name).write_text(json.dumps(payload), encoding="utf-8")
 
 
 class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
+
+    def test_joint_audit_reports_skew_and_missing_trading_symbol_tiers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            specs = root / "data" / "instrument_specs" / "linear"
+            risks = root / "data" / "instrument_specs" / "risk_limits" / "linear"
+            write_snapshot(
+                specs, "i1.json", "2026-11-01T00:00:00.000Z",
+                [instrument("BTCUSDT"), instrument("ETHUSDT")],
+            )
+            write_snapshot(
+                specs, "i2.json", "2026-11-01T00:10:00.000Z",
+                [instrument("BTCUSDT"), instrument("ETHUSDT")],
+            )
+            write_risk_snapshot(
+                risks, "r1.json", "2026-11-01T00:01:00.000Z",
+                ("BTCUSDT", "ETHUSDT"),
+            )
+            write_risk_snapshot(
+                risks, "r2.json", "2026-11-01T00:12:00.000Z",
+                ("BTCUSDT",),
+            )
+            report = audit_joint_market_state(specs, risks)
+
+        self.assertEqual(report["status"], "DATA_FOUND")
+        self.assertEqual(report["distinct_as_of_pairs"], 3)
+        self.assertEqual(report["snapshot_skew_ms"]["max"], 540_000)
+        self.assertEqual(report["pairs_with_missing_trading_symbol_risk_tiers"], 1)
+        missing = [
+            item for item in report["observations"]
+            if item["trading_symbols_missing_risk_tiers"]
+        ]
+        self.assertEqual(missing[0]["trading_symbols_missing_risk_tiers"], ["ETHUSDT"])
+        self.assertIsNone(report["skew_budget_recommendation_ms"])
+
+    def test_joint_audit_reports_incomplete_without_both_archives(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = audit_joint_market_state(root / "specs", root / "risk")
+        self.assertEqual(result["status"], "INCOMPLETE")
+        self.assertIsNone(result["skew_budget_recommendation_ms"])
+
     def test_empty_repository_reports_no_data_without_failing(self):
         with tempfile.TemporaryDirectory() as tmp:
             report = build_report(Path(tmp))

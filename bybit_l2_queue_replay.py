@@ -34,7 +34,7 @@ def parse_trade_timestamp_ms(value: object) -> int:
         raise ValueError("invalid public trade timestamp") from exc
     if not raw.is_finite() or raw <= ZERO:
         raise ValueError("public trade timestamp must be finite and positive")
-    milliseconds = raw if raw > Decimal("1000000000000") else raw * Decimal("1000")
+    milliseconds = raw if raw >= Decimal("1000000000000") else raw * Decimal("1000")
     if milliseconds != milliseconds.to_integral_value():
         raise ValueError("public trade timestamp has sub-millisecond precision")
     return int(milliseconds)

@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.bybit_reconciliation_report import ReportError, build_report, compare_execution_snapshots
+from scripts.bybit_reconciliation_report import (\n    ReportError, build_execution_merge_plan, build_report, compare_execution_snapshots,\n)
 
 SAVED = "2026-10-01T00:00:00Z"
 SAVED_MS = 1790812800000
@@ -463,6 +463,91 @@ class ReportOnlyComparatorTests(unittest.TestCase):
         data["capture_now_ms"] = SAVED_MS - 1
         with self.assertRaisesRegex(ReportError, "server-time bounds"):
             build_report(backup(), data)
+
+
+    def test_dry_run_merge_plan_proposes_late_fill_without_mutating_backup(self):
+        position = {
+            "symbol": "BTCUSDT",
+            "exchange_position_identity": {
+                "category": "linear", "settle_coin": "USDT", "symbol": "BTCUSDT",
+                "position_idx": 0, "position_mode": "one_way", "side": "Buy",
+                "qty": "0.1", "avg_price": "50000", "entry_order_id": "entry-1",
+                "entry_order_link_id": "",
+            },
+            "exchange_orders": [],
+            "exchange_executions": [],
+        }
+        local = backup(positions={"BTCUSDT": position})
+        original = copy.deepcopy(local)
+        execution = {
+            "execId": "late-fill-1", "orderId": "entry-1", "orderLinkId": "",
+            "symbol": "BTCUSDT", "execType": "Trade", "execTime": CAPTURE_MS - 1,
+            "side": "Buy", "execQty": "0.1", "execPrice": "50000", "execFee": "0.01",
+        }
+        data = upgrade_to_schema3(snapshot(execution_rows=[execution]))
+        plan = build_execution_merge_plan(local, data)
+        self.assertEqual(plan["status"], "DRY_RUN_MERGE_PLAN")
+        self.assertEqual(plan["mode"], "READ_ONLY_NO_MUTATION")
+        self.assertEqual(plan["planned_insert_count"], 1)
+        self.assertEqual(plan["planned_insertions"]["BTCUSDT"][0]["exec_id"], "late-fill-1")
+        self.assertFalse(plan["execution_history_complete"])
+        self.assertFalse(plan["reconciliation_pass"])
+        self.assertFalse(plan["live_resume_allowed"])
+        self.assertEqual(local, original)
+
+    def test_dry_run_merge_plan_counts_exact_duplicates_and_rejects_conflicts(self):
+        position = {
+            "symbol": "BTCUSDT",
+            "exchange_position_identity": {
+                "category": "linear", "settle_coin": "USDT", "symbol": "BTCUSDT",
+                "position_idx": 0, "position_mode": "one_way", "side": "Buy",
+                "qty": "0.1", "avg_price": "50000", "entry_order_id": "entry-1",
+                "entry_order_link_id": "",
+            },
+            "exchange_orders": [],
+            "exchange_executions": [{
+                "exec_id": "known-fill", "order_id": "entry-1", "order_link_id": "",
+                "symbol": "BTCUSDT", "side": "Buy", "exec_qty": "0.1",
+                "exec_price": "50000", "exec_time_ms": CAPTURE_MS - 1, "exec_fee": "0.01",
+            }],
+        }
+        local = backup(positions={"BTCUSDT": position})
+        execution = {
+            "execId": "known-fill", "orderId": "entry-1", "orderLinkId": "",
+            "symbol": "BTCUSDT", "execType": "Trade", "execTime": CAPTURE_MS - 1,
+            "side": "Buy", "execQty": "0.1", "execPrice": "50000", "execFee": "0.01",
+        }
+        plan = build_execution_merge_plan(local, upgrade_to_schema3(snapshot(execution_rows=[execution])))
+        self.assertEqual(plan["planned_insert_count"], 0)
+        self.assertEqual(plan["exact_duplicate_count"], 1)
+        conflicting = copy.deepcopy(execution)
+        conflicting["execFee"] = "0.02"
+        data = upgrade_to_schema3(snapshot(execution_rows=[conflicting]))
+        with self.assertRaisesRegex(ReportError, "conflicting local execution identity"):
+            build_execution_merge_plan(local, data)
+
+    def test_dry_run_merge_plan_rejects_unknown_order_before_returning_plan(self):
+        position = {
+            "symbol": "BTCUSDT",
+            "exchange_position_identity": {
+                "category": "linear", "settle_coin": "USDT", "symbol": "BTCUSDT",
+                "position_idx": 0, "position_mode": "one_way", "side": "Buy",
+                "qty": "0.1", "avg_price": "50000", "entry_order_id": "entry-1",
+                "entry_order_link_id": "",
+            },
+            "exchange_orders": [],
+            "exchange_executions": [],
+        }
+        execution = {
+            "execId": "orphan-fill", "orderId": "unknown-order", "orderLinkId": "",
+            "symbol": "BTCUSDT", "execType": "Trade", "execTime": CAPTURE_MS - 1,
+            "side": "Buy", "execQty": "0.1", "execPrice": "50000", "execFee": "0.01",
+        }
+        with self.assertRaisesRegex(ReportError, "unknown local order"):
+            build_execution_merge_plan(
+                backup(positions={"BTCUSDT": position}),
+                upgrade_to_schema3(snapshot(execution_rows=[execution])),
+            )
 
 
 if __name__ == "__main__":

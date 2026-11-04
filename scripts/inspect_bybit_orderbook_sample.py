@@ -80,7 +80,7 @@ def parse_event_integer_fields(event: dict) -> tuple[int, int | None, int, int]:
 def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
     event_types = Counter()
     ts_min = ts_max = cts_min = cts_max = None
-    previous_ts = previous_seq = None
+    previous_ts = previous_cts = previous_seq = previous_update_id = None
     nonmonotonic_ts = nonmonotonic_seq = duplicate_ts = 0
     cts_missing = u_reset_count = 0
     first_events, last_events = [], []
@@ -120,8 +120,12 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
                     nonmonotonic_ts += 1
                 if ts == previous_ts:
                     duplicate_ts += 1
+            if previous_cts is not None and cts is not None and cts < previous_cts:
+                raise ValueError(f"non-monotonic matching-engine timestamp at row {rows + 1}")
             if previous_seq is not None and seq < previous_seq:
-                nonmonotonic_seq += 1
+                raise ValueError(f"non-monotonic cross sequence at row {rows + 1}")
+            if previous_update_id is not None and update_id < previous_update_id and update_id != 1:
+                raise ValueError(f"non-monotonic order-book update ID at row {rows + 1}")
             if update_id == 1:
                 u_reset_count += 1
             if cts is None:
@@ -177,7 +181,9 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
                 last_events.pop(0)
             event_types[kind] += 1
             rows += 1
-            previous_ts, previous_seq = ts, seq
+            previous_ts, previous_seq, previous_update_id = ts, seq, update_id
+            if cts is not None:
+                previous_cts = cts
 
     if rows == 0 or first_snapshot is None:
         raise ValueError("archive has no usable snapshot/events")

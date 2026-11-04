@@ -370,3 +370,33 @@ Branch compare после изменений: research/market-regime-v1-main div
 - фактический архив не скачивался/не проверялся из-за external-data hold.
 
 Поэтому пока не включать `u+1` enforcement и не считать continuity доказанной. При будущем разрешённом аудите уже имеющегося локального файла можно проверить фактический raw JSONL: event types, snapshot/restart behavior, repeated IDs, gaps in u, seq semantics, cts monotonicity, and archive integrity. До этого остаётся блокер completeness для queue replay. Источник: https://github.com/Anton495/bybit-data-downloader (вторичный, неофициальный; проверен 2026-11-04).
+
+
+## 19. Строгая проверка схемы historical trade CSV и идентификаторов сделок
+
+В статическом аудите iter_public_trades() выявлены два дефекта валидации входного CSV:
+- csv.DictReader при повторяющихся заголовках может молча перезаписать одно из полей, что делает интерпретацию схемы неоднозначной;
+- пустой или whitespace-only trdMatchID принимался парсером и мог попасть в обработку как ID сделки.
+
+Исправлено в bybit_l2_queue_replay.py:
+- duplicate column names отклоняются до чтения строк;
+- trdMatchID должен быть непустой строкой после проверки .strip(); исходное значение ID сохраняется без модификации;
+- fail-closed проверки обязательных BT/isBlockTrade и RPI/isRPITrade не ослаблялись.
+
+Добавлены regression tests:
+- duplicate CSV headers отклоняются;
+- пустой и whitespace-only trade ID отклоняются;
+- тестовая фикстура содержит обязательные BT и RPI колонки и корректные newline-разделители.
+
+Изменения в research/market-regime-v1-main:
+- source commit: 8fa6e0d0ef23bda6d1f628f3673692640164eb2e;
+- regression tests: d122abbd3f7f00d05279993bd43801e7fb4a92ab;
+- fixture correction: e188a785df0a865afcee69dec295a4209f3b804f (текущая голова на момент обновления).
+
+CI:
+- source-only run 41836144914 завершился SUCCESS;
+- первый test run 41836151013 завершился FAILURE из-за некорректной CSV test fixture: в ней использовались двойные escape-последовательности для newline, поэтому парсер закономерно не видел заголовки и останавливался раньше проверки ID;
+- fixture исправлена отдельным commit e188a785df0a865afcee69dec295a4209f3b804f;
+- повторный run 41836302327: job tests завершился SUCCESS; 56/56 шагов job завершены успешно, включая Test conservative Bybit aggregate-L2 queue replay primitives.
+
+Это подтверждает deterministic parser/queue regression tests, но не доказывает полноту depth-200 архива, реальную maker очередь/L3 priority, delivery latency, cancel behavior, historical fee tier или совместимость BT/RPI конкретного публичного historical CSV. Не запускались новые Bybit archive downloads, strategy PnL, private API, paper/live orders. TRADE_ARCHIVE_FLAGS = UNVERIFIED_COMPATIBILITY и MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаются без изменений.

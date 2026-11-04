@@ -64,7 +64,9 @@ def main() -> int:
     }
     for url in URLS:
         head = request_once(url, "HEAD")
-        ranged = request_once(url, "GET")
+        ranged = request_once(url, "GET") if head.get("status") == 200 else {
+            "status": "skipped_after_head_failure", "bytes_read": 0
+        }
         report["results"].append({"url": url, "head": head, "range_get": ranged})
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "bybit_orderbook_archive_probe.json")
     out.parent.mkdir(parents=True, exist_ok=True)

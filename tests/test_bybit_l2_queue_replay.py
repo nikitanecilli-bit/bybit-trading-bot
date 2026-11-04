@@ -495,10 +495,10 @@ def test_sell_signed_markout_is_positive_when_mid_falls_after_fill():
 
 
 def test_duplicate_public_trade_id_fails_closed_before_double_counting():
-    o = order()
+    o = order(qty="3")
     events = [
-        {**trade(1100, "Sell", "100", "3"), "trade_id": "match-1"},
-        {**trade(1200, "Sell", "100", "3"), "trade_id": "match-1"},
+        {**trade(1100, "Sell", "100", "6"), "trade_id": "match-1"},
+        {**trade(1200, "Sell", "100", "6"), "trade_id": "match-1"},
     ]
     original = l2_module.iter_public_trades
     l2_module.iter_public_trades = lambda *_args: iter(events)
@@ -513,6 +513,7 @@ def test_duplicate_public_trade_id_fails_closed_before_double_counting():
         l2_module.iter_public_trades = original
     assert o.filled == D("0")
     assert o.queue_ahead_remaining == D("5")
+    assert o.fills == []
 
 
 def test_missing_public_trade_id_fails_closed():

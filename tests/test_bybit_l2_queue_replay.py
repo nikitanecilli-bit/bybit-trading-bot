@@ -242,6 +242,51 @@ def test_no_fill_scenario_has_no_per_fill_markouts():
     assert result["fills"] == []
 
 
+
+def test_order_book_rejects_float_update_id_without_truncating():
+    b = book()
+    before = (dict(b.bids), dict(b.asks), b.last_cts, b.last_seq, b.last_u)
+    event = {
+        "type": "delta", "cts": 1100,
+        "data": {"seq": 2, "u": 2.9, "b": [["100", "4"]], "a": []},
+    }
+    try:
+        b.apply(event)
+    except ValueError as exc:
+        assert "u must be an integer" in str(exc)
+    else:
+        raise AssertionError("float update ID must not be truncated")
+    assert (b.bids, b.asks, b.last_cts, b.last_seq, b.last_u) == before
+
+
+def test_order_book_rejects_boolean_sequence_number():
+    b = book()
+    event = {
+        "type": "delta", "cts": 1100,
+        "data": {"seq": True, "u": 2, "b": [["100", "4"]], "a": []},
+    }
+    try:
+        b.apply(event)
+    except ValueError as exc:
+        assert "seq must be an integer" in str(exc)
+    else:
+        raise AssertionError("boolean seq must not be accepted")
+
+
+def test_order_book_rejects_fractional_matching_engine_timestamp():
+    b = book()
+    event = {
+        "type": "delta", "cts": 1100.5,
+        "data": {"seq": 2, "u": 2, "b": [["100", "4"]], "a": []},
+    }
+    try:
+        b.apply(event)
+    except ValueError as exc:
+        assert "cts must be an integer" in str(exc)
+    else:
+        raise AssertionError("fractional cts must not be truncated")
+
+
 def test_snapshot_and_delta_are_absolute_level_updates_and_zero_deletes():
     b = book()
     b.apply({"type": "delta", "cts": 1100, "data": {

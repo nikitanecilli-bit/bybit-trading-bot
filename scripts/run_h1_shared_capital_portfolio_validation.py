@@ -932,11 +932,13 @@ def geometric_monthly_return_pct(net_pnl, starting_capital, start_ts, end_ts,
 
 
 def resolve_market_state_skew_budget(environ=None):
-    """Read an explicit instrument/risk snapshot skew budget; never invent a default."""
+    """Require an explicit instrument/risk snapshot skew budget; never invent a default."""
     env = os.environ if environ is None else environ
     raw = env.get("BYBIT_MAX_MARKET_STATE_SKEW_MS")
     if raw is None or not str(raw).strip():
-        return None
+        raise SystemExit(
+            "BYBIT_MAX_MARKET_STATE_SKEW_MS is required; choose an explicit snapshot-skew budget in milliseconds"
+        )
     value = str(raw).strip()
     if not value.isdecimal():
         raise SystemExit("BYBIT_MAX_MARKET_STATE_SKEW_MS must be a non-negative integer")

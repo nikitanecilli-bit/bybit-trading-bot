@@ -103,6 +103,18 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not Trading"):
             history.get_spec("BTCUSDT", 1_793_664_000_000)
 
+    def test_later_status_is_not_applied_retroactively_to_earlier_as_of(self):
+        write_snapshot(self.root, "c.json", "2026-11-03T00:00:00Z",
+                       [row(status="Closed")])
+        history = InstrumentSpecHistory.from_directory(self.root)
+
+        # Immediately before the Closed snapshot, the latest observed status
+        # is still Trading; at the snapshot timestamp, Closed must fail closed.
+        earlier = history.get_spec("BTCUSDT", 1_793_663_999_999)
+        self.assertEqual(earlier.status, "Trading")
+        with self.assertRaisesRegex(ValueError, "not Trading"):
+            history.get_spec("BTCUSDT", 1_793_664_000_000)
+
     def test_duplicate_timestamp_and_wrong_category_rejected(self):
         write_snapshot(self.root, "duplicate.json", "2026-11-02T00:00:00Z", [row()])
         with self.assertRaisesRegex(ValueError, "duplicate instrument snapshot timestamps"):

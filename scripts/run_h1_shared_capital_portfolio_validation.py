@@ -397,7 +397,8 @@ def validate_selection_provenance(selection, current_input_files, current_code_f
     if not isinstance(recorded_code, list):
         raise SystemExit("Selection manifest lacks replay code hashes")
 
-    def index_code_rows(rows, source):        indexed = {}
+    def index_code_rows(rows, source):
+        indexed = {}
         for row in rows:
             if not isinstance(row, dict):
                 raise SystemExit(f"Invalid {source} replay code provenance row")
@@ -796,7 +797,8 @@ def load_bybit_h1_datasets(directory):
                 try:
                     ts = int(row["timestamp_ms"])
                     op, hi, low, close, volume, turnover = (
-                        float(row[key]) for key in                        ("open", "high", "low", "close", "volume", "turnover")
+                        float(row[key]) for key in
+                        ("open", "high", "low", "close", "volume", "turnover")
                     )
                 except (TypeError, ValueError, KeyError, OverflowError) as exc:
                     raise SystemExit(f"{path}:{line_no}: invalid Bybit H1 candle: {exc}") from exc
@@ -894,7 +896,6 @@ def aligned_h1_datasets(kline_dir):
     return aligned, archives, timestamps
 
 AVERAGE_MONTH_MS = 365.2425 / 12.0 * 24.0 * 60.0 * 60.0 * 1000.0
-
 
 def geometric_monthly_return_pct(net_pnl, starting_capital, start_ts, end_ts,
                                   bar_interval_ms=3_600_000):
@@ -1198,7 +1199,8 @@ def _selected_kline_manifest_record(symbol, path):
                 ) from exc
     if not timestamps:
         raise SystemExit(f"{path}: selected Bybit H1 source is empty")
-    record.update({        "symbol": symbol,
+    record.update({
+        "symbol": symbol,
         "row_count": len(timestamps),
         "first_timestamp_ms": min(timestamps),
         "last_timestamp_ms": max(timestamps),

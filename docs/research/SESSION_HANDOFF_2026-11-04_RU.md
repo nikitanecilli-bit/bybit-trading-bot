@@ -196,3 +196,15 @@
 - Это исправление только временной/валидационной строгости. Нет новых Bybit snapshots/архивов, market PnL, collectors, private API/account access, runner registration, paper/live orders или изменений `main`.
 - Текущий code/test HEAD: `ae64222055c794584ee2b4207e940762b12fb130`. PR #4 остаётся Draft/open.
 - Следующий безопасный шаг: продолжить статический audit point-in-time контрактов и их вызывающих участков; не запускать PnL, пока execution/data gates закрыты.
+
+
+## Session update — 2026-11-04 (совместимость timestamp коллекторов и as-of загрузчиков)
+
+- Продолжая аудит, обнаружил системное несоответствие: оба collector `build_snapshot()` по умолчанию создавали `fetched_at` через `datetime.now(...).isoformat()`, то есть с произвольными микросекундами. `InstrumentSpecHistory` и `RiskTierHistory` требуют millisecond precision и отклоняют sub-ms значения. Поэтому собственный collector мог создать снимок, который его же исторический loader не сможет прочитать.
+- Исправлены `scripts/snapshot_bybit_instruments.py` и `scripts/snapshot_bybit_risk_limits.py`: default timestamp теперь формируется с `timespec="milliseconds"`; явные значения проверяются на ISO-8601, timezone и миллисекундную точность; все значения нормализуются в UTC с ровно тремя цифрами миллисекунд.
+- Добавлены офлайн-тесты default precision, отказа от naive/sub-ms timestamps, timezone-offset normalization и полного round-trip `build_snapshot → write_snapshot → History.from_directory → as-of lookup` для обоих типов snapshot.
+- Коммиты source: instrument collector `36686cb65a5dfc7d9adf6ec63e04c3a2fc1ae272`; risk-limit collector `5c99ecb47f734406ed6e8c925093f60e688990d8`. Тесты: instrument `3277c7c038a295bea6a6123decc3426d63d1a7d6`; risk-limit `729bc1a18d676e5c4dee81e3e29db37bbb21949f`.
+- Промежуточные CI завершались ошибкой на тестовых ожиданиях: сначала timestamp `Z` не учитывал канонический `.000Z`, затем один round-trip тест использовал фиксированное as-of время до сгенерированного snapshot. Оба тестовых дефекта исправлены; source behavior сохранён.
+- Финальный Research CI #41845297286 на `729bc1a18d676e5c4dee81e3e29db37bbb21949f`: SUCCESS; job `tests` SUCCESS; 57 completed workflow steps, failures отсутствуют. Фактические логи подтверждают instrument collector **17/17** и risk-limit collector **16/16** тестов, включая round-trip в оба as-of loader.
+- Это офлайн-коррекция формата snapshot. Сами collectors не запускались; новые Bybit данные не загружались. Нет market PnL, private API/account access, runner registration, paper/live orders или изменений `main`.
+- PR #4 остаётся Draft/open. Следующий безопасный шаг — продолжить read-only аудит исторических data contracts и вызывающих участков; PnL gate остаётся закрытым из-за отсутствующих датированных снимков и execution evidence.

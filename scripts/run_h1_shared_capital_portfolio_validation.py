@@ -211,7 +211,12 @@ def build_paired_donchian48_comparison(result_rows, enabled):
             indexed[key][(20, False)], indexed[key][(48, False)], indexed[key][(48, True)]
         )
         for field in invariants:
-            if any(row.get(field) != d20.get(field) for row in (d48, d48ema)):
+            if field not in d20 or d20[field] is None:
+                raise ValueError(
+                    f"Donchian paired portfolios lack required invariant {field!r} for key {key}"
+                )
+            if any(field not in row or row[field] is None or row[field] != d20[field]
+                   for row in (d48, d48ema)):
                 raise ValueError(f"Donchian paired portfolios differ in {field!r} for key {key}")
         pairs.append({
             "fold": key[0], "min_volume_ratio": key[1],

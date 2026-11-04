@@ -50,7 +50,7 @@ def validate_level(level: object) -> None:
 
 def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
     event_types = Counter()
-    ts_min = ts_max = None
+    ts_min = ts_max = cts_min = cts_max = None
     previous_ts = previous_seq = None
     nonmonotonic_ts = nonmonotonic_seq = duplicate_ts = 0
     cts_missing = u_reset_count = 0
@@ -76,12 +76,18 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
             if not isinstance(data, dict) or data.get("s") != SYMBOL:
                 raise ValueError(f"wrong/missing symbol at row {rows + 1}")
             ts = int(event["ts"])
+            cts = int(event["cts"]) if event.get("cts") is not None else None
             seq = int(data["seq"])
             update_id = int(data["u"])
             if ts_min is None or ts < ts_min:
                 ts_min = ts
             if ts_max is None or ts > ts_max:
                 ts_max = ts
+            if cts is not None:
+                if cts_min is None or cts < cts_min:
+                    cts_min = cts
+                if cts_max is None or cts > cts_max:
+                    cts_max = cts
             if previous_ts is not None:
                 if ts < previous_ts:
                     nonmonotonic_ts += 1
@@ -134,6 +140,8 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
         "event_types": dict(event_types),
         "timestamp_min_ms": ts_min,
         "timestamp_max_ms": ts_max,
+        "matching_engine_cts_min_ms": cts_min,
+        "matching_engine_cts_max_ms": cts_max,
         "duration_hours": round((ts_max - ts_min) / 3_600_000, 4),
         "nonmonotonic_timestamp_count": nonmonotonic_ts,
         "duplicate_adjacent_timestamp_count": duplicate_ts,

@@ -385,7 +385,7 @@ def capture_book_at(
 
 def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict]:
     with gzip.open(archive, "rt", encoding="utf-8", newline="") as stream:
-        reader = csv.DictReader(stream)
+        reader = csv.DictReader(stream, strict=True)
         required = {"timestamp", "symbol", "side", "size", "price", "trdMatchID"}
         fieldnames = reader.fieldnames or []
         if len(fieldnames) != len(set(fieldnames)):

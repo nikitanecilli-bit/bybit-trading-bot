@@ -45,6 +45,10 @@ on:
         description: "Required in confirm mode; select one predeclared grid value"
         required: false
         type: string
+      frozen_strategy_mode:
+        description: "Required in confirm mode; must match the frozen strategy arm set"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -119,6 +123,7 @@ jobs:
           H1_DONCHIAN48_EMA_ABLATION: ${{ inputs.donchian48_ema_ablation == 'paired' && '1' || '0' }}
           H1_FROZEN_MIN_VOLUME_RATIO: ${{ inputs.frozen_min_volume_ratio }}
           H1_FROZEN_MIN_BREAKOUT_ATR: ${{ inputs.frozen_min_breakout_atr }}
+          H1_FROZEN_STRATEGY_MODE: ${{ inputs.frozen_strategy_mode }}
           BYBIT_API_BASE_URL: ${{ vars.BYBIT_API_BASE_URL || 'https://api.bybit.com' }}
         run: python scripts/run_h1_shared_capital_portfolio_validation.py
       - name: Upload report

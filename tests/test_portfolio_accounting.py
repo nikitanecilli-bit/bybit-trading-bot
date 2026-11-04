@@ -1722,8 +1722,68 @@ def test_same_timestamp_close_batch_cannot_trip_kill_switch_by_symbol_order():
     assert win_first["ledger"] == loss_first["ledger"]
     assert win_first["realized_equity"] == loss_first["realized_equity"]
     assert win_first["current_equity"] == loss_first["current_equity"]
+    assert win_first["max_drawdown_pct"] == loss_first["max_drawdown_pct"]
     assert win_first["kill_switch"] == loss_first["kill_switch"]
 
+
+def _run_post_batch_kill_switch_flatten(order):
+    e = make_engine()
+    e.cfg.daily_stop_loss_pct = 99.0
+    e.cfg.emergency_kill_switch_pct = 0.12
+    e.cfg.max_hold_bars = 2
+    e.risk_mgr.cfg = e.cfg
+    hour = 3_600_000
+    bar_ts = 1_800_003_600_000
+    exit_ts = bar_ts + hour
+    positions = {
+        "BTCUSDT": make_position(symbol="BTCUSDT", size=1_000.0),
+        "ETHUSDT": make_position(symbol="ETHUSDT", size=1_000.0),
+    }
+    positions["BTCUSDT"].bars_held = 1
+    positions["ETHUSDT"].bars_held = 0
+    e.open_positions = {symbol: positions[symbol] for symbol in order}
+    trade_bars = {
+        "BTCUSDT": engine_mod.Candle(bar_ts, 100.0, 100.5, 98.5, 99.0, 10.0),
+        "ETHUSDT": engine_mod.Candle(bar_ts, 100.0, 101.0, 100.5, 100.8, 10.0),
+    }
+    e._mark_price_candles = {
+        symbol: {bar_ts: engine_mod.Candle(bar_ts, 100.0, 101.0, 100.0, 100.0, 0.0)}
+        for symbol in order
+    }
+    e._prepare_portfolio_intrabar_marks(trade_bars)
+    e._update_mark_to_market(exit_ts)
+    histories = {
+        symbol: [
+            engine_mod.Candle(bar_ts - hour, 100.0, 101.0, 99.0, 100.0, 10.0),
+            trade_bars[symbol],
+        ]
+        for symbol in order
+    }
+    e._defer_close_risk_evaluation = True
+    try:
+        for symbol in order:
+            e._manage_position(symbol, histories[symbol], fill_bar=False, exit_ts=exit_ts)
+    finally:
+        e._defer_close_risk_evaluation = False
+    e._update_mark_to_market(exit_ts)
+    e._force_flatten_open_positions_after_kill_switch(exit_ts)
+    return {
+        "ledger": sorted((t.token, t.pnl_usdt, t.exit_reason) for t in e.closed_trades),
+        "realized_equity": round(e.risk_mgr.realized_equity, 4),
+        "current_equity": round(e.risk_mgr.current_equity, 4),
+        "max_drawdown_pct": round(e.risk_mgr.max_drawdown_pct, 6),
+        "kill_switch": e.risk_mgr.kill_switch_triggered,
+        "open": sorted(e.open_positions),
+    }
+
+
+def test_post_batch_kill_switch_flattens_residual_positions_order_independently():
+    forward = _run_post_batch_kill_switch_flatten(["ETHUSDT", "BTCUSDT"])
+    reverse = _run_post_batch_kill_switch_flatten(["BTCUSDT", "ETHUSDT"])
+    assert forward == reverse
+    assert forward["kill_switch"] is True
+    assert forward["open"] == []
+    assert {row[2] for row in forward["ledger"]} == {"time_stop", "kill_switch"}
 
 
 def _run_finalization_close_order(order):

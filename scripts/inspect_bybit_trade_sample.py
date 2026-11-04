@@ -100,8 +100,11 @@ def trade_archive_replay_compatibility_status(
     trade_id_status: str,
     rpi_status: str,
     block_trade_status: str,
+    row_count: int,
 ) -> str:
     """Summarize whether the scanned archive meets queue-replay input requirements."""
+    if isinstance(row_count, bool) or not isinstance(row_count, int) or row_count <= 0:
+        return "invalid_or_incomplete"
     required_statuses = (
         timestamp_status,
         trade_id_status,
@@ -241,14 +244,17 @@ def main() -> int:
             "valid" if flags_valid(block_flags, block_flag_status_counts) else "invalid_or_incomplete"
         )
         replay_compatibility_status = trade_archive_replay_compatibility_status(
-            timestamp_status, trade_id_status, rpi_status, block_trade_status,
+            timestamp_status, trade_id_status, rpi_status, block_trade_status, rows,
         )
         report["validation"] = {
             "rows": rows,
             "columns": fields,
             "timestamp_min_ms": ts_min,
             "timestamp_max_ms": ts_max,
-            "duration_hours": round((ts_max - ts_min) / 3_600_000, 4),
+            "duration_hours": (
+                None if ts_min is None or ts_max is None
+                else round((ts_max - ts_min) / 3_600_000, 4)
+            ),
             "nonmonotonic_timestamp_count": nonmonotonic,
             "timestamp_order_validation_status": timestamp_status,
             "duplicate_trade_id_count": duplicate_ids,

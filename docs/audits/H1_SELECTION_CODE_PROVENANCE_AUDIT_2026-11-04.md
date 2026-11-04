@@ -187,3 +187,19 @@ rather than promoting weak or negative candidates into the Top-5.
 Decision: D20/D48/D48+EMA is now a cleaner one-factor/one-gate ablation at the
 signal-definition level. It is still not execution-realistic enough to
 validate a positive edge because the H1 maker fill proxy is not queue-aware.
+
+
+## Three-arm Donchian manifest pairing hardening — 2026-11-04
+
+A separate static control-flow review found that the generic EMA pairing summary expected every baseline arm to have a matching EMA-gated arm. That assumption is valid for the two-arm D20 vs D20+EMA experiment, but invalid for the preregistered three-arm design, which intentionally contains D20 baseline, D48 baseline and D48+EMA only.
+
+Correction:
+- Added `build_paired_h1_comparison_summaries()`.
+- In three-arm mode, the generic EMA comparison is restricted to D48 baseline vs D48+EMA.
+- The dedicated Donchian comparison retains all three arms and reports D20 vs D48 plus D48 vs D48+EMA.
+- Added an integration regression using all three result rows; it verifies that manifest summary construction no longer demands a nonexistent D20+EMA arm.
+
+Verification:
+- Research CI [#41814166935](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41814166935) completed **SUCCESS**, 58/58 workflow steps.
+- The new three-arm manifest-pairing regression passed.
+- No market PnL replay was run.

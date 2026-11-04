@@ -397,8 +397,7 @@ def validate_selection_provenance(selection, current_input_files, current_code_f
     if not isinstance(recorded_code, list):
         raise SystemExit("Selection manifest lacks replay code hashes")
 
-    def index_code_rows(rows, source):
-        indexed = {}
+    def index_code_rows(rows, source):        indexed = {}
         for row in rows:
             if not isinstance(row, dict):
                 raise SystemExit(f"Invalid {source} replay code provenance row")
@@ -797,8 +796,7 @@ def load_bybit_h1_datasets(directory):
                 try:
                     ts = int(row["timestamp_ms"])
                     op, hi, low, close, volume, turnover = (
-                        float(row[key]) for key in
-                        ("open", "high", "low", "close", "volume", "turnover")
+                        float(row[key]) for key in                        ("open", "high", "low", "close", "volume", "turnover")
                     )
                 except (TypeError, ValueError, KeyError, OverflowError) as exc:
                     raise SystemExit(f"{path}:{line_no}: invalid Bybit H1 candle: {exc}") from exc
@@ -942,11 +940,14 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
     start_ts, end_ts = timestamps[start_idx], timestamps[end_idx - 1]
     # Require as-of exchange metadata throughout the actual scored fold. A
     # present-day snapshot must never be silently applied to older candles.
+    # The final H1 timestamp is the candle OPEN. Replay accounting (funding,
+    # liquidation tier lookup and final close) runs through its CLOSE boundary.
+    fold_close_ts = end_ts + 3_600_000
     validate_snapshot_history_coverage(
-        instrument_specs_dir, risk_tiers_dir, start_ts, end_ts
+        instrument_specs_dir, risk_tiers_dir, start_ts, fold_close_ts
     )
     validate_funding_mark_coverage(
-        funding_dir, mark_price_dir, symbols, timestamps, start_ts, end_ts,
+        funding_dir, mark_price_dir, symbols, timestamps, start_ts, fold_close_ts,
         kline_dir,
     )
     # Truncate at fold end, while allowing pre-fold candles for indicator warm-up.
@@ -1197,8 +1198,7 @@ def _selected_kline_manifest_record(symbol, path):
                 ) from exc
     if not timestamps:
         raise SystemExit(f"{path}: selected Bybit H1 source is empty")
-    record.update({
-        "symbol": symbol,
+    record.update({        "symbol": symbol,
         "row_count": len(timestamps),
         "first_timestamp_ms": min(timestamps),
         "last_timestamp_ms": max(timestamps),

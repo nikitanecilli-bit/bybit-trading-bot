@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bybit_l2_queue_replay import (
     OrderBook, iter_book_events, place_passive_order, replay_public_trades,
+    signed_markout_bps,
 )
 
 BOOK_URL = "https://quote-saver.bycsi.com/orderbook/linear/AAVEUSDT/2025-09-02_AAVEUSDT_ob200.data.zip"
@@ -97,6 +98,76 @@ def capture_scenarios(book_archive: Path) -> tuple[list[dict], dict]:
     }
 
 
+def capture_book_states_at(book_archive: Path, targets: list[int]) -> dict[int, dict]:
+    ordered = sorted(set(targets))
+    states = {}
+    next_index = 0
+    book = OrderBook()
+
+    def capture(target: int) -> None:
+        if book.last_cts is None:
+            return
+        states[target] = {
+            "book_cts": book.last_cts,
+            "bids": dict(book.bids),
+            "asks": dict(book.asks),
+        }
+
+    for event in iter_book_events(book_archive, SYMBOL):
+        cts = int(event["cts"])
+        while next_index < len(ordered) and ordered[next_index] < cts:
+            capture(ordered[next_index])
+            next_index += 1
+        book.apply(event)
+        while next_index < len(ordered) and ordered[next_index] == cts:
+            capture(ordered[next_index])
+            next_index += 1
+    while next_index < len(ordered):
+        if book.last_cts is not None and ordered[next_index] <= book.last_cts:
+            capture(ordered[next_index])
+        next_index += 1
+    return states
+
+
+def add_post_fill_markouts(book_archive: Path, results: list[dict]) -> None:
+    horizons = (1_000, 5_000, 30_000, 60_000)
+    target_keys = {}
+    for result in results:
+        fill_ts = result["first_fill_ts_ms"]
+        if fill_ts is None:
+            result["post_fill_markout"] = []
+            continue
+        for horizon in horizons:
+            target = fill_ts + horizon
+            target_keys.setdefault(target, []).append((result, horizon))
+
+    states = capture_book_states_at(book_archive, list(target_keys))
+    for target, keys in target_keys.items():
+        state = states.get(target)
+        for result, horizon in keys:
+            if state is None or not state["bids"] or not state["asks"]:
+                result.setdefault("post_fill_markout", []).append({
+                    "horizon_ms": horizon, "status": "no_book_state",
+                })
+                continue
+            best_bid = max(state["bids"])
+            best_ask = min(state["asks"])
+            if best_bid > best_ask:
+                raise ValueError("crossed book in post-fill markout snapshot")
+            signed = signed_markout_bps(
+                result["side"], Decimal(result["limit_price"]), best_bid, best_ask,
+            )
+            result.setdefault("post_fill_markout", []).append({
+                "horizon_ms": horizon,
+                "book_state_cts_ms": state["book_cts"],
+                "book_state_age_ms": target - state["book_cts"],
+                "best_bid": str(best_bid),
+                "best_ask": str(best_ask),
+                "mid_price": str((best_bid + best_ask) / Decimal("2")),
+                "signed_mid_markout_bps": str(signed),
+            })
+
+
 def main() -> int:
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -153,6 +224,7 @@ def main() -> int:
                 ),
                 "expiry_ts_ms": order.expiry_ts,
             })
+        add_post_fill_markouts(book_path, results)
         report["scenarios"] = results
         report["status"] = "success"
 

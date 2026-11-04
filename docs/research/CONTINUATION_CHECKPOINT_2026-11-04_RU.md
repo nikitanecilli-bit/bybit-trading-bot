@@ -1476,3 +1476,11 @@ No market PnL, new archive download/collector, private API, runner registration,
 - Research CI [#41928296140](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928296140) completed SUCCESS on workflow commit `6dffae15ac9d7525b329273b0de66a8a124c550b`. Compile, deterministic suite, H1 runner gate, portfolio accounting/risk budget, specs/risk/funding tests all passed.
 - Follow-up details recorded in `docs/audits/ALT_SYSTEM_ACCOUNTING_CONTRACT_AUDIT_001_RU.md` (latest audit update commit `57efddd6196e5e1fa88f65e34a28507c9d797fff`).
 - This resolves the missing-budget integration failure only. The user/operator must still choose the skew budget; no default is invented. Historical effective-time and source completeness limitations remain. No market PnL replay, API, collector, archive download, paper/live, or parameter sweep was run.
+
+
+### Constructor fail-fast follow-up — 2026-11-05
+
+- `Bybit_Trading_Engine_v14_research.py` now raises at initialization if both dated instrument and risk-tier histories are enabled but `max_market_state_skew_ms` is omitted. This avoids delayed first-entry rejection or restore-time failure.
+- `tests/test_portfolio_accounting.py` now passes an explicit zero-ms fixture budget to the joined-entry test and adds a constructor regression for missing budget.
+- Research CI [#41928557280](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928557280) SUCCESS on commit `8fa1685db728a051f37bb59921a3048446d269b1`; compile and deterministic test suite passed.
+- Audit doc extended at commit `3e49814cdcfb37488b84edb02f6f3a624b43bbd6`. No market replay or data collection was run.

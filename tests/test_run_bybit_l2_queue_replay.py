@@ -75,6 +75,48 @@ def test_trade_sample_inspector_validates_flag_alias_values_and_conflicts():
     ) == "conflict"
 
 
+def test_trade_sample_inspector_rejects_duplicate_or_missing_header_columns():
+    try:
+        trade_inspector.validate_trade_csv_header(
+            ["timestamp", "symbol", "side", "size", "price", "timestamp"],
+        )
+    except ValueError as exc:
+        assert "duplicate column names" in str(exc)
+    else:
+        raise AssertionError("duplicate CSV header columns must be rejected")
+
+    try:
+        trade_inspector.validate_trade_csv_header(
+            ["timestamp", "symbol", "side", "size"],
+        )
+    except ValueError as exc:
+        assert "missing required columns" in str(exc)
+    else:
+        raise AssertionError("missing required CSV headers must be rejected")
+
+
+def test_trade_sample_inspector_rejects_extra_or_missing_row_fields():
+    try:
+        trade_inspector.validate_trade_csv_row(
+            {"timestamp": "1", "symbol": "AAVEUSDT", "side": "Buy",
+             "size": "1", "price": "1", None: ["extra"]}, 2,
+        )
+    except ValueError as exc:
+        assert "unexpected extra CSV fields" in str(exc)
+    else:
+        raise AssertionError("extra CSV fields must be rejected")
+
+    try:
+        trade_inspector.validate_trade_csv_row(
+            {"timestamp": "1", "symbol": "AAVEUSDT", "side": "Buy",
+             "size": "1", "price": None}, 3,
+        )
+    except ValueError as exc:
+        assert "missing CSV field value" in str(exc)
+    else:
+        raise AssertionError("missing row values must be rejected")
+
+
 
 def write_book_archive(path: Path, events: list[dict]) -> None:
     with zipfile.ZipFile(path, "w") as archive:

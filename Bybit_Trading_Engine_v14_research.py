@@ -38,6 +38,7 @@ import json
 import logging
 import math
 import os
+import stat
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, ROUND_FLOOR
 import re
 import time
@@ -1119,12 +1120,32 @@ class PlanBStatePersistence:
         lock_path = self.backup_filepath + ".lock"
         parent_dir = os.path.dirname(os.path.abspath(lock_path)) or "."
         os.makedirs(parent_dir, exist_ok=True)
-        with open(lock_path, "a+b") as lock_file:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if nofollow is None:
+            raise RuntimeError("Plan B lock requires O_NOFOLLOW support")
+        flags = os.O_CREAT | os.O_RDWR | nofollow
+        lock_fd = os.open(lock_path, flags, 0o600)
+        try:
+            lock_stat = os.fstat(lock_fd)
+            if not stat.S_ISREG(lock_stat.st_mode) or lock_stat.st_nlink != 1:
+                raise RuntimeError("Plan B lock must be a single-link regular file")
+            with os.fdopen(lock_fd, "a+b", closefd=False) as lock_file:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        finally:
+            os.close(lock_fd)
+
+    def _assert_regular_backup_path(self) -> None:
+        """Reject symlinks and non-regular Plan B targets before reading/replacing."""
+        try:
+            target_stat = os.lstat(self.backup_filepath)
+        except FileNotFoundError:
+            return
+        if not stat.S_ISREG(target_stat.st_mode):
+            raise RuntimeError("Plan B backup path must be a regular non-symlink file")
 
     @staticmethod
     def _canonical_backup_digest(payload: Dict[str, Any]) -> str:
@@ -1273,6 +1294,7 @@ class PlanBStatePersistence:
                     or any(ch not in "0123456789abcdef" for ch in digest)):
                 raise ValueError("reconciliation SHA-256 is invalid")
         with self._exclusive_backup_lock():
+            self._assert_regular_backup_path()
             if not os.path.isfile(self.backup_filepath):
                 return "BACKUP_MISSING"
             try:
@@ -1313,6 +1335,7 @@ class PlanBStatePersistence:
             raise ValueError("expected backup SHA-256 is invalid")
 
         with self._exclusive_backup_lock():
+            self._assert_regular_backup_path()
             if not os.path.isfile(self.backup_filepath):
                 raise RuntimeError("cannot reconcile: current Plan B backup does not exist")
             try:

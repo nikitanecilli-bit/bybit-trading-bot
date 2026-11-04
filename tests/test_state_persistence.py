@@ -1510,5 +1510,64 @@ class StatePersistenceTests(unittest.TestCase):
         self.assertEqual(position.exchange_executions, [])
 
 
+    def test_exchange_order_position_idx_must_match_hedge_position(self):
+        from exchange_execution_identity import ExchangeOrderIdentity, ExchangePositionIdentity
+        position = sample_position()
+        identity = ExchangePositionIdentity(
+            "linear", "USDT", "BTCUSDT", 1, "hedge", "Buy",
+            "0.5", "100", "entry-hedge", "",
+        )
+        position.set_exchange_position_identity(identity)
+        wrong_index = ExchangeOrderIdentity(
+            "wrong-index", "", "BTCUSDT", "Sell", 2,
+            "0.5", "0.5", "0", "New", True, True, "95",
+        )
+        with self.assertRaisesRegex(ValueError, "positionIdx differs"):
+            position.record_exchange_order(wrong_index)
+        self.assertEqual(position.exchange_orders, [])
+
+        valid_close = ExchangeOrderIdentity(
+            "valid-hedge-close", "", "BTCUSDT", "Sell", 1,
+            "0.5", "0.5", "0", "New", True, True, "95",
+        )
+        self.assertTrue(position.record_exchange_order(valid_close))
+
+    def test_exchange_order_side_must_match_reduce_only_intent(self):
+        from exchange_execution_identity import ExchangeOrderIdentity, ExchangePositionIdentity
+        position = sample_position()
+        position.set_exchange_position_identity(ExchangePositionIdentity(
+            "linear", "USDT", "BTCUSDT", 0, "one_way", "Buy",
+            "0.5", "100", "entry-oneway", "",
+        ))
+        same_side_reduce_only = ExchangeOrderIdentity(
+            "invalid-entry", "", "BTCUSDT", "Buy", 0,
+            "0.5", "0.5", "0", "New", True, False,
+        )
+        with self.assertRaisesRegex(ValueError, "same-side order cannot be reduceOnly"):
+            position.record_exchange_order(same_side_reduce_only)
+
+        opposite_side_not_reduce_only = ExchangeOrderIdentity(
+            "invalid-exit", "", "BTCUSDT", "Sell", 0,
+            "0.5", "0.5", "0", "New", False, False,
+        )
+        with self.assertRaisesRegex(ValueError, "opposite-side order must be reduceOnly"):
+            position.record_exchange_order(opposite_side_not_reduce_only)
+
+    def test_close_on_trigger_requires_reduce_only(self):
+        from exchange_execution_identity import ExchangeOrderIdentity, ExchangePositionIdentity
+        position = sample_position()
+        position.set_exchange_position_identity(ExchangePositionIdentity(
+            "linear", "USDT", "BTCUSDT", 0, "one_way", "Buy",
+            "0.5", "100", "entry-oneway", "",
+        ))
+        invalid = ExchangeOrderIdentity(
+            "invalid-trigger", "", "BTCUSDT", "Buy", 0,
+            "0.5", "0.5", "0", "New", False, True,
+        )
+        with self.assertRaisesRegex(ValueError, "closeOnTrigger order must be reduceOnly"):
+            position.record_exchange_order(invalid)
+        self.assertEqual(position.exchange_orders, [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

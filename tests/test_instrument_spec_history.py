@@ -47,6 +47,40 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+
+    def test_runtime_loader_validates_optional_instrument_page_metadata(self):
+        path = self.root / "a.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["fetched_at"] = "2026-11-01T00:00:02.000Z"
+        payload["collection_started_at"] = "2026-11-01T00:00:00.000Z"
+        filters = ("PreLaunch", "Trading", "Settling", "Delivering", "Closed")
+        payload["page_observations"] = [
+            {
+                "status_filter": status, "page_index": 1,
+                "request_started_at": f"2026-11-01T00:00:00.{100 + index * 100:03d}Z",
+                "request_completed_at": f"2026-11-01T00:00:00.{150 + index * 100:03d}Z",
+                "row_count": 1, "symbols": ["BTCUSDT"], "has_next_page": False,
+            }
+            for index, status in enumerate(filters)
+        ]
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        history = InstrumentSpecHistory.from_directory(self.root)
+        self.assertEqual(history.get_spec("BTCUSDT", 1_793_491_202_000).symbol, "BTCUSDT")
+
+        incomplete = json.loads(json.dumps(payload))
+        incomplete["page_observations"].pop()
+        path.write_text(json.dumps(incomplete), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "coverage is incomplete"):
+            InstrumentSpecHistory.from_directory(self.root)
+
+        out_of_order = json.loads(json.dumps(payload))
+        out_of_order["page_observations"][1], out_of_order["page_observations"][2] = (
+            out_of_order["page_observations"][2], out_of_order["page_observations"][1]
+        )
+        path.write_text(json.dumps(out_of_order), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "out of order"):
+            InstrumentSpecHistory.from_directory(self.root)
+
     def test_uses_latest_snapshot_not_later_than_as_of(self):
         history = InstrumentSpecHistory.from_directory(self.root)
         before = history.get_spec("BTCUSDT", 1_793_577_599_999)

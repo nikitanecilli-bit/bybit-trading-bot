@@ -203,8 +203,72 @@ def _snapshot_timestamp(value: str | None) -> str:
     return parsed.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-def build_snapshot(rows: list[dict[str, Any]], category: str,
-                   fetched_at: str | None = None) -> dict[str, Any]:
+
+def validate_page_observations(
+    observations: Any, *, expected_symbols: set[str],
+    collection_started_at: str, fetched_at: str,
+) -> list[dict[str, Any]]:
+    if not isinstance(observations, list) or not observations:
+        raise ValueError("page_observations must be a non-empty list")
+    started_collection = _snapshot_timestamp(collection_started_at)
+    completed_collection = _snapshot_timestamp(fetched_at)
+    validated = []
+    observed_symbols: set[str] = set()
+    previous_completed: str | None = None
+    for expected_index, item in enumerate(observations, start=1):
+        if not isinstance(item, dict) or set(item) != {
+            "page_index", "request_started_at", "request_completed_at",
+            "tier_count", "symbol_count", "symbols", "has_next_page",
+        }:
+            raise ValueError("risk page observation fields do not match schema")
+        if type(item["page_index"]) is not int or item["page_index"] != expected_index:
+            raise ValueError("risk page indexes must be sequential")
+        request_started = _snapshot_timestamp(item["request_started_at"])
+        request_completed = _snapshot_timestamp(item["request_completed_at"])
+        if request_started > request_completed:
+            raise ValueError("risk page request starts after completion")
+        if request_started < started_collection or request_completed > completed_collection:
+            raise ValueError("risk page request is outside collection bounds")
+        if previous_completed is not None and request_started < previous_completed:
+            raise ValueError("risk page observations are not chronological")
+        if type(item["tier_count"]) is not int or item["tier_count"] < 0:
+            raise ValueError("risk page tier_count must be a non-negative integer")
+        symbols = item["symbols"]
+        if not isinstance(symbols, list) or any(
+            not isinstance(symbol, str) or not symbol.strip() for symbol in symbols
+        ):
+            raise ValueError("risk page symbols must be non-empty strings")
+        normalized_symbols = [symbol.strip().upper() for symbol in symbols]
+        if normalized_symbols != sorted(set(normalized_symbols)):
+            raise ValueError("risk page symbols must be unique and sorted")
+        if type(item["symbol_count"]) is not int or item["symbol_count"] != len(normalized_symbols):
+            raise ValueError("risk page symbol_count does not match symbols")
+        if item["symbol_count"] > item["tier_count"]:
+            raise ValueError("risk page symbol_count cannot exceed tier_count")
+        if type(item["has_next_page"]) is not bool:
+            raise ValueError("risk page has_next_page must be boolean")
+        if expected_index < len(observations) and not item["has_next_page"]:
+            raise ValueError("risk page is missing continuation link")
+        if expected_index == len(observations) and item["has_next_page"]:
+            raise ValueError("last risk page cannot have continuation")
+        observed_symbols.update(normalized_symbols)
+        validated.append({
+            **item, "request_started_at": request_started,
+            "request_completed_at": request_completed,
+            "symbols": normalized_symbols,
+        })
+        previous_completed = request_completed
+    if observed_symbols != expected_symbols:
+        raise ValueError("risk page symbols do not match snapshot tiers")
+    return validated
+
+
+def build_snapshot(
+    rows: list[dict[str, Any]], category: str,
+    fetched_at: str | None = None, *,
+    collection_started_at: str | None = None,
+    page_observations: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     timestamp = _snapshot_timestamp(fetched_at)
     individually_validated = [validate_tier(row) for row in rows]
     keys = [(row["symbol"], row["id"]) for row in individually_validated]
@@ -212,7 +276,7 @@ def build_snapshot(rows: list[dict[str, Any]], category: str,
         raise ValueError("snapshot requires non-empty unique symbol/risk-tier rows")
     validated = validate_tier_groups(individually_validated)
     symbols = sorted({row["symbol"] for row in validated})
-    return {
+    snapshot = {
         "schema_version": 1,
         "source": "Bybit V5 GET /v5/market/risk-limit",
         "category": category,
@@ -221,6 +285,19 @@ def build_snapshot(rows: list[dict[str, Any]], category: str,
         "tier_count": len(validated),
         "tiers": validated,
     }
+    if collection_started_at is not None:
+        started = _snapshot_timestamp(collection_started_at)
+        if started > timestamp:
+            raise ValueError("collection_started_at cannot be after fetched_at")
+        snapshot["collection_started_at"] = started
+    if page_observations is not None:
+        if collection_started_at is None:
+            raise ValueError("page observations require collection_started_at")
+        snapshot["page_observations"] = validate_page_observations(
+            page_observations, expected_symbols=set(symbols),
+            collection_started_at=collection_started_at, fetched_at=timestamp,
+        )
+    return snapshot
 
 
 def write_snapshot(snapshot: dict[str, Any], output: str | Path) -> Path:
@@ -258,14 +335,33 @@ def main() -> None:
     if args.pause < 0:
         parser.error("--pause cannot be negative")
 
+    collection_started_at = _snapshot_timestamp(None)
+    page_observations: list[dict[str, Any]] = []
+
     def fetch(cursor: str | None):
+        request_started_at = _snapshot_timestamp(None)
         page, next_cursor = _request_page(args.base_url, args.category, cursor)
+        request_completed_at = _snapshot_timestamp(None)
+        symbols = sorted({str(row["symbol"]).strip().upper() for row in page})
+        page_observations.append({
+            "page_index": len(page_observations) + 1,
+            "request_started_at": request_started_at,
+            "request_completed_at": request_completed_at,
+            "tier_count": len(page),
+            "symbol_count": len(symbols),
+            "symbols": symbols,
+            "has_next_page": next_cursor is not None,
+        })
         if next_cursor and args.pause:
             time.sleep(args.pause)
         return page, next_cursor
 
     rows = fetch_all_tiers(args.category, fetch)
-    snapshot = build_snapshot(rows, args.category)
+    snapshot = build_snapshot(
+        rows, args.category,
+        collection_started_at=collection_started_at,
+        page_observations=page_observations,
+    )
     fetched = datetime.fromisoformat(snapshot["fetched_at"].replace("Z", "+00:00"))
     stamp = fetched.astimezone(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     output = Path(args.output_dir) / args.category / f"{stamp}.json"

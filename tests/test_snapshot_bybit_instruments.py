@@ -105,6 +105,22 @@ class SnapshotCollectorTests(unittest.TestCase):
         self.assertEqual(snapshot["fetched_at"], "2026-11-02T00:00:00Z")
         self.assertIn("instruments-info", snapshot["source"])
 
+    def test_default_snapshot_timestamp_has_millisecond_precision(self):
+        snapshot = build_snapshot([{"symbol": "BTCUSDT"}], "linear")
+        self.assertRegex(snapshot["fetched_at"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
+
+    def test_snapshot_timestamp_requires_timezone_and_millisecond_precision(self):
+        for value in ("2026-11-02T00:00:00", "2026-11-02T00:00:00.000500Z"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "timezone|millisecond precision"):
+                    build_snapshot([{"symbol": "BTCUSDT"}], "linear", value)
+
+    def test_snapshot_timestamp_normalizes_offset_to_utc(self):
+        snapshot = build_snapshot(
+            [{"symbol": "BTCUSDT"}], "linear", "2026-11-02T03:00:00.123+03:00"
+        )
+        self.assertEqual(snapshot["fetched_at"], "2026-11-02T00:00:00.123Z")
+
     def test_snapshot_rejects_duplicate_symbols(self):
         with self.assertRaisesRegex(ValueError, "duplicate"):
             build_snapshot([{"symbol": "BTCUSDT"}, {"symbol": "BTCUSDT"}], "linear")

@@ -157,9 +157,87 @@ def _snapshot_timestamp(value: str | None) -> str:
     return parsed.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
+def build_page_observation(
+    status_filter: str,
+    page_index: int,
+    request_started_at: str,
+    response_received_at: str,
+    rows: list[dict[str, Any]],
+    next_cursor: str | None,
+) -> dict[str, Any]:
+    if not isinstance(status_filter, str) or not status_filter:
+        raise ValueError("page observation status_filter must be non-empty")
+    if type(page_index) is not int or page_index < 1:
+        raise ValueError("page observation page_index must be a positive integer")
+    started = _snapshot_timestamp(request_started_at)
+    received = _snapshot_timestamp(response_received_at)
+    if started > received:
+        raise ValueError("page observation request_started_at cannot be after response_received_at")
+    if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+        raise ValueError("page observation rows must be a list of objects")
+    symbols = []
+    for row in rows:
+        symbol = row.get("symbol")
+        if not isinstance(symbol, str) or not symbol.strip():
+            raise ValueError("page observation row has invalid symbol")
+        symbols.append(symbol.strip().upper())
+    if len(symbols) != len(set(symbols)):
+        raise ValueError("page observation contains duplicate symbols")
+    if next_cursor not in (None, "") and not isinstance(next_cursor, str):
+        raise ValueError("page observation next cursor must be a string")
+    return {
+        "status_filter": status_filter,
+        "page_index": page_index,
+        "request_started_at": started,
+        "response_received_at": received,
+        "row_count": len(rows),
+        "symbols": sorted(symbols),
+        "has_next_page": next_cursor not in (None, ""),
+    }
+
+
+def validate_page_observations(observations: Any) -> list[dict[str, Any]]:
+    if not isinstance(observations, list) or not observations:
+        raise ValueError("page_observations must be a non-empty list")
+    validated = []
+    previous_received: str | None = None
+    page_counts: dict[str, int] = {}
+    for item in observations:
+        if not isinstance(item, dict):
+            raise ValueError("page observation must be an object")
+        required = {
+            "status_filter", "page_index", "request_started_at",
+            "response_received_at", "row_count", "symbols", "has_next_page",
+        }
+        if set(item) != required:
+            raise ValueError("page observation fields do not match schema")
+        normalized = build_page_observation(
+            item["status_filter"], item["page_index"],
+            item["request_started_at"], item["response_received_at"],
+            [{"symbol": symbol} for symbol in item["symbols"]]
+            if isinstance(item["symbols"], list) else item["symbols"],
+            "next" if item["has_next_page"] else None,
+        )
+        if type(item["row_count"]) is not int or item["row_count"] != normalized["row_count"]:
+            raise ValueError("page observation row_count does not match symbols")
+        if type(item["has_next_page"]) is not bool:
+            raise ValueError("page observation has_next_page must be boolean")
+        status = normalized["status_filter"]
+        expected_index = page_counts.get(status, 0) + 1
+        if normalized["page_index"] != expected_index:
+            raise ValueError("page observation page_index is not sequential")
+        if previous_received is not None and normalized["request_started_at"] < previous_received:
+            raise ValueError("page observations are not chronological")
+        page_counts[status] = expected_index
+        previous_received = normalized["response_received_at"]
+        validated.append(normalized)
+    return validated
+
+
 def build_snapshot(rows: list[dict[str, Any]], category: str,
                    fetched_at: str | None = None,
-                   collection_started_at: str | None = None) -> dict[str, Any]:
+                   collection_started_at: str | None = None,
+                   page_observations: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     timestamp = _snapshot_timestamp(fetched_at)
     started_at = (_snapshot_timestamp(collection_started_at)
                   if collection_started_at is not None else None)
@@ -183,6 +261,8 @@ def build_snapshot(rows: list[dict[str, Any]], category: str,
     }
     if started_at is not None:
         snapshot["collection_started_at"] = started_at
+    if page_observations is not None:
+        snapshot["page_observations"] = validate_page_observations(page_observations)
     return snapshot
 
 

@@ -51,3 +51,13 @@ Continue static audit of report/input provenance and exchange-spec validation. P
 - Lifecycle parsing: `f3be0b7`; regression tests: `e2a3df8`; syntax correction: `b32b823`; CI path-filter fix: `5296c5a`; parser contract test: `2bfcd82`. Первый CI #41894908409 поймал незакрытую docstring в lifecycle helper; исправлено в `b32b823`. Повторные Research CI #41895045876 и #41895062773 завершились SUCCESS; второй запуск включает все изменения на `2bfcd82`. В workflow добавлен path `scripts/snapshot_bybit_linear_universe.py`.
 - Основание API-семантики: [официальная документация Bybit Get Instruments Info](https://bybit-exchange.github.io/docs/v5/market/instrument), где `deliveryTime` описан как delivery time для expired futures и delisting time для perpetual; официальный пример LinearPerpetual показывает `deliveryTime: "0"`.
 - Никакие live/private API запросы, collectors, новые archive downloads, рыночные PnL-тесты или ордера не запускались.
+
+## ENG-DATA-008 — статус инструмента не равен исторической торгуемости
+
+- Статический аудит `scripts/snapshot_bybit_linear_universe.py`, `instrument_spec_history.py` и offline tests завершён.
+- `is_linear_usdt_perpetual_within_lifecycle_at()` проверяет только границы launch/delivery. Тест намеренно считает `Closed` контракт внутри lifecycle до `deliveryTime`; docstring прямо запрещает трактовать это как проверку непрерывной торгуемости.
+- `InstrumentSpecHistory.get_spec()` не переносит сегодняшнее состояние назад во времени: он выбирает последний завершённый snapshot с `fetched_at <= as_of_ts` и по умолчанию требует, чтобы статус в этом snapshot был `Trading`. Отсутствующий в последнем полном snapshot символ приводит к отказу.
+- Ограничение: snapshot — точечное наблюдение, не журнал переходов статуса. Между снимками невозможно восстановить временную приостановку, смену статуса или момент появления нового символа. `max_age_ms` необязателен и по умолчанию не ограничен; даже ограничение возраста не доказывает отсутствие перехода статуса внутри интервала.
+- Вывод: явного ретроактивного применения текущего статуса не обнаружено; as-of выборка по датированным снимкам устроена правильно. Но точный исторический tradable universe не доказан без частоты наблюдений и/или авторитетных событий смены статуса.
+- Не стал менять lifecycle predicate и не стал вводить произвольный default для freshness. Оставить историческую торгуемость и PnL gate заблокированными до подтверждения покрытия статусов и sampling gaps.
+- Документировано в `docs/audits/POINT_IN_TIME_UNIVERSE_AND_ARCHIVE_AUDIT_2026-11-03.md`; commit `371d989`. Это только документация, без запуска collectors/API/market tests и без новых архивов.

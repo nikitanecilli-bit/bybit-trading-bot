@@ -221,6 +221,7 @@ class ReportOnlyComparatorTests(unittest.TestCase):
             refreshed["raw"], ensure_ascii=False, sort_keys=True,
             separators=(",", ":"), allow_nan=False,
         ).encode("utf-8")).hexdigest()
+        initial = upgrade_to_schema3(initial)
         refreshed = upgrade_to_schema3(refreshed)
         with self.assertRaisesRegex(ReportError, "execution identity changed"):
             compare_execution_snapshots(initial, refreshed)

@@ -394,7 +394,7 @@ def replay_public_trades(order: PassiveOrder, archive: Path, symbol: str = "AAVE
         previous_ts = ts
         trade_id = trade.get("trade_id")
         if not isinstance(trade_id, str) or not trade_id or trade_id != trade_id.strip():
-            raise ValueError("missing or malformed public trade ID")
+            raise ValueError("missing public trade ID or malformed surrounding whitespace")
         trade_key = (symbol.strip().upper(), trade_id)
         if trade_key in seen_trade_ids:
             raise ValueError(f"duplicate public trade ID: {trade_id}")

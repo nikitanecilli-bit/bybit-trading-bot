@@ -203,3 +203,46 @@ Verification:
 - Research CI [#41814166935](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41814166935) completed **SUCCESS**, 58/58 workflow steps.
 - The new three-arm manifest-pairing regression passed.
 - No market PnL replay was run.
+
+
+## Aggregate-L2 execution audit — 2026-11-04
+
+The queue replay had a same-millisecond causality gap: a book update with the
+same matching-engine timestamp as hypothetical order arrival was applied before
+queue-ahead capture. Because the hypothetical order has no exchange sequence,
+that event cannot safely be classified as before or after arrival. The helper,
+scenario probe and post-fill markout snapshots now capture the prior book state
+and exclude same-millisecond updates. Public trades at or before arrival remain
+excluded. Regression tests cover both arrival and markout snapshots.
+
+A full AAVEUSDT 2025-09-02 archive sample was validated:
+- 816,684 order-book events over 24 hours; 2 snapshots and 816,682 deltas.
+- 346,131 public trades; monotonic timestamps and unique trade IDs.
+- No non-monotonic book timestamps/sequences, duplicate adjacent timestamps,
+  update-ID resets or missing matching-engine timestamps.
+- 18-symbol availability probe across three dates: 16 symbols returned 200
+  with a bounded range response; RAYUSDT and PUMPUSDT returned 404.
+
+Four hypothetical 1-unit best-bid/ask orders with one-hour TTL produced fill
+fractions of 58%, 100%, 100% and 33% (mean 72.75%); two were partial. First
+fill delays ranged from 1.54 seconds to 34.51 minutes. Three of four 1-second
+signed mid-price markouts were negative (mean -2.735 bps).
+
+This is a four-order microstructure diagnostic, not a fill-rate estimate,
+strategy PnL, or a test of the H1 strategy's 20-bps offset. It does show that
+queue position, partial fills and short-horizon adverse selection are material.
+The aggregate-L2 replay is not yet integrated into the H1 runner; OHLC
+penetration still overstates certainty of full maker execution.
+
+The three-arm D20 / D48 / D48+EMA summary now compares EMA only within D48
+(baseline D48 vs D48+EMA); D20 remains the control for the separate Donchian
+contrast. A regression test covers this pairing rule.
+
+Validation:
+- Research CI run 41814320035: SUCCESS.
+- AAVE aggregate-L2 sample probe run 41814319861: SUCCESS.
+- Three-arm pairing and full research checks run 41814166935: SUCCESS.
+
+No H1 market PnL, API/account access or orders were performed. Next step is to
+replay actual H1 limit prices against L2/trade archives for the frozen Top-5
+symbols and scored windows, then compare queue-aware fills with OHLC assumptions.

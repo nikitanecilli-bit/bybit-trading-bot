@@ -291,3 +291,42 @@ Verification:
   the complete Research CI job (all 55 numbered test/audit steps and cleanup).
 - No Bybit archive collection, selector run, H1 market PnL, private API access,
   paper order or live order was performed.
+## H1 final-candle-close funding coverage — 2026-11-04
+
+### Confirmed boundary-validation gap — corrected
+
+The H1 fold's end_ts is the open timestamp of its final scored candle. The engine, however, performs end-of-candle MTM, position management and finalization at candle.ts + 3,600,000. Funding cashflows are included through the supplied as_of_ts, inclusively.
+
+Before this correction, run_portfolio_variant() passed the final candle OPEN timestamp to:
+- validate_funding_mark_coverage(), which clipped the required funding-event interval and archive-manifest validation at that timestamp; and
+- validate_snapshot_history_coverage(), even though liquidation tier lookups can occur at the final candle CLOSE boundary.
+
+A settlement exactly at the final candle close could therefore be charged by the engine if present in the CSV, but its presence was not required by preflight. A truncated archive ending at the final candle open could pass the boundary-specific check and omit that settlement.
+
+### Correction
+
+- Compute fold_close_ts = end_ts + 3,600,000.
+- Validate dated instrument/risk-tier snapshot history through fold_close_ts.
+- Validate funding archive query coverage and the dated settlement schedule through fold_close_ts.
+- Keep the reported test_end_ts as the final candle OPEN timestamp; the duration metric already includes the final H1 interval. This avoids changing report timestamp semantics while validating the actual accounting boundary.
+
+### Regression and verification
+
+Added test_funding_mark_coverage_includes_final_h1_close_settlement:
+- Synthetic final candle opens at 25,200,000 ms and closes at 28,800,000 ms.
+- A funding settlement exists exactly at 28,800,000 ms with a matching Mark candle.
+- Validation using only the final candle OPEN correctly rejects the missing in-fold settlement.
+- Validation through the final candle CLOSE accepts the complete, hash/schedule-verified archive.
+
+Evidence:
+- Runner correction and formatting restoration: commit 35570c609da0503c16e0e9f0c9da612731b7d2b2.
+- Regression test and restoration of the complete execution-gate test file: commit 8f23a53c255a159ccaf32eaad9b23d3e5693d71b.
+- Research CI [#41818048739](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41818048739) — **SUCCESS**. The new final-close funding regression explicitly passed; all 55 numbered workflow steps and cleanup completed successfully.
+
+An intermediate set of CI runs failed on Python indentation/compilation after file updates were assembled from line-range fragments without preserving all fragment separators. The original formatting and omitted test-file tail were restored, the corrected diff was inspected, and the final full Research CI run passed. Those intermediate failures were editing/assembly errors, not strategy or funding-accounting test failures.
+
+### Remaining execution limitation
+
+The H1 OHLC wrapper still treats a qualifying limit touch as an all-or-none fill. It does not model partial fills, queue position, cancellations ahead, spread crossing or adverse selection. The separate aggregate-L2 diagnostic does not make the H1 replay queue-aware. This remains a material execution-model limitation; no fill-rate or profitability claim follows from the OHLC fill proxy.
+
+No market PnL replay, new Bybit archive collection, private API/account access, paper order or live order was performed.

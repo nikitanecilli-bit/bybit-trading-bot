@@ -548,3 +548,26 @@ CI:
 - после module-qualified test fix run 41838006400 на commit e7b60c224d77b3a8fe4bbbacb621f80e069a4294: SUCCESS, job tests 56/56 steps completed successfully, queue replay primitive test step SUCCESS.
 
 Это устраняет неоднозначность повторных JSON ключей, но не подтверждает семантическую непрерывность update IDs depth-200 или отсутствие пропущенных архивных событий. Новые archive downloads и PnL не запускались; private API и paper/live orders не использовались. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.
+
+
+## 26. Валидация всех полей каждой historical trade CSV строки
+
+После перехода replay_public_trades() на полное чтение архива для проверки timestamp order/ID uniqueness выяснилось, что iter_public_trades() всё ещё валидировал side, price и size только косвенно через apply_public_trade(). Поэтому malformed side/price/size в строках вне active window заявки могли остаться незамеченными.
+
+Исправлено в iter_public_trades():
+- каждая строка архива должна содержать side строго Buy или Sell;
+- price и size каждой строки разбираются как конечные Decimal и должны быть строго положительными;
+- проверки выполняются до yield, независимо от того, попадает строка в срок конкретной гипотетической заявки или нет;
+- исходные price/size значения сохраняются в нормализованной записи после валидации.
+
+Добавлен regression test на неизвестную сторону, нулевую цену и нулевой размер.
+
+Изменения в research/market-regime-v1-main:
+- source commit: 54c418a8c840808bcf9be16059994ef7546acb04;
+- regression tests: aae78ae30df5ff84582f3ce00c39819267fddb19.
+
+CI:
+- source run 41838205603: SUCCESS, 56/56 steps;
+- full test run 41838211515 на commit aae78ae30df5ff84582f3ce00c39819267fddb19: SUCCESS, 56/56 steps; queue replay primitive test step SUCCESS.
+
+Таким образом, replay теперь валидирует всю последовательность строк по timestamp, ID, block/RPI flags, side, price и size, включая строки вне active window и после completion. Это повышает строгость структурной валидации, но не доказывает полноту/истинность исходного архива и maker execution realism. Не запускались новые архивные загрузки, strategy PnL, private API, paper/live orders. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.

@@ -1342,3 +1342,9 @@ Core `81f58d0b`, inspector `d7872099`; tests `13f32dbc` + fixture correction `5f
 Trade inspector теперь отдельно публикует `queue_replay_compatibility_status`: `valid` только при валидных timestamp order, trade IDs, RPI и block-trade flags, а также при числе строк > 0. Пустой/header-only архив получает `duration_hours: null` и `invalid_or_incomplete`, не аварийный расчёт с None.
 
 Source `86a0590f`, `68ee303e`; tests `8311daa4`, `82852d6f`. Research CI run `41888048946` на `82852d6` завершился success. Никаких архивов, collectors, PnL/backtest, API, runner или orders.
+
+## 38. L2 inspector/replay compatibility boundary (ENG-EXEC-036)
+
+Статический аудит выявил, что L2 inspector может завершить сканирование с `status: success`, одновременно указав `missing_cts_count > 0`; replay требует `cts` для каждого события. Также inspector не вводит archive-wide monotonicity rule для `u`, тогда как replay `OrderBook.apply()` отклоняет non-reset regressions `u`. Это различие не следует считать автоматически дефектом: ENG-EXEC-031 намеренно не закрепляет неподтверждённую универсальную семантику `u`.
+
+Код не менялся. Не трактовать scan success как replay readiness; не ослаблять replay и не ужесточать inspector без подтверждения формата архива. Следующий шаг — определить explicit L2 replay compatibility dimensions после проверки источника/контракта. Note: `ENG_EXEC_036_L2_INSPECTOR_REPLAY_COMPATIBILITY_RU.md`. Архивы/network workflow/PnL/API/runner/orders не запускались; maker gate закрыт.

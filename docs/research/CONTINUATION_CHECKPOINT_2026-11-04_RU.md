@@ -823,3 +823,26 @@ Interpretation:
 - PR #4 is still open + Draft. No main-branch changes, merge/rebase/retarget, PnL, market data downloads, API, runner registration or orders.
 
 No code change was justified by the artifact inventory. Continue read-only review only until the required dated public data/snapshots and execution evidence can be acquired within the project's approved gates.
+
+
+## 41. Risk-tier as-of timestamps now enforce exact millisecond semantics — 2026-11-04
+
+Static review of `bybit_risk_tiers.py` found that `get_tiers()` and `get_tier()` coerced `as_of_ts` with `int()`. This silently accepted booleans, numeric strings and fractional values, unlike `InstrumentSpecHistory`'s strict integer-ms contract. The snapshot parser also used floating-point `datetime.timestamp() * 1000` and accepted sub-millisecond `fetched_at` values.
+
+Correction:
+- Added a shared strict `_as_of_ms()` guard: only integer milliseconds are accepted; bool, float and string inputs fail closed.
+- Snapshot timestamps now require millisecond precision, normalize explicitly to UTC, and convert using integer timedelta arithmetic rather than float.
+- Added regressions for invalid as-of types, sub-millisecond timestamps and exact timezone-offset conversion.
+
+Commits:
+- initial source: `7f16b39da23a8b6fbe1b80b05c51d53aa2318fdd`;
+- UTC normalization: `aa35e028dac3a6ba478e93cee36b693138708dfe`;
+- initial tests (one incorrect expected epoch, caught by CI): `5f6001e7620222738e8bac2b28a1078d4242d2a3`;
+- corrected tests: `ae64222055c794584ee2b4207e940762b12fb130`.
+
+Verification:
+- Final Research CI #41844132573 on `ae64222055c794584ee2b4207e940762b12fb130`: SUCCESS; job `tests` SUCCESS; all 54 workflow steps completed.
+- Actual job log confirms `tests/test_bybit_risk_tiers.py` ran **13/13 tests**, including all new timestamp regressions. The full deterministic suite and compile step also passed.
+- Intermediate CI #41844055151 failed only because the newly added timezone test contained an incorrect expected epoch; the UTC-normalization implementation was retained and the fixture corrected before the final green run.
+
+No Bybit data collection, market PnL, private API/account access, runner registration, paper/live orders, or main-branch changes. PR #4 remains Draft/open. Continue with read-only point-in-time contract audit; strategy PnL remains blocked by missing dated snapshots and execution evidence.

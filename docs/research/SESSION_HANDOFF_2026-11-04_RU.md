@@ -242,3 +242,15 @@
 - Финальный Research CI #41846644399 на 3b7442b32383f5c41043ea7bf74430e1acbcd7b2: SUCCESS; job tests SUCCESS; все 57 workflow steps completed, failures отсутствуют. Фактические логи подтверждают InstrumentSpecHistory 12/12 и RiskTierHistory 17/17, включая новые metadata-type regressions.
 - Никаких Bybit collectors/downloads, market PnL, private API/account access, runner registration, paper/live orders или main-branch changes. PR #4 остаётся Draft/open.
 - Следующий шаг: финально сверить текущий branch HEAD, PR #4, документацию и последние CI; затем продолжить независимый статический audit execution consumers без запуска PnL.
+
+
+## Session update — 2026-11-04 (strict integer metadata for isLowestRisk)
+
+- Execution/data-contract audit continued through engine consumers, risk-tier history, funding accounting, mark-price liquidation and exchange sizing. No new market experiment or PnL run was justified.
+- Found a strict-schema inconsistency: both risk-tier collector and history loader rejected boolean isLowestRisk but accepted JSON floating values 1.0/0.0 because Python equality treats them as equal to integers. Bybit schema expects integer 0/1.
+- Both collector and loader now require a non-bool int exactly in {0,1}; added offline regression tests to both suites.
+- Commits: history loader source a14f21c35bfe77674d3a7a3850396a6ecc2d781f; history regression 3e7047ddc19cff0543ab72fd1b42ce65df72236b; collector source 57796a8ecca249a482604a7e9b67dfa968cb9ff1; collector regression 715a7fe71350ff5ffd58b7bb7b1a232e6b7d57c6.
+- Final Research CI #41847652788 on 715a7fe71350ff5ffd58b7bb7b1a232e6b7d57c6: SUCCESS; job tests SUCCESS; 57/57 workflow steps completed, no failed steps. Actual logs confirm both float regressions passed. Relevant suite counts: collector 17/17, history 18/18.
+- Independent engine review confirms optional exchange sizing is fail-closed when dated instrument specs are supplied; risk tiers are selected as-of entry notional; exact contract quantity is propagated through TP1, close PnL, fees, funding and mark-to-market. Known limitations remain documented: OHLC/L2 execution proxies, account-level tier aggregation, actual funding settlement mark, account-specific fees, and absence of archived historical Bybit snapshots.
+- No Bybit collectors or downloads executed; no PnL/backtest, private API/account access, runner registration, paper/live orders or changes to main. PR #4 remains research-only.
+- Continue read-only review of execution consumers and provenance; do not relax the PnL gate until verified historical data and execution realism evidence exist.

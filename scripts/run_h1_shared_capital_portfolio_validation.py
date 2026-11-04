@@ -135,7 +135,7 @@ def build_paired_ema_comparison(result_rows, comparison_enabled):
         missing_ema = sorted(set(baseline) - set(gated))
         missing_baseline = sorted(set(gated) - set(baseline))
         raise ValueError(
-            "EMA comparison requires identical baseline/EMA key sets; "
+            "EMA comparison requires exactly paired, identical baseline/EMA key sets; "
             f"missing EMA rows={missing_ema}, missing baseline rows={missing_baseline}"
         )
 

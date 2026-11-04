@@ -31,6 +31,7 @@ Bybit Quant Engine v14.0 (Audit-Fixed)
 
 import argparse
 import csv
+import hashlib
 import dataclasses
 import glob
 import json
@@ -40,6 +41,8 @@ import os
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, ROUND_FLOOR
 import re
 import time
+import tempfile
+from contextlib import contextmanager
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, asdict, field
@@ -1107,7 +1110,42 @@ class PlanBStatePersistence:
         self.enabled = enabled
         self.last_mark_prices: Dict[str, float] = {}
 
+    @contextmanager
+    def _exclusive_backup_lock(self):
+        """Serialize all cooperative Plan B writers across threads and processes."""
+        if os.name != "posix":
+            raise RuntimeError("Plan B atomic compare-and-swap requires POSIX file locking")
+        import fcntl
+        lock_path = self.backup_filepath + ".lock"
+        parent_dir = os.path.dirname(os.path.abspath(lock_path)) or "."
+        os.makedirs(parent_dir, exist_ok=True)
+        with open(lock_path, "a+b") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    @staticmethod
+    def _canonical_backup_digest(payload: Dict[str, Any]) -> str:
+        encoded = json.dumps(
+            payload, ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"), allow_nan=False,
+        ).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
     def save_state(self, cfg: BotConfig, risk_mgr: AdaptiveRiskManager,
+                   open_positions: Dict[str, "OpenPositionState"],
+                   pending: Optional[Dict[str, Dict]] = None, trade_seq: int = 0,
+                   last_mark_prices: Optional[Dict[str, float]] = None) -> None:
+        if not self.enabled:
+            return
+        with self._exclusive_backup_lock():
+            self._save_state_unlocked(
+                cfg, risk_mgr, open_positions, pending, trade_seq, last_mark_prices,
+            )
+
+    def _save_state_unlocked(self, cfg: BotConfig, risk_mgr: AdaptiveRiskManager,
                    open_positions: Dict[str, "OpenPositionState"],
                    pending: Optional[Dict[str, Dict]] = None, trade_seq: int = 0,
                    last_mark_prices: Optional[Dict[str, float]] = None) -> None:
@@ -1218,6 +1256,76 @@ class PlanBStatePersistence:
             raise RuntimeError(
                 f"Не удалось сохранить резервное состояние в {self.backup_filepath!r}"
             ) from e
+
+    def save_reconciliation_candidate(
+        self, candidate: Dict[str, Any], *, expected_backup_sha256: str,
+        risk_mgr: AdaptiveRiskManager,
+    ) -> str:
+        """Atomically persist a validated detached reconciliation candidate.
+
+        This is an explicit local-file operation. It does not contact the
+        exchange, mutate an engine instance, or authorize live resumption.
+        """
+        if not self.enabled:
+            raise RuntimeError("Plan B persistence is disabled")
+        if not isinstance(candidate, dict):
+            raise ValueError("reconciliation candidate must be an object")
+        if (not isinstance(expected_backup_sha256, str)
+                or len(expected_backup_sha256) != 64
+                or any(ch not in "0123456789abcdef" for ch in expected_backup_sha256)):
+            raise ValueError("expected backup SHA-256 is invalid")
+
+        with self._exclusive_backup_lock():
+            if not os.path.isfile(self.backup_filepath):
+                raise RuntimeError("cannot reconcile: current Plan B backup does not exist")
+            try:
+                with open(self.backup_filepath, "r", encoding="utf-8") as current_file:
+                    current_payload = json.load(current_file)
+                current_digest = self._canonical_backup_digest(current_payload)
+            except Exception as exc:
+                raise RuntimeError("cannot reconcile: current Plan B backup is unreadable") from exc
+            if current_digest != expected_backup_sha256:
+                raise RuntimeError("stale reconciliation candidate: Plan B backup changed")
+
+            parent_dir = os.path.dirname(os.path.abspath(self.backup_filepath)) or "."
+            fd, temp_path = tempfile.mkstemp(
+                prefix=os.path.basename(self.backup_filepath) + ".reconcile.",
+                suffix=".tmp", dir=parent_dir,
+            )
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as temp_file:
+                    json.dump(candidate, temp_file, indent=2, ensure_ascii=False, allow_nan=False)
+                    temp_file.flush()
+                    os.fsync(temp_file.fileno())
+
+                # Validate the exact bytes to be installed through the strict
+                # Plan B reader before touching the last known-good backup.
+                PlanBStatePersistence(temp_path, enabled=True).load_state(
+                    risk_mgr, log_restore=False,
+                )
+
+                # Re-check immediately before replace (the lock also serializes
+                # all ordinary save_state writers in this process family).
+                with open(self.backup_filepath, "r", encoding="utf-8") as current_file:
+                    latest_payload = json.load(current_file)
+                if self._canonical_backup_digest(latest_payload) != expected_backup_sha256:
+                    raise RuntimeError("stale reconciliation candidate: Plan B backup changed")
+
+                os.replace(temp_path, self.backup_filepath)
+                if os.name == "posix":
+                    dir_fd = os.open(parent_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+                    try:
+                        os.fsync(dir_fd)
+                    finally:
+                        os.close(dir_fd)
+                return self._canonical_backup_digest(candidate)
+            except Exception:
+                try:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                except OSError:
+                    logger.exception("Не удалось удалить временный reconciliation backup %s", temp_path)
+                raise
 
     def load_state(
         self, risk_mgr: AdaptiveRiskManager, *, log_restore: bool = True,

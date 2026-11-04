@@ -468,6 +468,110 @@ class StatePersistenceTests(unittest.TestCase):
             )
             self.assertFalse(path.exists())
 
+    def _backup_with_exchange_identity(self, path):
+        from exchange_execution_identity import ExchangePositionIdentity
+        cfg = engine.BotConfig()
+        risk = engine.AdaptiveRiskManager(cfg)
+        position = sample_position()
+        position.set_exchange_position_identity(ExchangePositionIdentity(
+            category="linear", settle_coin="USDT", symbol="BTCUSDT",
+            position_idx=0, position_mode="one_way", side="Buy",
+            qty="0.1", avg_price="100", entry_order_id="entry-1",
+            entry_order_link_id="",
+        ))
+        writer = engine.PlanBStatePersistence(str(path), enabled=True)
+        writer.save_state(
+            cfg, risk, {"BTCUSDT": position}, {}, 42,
+            last_mark_prices={"BTCUSDT": 100.0},
+        )
+        return writer, cfg, risk
+
+    @staticmethod
+    def _canonical_backup_sha256(payload):
+        import hashlib
+        encoded = json.dumps(
+            payload, ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"), allow_nan=False,
+        ).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
+    def test_reconciliation_candidate_is_atomically_persisted_and_restorable(self):
+        from exchange_execution_identity import ExchangeExecutionIdentity
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            writer, cfg, risk = self._backup_with_exchange_identity(path)
+            current = json.loads(path.read_text(encoding="utf-8"))
+            expected = self._canonical_backup_sha256(current)
+            candidate = json.loads(json.dumps(current))
+            candidate["open_positions"]["BTCUSDT"]["exchange_executions"] = [
+                ExchangeExecutionIdentity(
+                    exec_id="exec-reconciled-1", order_id="entry-1",
+                    order_link_id="", symbol="BTCUSDT", side="Buy",
+                    exec_qty="0.1", exec_price="100", exec_time_ms=1_790_000_000_001,
+                    exec_fee="0.01",
+                ).to_dict()
+            ]
+            new_digest = writer.save_reconciliation_candidate(
+                candidate, expected_backup_sha256=expected, risk_mgr=risk,
+            )
+            restored, _, _ = writer.load_state(engine.AdaptiveRiskManager(cfg), log_restore=False)
+            self.assertEqual(
+                restored["BTCUSDT"].exchange_executions[0]["exec_id"],
+                "exec-reconciled-1",
+            )
+            self.assertEqual(new_digest, self._canonical_backup_sha256(candidate))
+            self.assertFalse(list(Path(tmp).glob("state.json.reconcile.*.tmp")))
+
+    def test_reconciliation_candidate_rejects_stale_backup_without_overwrite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            writer, _, risk = self._backup_with_exchange_identity(path)
+            current = json.loads(path.read_text(encoding="utf-8"))
+            expected = self._canonical_backup_sha256(current)
+            candidate = json.loads(json.dumps(current))
+            candidate["trade_seq"] += 1
+            current["trade_seq"] += 1
+            path.write_text(json.dumps(current), encoding="utf-8")
+            latest = path.read_text(encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "stale reconciliation candidate"):
+                writer.save_reconciliation_candidate(
+                    candidate, expected_backup_sha256=expected, risk_mgr=risk,
+                )
+            self.assertEqual(path.read_text(encoding="utf-8"), latest)
+
+    def test_reconciliation_candidate_validation_failure_preserves_previous_backup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            writer, _, risk = self._backup_with_exchange_identity(path)
+            current = json.loads(path.read_text(encoding="utf-8"))
+            expected = self._canonical_backup_sha256(current)
+            candidate = json.loads(json.dumps(current))
+            candidate["risk"]["current_equity"] = float("nan")
+            previous = path.read_text(encoding="utf-8")
+            with self.assertRaises((ValueError, RuntimeError)):
+                writer.save_reconciliation_candidate(
+                    candidate, expected_backup_sha256=expected, risk_mgr=risk,
+                )
+            self.assertEqual(path.read_text(encoding="utf-8"), previous)
+            self.assertFalse(list(Path(tmp).glob("state.json.reconcile.*.tmp")))
+
+    def test_reconciliation_candidate_replace_failure_preserves_previous_backup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.json"
+            writer, _, risk = self._backup_with_exchange_identity(path)
+            current = json.loads(path.read_text(encoding="utf-8"))
+            expected = self._canonical_backup_sha256(current)
+            candidate = json.loads(json.dumps(current))
+            candidate["trade_seq"] += 1
+            previous = path.read_text(encoding="utf-8")
+            with patch("os.replace", side_effect=OSError("simulated replace failure")):
+                with self.assertRaisesRegex(OSError, "simulated replace failure"):
+                    writer.save_reconciliation_candidate(
+                        candidate, expected_backup_sha256=expected, risk_mgr=risk,
+                    )
+            self.assertEqual(path.read_text(encoding="utf-8"), previous)
+            self.assertFalse(list(Path(tmp).glob("state.json.reconcile.*.tmp")))
+
     def test_successful_save_fsyncs_file_and_parent_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "state.json"

@@ -127,6 +127,11 @@ def fetch_all_instruments(
                 if not isinstance(raw_symbol, str) or not raw_symbol.strip():
                     raise ValueError("instrument row is missing or has invalid symbol")
                 symbol = raw_symbol.strip().upper()
+                if row.get("status") != status:
+                    raise ValueError(
+                        f"instrument status mismatch for {symbol}: "
+                        f"requested {status}, got {row.get('status')!r}"
+                    )
                 if symbol in by_symbol and by_symbol[symbol] != row:
                     raise ValueError(f"conflicting duplicate instrument row: {symbol}")
                 by_symbol[symbol] = row

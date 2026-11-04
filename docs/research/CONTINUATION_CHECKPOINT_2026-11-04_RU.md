@@ -239,3 +239,22 @@ Official Bybit docs: public trade stream defines `T` as fill timestamp, `S` as t
 Latest validation is static only: source/test/runner files re-fetched and reviewed; 56 test functions present. CI execution is not confirmed. GitHub combined statuses remain empty for these push commits, and available workflow-run wrapper only surfaces PR-triggered runs; no workflow_dispatch action is available through current connector. No tests-pass claim.
 
 Runner report now declares mandatory BT/RPI metadata and counts excluded block trades. No historical archives downloaded or replayed, no new network collector invoked, no private API/live/paper orders. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains.
+
+
+## 12. Дополнительный аудит временной точности instrument-spec history
+
+При статической проверке `instrument_spec_history.py` найдено тихое преобразование `as_of_ts = int(as_of_ts)`: дробная миллисекунда отбрасывалась, а bool/строковое значение могло быть неявно принято. Это создавало риск выбора неверного исторического снимка при ошибочном типе входа. Также преобразование ISO-времени через float `datetime.timestamp() * 1000` не давало строгой гарантии точной миллисекундной границы.
+
+Исправлено в research branch:
+- `get_spec()` теперь принимает только настоящий Python integer timestamp в миллисекундах; bool, float и string отклоняются;
+- ISO `fetched_at` переводится в UTC через целочисленную арифметику timedelta, без float;
+- ISO timestamp с точностью меньше миллисекунды отклоняется, а не усекается;
+- добавлены regression tests на fractional/bool/string as-of и sub-millisecond snapshot timestamp.
+
+Изменения:
+- source commit: `64d6e2640a926e9bc0cc08f338a2667ff990e14e`
+- test commit: `ee0b173f707c53af25f0f892a37357c5a8a90cc1`
+- source blob: `dd5c44ee1af39e8b9be2f776744ef8a393d774ed`
+- test blob: `a458dd69875bba1ad4cbc40aece0166389fa44ce`
+
+Проверка на данный момент статическая: изменения записаны в GitHub, но локальный Python test runner недоступен, а доступный workflow-run lookup показывает только PR-triggered runs. Поэтому тесты добавлены, но не объявляются пройденными; CI status требует отдельного подтверждения. `main` не затронут. Новые рыночные архивы, PnL, private API и ордера не запускались.

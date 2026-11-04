@@ -186,6 +186,8 @@ def main() -> int:
         if args.max_collection_minutes is not None else None
     )
     for section in report["sections"].values():
+        if section["overlapping_collection_windows"]:
+            return 1
         if gap_limit is not None and any(
             item["gap_from_previous_completion_ms"] > gap_limit
             for item in section["intervals"]

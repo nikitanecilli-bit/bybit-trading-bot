@@ -18,6 +18,13 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from exchange_execution_identity import (
+    ExchangeExecutionIdentity,
+    ExchangeExecutionIdentityError,
+    ExchangeOrderIdentity,
+    ExchangePositionIdentity,
+)
+
 from bybit_reconciliation import (
     SnapshotValidationError,
     deduplicate_executions,
@@ -331,6 +338,115 @@ def compare_execution_snapshots(initial: dict[str, Any], refreshed: dict[str, An
         "late_exec_ids": late_ids,
         "subsequent_execution_count": len(subsequent_ids),
         "subsequent_exec_ids": subsequent_ids,
+        "execution_history_complete": False,
+        "reconciliation_pass": False,
+        "live_resume_allowed": False,
+    }
+
+
+
+def build_execution_merge_plan(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Build a strictly read-only, all-or-nothing execution-ledger merge proposal.
+
+    The returned records are candidates only. This function never mutates the
+    supplied backup, writes files, or marks exchange history complete.
+    """
+    if not isinstance(local_backup, dict):
+        raise ReportError("local backup root must be an object")
+    if not isinstance(snapshot, dict) or snapshot.get("schema_version") != 3:
+        raise ReportError("execution merge planning requires schema_version 3")
+    if local_backup.get("saved_at_utc") != snapshot.get("saved_at_utc"):
+        raise ReportError("snapshot saved_at_utc does not match local backup")
+    saved_dt = _utc_timestamp(local_backup.get("saved_at_utc"), "local backup saved_at_utc")
+    saved_at_ms = int(saved_dt.timestamp() * 1000)
+    _, _, _, parsed = _parse_exchange_snapshot(snapshot, saved_at_ms)
+
+    positions = local_backup.get("open_positions")
+    if not isinstance(positions, dict):
+        raise ReportError("local backup open_positions must be an object")
+    by_symbol: dict[str, dict[str, Any]] = {}
+    for key, state in positions.items():
+        if not isinstance(key, str) or not isinstance(state, dict):
+            raise ReportError("local open position entries must be objects keyed by symbol")
+        symbol = state.get("symbol", key)
+        if symbol != key or symbol in by_symbol:
+            raise ReportError("local open position symbol identity is ambiguous")
+        by_symbol[symbol] = state
+
+    known_orders: dict[str, dict[str, ExchangeOrderIdentity]] = {}
+    known_execs: dict[str, dict[str, ExchangeExecutionIdentity]] = {}
+    position_identities: dict[str, ExchangePositionIdentity] = {}
+    for symbol, state in by_symbol.items():
+        try:
+            raw_position = state.get("exchange_position_identity")
+            if not isinstance(raw_position, dict):
+                raise ReportError(f"local position {symbol} lacks exchange position identity")
+            position_identity = ExchangePositionIdentity.from_dict(raw_position)
+            if position_identity.symbol != symbol:
+                raise ReportError(f"local position {symbol} exchange identity symbol mismatch")
+            position_identities[symbol] = position_identity
+            orders_raw = state.get("exchange_orders", [])
+            executions_raw = state.get("exchange_executions", [])
+            if not isinstance(orders_raw, list) or not isinstance(executions_raw, list):
+                raise ReportError(f"local position {symbol} exchange ledgers must be lists")
+            order_map: dict[str, ExchangeOrderIdentity] = {}
+            for raw in orders_raw:
+                order = ExchangeOrderIdentity.from_dict(raw)
+                if order.symbol != symbol or order.order_id in order_map:
+                    raise ReportError(f"local position {symbol} has invalid/duplicate exchange order")
+                order_map[order.order_id] = order
+            exec_map: dict[str, ExchangeExecutionIdentity] = {}
+            for raw in executions_raw:
+                execution = ExchangeExecutionIdentity.from_dict(raw)
+                if execution.symbol != symbol or execution.exec_id in exec_map:
+                    raise ReportError(f"local position {symbol} has invalid/duplicate execution ledger")
+                exec_map[execution.exec_id] = execution
+            known_orders[symbol] = order_map
+            known_execs[symbol] = exec_map
+        except (ValueError, TypeError, ExchangeExecutionIdentityError) as exc:
+            if isinstance(exc, ReportError):
+                raise
+            raise ReportError(f"local exchange ledger for {symbol} is invalid: {exc}") from exc
+
+    planned: dict[str, list[dict[str, Any]]] = {symbol: [] for symbol in by_symbol}
+    duplicates: list[str] = []
+    for row in parsed:
+        symbol = row.symbol
+        if symbol not in by_symbol:
+            raise ReportError(f"execution {row.exec_id} has no local open-position ledger for {symbol}")
+        position = position_identities[symbol]
+        orders = known_orders[symbol]
+        order = orders.get(row.order_id)
+        if order is None and row.order_id != position.entry_order_id:
+            raise ReportError(f"execution {row.exec_id} references unknown local order {row.order_id}")
+        expected_side = order.side if order is not None else position.side
+        expected_link = order.order_link_id if order is not None else position.entry_order_link_id
+        if row.side != expected_side:
+            raise ReportError(f"execution {row.exec_id} side conflicts with local order/position")
+        if expected_link and row.order_link_id != expected_link:
+            raise ReportError(f"execution {row.exec_id} orderLinkId conflicts with local order/position")
+        candidate = ExchangeExecutionIdentity(
+            exec_id=row.exec_id, order_id=row.order_id, order_link_id=row.order_link_id,
+            symbol=row.symbol, side=row.side, exec_qty=str(row.exec_qty),
+            exec_price=str(row.exec_price), exec_time_ms=row.exec_time_ms,
+            exec_fee=None if row.exec_fee is None else str(row.exec_fee),
+        )
+        existing = known_execs[symbol].get(candidate.exec_id)
+        if existing is not None:
+            if existing != candidate:
+                raise ReportError(f"conflicting local execution identity: {candidate.exec_id}")
+            duplicates.append(candidate.exec_id)
+            continue
+        planned[symbol].append(candidate.to_dict())
+
+    proposed = {symbol: rows for symbol, rows in planned.items() if rows}
+    return {
+        "status": "DRY_RUN_MERGE_PLAN",
+        "mode": "READ_ONLY_NO_MUTATION",
+        "planned_insert_count": sum(len(rows) for rows in proposed.values()),
+        "exact_duplicate_count": len(duplicates),
+        "planned_insertions": proposed,
+        "exact_duplicate_exec_ids": sorted(duplicates),
         "execution_history_complete": False,
         "reconciliation_pass": False,
         "live_resume_allowed": False,

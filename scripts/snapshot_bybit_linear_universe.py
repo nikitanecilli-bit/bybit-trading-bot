@@ -206,10 +206,10 @@ def main() -> None:
         page_counts[status_filter] += 1
         request_started_at = _snapshot_timestamp(None)
         rows, next_cursor = _request_page(args.base_url, "linear", cursor, status=status)
-        response_received_at = _snapshot_timestamp(None)
+        request_completed_at = _snapshot_timestamp(None)
         page_observations.append(build_page_observation(
             status_filter, page_counts[status_filter], request_started_at,
-            response_received_at, rows, next_cursor,
+            request_completed_at, rows, next_cursor,
         ))
         if next_cursor and args.pause:
             time.sleep(args.pause)

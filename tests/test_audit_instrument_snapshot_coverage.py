@@ -75,6 +75,10 @@ def write_risk_snapshot(root: Path, name: str, fetched_at: str,
         "category": "linear", "fetched_at": fetched_at,
         "symbol_count": len(symbols), "tier_count": len(tiers), "tiers": tiers,
     }
+    if started_at is not None:
+        payload["collection_started_at"] = started_at
+    if page_observations is not None:
+        payload["page_observations"] = page_observations
     root.mkdir(parents=True, exist_ok=True)
     (root / name).write_text(json.dumps(payload), encoding="utf-8")
 

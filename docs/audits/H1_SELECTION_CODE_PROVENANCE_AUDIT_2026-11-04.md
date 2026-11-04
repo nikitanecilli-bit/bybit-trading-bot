@@ -437,3 +437,8 @@ This avoids inventing an intra-bar ordering between independent symbols and prev
 ### Scope and remaining limits
 
 This correction applies to synchronized historical replay (dense and sparse). It does not create a tick-level execution chronology or solve queue/partial-fill uncertainty. OHLC Mark/Last extremes remain conservative bar-level proxies; real intrabar sequencing and execution slippage can still differ. No market PnL run, new archive download, private API/account access, paper order or live order was performed.
+### End-of-test finalization is also a same-timestamp batch
+
+The finalizer previously closed every remaining position sequentially and evaluated drawdown after each close, creating the same artificial transient equity path at the common terminal timestamp. It now defers close-level risk evaluation across the finalization set, then reconciles equity and evaluates risk once after all final exits. It also persists the final reconciled state. The pre-finalization adverse portfolio mark is still evaluated as a single portfolio snapshot.
+
+Regression: test_end_of_test_finalization_is_order_independent_for_simultaneous_positions. Research CI #41822118438 — SUCCESS, including the new finalization-order regression and sparse replay suite.

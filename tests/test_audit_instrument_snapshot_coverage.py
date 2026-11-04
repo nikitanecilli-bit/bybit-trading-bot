@@ -15,7 +15,8 @@ from scripts.audit_instrument_snapshot_coverage import audit_directory, build_re
 
 
 def write_snapshot(root: Path, name: str, fetched_at: str, instruments: list[dict],
-                   started_at: str | None = None) -> None:
+                   started_at: str | None = None,
+                   page_observations: list[dict] | None = None) -> None:
     payload = {
         "schema_version": 1,
         "source": "Bybit V5 GET /v5/market/instruments-info",
@@ -26,6 +27,8 @@ def write_snapshot(root: Path, name: str, fetched_at: str, instruments: list[dic
     }
     if started_at is not None:
         payload["collection_started_at"] = started_at
+    if page_observations is not None:
+        payload["page_observations"] = page_observations
     root.mkdir(parents=True, exist_ok=True)
     (root / name).write_text(json.dumps(payload), encoding="utf-8")
 
@@ -94,6 +97,52 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
                 with contextlib.redirect_stdout(io.StringIO()):
                     result = main()
         self.assertEqual(result, 1)
+
+
+    def test_audit_reports_per_page_status_timing_and_validates_symbol_coverage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "data" / "universe_history" / "linear"
+            observations = [
+                {
+                    "status_filter": "default", "page_index": 1,
+                    "request_started_at": "2026-11-01T00:00:00.000Z",
+                    "response_received_at": "2026-11-01T00:00:00.250Z",
+                    "row_count": 1, "symbols": ["BTCUSDT"], "has_next_page": False,
+                },
+                {
+                    "status_filter": "Closed", "page_index": 1,
+                    "request_started_at": "2026-11-01T00:00:01.000Z",
+                    "response_received_at": "2026-11-01T00:00:01.500Z",
+                    "row_count": 1, "symbols": ["OLDUSDT"], "has_next_page": False,
+                },
+            ]
+            write_snapshot(
+                target, "a.json", "2026-11-01T00:00:02.000Z",
+                [instrument("BTCUSDT"), instrument("OLDUSDT", "Closed")],
+                "2026-11-01T00:00:00.000Z", observations,
+            )
+            report = audit_directory(target)
+        self.assertEqual(report["snapshots_with_page_observations"], 1)
+        page_summary = report["snapshots"][0]["page_observations"]
+        self.assertEqual(page_summary["page_count"], 2)
+        self.assertEqual(page_summary["status_filters"]["Closed"]["row_count"], 1)
+        self.assertEqual(page_summary["request_duration_ms"]["max"], 500)
+
+    def test_audit_rejects_page_observation_symbol_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "snapshots"
+            observations = [{
+                "status_filter": "Trading", "page_index": 1,
+                "request_started_at": "2026-11-01T00:00:00.000Z",
+                "response_received_at": "2026-11-01T00:00:00.100Z",
+                "row_count": 1, "symbols": ["ETHUSDT"], "has_next_page": False,
+            }]
+            write_snapshot(target, "a.json", "2026-11-01T00:00:01.000Z",
+                           [instrument("BTCUSDT")], "2026-11-01T00:00:00.000Z",
+                           observations)
+            with self.assertRaisesRegex(ValueError, "symbols do not match"):
+                audit_directory(target)
 
     def test_duplicate_snapshot_timestamps_fail_closed(self):
         with tempfile.TemporaryDirectory() as tmp:

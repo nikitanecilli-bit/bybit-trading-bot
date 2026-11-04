@@ -67,10 +67,23 @@ def test_u1_restart_snapshot_resets_book_and_allows_new_sequence_epoch():
         "u": 1, "seq": 1, "u": 1, "b": [["98", "4"]], "a": [["99", "6"]],
     }})
     assert b.last_u == 1
-    assert b.last_seq == 1
+    assert b.last_seq == 3
     assert b.quantity_at("Buy", D("100")) == 0
     assert b.quantity_at("Buy", D("98")) == D("4")
     assert b.quantity_at("Sell", D("99")) == D("6")
+
+
+
+def test_u1_restart_snapshot_does_not_bypass_cross_sequence_ordering():
+    b = book()
+    try:
+        b.apply({"type": "snapshot", "cts": 1100, "data": {
+            "u": 1, "seq": 0, "b": [["98", "4"]], "a": [["99", "6"]],
+        }})
+    except ValueError as exc:
+        assert "non-monotonic cross sequence" in str(exc)
+    else:
+        raise AssertionError("u=1 must not bypass cross-sequence ordering")
 
 
 def test_u1_restart_marker_on_delta_fails_closed_without_mutating_book():

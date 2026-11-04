@@ -64,6 +64,71 @@ def inspect_snapshot(path: Path) -> dict[str, Any]:
         if status is not None and not isinstance(status, str):
             raise ValueError(f"{path}: status for {symbol} must be a string")
         symbols[symbol] = status
+    page_observations = payload.get("page_observations")
+    page_summary = None
+    if page_observations is not None:
+        if not isinstance(page_observations, list) or not page_observations:
+            raise ValueError(f"{path}: page_observations must be a non-empty list")
+        page_counts: dict[str, int] = {}
+        page_durations: list[int] = []
+        page_symbols: set[str] = set()
+        by_status: dict[str, dict[str, Any]] = {}
+        previous_received: int | None = None
+        for item in page_observations:
+            if not isinstance(item, dict):
+                raise ValueError(f"{path}: page observation must be an object")
+            status = item.get("status_filter")
+            index = item.get("page_index")
+            if not isinstance(status, str) or not status or type(index) is not int or index < 1:
+                raise ValueError(f"{path}: invalid page observation status or index")
+            started = utc_ms(item.get("request_started_at"), "request_started_at")
+            received = utc_ms(item.get("response_received_at"), "response_received_at")
+            if started > received:
+                raise ValueError(f"{path}: page request starts after response")
+            if previous_received is not None and started < previous_received:
+                raise ValueError(f"{path}: page observations are not chronological")
+            if started_text is not None and started < started_ms:
+                raise ValueError(f"{path}: page request starts before collection_started_at")
+            if received > fetched_ms:
+                raise ValueError(f"{path}: page response is after fetched_at")
+            expected_index = page_counts.get(status, 0) + 1
+            if index != expected_index:
+                raise ValueError(f"{path}: page indexes are not sequential for {status}")
+            rows_count = item.get("row_count")
+            symbols_in_page = item.get("symbols")
+            has_next = item.get("has_next_page")
+            if (type(rows_count) is not int or rows_count < 0
+                    or not isinstance(symbols_in_page, list)
+                    or len(symbols_in_page) != rows_count
+                    or type(has_next) is not bool):
+                raise ValueError(f"{path}: invalid page observation row metadata")
+            normalized_symbols = []
+            for symbol in symbols_in_page:
+                if not isinstance(symbol, str) or not symbol.strip():
+                    raise ValueError(f"{path}: invalid page observation symbol")
+                normalized_symbols.append(symbol.strip().upper())
+            if len(normalized_symbols) != len(set(normalized_symbols)):
+                raise ValueError(f"{path}: duplicate page observation symbols")
+            page_symbols.update(normalized_symbols)
+            page_counts[status] = expected_index
+            duration = received - started
+            page_durations.append(duration)
+            summary = by_status.setdefault(status, {
+                "page_count": 0, "first_request_started_at": item["request_started_at"],
+                "last_response_received_at": item["response_received_at"],
+                "row_count": 0,
+            })
+            summary["page_count"] += 1
+            summary["last_response_received_at"] = item["response_received_at"]
+            summary["row_count"] += rows_count
+            previous_received = received
+        if page_symbols != set(symbols):
+            raise ValueError(f"{path}: page observation symbols do not match snapshot instruments")
+        page_summary = {
+            "page_count": len(page_observations),
+            "request_duration_ms": _distribution(page_durations),
+            "status_filters": by_status,
+        }
     return {
         "path": str(path),
         "fetched_at": fetched_text,
@@ -75,6 +140,7 @@ def inspect_snapshot(path: Path) -> dict[str, Any]:
         ),
         "count": len(rows),
         "symbols": symbols,
+        "page_observations": page_summary,
     }
 
 

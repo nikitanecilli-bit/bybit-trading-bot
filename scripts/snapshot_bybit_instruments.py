@@ -161,7 +161,7 @@ def build_page_observation(
     status_filter: str,
     page_index: int,
     request_started_at: str,
-    response_received_at: str,
+    request_completed_at: str,
     rows: list[dict[str, Any]],
     next_cursor: str | None,
 ) -> dict[str, Any]:
@@ -170,9 +170,9 @@ def build_page_observation(
     if type(page_index) is not int or page_index < 1:
         raise ValueError("page observation page_index must be a positive integer")
     started = _snapshot_timestamp(request_started_at)
-    received = _snapshot_timestamp(response_received_at)
+    received = _snapshot_timestamp(request_completed_at)
     if started > received:
-        raise ValueError("page observation request_started_at cannot be after response_received_at")
+        raise ValueError("page observation request_started_at cannot be after request_completed_at")
     if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
         raise ValueError("page observation rows must be a list of objects")
     symbols = []
@@ -189,7 +189,7 @@ def build_page_observation(
         "status_filter": status_filter,
         "page_index": page_index,
         "request_started_at": started,
-        "response_received_at": received,
+        "request_completed_at": received,
         "row_count": len(rows),
         "symbols": sorted(symbols),
         "has_next_page": next_cursor not in (None, ""),
@@ -210,13 +210,13 @@ def validate_page_observations(
             raise ValueError("page observation must be an object")
         required = {
             "status_filter", "page_index", "request_started_at",
-            "response_received_at", "row_count", "symbols", "has_next_page",
+            "request_completed_at", "row_count", "symbols", "has_next_page",
         }
         if set(item) != required:
             raise ValueError("page observation fields do not match schema")
         normalized = build_page_observation(
             item["status_filter"], item["page_index"],
-            item["request_started_at"], item["response_received_at"],
+            item["request_started_at"], item["request_completed_at"],
             [{"symbol": symbol} for symbol in item["symbols"]]
             if isinstance(item["symbols"], list) else item["symbols"],
             "next" if item["has_next_page"] else None,
@@ -232,11 +232,11 @@ def validate_page_observations(
         if previous_received is not None and normalized["request_started_at"] < previous_received:
             raise ValueError("page observations are not chronological")
         page_counts[status] = expected_index
-        previous_received = normalized["response_received_at"]
+        previous_received = normalized["request_completed_at"]
         validated.append(normalized)
     if collection_started_at is not None and validated[0]["request_started_at"] < _snapshot_timestamp(collection_started_at):
         raise ValueError("first page observation starts before collection_started_at")
-    if fetched_at is not None and validated[-1]["response_received_at"] > _snapshot_timestamp(fetched_at):
+    if fetched_at is not None and validated[-1]["request_completed_at"] > _snapshot_timestamp(fetched_at):
         raise ValueError("last page observation is after fetched_at")
     if expected_symbols is not None:
         observed_symbols = {symbol for item in validated for symbol in item["symbols"]}
@@ -319,10 +319,10 @@ def main() -> None:
         page, next_cursor = _request_page(
             args.base_url, args.category, cursor, status=status
         )
-        response_received_at = _snapshot_timestamp(None)
+        request_completed_at = _snapshot_timestamp(None)
         page_observations.append(build_page_observation(
             status, page_counts[status], request_started_at,
-            response_received_at, page, next_cursor,
+            request_completed_at, page, next_cursor,
         ))
         if next_cursor and args.pause:
             time.sleep(args.pause)

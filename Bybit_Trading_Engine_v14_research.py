@@ -1118,7 +1118,6 @@ class PlanBStatePersistence:
                         raise ValueError(f"позиция {sym}: открытая contract quantity ниже minOrderQty")
                     lowest_planned_exit = min(
                         Decimal(str(pos_dict["stop_price"])),
-                        Decimal(str(pos_dict["entry_price"])),
                         Decimal(str(pos_dict["tp2_price"])),
                     )
                     if remaining_qty * lowest_planned_exit < min_notional:
@@ -2189,7 +2188,6 @@ class UnifiedQuantEngine:
             # would miss that lower-notional target exit.
             lowest_planned_exit = min(
                 Decimal(str(pos.stop_price)),
-                Decimal(str(pos.entry_price)),
                 Decimal(str(pos.tp2_price)),
             )
             if (tp1_qty < min_qty or remaining_qty < min_qty

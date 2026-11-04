@@ -193,3 +193,27 @@ This direction follows the linear USDT quantity identity: total exit notional ac
 - This is a classification of historical evidence, not a claim that every old result is numerically wrong in the same direction.
 - No historical PnL was recalculated, no fixed-trade sensitivity was applied to E01–E07, no artifacts were downloaded, and no backtest or parameter sweep was run.
 - Preserve original reported figures as historical outputs, but do not use them as corrected-engine profitability evidence. Any future rerun would require the separate user/data/execution gates to be explicitly reopened.
+
+
+## 2026-11-05 — P1: accounting-version cross-check extended to E08–E13 and H-A/H-C
+
+Exact engine file blobs were fetched at each recorded experiment commit and the `_close_position()` execution-cost formula was inspected. This is static code provenance; no PnL was recomputed.
+
+| Experiment | Run commit | Engine blob at run commit | Exit-cost basis | PnL impact classification |
+|---|---|---|---|---|
+| E08 | `17c31df587e802da7c74d3c8e2f53a656a632668` | `e4501bd3666d7fe25ae8c1a10a9813da89b535dd` | Old entry-notional basis | **PROVISIONAL** — limit/maker proxy results affected; no scalar correction. |
+| E09 | `483278f51d99d402215a1f26a690ea2661e28939` | `1a19ae8c3a321cf1efcba85223c2aded13da5868` | Old entry-notional basis | **PROVISIONAL** — market and limit factorial results affected; cost correction can also change risk sizing. |
+| E10 | `483278f51d99d402215a1f26a690ea2661e28939` | `1a19ae8c3a321cf1efcba85223c2aded13da5868` | Old entry-notional basis | **PROVISIONAL** — per-symbol PnL sums and selection of the body gate affected. |
+| E11 | `ae6f7b4c99b79cbe31fdfeded8780a058b118049` | `1a19ae8c3a321cf1efcba85223c2aded13da5868` | Old entry-notional basis | **PROVISIONAL** — shared-capital portfolio path affected. Existing cost-only sensitivity is explicitly not a corrected-engine rerun and does not capture changed stop-risk sizing/portfolio sequence. |
+| E12 | `4100d800761983d9de148f368d2402280b3dc6be` | `1a19ae8c3a321cf1efcba85223c2aded13da5868` | Old engine present, but workflow is diagnostics-only | **NOT A PnL RESULT** — diagnostic values are not a strategy net-PnL estimate; no independent profitability claim. |
+| E13 | `f4da3cca0c0dc79cee86350ba6a680fc461e47fc` | `1a19ae8c3a321cf1efcba85223c2aded13da5868` | Old entry-notional basis | **PROVISIONAL** — shared-capital portfolio path affected. Existing cost-only sensitivity does not capture changed sizing or trade sequence. |
+| H-A final report run #41670116033 | Checkout SHA `3f762a4bf9fa3f53a61ff0912e2deaf411ead4b8` recovered from job log | `cc390a1f4c7345040e125ee64c1943ab944ed4be` | Correct execution-price TP1/final notional | **Fee-basis correction present.** Final report run code SHA is now resolved; do not apply the E01–E07 old-formula caveat to this run. |
+| H-C reverse-time run #41722545731 | `a5e7e1799f472db4cc00824dfcc774b40058165e` | `4f2b101379cab11a351ecf4ce3ec18d01872d8a6` | Correct execution-price TP1/final notional | **Fee-basis correction present.** Remaining blockers are proxy universe, reverse-time design, omitted funding/mark and lack of forward OOS—not the old exit-notional formula. |
+
+### Interpretation
+
+- The accounting correction boundary is now materially clearer: E01–E11 and E13 used the old exit-notional formula; E12 is diagnostics-only; H-A final run and H-C run used the corrected execution-price fee formula.
+- H-A final run checkout SHA `3f762a4bf9fa3f53a61ff0912e2deaf411ead4b8` was recovered from workflow job #126035908527. The exact engine blob at that SHA confirms TP1 and final exit costs use their execution prices. This resolves the previously unknown H-A final-run SHA.
+- E11/E13 cost-only sensitivity values already documented elsewhere remain sensitivity estimates on fixed historical trades, not corrected engine portfolio runs. Since stop-risk cost estimates also changed, the trade sizes and later portfolio path could differ.
+- H-C's corrected accounting does not make its negative proxy result a Bybit-native or forward-OOS result.
+- No artifact contents were downloaded; no historical PnL, cost sensitivity or replay was recalculated in this pass.

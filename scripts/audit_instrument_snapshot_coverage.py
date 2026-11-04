@@ -129,6 +129,7 @@ def audit_directory(directory: Path) -> dict[str, Any]:
         "first_fetched_at": snapshots[0]["fetched_at"] if snapshots else None,
         "last_fetched_at": snapshots[-1]["fetched_at"] if snapshots else None,
         "collection_duration_ms": _distribution(durations),
+        "collection_durations_ms": durations,
         "inter_snapshot_gap_ms": _distribution(gaps),
         "overlapping_collection_windows": sum(
             item["collection_windows_overlap"] for item in intervals
@@ -191,9 +192,8 @@ def main() -> int:
         ):
             return 1
         if duration_limit is not None and any(
-            item["collection_duration_ms"] is not None
-            and item["collection_duration_ms"] > duration_limit
-            for item in audit_directory(Path(section["directory"]))["intervals"]
+            duration > duration_limit
+            for duration in section["collection_durations_ms"]
         ):
             return 1
     return 0

@@ -648,6 +648,36 @@ def test_trade_archive_rejects_empty_or_whitespace_trade_id():
                 raise AssertionError("empty trade IDs must be rejected")
 
 
+def test_trade_archive_rejects_extra_csv_fields():
+    import gzip
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "trades.csv.gz"
+        with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
+            stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,False,False,unexpected\\n")
+        try:
+            list(l2_module.iter_public_trades(path))
+        except ValueError as exc:
+            assert "extra CSV fields" in str(exc)
+        else:
+            raise AssertionError("extra CSV fields must be rejected")
+
+
+def test_trade_archive_rejects_trade_id_with_surrounding_whitespace():
+    import gzip
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "trades.csv.gz"
+        with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
+            stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100, match-1 ,False,False\\n")
+        try:
+            list(l2_module.iter_public_trades(path))
+        except ValueError as exc:
+            assert "surrounding whitespace" in str(exc)
+        else:
+            raise AssertionError("padded trade IDs must be rejected")
+
+
 def test_trade_archive_parses_block_trade_and_rpi_flags():
     import gzip
     with tempfile.TemporaryDirectory() as tmp:

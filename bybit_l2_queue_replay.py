@@ -132,17 +132,22 @@ def apply_public_trade(order: PassiveOrder, trade: dict) -> None:
     if ts <= order.arrival_ts or ts >= order.expiry_ts or order.complete:
         return
     side = str(trade["side"])
+    if side not in ("Buy", "Sell"):
+        raise ValueError(f"unknown trade side: {side!r}")
     price, qty = dec(trade["price"]), dec(trade["size"])
-    if price != order.price or qty <= ZERO:
+    if price <= ZERO or qty <= ZERO:
+        raise ValueError("public trade price and size must be positive")
+    rpi_flag = str(trade.get("rpi", "0")).strip()
+    if rpi_flag not in ("", "0", "1", "False", "false", "True", "true"):
+        raise ValueError(f"unknown RPI flag: {rpi_flag!r}")
+    if rpi_flag in ("1", "True", "true"):
+        order.rpi_excluded_count += 1
+        return
+    if price != order.price:
         return
     if side == "Buy" and order.side != "Sell":
         return
     if side == "Sell" and order.side != "Buy":
-        return
-    if side not in ("Buy", "Sell"):
-        raise ValueError(f"unknown trade side: {side!r}")
-    if str(trade.get("rpi", "0")).strip() not in ("", "0", "False", "false"):
-        order.rpi_excluded_count += 1
         return
     order.eligible_trade_count += 1
     consumed_ahead = min(order.queue_ahead_remaining, qty)

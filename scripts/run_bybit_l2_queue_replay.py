@@ -14,10 +14,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bybit_l2_queue_replay import (
-from report_io import write_json_report
     OrderBook, iter_book_events, place_passive_order, replay_public_trades,
     signed_markout_bps, strict_int,
 )
+from report_io import write_json_report
 
 BOOK_URL = "https://quote-saver.bycsi.com/orderbook/linear/AAVEUSDT/2025-09-02_AAVEUSDT_ob200.data.zip"
 TRADES_URL = "https://public.bybit.com/trading/AAVEUSDT/AAVEUSDT2025-09-02.csv.gz"

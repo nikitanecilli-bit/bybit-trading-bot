@@ -172,3 +172,22 @@ CI: `research-checks.yml` already runs `tests/test_bybit_l2_queue_replay.py` on 
 Branch comparison at this checkpoint: `research/market-regime-v1-main` is diverged from `main` (1962 ahead, 36 behind). Do not merge this research branch wholesale or infer that it is safe to fast-forward; preserve main and use a reviewed selective PR/cherry-pick strategy later.
 
 Next audit: inspect existing queue replay against canonical dated spec history integration and identify whether a valid historical snapshot exists in prior artifacts; if not, keep historical order-validity unknown. Then continue per-fill execution accounting and latency/cancel modeling. No new archive/API call, PnL run, private API, or live order was made.
+## 14. Per-fill lifecycle: partial fills, VWAP, explicit fee rates and per-fill markout
+
+Расширен execution trace прототипа без запуска нового рыночного replay:
+- `PassiveOrder` сохраняет отдельный immutable `PassiveFill` для каждого частичного исполнения: timestamp, side, price, quantity.
+- Добавлены `filled_notional` и `filled_vwap` по фактическим fill records.
+- `replay_public_trades()` копирует также список fills перед replay; при ошибке валидации после уже смоделированного частичного fill исходный order остаётся неизменным.
+- `per_fill_fee_ledger()` принимает только явно переданные ставки комиссии для каждого fill; не подставляет account tier и допускает отрицательную ставку только как явно заданный rebate. Количество ставок обязано совпадать с числом fills.
+- Runner сохраняет каждый fill в report и рассчитывает 1s/5s/30s/60s markout отдельно от цены/времени каждого fill, а не только от первого fill.
+- Report явно помечает `order_spec_validation=not_performed_no_verified_historical_snapshot` и `fee_accounting=not_calculated_requires_account_fee_tier_per_fill`.
+
+Добавлены regression tests на partial-fill VWAP, per-fill rate matching, разные fee rates/rebate, markout каждого partial fill и rollback после duplicate trade ID, который возникает уже после потенциального первого fill. Queue test file содержит 39 test functions.
+
+Commits: fill records/fee ledger source `e9af629e1fe9ecf9748c508f57c45e9cca48fc6b`; fee/VWAP tests `6511bc0064be70a45bbc188e2c15dfe947c3515d`; per-fill markout runner `4db0454c121b3f198fcdade736af4fb58346a3ae`; tests `89f1f0f249338c15c4e744a4fc791f6bc33722fe`; report gate labels `d8371ddacc6b6df9fc91c454c0e902cbb17543f4`; rollback regression `5c83a3c370ade99b65112a0a78b1faf6b087902f`.
+
+Verification status: 39 test functions are present and source/runner/test files were re-fetched from branch; duplicate `u` fixture keys absent. GitHub combined statuses are empty for latest commits and the available workflow-run wrapper does not expose push runs. Do not state that tests passed until terminal Research CI is inspected.
+
+Research branch comparison now reports 1969 commits ahead and 36 behind `main` (diverged). Keep changes isolated; no merge/rebase to main.
+
+Remaining execution gaps: no verified historical instrument spec for the 2025-09-02 sample; no historical/account-specific per-fill fee rates; no measured order-entry/cancel latency or cancel queue model; no L3 priority. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`. No data downloads, PnL tests, private API or live orders.

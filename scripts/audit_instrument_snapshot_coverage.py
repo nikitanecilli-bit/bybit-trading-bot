@@ -9,9 +9,12 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from instrument_spec_history import InstrumentSpecHistory
 from bybit_risk_tiers import RiskTierHistory

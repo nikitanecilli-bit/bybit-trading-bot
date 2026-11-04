@@ -2,11 +2,6 @@ name: Bybit historical order-book archive probe
 
 on:
   workflow_dispatch:
-  push:
-    branches: [research/market-regime-v1-main]
-    paths:
-      - 'scripts/probe_bybit_orderbook_archives.py'
-      - '.github/workflows/bybit-orderbook-archive-probe.yml'
 
 permissions:
   contents: read

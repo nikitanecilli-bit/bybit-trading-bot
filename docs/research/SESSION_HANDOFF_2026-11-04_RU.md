@@ -471,3 +471,10 @@
 - Current historical pipeline uses L2 ZIP and daily public trade CSV.GZ. L2 parser retains `seq`, but trade normalization drops it; independent timestamp monotonicity checks do not establish cross-stream order. Equal-ms events remain ambiguous. Runner already excludes same-ms book events for arrival/markout and declares no same-ms fills.
 - No code change. Keep the conservative policy until trade `seq` availability in historical daily CSV is confirmed. Common ordering would not solve aggregate-L2 queue/cancel allocation.
 - Note: `ENG_EXEC_038_CROSS_STREAM_ORDERING_BOUNDARY_RU.md`. No API requests, archive downloads, tests, replay, PnL, collectors, runner or orders. Maker gate remains closed; `main` unchanged; PR #4 Draft/unmerged.
+
+## 2026-11-04 — ENG-EXEC-039 historical CSV sequence availability
+
+- Official REST/WS docs confirm live/recent trade `seq`, but official docs do not specify the daily historical CSV header or guarantee sequence retention. Secondary descriptions of common daily CSV show no `seq`; this is indicative, not universal proof.
+- Repo parser drops any trade `seq` even if present. Existing no-seq fixtures are synthetic; no verified real historical header is stored in repo.
+- No code change. Historical CSV cross-stream `seq` remains unavailable/unverified; keep conservative no-same-ms-fill policy. Need provenance-labelled sample or a separate approved acquisition to settle schema. Note: `ENG_EXEC_039_HISTORICAL_TRADE_CSV_SEQ_AVAILABILITY_RU.md`.
+- No archive/API requests, tests, replay, PnL, collectors, runner or orders. Maker gate closed; `main` unchanged; PR #4 Draft/unmerged.

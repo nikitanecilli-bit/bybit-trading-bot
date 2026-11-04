@@ -1484,3 +1484,14 @@ No market PnL, new archive download/collector, private API, runner registration,
 - `tests/test_portfolio_accounting.py` now passes an explicit zero-ms fixture budget to the joined-entry test and adds a constructor regression for missing budget.
 - Research CI [#41928557280](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928557280) SUCCESS on commit `8fa1685db728a051f37bb59921a3048446d269b1`; compile and deterministic test suite passed.
 - Audit doc extended at commit `3e49814cdcfb37488b84edb02f6f3a624b43bbd6`. No market replay or data collection was run.
+
+
+## 2026-11-05 — liquidation/Mark integration audit and test fixture cleanup
+
+- Read-only trace completed across `mark_price_liquidation.py`, Mark OHLC loading, engine adverse-Mark margin health, intrabar portfolio MTM, stop/liquidation ordering, TP1 remaining quantity and funding allocation.
+- No new confirmed arithmetic defect found. Model behavior and limitations are recorded in `docs/audits/ALT_SYSTEM_ACCOUNTING_CONTRACT_AUDIT_001_RU.md`, section 8.
+- Confirmed boundaries: position-level isolated UTA approximation only; Mark adverse candle extreme with conservative same-bar liquidation priority; no account wallet funding routing, extra/auto margin, cross/portfolio collateral, partial liquidation ladder or tick event sequence.
+- Updated `tests/test_mark_price_engine_integration.py`: stale fixture now supplies explicit `max_market_state_skew_ms=0` and asserts the joined helper receives zero. No production liquidation arithmetic changed.
+- Research CI [#41928978081](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928978081) SUCCESS on commit `08afcdd6c16e6c32fa33198e2ff56c66023ce585`; all 58 workflow steps passed.
+- Scope note: normal CI ran the existing read-only CryptoFetch ZIP integrity/overlap audit and H-A preparation-manifest step against repository-resident archives. It streamed ZIP members for inspection; no new archives were downloaded and no files were extracted to disk. No market PnL replay/test, exchange API, collector, private account query, paper/live or sweep ran.
+- All data, liquidation-safety, strategy PnL, maker, paper and live gates remain BLOCKED.

@@ -124,3 +124,11 @@ CI: run [41901402434](https://github.com/nikitanecilli-bit/bybit-trading-bot/act
 - Research CI [#41902137997](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41902137997): **SUCCESS**. Новые проверки `Test as-of instrument spec history` прошли; полный job завершился успешно.
 - Это проверка исторического выбора snapshot-версий, а не доказательство, что публичные snapshots достаточно частые или что биржа предоставляла каждое ограничение в точный момент сделки. Исторические значения между снимками неизвестны; интерполяция и перенос назад запрещены.
 - Только offline regression tests. Никакие API requests, collectors, archive downloads, live orders или market PnL tests не запускались.
+
+## ENG-DATA-014 — point-in-time выбор risk tiers
+
+- Добавлен regression test для двух dated risk-limit snapshots. На границе `fetched_at` проверяются `riskLimitValue`, `maintenanceMargin`, `initialMargin`, `maxLeverage` и `mmDeduction`; lookup должен использовать только соответствующую версию tier ladder.
+- Первый тестовый fixture ошибочно запрашивал position value, которая попадала во второй tier старого снимка, где leverage 80 уже запрещён. Исправлен именно fixture: position value помещена внутрь первого tier; production logic не менялась.
+- Research CI [#41902627575](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41902627575): **SUCCESS**, полный job завершился успешно. Проверка `Test as-of Bybit risk-tier history and selection` прошла.
+- Результат подтверждает выбор сохранённого снимка по `fetched_at`, но не покрывает неизвестные изменения risk tiers между снимками. Не выполняется интерполяция и не предполагается, что снимок атомарен на стороне биржи.
+- Только offline tests; API, collectors, архивы, live orders и market PnL tests не запускались.

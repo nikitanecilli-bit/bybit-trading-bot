@@ -6,9 +6,9 @@
 
 - Репозиторий: `nikitanecilli-bit/bybit-trading-bot` (private).
 - Рабочая ветка: `research/market-regime-v1-main`.
-- Последний проверенный code/test commit: `ec28763da6ade2635c31cd0111ae8c612625f23d`; все последующие коммиты на момент этого handoff snapshot — только документальные обновления handoff/checkpoint/ledger.
-- Последний подтверждённый CI: [Research engine checks #41873039139](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41873039139), commit `ec28763`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps.
-- В этом CI: aggregate-L2 primitive tests 81/81 passed; runner chronology/markout test step 7/7 passed, включая shared strict trade-timestamp parser coverage; state persistence 84/84.
+- Последний проверенный code/test commit: `6dcb9d8bc000778c09975dbd462c36545e23682c`; последние изменения после него в handoff/checkpoint/ledger являются документальными.
+- Последний подтверждённый CI: [Research engine checks #41873425668](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41873425668), commit `6dcb9d8`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps.
+- В этом CI: aggregate-L2 primitive tests 81/81; runner chronology/inspector suite 9/9; portfolio accounting 54/54; state persistence 84/84. Логи подтверждают новые проверки отсутствующих, whitespace-malformed и duplicate trade IDs.
 - Предыдущая неудачная попытка #41872989853 была вызвана устаревшим тестом, который после перехода инспектора на общий `parse_trade_timestamp_ms` всё ещё обращался к удалённому локальному helper `parse_archive_timestamp_ms`. Тест синхронизирован в `ec28763`; финальный CI прошёл.
 - PR #4: открыт, Draft, base `main`, head = текущая research-ветка; mergeable=false. Не сливать автоматически.
 - Сравнение с `main` на code/test snapshot `ec28763`: diverged, 2192 commits ahead / 36 behind. Merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. Точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
@@ -338,3 +338,14 @@
 - Это проверка целостности временных меток диагностического инструмента, не доказательство maker fill или PnL. Inspector с сетевой загрузкой не запускался; новые архивы не скачивались.
 - Execution gate остаётся `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`: сохранённый AAVE CSV не содержит ни `BT`, ни `isBlockTrade`; documented REST recent-trade endpoint не предоставляет произвольный исторический диапазон. Нужен уже имеющийся проверенный WS capture/archive с BT либо отдельное решение о будущем сборе данных.
 - Никаких PnL/backtests, market data downloads, collectors, private API, runner, paper/live orders или изменений `main` не было.
+
+
+## Session update — trade ID diagnostics in historical archive inspector (2026-11-04)
+
+- Статический аудит `scripts/inspect_bybit_trade_sample.py` выявил, что inspector считал только truthy `trdMatchID`. Пустые/отсутствующие ID и ID с окружающими пробелами пропускались без отдельного счётчика; отчёт мог выглядеть как отсутствие проблем с ID, хотя строгий queue replay такие строки отклоняет.
+- Добавлен `classify_trade_id()` с теми же правилами identity, что использует replay: missing/blank → `missing`, surrounding whitespace → `malformed`, повтор → `duplicate`, иначе уникальный ID.
+- JSON report теперь включает `missing_trade_id_count`, `malformed_trade_id_count`, `has_trade_id_column` и `trade_id_validation_status` (`valid` только при наличии колонки и нулевых missing/malformed/duplicate).
+- Коммиты: source `bd2c0f9bc9fe2ad64044a4b9fe672ceb148950b3`; regression `6dcb9d8bc000778c09975dbd462c36545e23682c`.
+- Source-only CI #41873380445 завершился SUCCESS; final Research CI #41873425668 на `6dcb9d8`: SUCCESS, job `tests` SUCCESS, 57/57 steps. Фактический лог подтверждает runner/inspector suite 9/9, включая новый ID classification regression; aggregate-L2 primitives 81/81.
+- Это улучшение диагностики качества CSV, не подтверждение исторических maker fills. Сохранённый AAVE archive всё ещё не содержит BT/isBlockTrade; maker execution realism остаётся BLOCKED_FOR_STRATEGY_PNL.
+- Никакие новые архивы не скачивались; inspector с сетевой загрузкой не запускался; нет PnL/backtest, collectors, private API, runner, paper/live orders или изменений main.

@@ -94,6 +94,18 @@ def test_markout_capture_excludes_exact_target_event_and_never_extrapolates():
     assert 5_000 not in states
 
 
+def test_capture_scenarios_rejects_empty_order_book_archive():
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = Path(tmp) / "empty.zip"
+        write_book_archive(archive, [])
+        try:
+            capture_scenarios(archive)
+        except ValueError as exc:
+            assert "order-book archive contains no events" in str(exc)
+        else:
+            raise AssertionError("empty order-book archive must fail with a clear validation error")
+
+
 def test_markout_capture_rejects_out_of_order_archive_after_last_target():
     with tempfile.TemporaryDirectory() as tmp:
         archive = Path(tmp) / "out_of_order.zip"

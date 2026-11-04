@@ -533,6 +533,48 @@ class OpenPositionState:
         except ExecutionIdentityError as exc:
             raise ValueError(f"позиция {self.symbol}: invalid exchange identity state: {exc}") from exc
 
+    def audit_exchange_position_quantity(
+        self, *, execution_history_complete: bool = False,
+    ) -> Dict[str, str]:
+        """Reconcile signed execution quantity with the current exchange position.
+
+        Set execution_history_complete=True only when the caller has independently
+        established full execution-history coverage for the position lifecycle.
+        """
+        if not isinstance(execution_history_complete, bool):
+            raise TypeError("execution_history_complete must be bool")
+        self._validate_exchange_identity_state()
+        if self.exchange_position_identity is None:
+            raise ValueError("exchange position identity is required for quantity audit")
+        identity = ExchangePositionIdentity.from_dict(self.exchange_position_identity)
+        entry_qty = Decimal("0")
+        exit_qty = Decimal("0")
+        for raw in self.exchange_executions:
+            execution = ExchangeExecutionIdentity.from_dict(raw)
+            quantity = Decimal(execution.exec_qty)
+            if execution.side == identity.side:
+                entry_qty += quantity
+            else:
+                exit_qty += quantity
+        net_qty = entry_qty - exit_qty
+        if net_qty < 0:
+            raise ValueError("closing execution quantity exceeds opening execution quantity")
+        expected_qty = Decimal(identity.qty)
+        difference = expected_qty - net_qty
+        if execution_history_complete:
+            status = "MATCH" if difference == 0 else "MISMATCH"
+        else:
+            status = "INCOMPLETE"
+        return {
+            "status": status,
+            "entry_exec_qty": str(entry_qty),
+            "exit_exec_qty": str(exit_qty),
+            "net_exec_qty": str(net_qty),
+            "position_qty": identity.qty,
+            "difference_qty": str(difference),
+            "execution_history_complete": str(execution_history_complete).lower(),
+        }
+
     def set_exchange_position_identity(self, identity: ExchangePositionIdentity) -> None:
         if not isinstance(identity, ExchangePositionIdentity):
             raise TypeError("identity must be ExchangePositionIdentity")

@@ -761,6 +761,8 @@ if __name__ == "__main__":
         test_selection_provenance_rejects_changed_data_and_code,
         test_selection_provenance_rejects_added_or_removed_replay_dependencies,
         test_selection_provenance_rejects_duplicate_code_paths,
+        test_replay_code_dependency_closure_includes_transitive_local_imports,
+        test_replay_code_dependency_closure_discovers_nested_package_imports,
         test_selection_provenance_rejects_changed_universe_snapshot,
         test_runtime_provenance_separates_research_checkout_from_workflow_ref,
         test_geometric_monthly_return_normalizes_compounded_returns_by_exact_duration,

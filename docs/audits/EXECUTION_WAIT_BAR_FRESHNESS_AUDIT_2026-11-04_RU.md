@@ -18,10 +18,11 @@ Research CI: [#41807674494 — SUCCESS](https://github.com/nikitanecilli-bit/byb
 - `scripts/run_h1_direction_execution_ablation.py`
 - `scripts/run_h1_chase_limit_ablation.py`
 - `scripts/run_h1_chase_gate_decoupling.py`
+- `scripts/run_h1_limit_fill_stress.py`
 
 Перед каждой повторной попыткой лимитной заявки runner теперь вызывает `prepare_signal_for_next_bar_fill()`: временной guard обновляется для текущей свечи, а исходный timestamp сохраняется в `signal_origin_ts` для provenance.
 
-`run_h1_shared_capital_portfolio_validation.py` уже использует этот адаптер. `run_h1_limit_fill_stress.py` также имеет отдельную реализацию с сохранением исходного timestamp.
+`run_h1_shared_capital_portfolio_validation.py` уже использует этот адаптер. `run_h1_limit_fill_stress.py` теперь использует общий `evaluate_limit_wait()` с `open_price`: гэп через лимит становится немедленным fill, а повторные попытки проходят через тот же freshness adapter.
 
 ## Регрессионная защита и CI
 
@@ -34,7 +35,7 @@ Research CI: [#41807674494 — SUCCESS](https://github.com/nikitanecilli-bit/byb
 
 Любые результаты с `wait_bars > 1`, полученные шестью перечисленными runners до исправления, нельзя трактовать как честное сравнение TTL: фактическое ожидание могло завершаться на первой свече из-за stale guard. Это относится к механике эксперимента, а не доказывает, что PnL был завышен или занижен.
 
-В этом аудите старые результаты не пересчитывались, рыночный PnL replay не запускался. Перед повторным использованием нужно проверить наличие исторических workflow artifacts и перезапустить только действительно нужные эксперименты на корректной механике.
+В `run_h1_limit_fill_stress.py` дополнительно устранена отдельная ошибка: старая ветка не распознавала marketable open gap и применяла только intrabar penetration. Теперь используется общий классификатор с ценой открытия. В этом аудите старые результаты не пересчитывались, рыночный PnL replay не запускался. Перед повторным использованием нужно проверить наличие исторических workflow artifacts и перезапустить только действительно нужные эксперименты на корректной механике.
 
 ## Ограничения, не устранённые этим исправлением
 

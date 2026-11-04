@@ -1748,5 +1748,44 @@ class StatePersistenceTests(unittest.TestCase):
             position.audit_exchange_position_quantity(execution_history_complete=True)
 
 
+    def test_exchange_quantity_audit_survives_plan_b_restart(self):
+        from exchange_execution_identity import (
+            ExchangeExecutionIdentity, ExchangeOrderIdentity, ExchangePositionIdentity,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "exchange-quantity-audit.json"
+            position = sample_position()
+            position.set_exchange_position_identity(ExchangePositionIdentity(
+                "linear", "USDT", "BTCUSDT", 0, "one_way", "Buy",
+                "0.75", "100", "entry-restart", "",
+            ))
+            position.record_exchange_order(ExchangeOrderIdentity(
+                "exit-restart", "", "BTCUSDT", "Sell", 0,
+                "0.5", "0.25", "0.25", "PartiallyFilled", True, False,
+            ))
+            position.record_exchange_execution(ExchangeExecutionIdentity(
+                "entry-restart-fill", "entry-restart", "", "BTCUSDT",
+                "Buy", "1.0", "100", position.entry_ts + 1,
+            ))
+            position.record_exchange_execution(ExchangeExecutionIdentity(
+                "exit-restart-fill", "exit-restart", "", "BTCUSDT",
+                "Sell", "0.25", "101", position.entry_ts + 2,
+            ))
+            cfg = engine.BotConfig()
+            risk = engine.AdaptiveRiskManager(cfg)
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                cfg, risk, {"BTCUSDT": position}, {}, 11,
+                last_mark_prices={"BTCUSDT": 100.0},
+            )
+            restored = engine.PlanBStatePersistence(str(path)).load_state(
+                engine.AdaptiveRiskManager(cfg)
+            )[0]["BTCUSDT"]
+            audit = restored.audit_exchange_position_quantity(execution_history_complete=True)
+            self.assertEqual(audit["status"], "MATCH")
+            self.assertEqual(audit["net_exec_qty"], "0.75")
+            self.assertEqual(restored.exchange_position_identity, position.exchange_position_identity)
+            self.assertEqual(restored.exchange_executions, position.exchange_executions)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

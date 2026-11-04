@@ -101,6 +101,20 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertIn('"status": "DATA_FOUND"', output.getvalue())
 
+
+    def test_optional_collection_duration_threshold_is_enforced(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "data" / "instrument_specs" / "linear"
+            write_snapshot(target, "a.json", "2026-11-01T00:00:10.000Z",
+                           [instrument("BTCUSDT")], "2026-11-01T00:00:00.000Z")
+            output = io.StringIO()
+            with patch("sys.argv", ["audit", "--root", str(root),
+                                    "--max-collection-minutes", "0.1"]):
+                with contextlib.redirect_stdout(output):
+                    result = main()
+        self.assertEqual(result, 1)
+
     def test_require_data_is_explicit_and_optional(self):
         with tempfile.TemporaryDirectory() as tmp:
             output = io.StringIO()

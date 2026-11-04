@@ -739,3 +739,23 @@ Verification status:
 - The last confirmed CI remains #41840361238 on `d2740c6ff444c3a7302b4b04dcc04d15ebf1dcb1`, SUCCESS (57/57 steps; L2 primitives 80/80; runner chronology step SUCCESS).
 - CI outcome for the new source/test commits has not been retrieved. This regression is **not yet claimed as passed**.
 - No market PnL, data download/collector, private API/account access, paper/live orders, or main-branch changes.
+
+
+## 36. Validate complete L2 archive payload after the arrival boundary — 2026-11-04
+
+Static audit found that `capture_book_at()` checked `cts` and `seq` for the full archive but skipped applying events at/after `arrival_ts` to an order book. That correctly prevented future/same-ms events from contaminating the returned pre-arrival snapshot, but it also meant malformed post-boundary payloads (for example, non-integer `u` or a crossed reconstructed book) could escape validation.
+
+Correction:
+- Keep the returned `book` frozen at the last state strictly before arrival.
+- At the first event at/after arrival, seed a separate validation-only `OrderBook` from the pre-arrival state and apply the remaining events to it. This validates update IDs, levels, snapshot/delta semantics and reconstructed-book integrity without introducing look-ahead into the returned snapshot.
+- Added `test_capture_book_at_rejects_malformed_book_events_after_arrival_boundary`, covering malformed update ID and crossed book in the tail.
+
+Commits:
+- source: `b79d827d7c6feadb7f4bf9f306fede7b5bd53f25`
+- regression: `57f5263c7bbd5f123e19cd2be2f23c2a31765446`
+
+Verification:
+- Source and test were re-fetched from the working branch; both changes are present.
+- The available commit-associated workflow lookup returned no runs for the test commit. CI is **unverified**; no claim that the new test passed.
+- The immediately preceding empty-arrival-archive guard is recorded in section 35; its CI status is also unverified.
+- No market PnL, archive collection/download, private API/account access, paper/live order, or main-branch change.

@@ -12,9 +12,20 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import scripts.run_bybit_l2_queue_replay as runner
+import scripts.inspect_bybit_trade_sample as trade_inspector
 from scripts.run_bybit_l2_queue_replay import (
     HOUR_MS, capture_book_states_at, capture_scenarios,
 )
+
+
+def test_trade_sample_inspector_recognizes_both_block_trade_aliases():
+    assert trade_inspector.block_trade_flag_columns(["timestamp", "BT"]) == ["BT"]
+    assert trade_inspector.block_trade_flag_columns(["isBlockTrade"]) == ["isBlockTrade"]
+    assert trade_inspector.block_trade_flag_columns(["BT", "isBlockTrade"]) == [
+        "isBlockTrade", "BT",
+    ]
+    assert trade_inspector.block_trade_flag_columns(["timestamp", "RPI"]) == []
+
 
 
 def write_book_archive(path: Path, events: list[dict]) -> None:

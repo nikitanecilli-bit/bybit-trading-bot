@@ -39,6 +39,11 @@ def download(url: str, path: Path) -> tuple[int, str]:
     return total, digest.hexdigest()
 
 
+def block_trade_flag_columns(fields: list[str]) -> list[str]:
+    """Return supported Bybit block-trade flag columns in stable order."""
+    return [name for name in ("isBlockTrade", "BT") if name in fields]
+
+
 def main() -> int:
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -108,6 +113,7 @@ def main() -> int:
                 total_notional += qty * price
                 rows += 1
 
+        block_flags = block_trade_flag_columns(fields)
         report["validation"] = {
             "rows": rows,
             "columns": fields,
@@ -122,7 +128,8 @@ def main() -> int:
             "total_contract_notional_usdt": str(total_notional),
             "has_rpi_flag": "RPI" in fields or "isRPITrade" in fields,
             "rpi_flag_value_counts": dict(rpi_counts),
-            "has_block_trade_flag": "isBlockTrade" in fields,
+            "has_block_trade_flag": bool(block_flags),
+            "block_trade_flag_columns": block_flags,
             "matching_engine_cts_min_ms": cts_min,
             "matching_engine_cts_max_ms": cts_max,
             "trades_before_book_cts_start": before_book,

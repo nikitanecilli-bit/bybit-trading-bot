@@ -692,6 +692,24 @@ class StatePersistenceTests(unittest.TestCase):
             lambda position: position.update({"realized_tp1_gross_usdt": 12.0})
         )
 
+    def test_restore_rejects_zero_favorable_extreme(self):
+        self._assert_invalid_position_payload(
+            lambda position: position.update({"max_favorable_px": 0.0})
+        )
+
+    def test_restore_rejects_long_favorable_extreme_below_entry(self):
+        self._assert_invalid_position_payload(
+            lambda position: position.update({"max_favorable_px": 99.0})
+        )
+
+    def test_restore_rejects_short_adverse_extreme_below_entry(self):
+        def mutate(position):
+            position.update({
+                "direction": "short", "tp1_price": 94.0, "tp2_price": 88.0,
+                "max_adverse_px": 99.0,
+            })
+        self._assert_invalid_position_payload(mutate)
+
     def test_long_targets_must_be_ordered_above_entry(self):
         self._assert_invalid_position_payload(
             lambda position: position.update({"tp1_price": 110.0, "tp2_price": 108.0})

@@ -188,7 +188,17 @@ def build_paired_donchian48_comparison(result_rows, enabled):
     rows = list(result_rows)
     indexed = {}
     for row in rows:
-        mode = (int(row.get("donchian_period", 20)), bool(row.get("ema50_200_gate", False)))
+        if not isinstance(row, dict):
+            raise ValueError("Donchian comparison rows must be dictionaries")
+        if "donchian_period" not in row or "ema50_200_gate" not in row:
+            raise ValueError("Donchian comparison row lacks explicit variant metadata")
+        period = row["donchian_period"]
+        ema_enabled = row["ema50_200_gate"]
+        if isinstance(period, bool) or not isinstance(period, int) or period not in (20, 48):
+            raise ValueError(f"invalid Donchian comparison period: {period!r}")
+        if not isinstance(ema_enabled, bool):
+            raise ValueError(f"invalid Donchian EMA gate marker: {ema_enabled!r}")
+        mode = (period, ema_enabled)
         key = (
             int(row["fold"]), float(row["min_volume_ratio"]),
             float(row["min_breakout_atr"]), float(row["cost_multiplier"]),

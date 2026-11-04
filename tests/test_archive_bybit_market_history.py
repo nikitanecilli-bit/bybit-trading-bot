@@ -64,28 +64,47 @@ class BybitMarketHistoryTests(unittest.TestCase):
         self.assertEqual([x["funding_timestamp_ms"] for x in rows],
                          sorted(x["funding_timestamp_ms"] for x in rows))
 
-    def test_archive_symbol_writes_funding_query_sidecar(self):
+    def test_archive_symbol_writes_funding_query_sidecar_through_final_close(self):
         hour = 3_600_000
         with tempfile.TemporaryDirectory() as tmp:
+            funding_requests = []
+            mark_requests = []
+
             def fake_funding(symbol, start_ms, end_ms, *, base_url, pause, audit_pages):
+                funding_requests.append((start_ms, end_ms))
                 audit_pages.append({
                     "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
-                    "response_rows": 1, "first_ts": start_ms, "last_ts": start_ms,
+                    "response_rows": 2, "first_ts": start_ms, "last_ts": end_ms - 1,
                     "complete": True, "saturated": False,
                 })
-                return [{
-                    "symbol": symbol, "funding_timestamp_ms": start_ms,
-                    "funding_rate": "0.001",
-                }]
+                return [
+                    {
+                        "symbol": symbol, "funding_timestamp_ms": start_ms,
+                        "funding_rate": "0.001",
+                    },
+                    {
+                        "symbol": symbol, "funding_timestamp_ms": end_ms - 1,
+                        "funding_rate": "0.002",
+                    },
+                ]
+
+            def fake_marks(symbol, start_ms, end_ms, interval, *, base_url, pause):
+                mark_requests.append((start_ms, end_ms, interval))
+                return [
+                    {
+                        "symbol": symbol, "timestamp_ms": hour,
+                        "open": "100", "high": "102", "low": "99", "close": "101",
+                    },
+                    {
+                        "symbol": symbol, "timestamp_ms": hour * 2,
+                        "open": "101", "high": "103", "low": "100", "close": "102",
+                    },
+                ]
 
             candle = {
                 "symbol": "BTCUSDT", "timestamp_ms": hour,
                 "open": "100", "high": "102", "low": "99", "close": "101",
                 "volume": "10", "turnover": "1010",
-            }
-            mark = {
-                "symbol": "BTCUSDT", "timestamp_ms": hour,
-                "open": "100", "high": "102", "low": "99", "close": "101",
             }
             snapshot_dir = Path(tmp) / "source_snapshots"
             snapshot_dir.mkdir()
@@ -108,28 +127,34 @@ class BybitMarketHistoryTests(unittest.TestCase):
             with (
                 patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=fake_funding),
                 patch("scripts.archive_bybit_market_history.fetch_trade_klines", return_value=[candle]),
-                patch("scripts.archive_bybit_market_history.fetch_mark_klines", return_value=[mark]),
+                patch("scripts.archive_bybit_market_history.fetch_mark_klines", side_effect=fake_marks),
             ):
                 result = archive_symbol(
                     "BTCUSDT", hour, hour * 2, tmp, "60", pause=0,
                     instrument_snapshot_paths=snapshot_paths,
                 )
 
+            self.assertEqual(funding_requests, [(hour, hour * 2 + 1)])
+            self.assertEqual(mark_requests, [(hour, hour * 3, "60")])
+            self.assertEqual(result["trade_candles"], 1)
+            self.assertEqual(result["mark_candles"], 2)
             funding_path = Path(result["funding_file"])
             manifest_path = Path(result["funding_manifest_file"])
             self.assertTrue(funding_path.is_file())
             self.assertTrue(manifest_path.is_file())
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(manifest["csv_sha256"], result["funding_file_sha256"])
+            self.assertEqual(manifest["runs"][0]["requested_end_ms"], hour * 2)
+            self.assertEqual(manifest["runs"][0]["pages"][0]["request_end_ms"], hour * 2)
             self.assertEqual(manifest["runs"][0]["pages"][0]["complete"], True)
             self.assertIsNotNone(manifest["settlement_schedule_evidence"])
             schedule_path = Path(result["funding_schedule_file"])
             schedule = json.loads(schedule_path.read_text(encoding="utf-8"))
-            self.assertEqual(schedule["expected_settlement_timestamps_ms"], [hour])
-            self.assertEqual(result["funding_schedule_events"], 1)
+            self.assertEqual(schedule["expected_settlement_timestamps_ms"], [hour, hour * 2])
+            self.assertEqual(result["funding_schedule_events"], 2)
             schedule_report = validate_funding_manifest(
                 funding_path, manifest_path, symbol="BTCUSDT",
-                required_start_ms=hour, required_end_ms=hour * 2 - 1,
+                required_start_ms=hour, required_end_ms=hour * 2,
             )
             self.assertTrue(schedule_report["ok"], schedule_report["errors"])
             with (

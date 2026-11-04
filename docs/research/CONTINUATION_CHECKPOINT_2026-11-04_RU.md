@@ -191,3 +191,18 @@ Verification status: 39 test functions are present and source/runner/test files 
 Research branch comparison now reports 1969 commits ahead and 36 behind `main` (diverged). Keep changes isolated; no merge/rebase to main.
 
 Remaining execution gaps: no verified historical instrument spec for the 2025-09-02 sample; no historical/account-specific per-fill fee rates; no measured order-entry/cancel latency or cancel queue model; no L3 priority. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`. No data downloads, PnL tests, private API or live orders.
+## 15. Strict integer validation for L2 order-book metadata
+
+Повторный статический аудит `OrderBook.apply()` выявил тихое приведение malformed JSON metadata через `int(...)`: например, `u=2.9` превращалось в `2`, а `seq=True` — в `1`. Это могло скрывать повреждение архива и применять неверный ordering metadata.
+
+Исправление: введён strict integer parser для `cts`, `seq`, `u`; принимаются только JSON integer values (bool/float/string coercion отклоняются), все три поля обязаны быть положительными. Ошибка возникает до candidate book mutation.
+
+Добавлены regression tests: fractional `u` (плюс проверка отсутствия мутации), boolean `seq`, fractional `cts`. Queue test file теперь содержит 42 test functions; duplicate `u` keys отсутствуют.
+
+Commits: source `c08336161c73a071cd440c50fc12f2aa7b5091f5`; tests `14d979ab8efef6100a9b8a678e94bc21ec050be3`.
+
+Bybit public orderbook docs define `u` and `seq` as integer fields, `cts` as matching-engine timestamp in ms, and `u=1` as restart snapshot marker. Source: https://bybit-exchange.github.io/docs/v5/websocket/public/orderbook. The separate full-orderbook synchronization page documents consecutive `u` for that specific full-depth stream; do not transfer that stronger continuity contract to the current depth-200 archive without confirming its feed format.
+
+CI remains unverified for these new push commits: combined status is empty and the available commit-workflow wrapper only returns PR-triggered runs; `research-checks.yml` has push/workflow_dispatch triggers but no `pull_request` trigger. No test-pass claim. Research branch compare: 1973 ahead / 36 behind `main`, diverged. Do not merge PR #4 or retarget it.
+
+External-data hold remains in force: do not dispatch collectors, configure self-hosted runner, download new Bybit archives, connect account/private API, or place paper/live orders until user-defined profitability condition is met. Current static work only. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`.

@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bybit_l2_queue_replay import (
+from report_io import write_json_report
     OrderBook, iter_book_events, place_passive_order, replay_public_trades,
     signed_markout_bps, strict_int,
 )
@@ -294,7 +295,7 @@ def main() -> int:
         report["status"] = "success"
 
     output = Path("bybit_l2_queue_replay_report.json")
-    output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    write_json_report(output, report)
     print(json.dumps(report, indent=2))
     return 0
 

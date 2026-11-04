@@ -10,7 +10,8 @@ from scripts.run_h1_shared_capital_portfolio_validation import (
     ACCELERATED_ATR_TRAIL_AFTER_1_5R, ENABLE_POST_BREAK_INVALIDATION,
     LEVERAGE_MODE, LEVERAGE_VAL, MAX_CHASE_LIMIT_PCT,
     build_ema50_200_label_maps, build_paired_ema_comparison,
-    build_paired_donchian48_comparison, resolve_donchian_variant_modes,
+    build_paired_donchian48_comparison, build_paired_h1_comparison_summaries,
+    resolve_donchian_variant_modes,
     h1_variant_modes, h1_variant_name, resolve_ema50_200_gate,
 )
 import Bybit_Trading_Engine_v14_research as em
@@ -396,6 +397,33 @@ def test_paired_donchian48_rejects_changed_volume_lookback():
         raise AssertionError("Donchian arms must share the same volume lookback")
 
 
+def test_three_arm_donchian48_manifest_pairs_ema_only_within_d48():
+    base = {
+        "fold": 1, "min_volume_ratio": 1.6, "min_breakout_atr": 0.1,
+        "cost_multiplier": 2.0, "timeframe": "1h",
+        "symbol_list": "BTCUSDT;ETHUSDT", "symbols": 2,
+        "common_h1_bars": 4000, "test_start_ts": 1_000_000,
+        "test_end_ts": 2_000_000, "shared_starting_capital": 10_000.0,
+        "max_concurrent_positions": 5, "volume_lookback_period": 20,
+        "net_pnl": -100.0, "trades": 40, "costs": 100.0,
+        "profit_factor": 0.8, "expectancy_r": -0.1,
+    }
+    rows = [
+        dict(base, donchian_period=20, ema50_200_gate=False, net_pnl=-100.0),
+        dict(base, donchian_period=48, ema50_200_gate=False, net_pnl=-60.0),
+        dict(base, donchian_period=48, ema50_200_gate=True, net_pnl=-30.0),
+    ]
+    summaries = build_paired_h1_comparison_summaries(rows, {
+        "ema50_200_gate_enabled": True,
+        "donchian48_ema_ablation_enabled": True,
+    })
+    assert summaries["paired_ema_comparison"]["pair_count"] == 1
+    assert summaries["paired_ema_comparison"]["pairs"][0]["baseline_net_pnl"] == -60.0
+    assert summaries["paired_ema_comparison"]["pairs"][0]["ema_gated_net_pnl"] == -30.0
+    assert summaries["paired_donchian48_comparison"]["pair_count"] == 1
+    assert summaries["paired_donchian48_comparison"]["pairs"][0]["d20_net_pnl"] == -100.0
+
+
 if __name__ == "__main__":
     tests = [
         test_h1_execution_risk_settings_are_explicitly_frozen,
@@ -414,6 +442,7 @@ if __name__ == "__main__":
         test_paired_donchian48_rejects_missing_or_invalid_arm_metadata,
         test_donchian48_keeps_volume_baseline_fixed_at_20_bars,
         test_paired_donchian48_rejects_changed_volume_lookback,
+        test_three_arm_donchian48_manifest_pairs_ema_only_within_d48,
     ]
     for test in tests:
         test()

@@ -133,6 +133,7 @@ class PassiveOrder:
     rpi_excluded_count: int = 0
     first_fill_ts: int | None = None
     fills: list[PassiveFill] = field(default_factory=list)
+    processed_trade_ids: set[tuple[str, str]] = field(default_factory=set)
 
     @property
     def remaining(self) -> Decimal:
@@ -316,8 +317,11 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
 
 def replay_public_trades(order: PassiveOrder, archive: Path, symbol: str = "AAVEUSDT") -> PassiveOrder:
     previous_ts = None
-    seen_trade_ids: set[str] = set()
-    working_order = replace(order, fills=list(order.fills))
+    seen_trade_ids: set[tuple[str, str]] = set()
+    working_order = replace(
+        order, fills=list(order.fills),
+        processed_trade_ids=set(order.processed_trade_ids),
+    )
     for trade in iter_public_trades(archive, symbol):
         ts = trade["timestamp_ms"]
         if previous_ts is not None and ts < previous_ts:
@@ -328,9 +332,15 @@ def replay_public_trades(order: PassiveOrder, archive: Path, symbol: str = "AAVE
         trade_id = trade.get("trade_id")
         if not isinstance(trade_id, str) or not trade_id:
             raise ValueError("missing public trade ID")
-        if trade_id in seen_trade_ids:
+        trade_key = (symbol.strip().upper(), trade_id)
+        if trade_key in working_order.processed_trade_ids:
+            # Replaying an overlapping archive is idempotent: do not consume
+            # queue or count the same public match twice.
+            continue
+        if trade_key in seen_trade_ids:
             raise ValueError(f"duplicate public trade ID: {trade_id}")
-        seen_trade_ids.add(trade_id)
+        seen_trade_ids.add(trade_key)
+        working_order.processed_trade_ids.add(trade_key)
         apply_public_trade(working_order, trade)
         if working_order.complete:
             break

@@ -443,27 +443,38 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
             f"Bybit archive output already exists for {symbol} in {root}; "
             "use a fresh output root rather than overwriting provenance."
         )
+    interval_ms = int(interval) * 60_000
     funding_pages: list[dict[str, Any]] = []
+    # Funding is settled at the final H1 candle CLOSE boundary. Its endpoint
+    # uses inclusive endTime, so query through end_ms (exclusive API helper
+    # boundary is end_ms + 1) rather than stopping at end_ms - 1.
     funding = fetch_funding_history(
-        symbol, start_ms, end_ms, base_url=base_url, pause=pause,
+        symbol, start_ms, end_ms + 1, base_url=base_url, pause=pause,
         audit_pages=funding_pages,
     )
     klines = fetch_trade_klines(symbol, start_ms, end_ms, interval, base_url=base_url, pause=pause)
-    marks = fetch_mark_klines(symbol, start_ms, end_ms, interval, base_url=base_url, pause=pause)
     _atomic_csv(funding_path, ["symbol", "funding_timestamp_ms", "funding_rate"], funding)
     from funding_archive_manifest import record_funding_collection
     funding_manifest = record_funding_collection(
         funding_path, funding_manifest_path, symbol=symbol, category="linear",
         api_base=base_url, requested_start_ms=start_ms,
-        requested_end_ms=end_ms - 1, pages=funding_pages,
+        requested_end_ms=end_ms, pages=funding_pages,
         collected_at_ms=int(datetime.now(timezone.utc).timestamp() * 1000),
     )
     from funding_archive_manifest import attach_funding_settlement_schedule
     schedule = attach_funding_settlement_schedule(
         funding_path, funding_manifest_path, symbol=symbol, category="linear",
-        required_start_ms=start_ms, required_end_ms=end_ms - 1,
+        required_start_ms=start_ms, required_end_ms=end_ms,
         snapshot_paths=instrument_snapshot_paths,
         snapshot_copy_dir=root / "instrument_snapshots",
+    )
+    # A settlement exactly at end_ms needs the Mark candle whose OPEN is at
+    # that boundary. Keep trade OHLCV end-exclusive, and fetch one additional
+    # closed Mark candle only when the dated settlement grid requires it.
+    terminal_settlement = end_ms in set(schedule["expected_settlement_timestamps_ms"])
+    mark_end_exclusive = end_ms + interval_ms if terminal_settlement else end_ms
+    marks = fetch_mark_klines(
+        symbol, start_ms, mark_end_exclusive, interval, base_url=base_url, pause=pause
     )
     _atomic_csv(kline_path, ["symbol", "timestamp_ms", "open", "high", "low", "close", "volume", "turnover"], klines)
     _atomic_csv(mark_path, ["symbol", "timestamp_ms", "open", "high", "low", "close"], marks)

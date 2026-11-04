@@ -192,6 +192,13 @@ def audit_directory(directory: Path) -> dict[str, Any]:
     return {
         "directory": str(directory),
         "snapshot_count": len(snapshots),
+        "snapshots": [{
+            "path": item["path"], "fetched_at": item["fetched_at"],
+            "page_observations": item["page_observations"],
+        } for item in snapshots],
+        "snapshots_with_page_observations": sum(
+            item["page_observations"] is not None for item in snapshots
+        ),
         "first_fetched_at": snapshots[0]["fetched_at"] if snapshots else None,
         "last_fetched_at": snapshots[-1]["fetched_at"] if snapshots else None,
         "collection_duration_ms": _distribution(durations),

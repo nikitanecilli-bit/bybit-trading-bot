@@ -1569,5 +1569,95 @@ class StatePersistenceTests(unittest.TestCase):
         self.assertEqual(position.exchange_orders, [])
 
 
+    def test_multiple_orders_partial_fills_cancel_and_replacement_remain_distinct(self):
+        from exchange_execution_identity import (
+            ExchangeExecutionIdentity, ExchangeOrderIdentity, ExchangePositionIdentity,
+        )
+        position = sample_position()
+        position.set_exchange_position_identity(ExchangePositionIdentity(
+            "linear", "USDT", "BTCUSDT", 0, "one_way", "Buy",
+            "1.0", "100", "entry-main", "entry-link",
+        ))
+
+        first = ExchangeOrderIdentity(
+            "exit-old", "exit-link-old", "BTCUSDT", "Sell", 0,
+            "1.0", "0.7", "0.3", "PartiallyFilled", True, False,
+        )
+        second = ExchangeOrderIdentity(
+            "exit-parallel", "exit-link-parallel", "BTCUSDT", "Sell", 0,
+            "0.5", "0.4", "0.1", "PartiallyFilled", True, False,
+        )
+        self.assertTrue(position.record_exchange_order(first))
+        self.assertTrue(position.record_exchange_order(second))
+        self.assertTrue(position.record_exchange_execution(ExchangeExecutionIdentity(
+            "fill-old-a", "exit-old", "exit-link-old", "BTCUSDT",
+            "Sell", "0.1", "99", position.entry_ts + 1,
+        )))
+        self.assertTrue(position.record_exchange_execution(ExchangeExecutionIdentity(
+            "fill-old-b", "exit-old", "exit-link-old", "BTCUSDT",
+            "Sell", "0.2", "98", position.entry_ts + 2,
+        )))
+        self.assertTrue(position.record_exchange_execution(ExchangeExecutionIdentity(
+            "fill-parallel", "exit-parallel", "exit-link-parallel", "BTCUSDT",
+            "Sell", "0.1", "97", position.entry_ts + 3,
+        )))
+
+        cancelled_partial = ExchangeOrderIdentity(
+            "exit-old", "exit-link-old", "BTCUSDT", "Sell", 0,
+            "1.0", "0", "0.3", "Cancelled", True, False,
+        )
+        self.assertTrue(position.record_exchange_order(cancelled_partial))
+        replacement = ExchangeOrderIdentity(
+            "exit-replacement", "exit-link-replacement", "BTCUSDT", "Sell", 0,
+            "0.7", "0.7", "0", "New", True, False,
+        )
+        self.assertTrue(position.record_exchange_order(replacement))
+
+        self.assertEqual(
+            {order["order_id"] for order in position.exchange_orders},
+            {"exit-old", "exit-parallel", "exit-replacement"},
+        )
+        self.assertEqual(
+            {fill["exec_id"] for fill in position.exchange_executions},
+            {"fill-old-a", "fill-old-b", "fill-parallel"},
+        )
+        self.assertEqual(
+            next(o for o in position.exchange_orders if o["order_id"] == "exit-old")["cum_exec_qty"],
+            "0.3",
+        )
+        with self.assertRaisesRegex(ValueError, "terminal exchange order"):
+            position.record_exchange_order(ExchangeOrderIdentity(
+                "exit-old", "exit-link-old", "BTCUSDT", "Sell", 0,
+                "1.0", "0", "0.3", "Cancelled", True, False,
+            ))
+
+    def test_filled_order_requires_full_cumulative_quantity_and_zero_leaves(self):
+        from exchange_execution_identity import ExchangeOrderIdentity
+        position = sample_position()
+        incomplete = ExchangeOrderIdentity(
+            "bad-filled", "", "BTCUSDT", "Sell", 0,
+            "1", "0", "0.8", "Filled", True, False,
+        )
+        with self.assertRaisesRegex(ValueError, "Filled order must have"):
+            position.record_exchange_order(incomplete)
+        self.assertEqual(position.exchange_orders, [])
+
+    def test_cancelled_order_requires_zero_leaves_but_preserves_partial_fill(self):
+        from exchange_execution_identity import ExchangeOrderIdentity
+        position = sample_position()
+        partial = ExchangeOrderIdentity(
+            "cancel-check", "", "BTCUSDT", "Sell", 0,
+            "1", "0.6", "0.4", "PartiallyFilled", True, False,
+        )
+        position.record_exchange_order(partial)
+        invalid_cancel = ExchangeOrderIdentity(
+            "cancel-check", "", "BTCUSDT", "Sell", 0,
+            "1", "0.1", "0.4", "Cancelled", True, False,
+        )
+        with self.assertRaisesRegex(ValueError, "terminal order must have zero leavesQty"):
+            position.record_exchange_order(invalid_cancel)
+        self.assertEqual(position.exchange_orders, [partial.to_dict()])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

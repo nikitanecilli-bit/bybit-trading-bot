@@ -2056,6 +2056,21 @@ class StatePersistenceTests(unittest.TestCase):
                     self.fail("symlink lock must not be followed")
             self.assertEqual(target.read_text(encoding="utf-8"), "do-not-touch")
 
+    def test_plan_b_save_and_restore_reject_symlink_backup_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "real-state.json"
+            target.write_text(json.dumps({"sentinel": "unchanged"}), encoding="utf-8")
+            backup = Path(tmp) / "state.json"
+            backup.symlink_to(target)
+            persistence = engine.PlanBStatePersistence(str(backup), enabled=True)
+            cfg = engine.BotConfig()
+            risk_mgr = engine.AdaptiveRiskManager(cfg)
+            with self.assertRaisesRegex(RuntimeError, "regular non-symlink"):
+                persistence.save_state(cfg, risk_mgr, {}, {}, 0, last_mark_prices={})
+            with self.assertRaisesRegex(RuntimeError, "regular non-symlink"):
+                persistence.load_state(risk_mgr, log_restore=False)
+            self.assertEqual(json.loads(target.read_text(encoding="utf-8")), {"sentinel": "unchanged"})
+
     def test_plan_b_reconciliation_rejects_symlink_backup_target(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "real-state.json"

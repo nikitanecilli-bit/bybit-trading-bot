@@ -100,6 +100,32 @@ class PointInTimeUniverseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "status counts"):
             build_universe_snapshot(rows, {status: 0 for status in CAPTURED_STATUSES})
 
+    def test_snapshot_rejects_negative_or_boolean_status_counts(self):
+        rows = [row("BTCUSDT", "Trading")]
+        counts = {status: int(status == "Trading") for status in CAPTURED_STATUSES}
+        counts["Trading"] = True
+        with self.assertRaisesRegex(ValueError, "status counts"):
+            build_universe_snapshot(rows, counts)
+        counts["Trading"] = -1
+        counts["PendingOpen"] = 2
+        with self.assertRaisesRegex(ValueError, "status counts"):
+            build_universe_snapshot(rows, counts)
+
+    def test_snapshot_rejects_counts_that_do_not_match_statuses(self):
+        rows = [row("BTCUSDT", "Trading")]
+        counts = {status: 0 for status in CAPTURED_STATUSES}
+        counts["PendingOpen"] = 1
+        with self.assertRaisesRegex(ValueError, "status counts"):
+            build_universe_snapshot(rows, counts)
+
+    def test_snapshot_rejects_invalid_timestamps(self):
+        rows = [row("BTCUSDT", "Trading")]
+        counts = {status: int(status == "Trading") for status in CAPTURED_STATUSES}
+        for timestamp in ("not-a-time", "2026-11-03T00:00:00", "2026-11-03T00:00:00.000500Z"):
+            with self.subTest(timestamp=timestamp):
+                with self.assertRaisesRegex(ValueError, "fetched_at"):
+                    build_universe_snapshot(rows, counts, timestamp)
+
     def test_snapshot_writer_round_trips(self):
         rows = [row("BTCUSDT", "Trading")]
         counts = {status: int(status == "Trading") for status in CAPTURED_STATUSES}

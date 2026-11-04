@@ -523,11 +523,25 @@ class QuantStrategyCore:
         return sum(trs) / len(trs)
 
     @staticmethod
-    def compute_donchian_and_volume(candles: List[Candle], period: int = 20) -> Tuple[float, float, float]:
-        window = candles[-period:] if len(candles) >= period else candles
-        hi = max(c.high for c in window)
-        lo = min(c.low for c in window)
-        avg_vol = sum(c.volume for c in window) / len(window) if window else 1.0
+    def compute_donchian_and_volume(
+        candles: List[Candle], period: int = 20,
+        volume_period: Optional[int] = None,
+    ) -> Tuple[float, float, float]:
+        """Compute channel extrema and volume baseline on independently frozen windows.
+
+        When volume_period is omitted, preserve the legacy behavior where both
+        calculations use the Donchian period.
+        """
+        if period < 1:
+            raise ValueError("Donchian period must be positive")
+        volume_period = period if volume_period is None else int(volume_period)
+        if volume_period < 1:
+            raise ValueError("volume lookback period must be positive")
+        channel_window = candles[-period:] if len(candles) >= period else candles
+        volume_window = candles[-volume_period:] if len(candles) >= volume_period else candles
+        hi = max(c.high for c in channel_window)
+        lo = min(c.low for c in channel_window)
+        avg_vol = sum(c.volume for c in volume_window) / len(volume_window) if volume_window else 1.0
         return hi, lo, avg_vol
 
     @staticmethod
@@ -538,7 +552,8 @@ class QuantStrategyCore:
 
     @staticmethod
     def evaluate_signal(symbol: str, candles: List[Candle], cfg: BotConfig) -> Optional[Dict]:
-        min_bars = max(cfg.donchian_period, cfg.atr_period) + 2
+        volume_period = int(getattr(cfg, "volume_lookback_period", cfg.donchian_period))
+        min_bars = max(cfg.donchian_period, volume_period, cfg.atr_period) + 2
         if len(candles) < min_bars:
             return None
         if symbol in cfg.disabled_instruments or symbol not in cfg.active_trading_pool:
@@ -559,7 +574,9 @@ class QuantStrategyCore:
             if abs(curr.close - curr.open) / curr.open * 100.0 > cfg.max_chase_limit_pct:
                 return None
 
-        hi_ch, lo_ch, avg_vol = QuantStrategyCore.compute_donchian_and_volume(history, cfg.donchian_period)
+        hi_ch, lo_ch, avg_vol = QuantStrategyCore.compute_donchian_and_volume(
+            history, cfg.donchian_period, volume_period=volume_period,
+        )
         vol_ratio = curr.volume / avg_vol if avg_vol > 0 else 1.0
         atr = QuantStrategyCore.compute_atr(history, cfg.atr_period)
         if atr <= 0:

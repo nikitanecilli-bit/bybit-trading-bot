@@ -304,6 +304,7 @@ def test_duplicate_public_trade_id_fails_closed_before_double_counting():
     finally:
         l2_module.iter_public_trades = original
     assert o.filled == D("0")
+    assert o.queue_ahead_remaining == D("5")
 
 
 def test_missing_public_trade_id_fails_closed():
@@ -321,6 +322,7 @@ def test_missing_public_trade_id_fails_closed():
     finally:
         l2_module.iter_public_trades = original
     assert o.filled == D("0")
+    assert o.queue_ahead_remaining == D("5")
 
 
 def test_book_state_capture_excludes_same_millisecond_updates():

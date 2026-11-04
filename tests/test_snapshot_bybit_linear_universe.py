@@ -187,15 +187,35 @@ class PointInTimeUniverseTests(unittest.TestCase):
         from scripts.snapshot_bybit_instruments import build_page_observation
         rows = [row("BTCUSDT", "Trading")]
         counts = {status: int(status == "Trading") for status in CAPTURED_STATUSES}
-        observations = [build_page_observation(
-            "default", 1, "2026-11-03T00:00:00.000Z",
-            "2026-11-03T00:00:00.250Z", rows, None,
-        )]
+        observations = []
+        for index, status in enumerate(("default", *STATUSES)):
+            page_rows = rows if status == "default" else []
+            start_ms = index * 10
+            observations.append(build_page_observation(
+                status, 1, f"2026-11-03T00:00:00.{start_ms:03d}Z",
+                f"2026-11-03T00:00:00.{start_ms + 1:03d}Z",
+                page_rows, None,
+            ))
         snapshot = build_universe_snapshot(
             rows, counts, "2026-11-03T00:00:01.000Z",
             "2026-11-03T00:00:00.000Z", observations,
         )
         self.assertEqual(snapshot["page_observations"], observations)
+
+
+    def test_universe_snapshot_requires_all_status_filter_groups(self):
+        from scripts.snapshot_bybit_instruments import build_page_observation
+        rows = [row("BTCUSDT", "Trading")]
+        counts = {status: int(status == "Trading") for status in CAPTURED_STATUSES}
+        observation = build_page_observation(
+            "default", 1, "2026-11-03T00:00:00.000Z",
+            "2026-11-03T00:00:00.100Z", rows, None,
+        )
+        with self.assertRaisesRegex(ValueError, "expected status filters"):
+            build_universe_snapshot(
+                rows, counts, "2026-11-03T00:00:01.000Z",
+                page_observations=[observation],
+            )
 
     def test_universe_snapshot_rejects_page_observation_after_fetched_at(self):
         from scripts.snapshot_bybit_instruments import build_page_observation

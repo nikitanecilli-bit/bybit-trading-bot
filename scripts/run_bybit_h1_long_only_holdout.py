@@ -70,9 +70,15 @@ def funding_cost_for_trade(trade, funding):
                for ts, rate in funding if entry < ts <= exit_)
 
 
-def run_holdout(symbol, candles, cutoff_ts):
+def run_holdout(
+    symbol, candles, cutoff_ts, *, instrument_specs_dir, risk_tiers_dir,
+    max_market_state_skew_ms,
+):
     engine = engine_mod.UnifiedQuantEngine(
-        journal_output_path=f"/tmp/bybit_h1_{symbol}_journal.json"
+        journal_output_path=f"/tmp/bybit_h1_{symbol}_journal.json",
+        instrument_specs_dir=instrument_specs_dir,
+        risk_tiers_dir=risk_tiers_dir,
+        max_market_state_skew_ms=max_market_state_skew_ms,
     )
     cfg = engine.cfg
     cfg.bot_version = "bybit-h1-long-only-cross-venue"
@@ -139,7 +145,19 @@ def max_dd_pct(values, capital=10_000.0):
 
 
 def run(data_dir="data/bybit_recent", output="bybit_h1_long_only_holdout.csv",
-        trades_output="bybit_h1_long_only_holdout_trades.csv"):
+        trades_output="bybit_h1_long_only_holdout_trades.csv", *,
+        instrument_specs_dir=None, risk_tiers_dir=None,
+        max_market_state_skew_ms=None):
+    if not instrument_specs_dir or not risk_tiers_dir:
+        raise ValueError(
+            "Bybit holdout requires dated --instrument-specs-dir and --risk-tiers-dir"
+        )
+    if (isinstance(max_market_state_skew_ms, bool)
+            or not isinstance(max_market_state_skew_ms, int)
+            or max_market_state_skew_ms < 0):
+        raise ValueError(
+            "Bybit holdout requires an explicit non-negative integer market-state skew budget"
+        )
     data_dir = Path(data_dir)
     results, all_trades = [], []
     for symbol in FROZEN_CANDIDATES:
@@ -159,7 +177,12 @@ def run(data_dir="data/bybit_recent", output="bybit_h1_long_only_holdout.csv",
         common = [(c.close, mark_by_ts[c.ts]) for c in candles[split:] if c.ts in mark_by_ts]
         basis = [abs(last - mark) / last * 100 for last, mark in common if last > 0]
 
-        engine, audit = run_holdout(symbol, candles, cutoff_ts)
+        engine, audit = run_holdout(
+            symbol, candles, cutoff_ts,
+            instrument_specs_dir=instrument_specs_dir,
+            risk_tiers_dir=risk_tiers_dir,
+            max_market_state_skew_ms=max_market_state_skew_ms,
+        )
         trades = list(engine.closed_trades)
         funding_costs = []
         adjusted_pnls = []
@@ -243,5 +266,13 @@ if __name__ == "__main__":
     parser.add_argument("--data-dir", default="data/bybit_recent")
     parser.add_argument("--output", default="bybit_h1_long_only_holdout.csv")
     parser.add_argument("--trades-output", default="bybit_h1_long_only_holdout_trades.csv")
+    parser.add_argument("--instrument-specs-dir", required=True)
+    parser.add_argument("--risk-tiers-dir", required=True)
+    parser.add_argument("--max-market-state-skew-ms", type=int, required=True)
     args = parser.parse_args()
-    run(args.data_dir, args.output, args.trades_output)
+    run(
+        args.data_dir, args.output, args.trades_output,
+        instrument_specs_dir=args.instrument_specs_dir,
+        risk_tiers_dir=args.risk_tiers_dir,
+        max_market_state_skew_ms=args.max_market_state_skew_ms,
+    )

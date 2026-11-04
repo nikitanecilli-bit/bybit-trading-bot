@@ -541,7 +541,7 @@ class ReportOnlyComparatorTests(unittest.TestCase):
             restored, _, trade_seq = restarted.load_state(
                 engine.AdaptiveRiskManager(cfg), log_restore=False,
             )
-            self.assertEqual(trade_seq, 7)
+            self.assertEqual(trade_seq, local["trade_seq"])
             self.assertEqual(
                 [row["exec_id"] for row in restored["BTCUSDT"].exchange_executions],
                 ["e2e-late-fill"],

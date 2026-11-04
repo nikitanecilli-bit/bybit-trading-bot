@@ -132,16 +132,21 @@ class SnapshotCollectorTests(unittest.TestCase):
             )
 
     def test_snapshot_round_trips_validated_page_observations(self):
-        observation = build_page_observation(
-            "Trading", 1, "2026-11-02T00:00:00.000Z",
-            "2026-11-02T00:00:00.250Z", [{"symbol": "BTCUSDT"}], None,
-        )
+        observations = []
+        for index, status in enumerate(collector.INSTRUMENT_STATUS_FILTERS["linear"]):
+            rows = [{"symbol": "BTCUSDT"}] if status == "Trading" else []
+            start_ms = index * 10
+            started = f"2026-11-02T00:00:00.{start_ms:03d}Z"
+            completed = f"2026-11-02T00:00:00.{start_ms + 1:03d}Z"
+            observations.append(build_page_observation(
+                status, 1, started, completed, rows, None,
+            ))
         snapshot = build_snapshot(
             [{"symbol": "BTCUSDT"}], "linear",
             "2026-11-02T00:00:01.000Z", "2026-11-02T00:00:00.000Z",
-            [observation],
+            observations,
         )
-        self.assertEqual(snapshot["page_observations"], [observation])
+        self.assertEqual(snapshot["page_observations"], observations)
 
     def test_snapshot_rejects_non_chronological_page_observations(self):
         observations = [
@@ -156,6 +161,30 @@ class SnapshotCollectorTests(unittest.TestCase):
             build_snapshot(
                 [{"symbol": "BTCUSDT"}, {"symbol": "OLDUSDT"}], "linear",
                 "2026-11-02T00:00:03.000Z", page_observations=observations,
+            )
+
+
+    def test_page_continuation_flags_must_match_page_sequence(self):
+        observations = [
+            build_page_observation("Trading", 1, "2026-11-02T00:00:00.000Z",
+                                   "2026-11-02T00:00:00.100Z",
+                                   [{"symbol": "BTCUSDT"}], None),
+            build_page_observation("Trading", 2, "2026-11-02T00:00:00.200Z",
+                                   "2026-11-02T00:00:00.300Z",
+                                   [{"symbol": "ETHUSDT"}], None),
+        ]
+        with self.assertRaisesRegex(ValueError, "continuation flags"):
+            collector.validate_page_observations(observations)
+
+    def test_snapshot_requires_all_expected_status_filters(self):
+        observation = build_page_observation(
+            "Trading", 1, "2026-11-02T00:00:00.000Z",
+            "2026-11-02T00:00:00.100Z", [{"symbol": "BTCUSDT"}], None,
+        )
+        with self.assertRaisesRegex(ValueError, "expected status filters"):
+            build_snapshot(
+                [{"symbol": "BTCUSDT"}], "linear",
+                "2026-11-02T00:00:01.000Z", page_observations=[observation],
             )
 
     def test_snapshot_has_provenance_and_exact_timestamp(self):

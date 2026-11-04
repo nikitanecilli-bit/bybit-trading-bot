@@ -18,7 +18,7 @@ EVENTS = [{"ts": SETTLE_1, "rate": "0.01"},
 MARKS = {SETTLE_1: "100", SETTLE_2: "120"}
 
 
-def position(direction="long", tp1=False, tp1_ts=None, remaining="0.5"):
+def position(direction="long", tp1=False, tp1_ts=None, remaining="1"):
     return SimpleNamespace(
         entry_ts=ENTRY, entry_price="100", size_usdt="1000",
         direction=direction, remaining_fraction=remaining,
@@ -188,6 +188,29 @@ class AccruedFundingTests(unittest.TestCase):
             with self.subTest(helper=helper.__name__):
                 with self.assertRaisesRegex(ValueError, "tp1_hit must be bool"):
                     helper(invalid, EVENTS, MARKS, SETTLE_2)
+
+    def test_funding_helpers_reject_partial_quantity_without_tp1_state(self):
+        inconsistent = position(tp1=False, tp1_ts=None, remaining="0.5")
+        for helper in (accrued_funding_cost, accrued_funding_cost_for_remaining_margin):
+            with self.subTest(helper=helper.__name__):
+                with self.assertRaisesRegex(ValueError, "cannot be partial when tp1_hit is false"):
+                    helper(inconsistent, EVENTS, MARKS, SETTLE_2)
+
+    def test_funding_helpers_reject_tp1_state_without_reduced_quantity(self):
+        inconsistent = position(tp1=True, tp1_ts=SETTLE_1, remaining="1")
+        for helper in (accrued_funding_cost, accrued_funding_cost_for_remaining_margin):
+            with self.subTest(helper=helper.__name__):
+                with self.assertRaisesRegex(ValueError, "tp1_hit requires a reduced"):
+                    helper(inconsistent, EVENTS, MARKS, SETTLE_2)
+
+    def test_funding_helpers_use_exact_quantity_to_validate_tp1_flag(self):
+        inconsistent = position(tp1=False, tp1_ts=None, remaining="1")
+        inconsistent.contract_qty = "1.0"
+        inconsistent.remaining_contract_qty = "0.4"
+        for helper in (accrued_funding_cost, accrued_funding_cost_for_remaining_margin):
+            with self.subTest(helper=helper.__name__):
+                with self.assertRaisesRegex(ValueError, "cannot be partial when tp1_hit is false"):
+                    helper(inconsistent, EVENTS, MARKS, SETTLE_2)
 
     def test_invalid_position_state_rejected(self):
         with self.assertRaisesRegex(ValueError, "tp1_ts_ms"):

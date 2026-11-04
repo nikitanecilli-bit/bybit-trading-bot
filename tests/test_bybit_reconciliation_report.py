@@ -223,6 +223,26 @@ class ReportOnlyComparatorTests(unittest.TestCase):
         self.assertEqual(report["exchange"]["execution_ids"], ["exec-1"])
         self.assertTrue(any("local execution ledger" in reason for reason in report["block_reasons"]))
 
+    def test_local_only_and_exchange_only_positions_are_both_reported(self):
+        exchange_position = {
+            "symbol": "ETHUSDT", "positionIdx": 0, "side": "Buy",
+            "size": "0.5", "avgPrice": "2500",
+            "updatedTime": CAPTURE_MS, "positionStatus": "Normal",
+            "takeProfit": "0", "stopLoss": "2400",
+            "trailingStop": "0",
+        }
+        local = backup({
+            "BTCUSDT": {"symbol": "BTCUSDT", "direction": "long"},
+        })
+        report = build_report(local, snapshot(position_rows=[exchange_position]))
+
+        self.assertEqual(report["diagnostics"]["local_symbols_missing_on_exchange"], ["BTCUSDT"])
+        self.assertEqual(report["diagnostics"]["exchange_symbols_missing_locally"], ["ETHUSDT"])
+        self.assertFalse(report["reconciliation_pass"])
+        self.assertFalse(report["live_resume_allowed"])
+        self.assertTrue(any("exact position reconciliation is unsupported" in reason
+                            for reason in report["block_reasons"]))
+
     def test_non_object_snapshot_is_rejected(self):
         with self.assertRaisesRegex(ReportError, "snapshot root must be an object"):
             build_report(backup(), [])

@@ -36,7 +36,10 @@ def _timestamp_ms(value: Any, field: str, *, allow_zero: bool) -> int:
 def validate_instrument_row(row: Any, requested_status: str | None) -> dict[str, Any]:
     if not isinstance(row, dict):
         raise ValueError("instrument row must be an object")
-    symbol = str(row.get("symbol") or "").strip().upper()
+    raw_symbol = row.get("symbol")
+    if not isinstance(raw_symbol, str) or not raw_symbol.strip():
+        raise ValueError("instrument row has invalid symbol")
+    symbol = raw_symbol.strip().upper()
     if not SYMBOL_RE.fullmatch(symbol):
         raise ValueError("instrument row has invalid symbol")
     actual_status = row.get("status")

@@ -1,6 +1,8 @@
 import sys
 import time
 import unittest
+import hashlib
+import json
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -50,6 +52,18 @@ class FakeTransport:
         raise AssertionError(f"unexpected endpoint: {endpoint}")
 
 
+class MultiPageExecutionTransport(FakeTransport):
+    def __call__(self, url, headers=None, timeout=20):
+        endpoint = urlparse(url).path
+        params = parse_qs(urlparse(url).query)
+        if endpoint == "/v5/execution/list":
+            self.calls.append((endpoint, url, headers or {}))
+            if params.get("cursor") == ["next-page"]:
+                return response(rows=[], cursor="")
+            return response(rows=[], cursor="next-page")
+        return super().__call__(url, headers=headers, timeout=timeout)
+
+
 class ReconciliationCollectorTests(unittest.TestCase):
     def test_signature_includes_query_string(self):
         a = _signature("1", "key", "secret", "a=1&b=2")
@@ -93,6 +107,31 @@ class ReconciliationCollectorTests(unittest.TestCase):
             snapshot["bybit_server_time_before_ms"], 120_000
         )
         self.assertEqual(len(snapshot["raw_sha256"]), 64)
+
+    def test_page_provenance_is_bound_to_query_response_and_cursor_chain(self):
+        fake = MultiPageExecutionTransport()
+        snapshot = collect_snapshot(
+            "key", "secret", SAVED, request_json=fake,
+        )
+        pages = snapshot["raw"]["executions"]
+        self.assertEqual(len(pages), 2)
+        first, last = pages
+        p0, p1 = first["page_provenance"], last["page_provenance"]
+        self.assertEqual(p0["endpoint"], "/v5/execution/list")
+        self.assertEqual([p0["page_index"], p1["page_index"]], [0, 1])
+        self.assertTrue(p0["has_next_page"])
+        self.assertFalse(p1["has_next_page"])
+        self.assertEqual(p0["next_cursor_sha256"], p1["requested_cursor_sha256"])
+        self.assertEqual(p0["response_canonical_sha256"], hashlib.sha256(
+            json.dumps(first["response"], ensure_ascii=False, sort_keys=True,
+                       separators=(",", ":"), allow_nan=False).encode("utf-8")
+        ).hexdigest())
+        self.assertEqual(p0["row_count"], len(first["response"]["result"]["list"]))
+        self.assertEqual(p0["ret_code"], 0)
+        self.assertLessEqual(p0["request_started_at_ms"], p0["request_completed_at_ms"])
+        self.assertLessEqual(p0["request_completed_at_ms"], p1["request_started_at_ms"])
+        self.assertEqual(len(p0["query_params_sha256"]), 64)
+        self.assertEqual(len(p0["requested_cursor_sha256"]), 64)
 
     def test_historical_order_rows_are_parsed_and_counted(self):
         row = {

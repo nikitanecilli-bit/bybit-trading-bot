@@ -13,6 +13,7 @@ from scripts.run_h1_shared_capital_portfolio_validation import (
     build_paired_donchian48_comparison, resolve_donchian_variant_modes,
     h1_variant_modes, h1_variant_name, resolve_ema50_200_gate,
 )
+import Bybit_Trading_Engine_v14_research as em
 from market_structure import lookup_trend_label
 
 H1_MS = 3_600_000
@@ -83,6 +84,7 @@ def test_paired_ema_comparison_matches_identical_configs_and_costs():
             "test_end_ts": 2_000_000,
             "shared_starting_capital": 10_000.0,
             "max_concurrent_positions": 5,
+        "volume_lookback_period": 20,
             "net_pnl": net,
             "trades": trades,
             "costs": costs,
@@ -111,6 +113,7 @@ def test_paired_ema_comparison_rejects_different_baskets_or_windows():
         "symbols": 2, "common_h1_bars": 4000,
         "test_start_ts": 1_000_000, "test_end_ts": 2_000_000,
         "shared_starting_capital": 10_000.0, "max_concurrent_positions": 5,
+        "volume_lookback_period": 20,
         "net_pnl": -100.0, "trades": 40, "costs": 50.0,
         "profit_factor": 0.8, "expectancy_r": -0.05,
     }
@@ -151,6 +154,7 @@ def test_paired_ema_comparison_rejects_unmatched_extra_baseline_rows():
             "symbols": 2, "common_h1_bars": 4000,
             "test_start_ts": 1_000_000, "test_end_ts": 2_000_000,
             "shared_starting_capital": 10_000.0, "max_concurrent_positions": 5,
+        "volume_lookback_period": 20,
             "net_pnl": -100.0, "trades": 40, "costs": 50.0,
             "profit_factor": 0.8, "expectancy_r": -0.05,
         }
@@ -253,7 +257,8 @@ def test_paired_donchian48_comparison_requires_three_exact_arms():
         "symbol_list": "BTCUSDT;ETHUSDT", "symbols": 2,
         "common_h1_bars": 4000, "test_start_ts": 1_000_000,
         "test_end_ts": 2_000_000, "shared_starting_capital": 10_000.0,
-        "max_concurrent_positions": 5, "net_pnl": -100.0,
+        "max_concurrent_positions": 5,
+        "volume_lookback_period": 20, "net_pnl": -100.0,
         "trades": 40, "ema50_200_gate": False, "donchian_period": 20,
     }
     rows = []
@@ -279,6 +284,7 @@ def test_paired_donchian48_rejects_missing_shared_invariant():
         "symbol_list": "BTCUSDT;ETHUSDT", "symbols": 2,
         "common_h1_bars": 4000, "test_end_ts": 2_000_000,
         "shared_starting_capital": 10_000.0, "max_concurrent_positions": 5,
+        "volume_lookback_period": 20,
         "net_pnl": -100.0, "trades": 40,
     }
     rows = [
@@ -300,7 +306,8 @@ def test_paired_donchian48_rejects_missing_or_invalid_arm_metadata():
         "symbol_list": "BTCUSDT;ETHUSDT", "symbols": 2,
         "common_h1_bars": 4000, "test_start_ts": 1_000_000,
         "test_end_ts": 2_000_000, "shared_starting_capital": 10_000.0,
-        "max_concurrent_positions": 5, "net_pnl": -100.0, "trades": 40,
+        "max_concurrent_positions": 5,
+        "volume_lookback_period": 20, "net_pnl": -100.0, "trades": 40,
     }
     valid_rows = [
         dict(base, donchian_period=period, ema50_200_gate=ema)
@@ -323,6 +330,72 @@ def test_paired_donchian48_rejects_missing_or_invalid_arm_metadata():
             raise AssertionError("missing or invalid arm metadata must fail closed")
 
 
+def test_donchian48_keeps_volume_baseline_fixed_at_20_bars():
+    cfg = em.BotConfig()
+    cfg.timeframe = "1h"
+    cfg.donchian_period = 48
+    cfg.volume_lookback_period = 20
+    cfg.atr_period = 14
+    cfg.min_volume_ratio = 1.6
+    cfg.active_trading_pool = ["BTCUSDT"]
+
+    history = []
+    for index in range(49):
+        history.append(em.Candle(
+            ts=(index + 1) * H1_MS,
+            open=100.0,
+            high=120.0 if index < 29 else 101.0,
+            low=99.0,
+            close=100.0,
+            volume=500.0 if index < 29 else 100.0,
+        ))
+    signal_candle = em.Candle(
+        ts=50 * H1_MS, open=120.5, high=122.0, low=120.0,
+        close=121.0, volume=300.0,
+    )
+    candles = history + [signal_candle]
+
+    hi20, lo20, avg20 = em.QuantStrategyCore.compute_donchian_and_volume(
+        history, 20, volume_period=20,
+    )
+    hi48, lo48, avg48 = em.QuantStrategyCore.compute_donchian_and_volume(
+        history, 48, volume_period=20,
+    )
+    assert (hi20, lo20) != (hi48, lo48)
+    assert avg20 == avg48 == 100.0
+
+    signals = []
+    for period in (20, 48):
+        cfg.donchian_period = period
+        signal = em.QuantStrategyCore.evaluate_signal("BTCUSDT", candles, cfg)
+        assert signal is not None
+        signals.append(signal)
+    assert signals[0]["vol_ratio"] == signals[1]["vol_ratio"] == 3.0
+
+
+def test_paired_donchian48_rejects_changed_volume_lookback():
+    base = {
+        "fold": 1, "min_volume_ratio": 1.6, "min_breakout_atr": 0.1,
+        "cost_multiplier": 2.0, "timeframe": "1h",
+        "symbol_list": "BTCUSDT;ETHUSDT", "symbols": 2,
+        "common_h1_bars": 4000, "test_start_ts": 1_000_000,
+        "test_end_ts": 2_000_000, "shared_starting_capital": 10_000.0,
+        "max_concurrent_positions": 5, "volume_lookback_period": 20,
+        "net_pnl": -100.0, "trades": 40,
+    }
+    rows = [
+        dict(base, donchian_period=period, ema50_200_gate=ema)
+        for period, ema in ((20, False), (48, False), (48, True))
+    ]
+    rows[1]["volume_lookback_period"] = 48
+    try:
+        build_paired_donchian48_comparison(rows, enabled=True)
+    except ValueError as exc:
+        assert "volume_lookback_period" in str(exc)
+    else:
+        raise AssertionError("Donchian arms must share the same volume lookback")
+
+
 if __name__ == "__main__":
     tests = [
         test_h1_execution_risk_settings_are_explicitly_frozen,
@@ -339,6 +412,8 @@ if __name__ == "__main__":
         test_paired_donchian48_comparison_requires_three_exact_arms,
         test_paired_donchian48_rejects_missing_shared_invariant,
         test_paired_donchian48_rejects_missing_or_invalid_arm_metadata,
+        test_donchian48_keeps_volume_baseline_fixed_at_20_bars,
+        test_paired_donchian48_rejects_changed_volume_lookback,
     ]
     for test in tests:
         test()

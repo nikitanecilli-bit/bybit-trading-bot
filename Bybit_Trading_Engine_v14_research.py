@@ -52,6 +52,10 @@ from instrument_spec_history import InstrumentSpecHistory
 from bybit_risk_tiers import RiskTierHistory, calculate_margin_requirements_from_tiers
 from bybit_market_state import get_linear_market_state
 from exchange_order_sizing import size_to_exchange_constraints
+from exchange_execution_identity import (
+    ExchangeExecutionIdentity, ExchangeOrderIdentity, ExchangePositionIdentity,
+    ExecutionIdentityError,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -430,14 +434,91 @@ class OpenPositionState:
     min_order_qty: Optional[str] = None
     min_notional_value: Optional[str] = None
     exchange_sized: bool = False
-    # Appended to preserve the positional constructor order of older position fields.
+    # Appended optional exchange identity fields; absent in legacy backups.
     tp1_maker: Optional[bool] = None
+    exchange_position_identity: Optional[Dict[str, Any]] = None
+    exchange_orders: List[Dict[str, Any]] = field(default_factory=list)
+    exchange_executions: List[Dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.max_favorable_px <= 0.0:
             self.max_favorable_px = self.entry_price
         if self.max_adverse_px <= 0.0:
             self.max_adverse_px = self.entry_price
+        self._validate_exchange_identity_state()
+
+    def _validate_exchange_identity_state(self) -> None:
+        try:
+            if self.exchange_position_identity is not None:
+                identity = ExchangePositionIdentity.from_dict(self.exchange_position_identity)
+                if identity.symbol != self.symbol:
+                    raise ExecutionIdentityError("position identity symbol differs from local position")
+                expected_side = "Buy" if self.direction == "long" else "Sell"
+                if identity.side != expected_side:
+                    raise ExecutionIdentityError("position identity side differs from local direction")
+            if not isinstance(self.exchange_orders, list):
+                raise ExecutionIdentityError("exchange_orders must be a list")
+            order_ids = set()
+            for raw in self.exchange_orders:
+                order = ExchangeOrderIdentity.from_dict(raw)
+                if order.symbol != self.symbol:
+                    raise ExecutionIdentityError("exchange order symbol differs from local position")
+                if order.order_id in order_ids:
+                    raise ExecutionIdentityError("duplicate exchange order_id")
+                order_ids.add(order.order_id)
+            if not isinstance(self.exchange_executions, list):
+                raise ExecutionIdentityError("exchange_executions must be a list")
+            executions = {}
+            for raw in self.exchange_executions:
+                execution = ExchangeExecutionIdentity.from_dict(raw)
+                if execution.symbol != self.symbol:
+                    raise ExecutionIdentityError("exchange execution symbol differs from local position")
+                previous = executions.get(execution.exec_id)
+                if previous is not None:
+                    if previous != execution.to_dict():
+                        raise ExecutionIdentityError("conflicting duplicate exchange exec_id")
+                    raise ExecutionIdentityError("duplicate exchange exec_id")
+                executions[execution.exec_id] = execution.to_dict()
+        except ExecutionIdentityError as exc:
+            raise ValueError(f"позиция {self.symbol}: invalid exchange identity state: {exc}") from exc
+
+    def set_exchange_position_identity(self, identity: ExchangePositionIdentity) -> None:
+        if not isinstance(identity, ExchangePositionIdentity):
+            raise TypeError("identity must be ExchangePositionIdentity")
+        if identity.symbol != self.symbol:
+            raise ValueError("exchange position identity symbol mismatch")
+        expected_side = "Buy" if self.direction == "long" else "Sell"
+        if identity.side != expected_side:
+            raise ValueError("exchange position identity side mismatch")
+        self.exchange_position_identity = identity.to_dict()
+
+    def record_exchange_order(self, order: ExchangeOrderIdentity) -> bool:
+        if not isinstance(order, ExchangeOrderIdentity):
+            raise TypeError("order must be ExchangeOrderIdentity")
+        if order.symbol != self.symbol:
+            raise ValueError("exchange order symbol mismatch")
+        for existing in self.exchange_orders:
+            if existing["order_id"] == order.order_id:
+                if existing == order.to_dict():
+                    return False
+                raise ValueError("conflicting exchange order_id update")
+        self.exchange_orders.append(order.to_dict())
+        self._validate_exchange_identity_state()
+        return True
+
+    def record_exchange_execution(self, execution: ExchangeExecutionIdentity) -> bool:
+        if not isinstance(execution, ExchangeExecutionIdentity):
+            raise TypeError("execution must be ExchangeExecutionIdentity")
+        if execution.symbol != self.symbol:
+            raise ValueError("exchange execution symbol mismatch")
+        for existing in self.exchange_executions:
+            if existing["exec_id"] == execution.exec_id:
+                if existing == execution.to_dict():
+                    return False
+                raise ValueError("conflicting duplicate exchange exec_id")
+        self.exchange_executions.append(execution.to_dict())
+        self._validate_exchange_identity_state()
+        return True
 
 
 @dataclass

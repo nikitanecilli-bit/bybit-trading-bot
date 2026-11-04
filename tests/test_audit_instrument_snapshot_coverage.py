@@ -103,20 +103,20 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             target = root / "data" / "universe_history" / "linear"
-            observations = [
-                {
-                    "status_filter": "default", "page_index": 1,
-                    "request_started_at": "2026-11-01T00:00:00.000Z",
-                    "request_completed_at": "2026-11-01T00:00:00.250Z",
-                    "row_count": 1, "symbols": ["BTCUSDT"], "has_next_page": False,
-                },
-                {
-                    "status_filter": "Closed", "page_index": 1,
-                    "request_started_at": "2026-11-01T00:00:01.000Z",
-                    "request_completed_at": "2026-11-01T00:00:01.500Z",
-                    "row_count": 1, "symbols": ["OLDUSDT"], "has_next_page": False,
-                },
-            ]
+            observations = []
+            pages = {
+                "default": ["BTCUSDT"], "PreLaunch": [],
+                "Settling": [], "Delivering": [], "Closed": ["OLDUSDT"],
+            }
+            for index, (status, page_symbols) in enumerate(pages.items()):
+                start_ms = index * 1000
+                observations.append({
+                    "status_filter": status, "page_index": 1,
+                    "request_started_at": f"2026-11-01T00:00:{start_ms // 1000:02d}.000Z",
+                    "request_completed_at": f"2026-11-01T00:00:{start_ms // 1000:02d}.250Z",
+                    "row_count": len(page_symbols), "symbols": page_symbols,
+                    "has_next_page": False,
+                })
             write_snapshot(
                 target, "a.json", "2026-11-01T00:00:02.000Z",
                 [instrument("BTCUSDT"), instrument("OLDUSDT", "Closed")],
@@ -131,18 +131,73 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
 
     def test_audit_rejects_page_observation_symbol_mismatch(self):
         with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "snapshots"
-            observations = [{
-                "status_filter": "Trading", "page_index": 1,
-                "request_started_at": "2026-11-01T00:00:00.000Z",
-                "request_completed_at": "2026-11-01T00:00:00.100Z",
-                "row_count": 1, "symbols": ["ETHUSDT"], "has_next_page": False,
-            }]
+            target = Path(tmp) / "data" / "instrument_specs" / "linear"
+            observations = []
+            for index, status in enumerate(("PreLaunch", "Trading", "Settling", "Delivering", "Closed")):
+                start_ms = index * 100
+                page_symbols = ["ETHUSDT"] if status == "Trading" else []
+                observations.append({
+                    "status_filter": status, "page_index": 1,
+                    "request_started_at": f"2026-11-01T00:00:00.{start_ms:03d}Z",
+                    "request_completed_at": f"2026-11-01T00:00:00.{start_ms + 10:03d}Z",
+                    "row_count": len(page_symbols), "symbols": page_symbols,
+                    "has_next_page": False,
+                })
             write_snapshot(target, "a.json", "2026-11-01T00:00:01.000Z",
                            [instrument("BTCUSDT")], "2026-11-01T00:00:00.000Z",
                            observations)
             with self.assertRaisesRegex(ValueError, "symbols do not match"):
                 audit_directory(target)
+
+
+    def test_audit_rejects_missing_continuation_page(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "data" / "instrument_specs" / "spot"
+            observations = [
+                {
+                    "status_filter": "Trading", "page_index": 1,
+                    "request_started_at": "2026-11-01T00:00:00.000Z",
+                    "request_completed_at": "2026-11-01T00:00:00.100Z",
+                    "row_count": 1, "symbols": ["BTCUSDT"], "has_next_page": False,
+                },
+                {
+                    "status_filter": "Trading", "page_index": 2,
+                    "request_started_at": "2026-11-01T00:00:00.200Z",
+                    "request_completed_at": "2026-11-01T00:00:00.300Z",
+                    "row_count": 1, "symbols": ["ETHUSDT"], "has_next_page": False,
+                },
+            ]
+            write_snapshot(target, "a.json", "2026-11-01T00:00:01.000Z",
+                           [instrument("BTCUSDT"), instrument("ETHUSDT")],
+                           "2026-11-01T00:00:00.000Z", observations)
+            with self.assertRaisesRegex(ValueError, "continuation flags"):
+                audit_directory(target)
+
+    def test_audit_reports_repeated_symbols_across_pages(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "data" / "instrument_specs" / "spot"
+            observations = [
+                {
+                    "status_filter": "Trading", "page_index": 1,
+                    "request_started_at": "2026-11-01T00:00:00.000Z",
+                    "request_completed_at": "2026-11-01T00:00:00.100Z",
+                    "row_count": 1, "symbols": ["BTCUSDT"], "has_next_page": True,
+                },
+                {
+                    "status_filter": "Trading", "page_index": 2,
+                    "request_started_at": "2026-11-01T00:00:00.200Z",
+                    "request_completed_at": "2026-11-01T00:00:00.300Z",
+                    "row_count": 2, "symbols": ["BTCUSDT", "ETHUSDT"], "has_next_page": False,
+                },
+            ]
+            write_snapshot(target, "a.json", "2026-11-01T00:00:01.000Z",
+                           [instrument("BTCUSDT"), instrument("ETHUSDT")],
+                           "2026-11-01T00:00:00.000Z", observations)
+            report = audit_directory(target)
+        self.assertEqual(
+            report["snapshots"][0]["page_observations"]["duplicate_symbol_observations"],
+            [{"symbol": "BTCUSDT", "occurrences": 2}],
+        )
 
     def test_duplicate_snapshot_timestamps_fail_closed(self):
         with tempfile.TemporaryDirectory() as tmp:

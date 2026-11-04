@@ -1012,3 +1012,10 @@ Restore path now rejects exchange-sized positions whose initial/remaining quanti
 Funding audit found accrued_funding_cost() and accrued_funding_cost_for_remaining_margin() accepted a TP1 timestamp while tp1_hit=false, and accepted non-bool tp1_hit values through truthiness. Both now require a bool and enforce timestamp iff TP1 is hit. Two regressions added. Final CI #41851768270 (3170738a78eac92b0a93eda66510c038660f0864) SUCCESS, 57/57 steps; actual log confirms both tests passed; funding suite 76 tests. Source-only CI #41851738950 (568f5ed2552d27dadfeb82c4d1e9610cfac3cd13) SUCCESS, 57/57.
 
 Classification: execution/persistence/accounting correctness; no evidence of strategy profitability. No market PnL, archive downloads, private API, runner, paper/live orders, or main changes.
+
+
+## 51. MinNotional must use actual planned exit prices, not entry — 2026-11-04
+
+Refined exchange-sized TP1/restore checks: entry price is not a planned exit order. The minimum notional price is now min(stop_price, tp2_price), with TP1 leg separately validated at TP1 price. This avoids false rejection after a long trailing stop rises above entry while both actual exit prices still meet minNotionalValue.
+
+Regression: exchange-sized long entry 100, trailing stop 110, TP2 112, qty 1, minNotional 105. Restore succeeds although entry notional is 100, because stop and TP2 notionals are valid. CI #41852293859 on c88e587d01739eb7c0ee6fe94e0369b28aff664c: SUCCESS 57/57; actual log confirms new test passed; state persistence suite 77/77.

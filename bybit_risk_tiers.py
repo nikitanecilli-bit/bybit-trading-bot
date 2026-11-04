@@ -37,6 +37,89 @@ def _timestamp_ms(value: str) -> int:
             + delta.microseconds // 1000)
 
 
+
+def _validate_optional_collection_metadata(
+    payload: dict[str, Any], path: Path, fetched_at_ms: int,
+    rows: list[Any], symbols: set[str],
+) -> None:
+    started_text = payload.get("collection_started_at")
+    started_ms = None
+    if started_text is not None:
+        if not isinstance(started_text, str):
+            raise ValueError(f"{path}: collection_started_at must be an ISO-8601 string")
+        started_ms = _timestamp_ms(started_text)
+        if started_ms > fetched_at_ms:
+            raise ValueError(f"{path}: collection_started_at is after fetched_at")
+
+    if "symbol_count" in payload:
+        count = payload["symbol_count"]
+        if isinstance(count, bool) or not isinstance(count, int) or count != len(symbols):
+            raise ValueError(f"{path}: symbol_count does not match tier symbols")
+
+    observations = payload.get("page_observations")
+    if observations is None:
+        return
+    if not isinstance(observations, list) or not observations:
+        raise ValueError(f"{path}: page_observations must be a non-empty list")
+    if started_ms is None:
+        raise ValueError(f"{path}: page_observations require collection_started_at")
+
+    observed_symbols: set[str] = set()
+    previous_completed: int | None = None
+    page_tier_total = 0
+    for expected_index, item in enumerate(observations, start=1):
+        if not isinstance(item, dict) or set(item) != {
+            "page_index", "request_started_at", "request_completed_at",
+            "tier_count", "symbol_count", "symbols", "has_next_page",
+        }:
+            raise ValueError(f"{path}: invalid risk page observation schema")
+        if type(item["page_index"]) is not int or item["page_index"] != expected_index:
+            raise ValueError(f"{path}: risk page indexes are not sequential")
+        request_started_text = item["request_started_at"]
+        request_completed_text = item["request_completed_at"]
+        if not isinstance(request_started_text, str) or not isinstance(request_completed_text, str):
+            raise ValueError(f"{path}: risk page timestamps must be ISO-8601 strings")
+        request_started = _timestamp_ms(request_started_text)
+        request_completed = _timestamp_ms(request_completed_text)
+        if request_started > request_completed:
+            raise ValueError(f"{path}: risk page request starts after completion")
+        if request_started < started_ms or request_completed > fetched_at_ms:
+            raise ValueError(f"{path}: risk page request is outside collection bounds")
+        if previous_completed is not None and request_started < previous_completed:
+            raise ValueError(f"{path}: risk page observations are not chronological")
+
+        tier_count = item["tier_count"]
+        if type(tier_count) is not int or tier_count < 0:
+            raise ValueError(f"{path}: invalid risk page tier_count")
+        page_symbols = item["symbols"]
+        if (not isinstance(page_symbols, list)
+                or any(not isinstance(symbol, str) or not symbol.strip() for symbol in page_symbols)):
+            raise ValueError(f"{path}: invalid risk page symbols")
+        normalized = [symbol.strip().upper() for symbol in page_symbols]
+        if normalized != sorted(set(normalized)):
+            raise ValueError(f"{path}: risk page symbols must be unique and sorted")
+        symbol_count = item["symbol_count"]
+        if type(symbol_count) is not int or symbol_count != len(normalized):
+            raise ValueError(f"{path}: risk page symbol_count mismatch")
+        if symbol_count > tier_count:
+            raise ValueError(f"{path}: risk page symbol_count exceeds tier_count")
+        has_next = item["has_next_page"]
+        if type(has_next) is not bool:
+            raise ValueError(f"{path}: invalid risk page continuation flag")
+        if expected_index < len(observations) and not has_next:
+            raise ValueError(f"{path}: missing risk page continuation")
+        if expected_index == len(observations) and has_next:
+            raise ValueError(f"{path}: final risk page has continuation")
+        observed_symbols.update(normalized)
+        page_tier_total += tier_count
+        previous_completed = request_completed
+
+    if observed_symbols != symbols:
+        raise ValueError(f"{path}: risk page symbols do not match tier symbols")
+    if page_tier_total != len(rows):
+        raise ValueError(f"{path}: risk page tier counts do not match tier rows")
+
+
 def _as_of_ms(value: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError("as_of_ts must be an integer millisecond timestamp")
@@ -182,6 +265,9 @@ class RiskTierHistory:
                 grouped.setdefault(symbol, []).append(RiskTier(
                     symbol, tier_id, risk_limit, mmr, imr, max_lev, deduction, bool(lowest)
                 ))
+            _validate_optional_collection_metadata(
+                payload, path, fetched_at_ms, rows, set(grouped)
+            )
             final: dict[str, tuple[RiskTier, ...]] = {}
             for symbol, tiers in grouped.items():
                 tiers.sort(key=lambda item: item.risk_limit_value)

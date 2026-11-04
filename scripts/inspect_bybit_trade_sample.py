@@ -48,6 +48,26 @@ def block_trade_flag_columns(fields: list[str]) -> list[str]:
     """Return supported Bybit block-trade flag columns in stable order."""
     return [name for name in ("isBlockTrade", "BT") if name in fields]
 
+def validate_trade_csv_header(fields: list[str]) -> None:
+    """Reject ambiguous headers using the queue replay CSV contract."""
+    if len(fields) != len(set(fields)):
+        raise ValueError("trade CSV contains duplicate column names")
+    required = {"timestamp", "symbol", "side", "size", "price"}
+    missing = sorted(required - set(fields))
+    if missing:
+        raise ValueError(f"trade CSV missing required columns: {missing}")
+
+
+def validate_trade_csv_row(row: dict, row_no: int) -> None:
+    """Reject malformed CSV row widths and missing core values."""
+    if None in row:
+        raise ValueError(f"unexpected extra CSV fields at row {row_no}")
+    required = {"timestamp", "symbol", "side", "size", "price"}
+    missing = sorted(name for name in required if row.get(name) is None)
+    if missing:
+        raise ValueError(f"missing CSV field value at row {row_no}: {missing}")
+
+
 def classify_trade_id(value: object, seen_ids: set[str]) -> str:
     """Classify a CSV trade ID using the queue replay strict identity rules."""
     if not isinstance(value, str) or not value.strip():
@@ -109,13 +129,11 @@ def main() -> int:
         with gzip.open(archive, "rt", encoding="utf-8", newline="") as stream:
             reader = csv.DictReader(stream)
             fields = list(reader.fieldnames or [])
-            required = {"timestamp", "symbol", "side", "size", "price"}
-            missing = sorted(required - set(fields))
-            if missing:
-                raise ValueError(f"trade CSV missing required columns: {missing}")
+            validate_trade_csv_header(fields)
             block_flags = block_trade_flag_columns(fields)
             rpi_flags = [name for name in ("RPI", "isRPITrade") if name in fields]
-            for row in reader:
+            for row_no, row in enumerate(reader, 2):
+                validate_trade_csv_row(row, row_no)
                 if row.get("symbol") != SYMBOL:
                     raise ValueError(f"unexpected trade symbol: {row.get('symbol')!r}")
                 ts = parse_trade_timestamp_ms(row["timestamp"])

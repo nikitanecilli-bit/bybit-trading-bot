@@ -19,6 +19,10 @@ on:
         description: "Committed JSON output from the H1 top-five train-only selector"
         required: true
         type: string
+      max_market_state_skew_ms:
+        description: "Required maximum timestamp skew between instrument-spec and risk-tier snapshots, in milliseconds"
+        required: true
+        type: string
       validation_mode:
         description: "Explore = grid on folds 1-2 only; confirm = one frozen configuration on final fold 3 only"
         required: true
@@ -117,6 +121,7 @@ jobs:
           BYBIT_FUNDING_DIR: ${{ inputs.funding_dir }}
           BYBIT_MARK_PRICE_DIR: ${{ inputs.mark_price_dir }}
           BYBIT_KLINE_DIR: ${{ inputs.kline_dir }}
+          BYBIT_MAX_MARKET_STATE_SKEW_MS: ${{ inputs.max_market_state_skew_ms }}
           H1_SELECTION_MANIFEST: ${{ inputs.selection_manifest }}
           H1_VALIDATION_MODE: ${{ inputs.validation_mode }}
           H1_EMA50_200_GATE: ${{ inputs.ema50_200_comparison == 'paired' && '1' || '0' }}

@@ -319,3 +319,13 @@
 - Added three regressions: zero favorable extreme, long favorable below entry, short adverse below entry.
 - Source CI #41854906684 SUCCESS, 57/57; final source+tests CI #41854947672 on 4c7744c22180a97fa868547eac034cdf91b69491 SUCCESS, 57/57; actual log confirms all three new regressions; state persistence suite 81 tests.
 - Classification: persisted trade-excursion metrics integrity; no PnL/backtest, archive downloads, API, runner, paper/live or main changes.
+
+
+## Session update — risk stop latches must agree with drawdown evidence (2026-11-04)
+
+- Found a fail-open restore case: a backup could contain current drawdown >= emergency kill-switch threshold while `kill_switch_triggered=false`, or current-day drawdown >= daily stop threshold while `daily_stop_triggered=false`. `can_open_new_trade()` trusts those latches, so restart could re-enable entries despite breached limits.
+- Restore now requires `kill_switch_triggered=true` whenever either current peak-to-equity drawdown OR persisted historical `max_drawdown_pct` reaches `emergency_kill_switch_pct`. Including historical max is necessary because the emergency latch remains active after equity recovers.
+- For a non-empty `current_day_str`, restore requires `daily_stop_triggered=true` whenever current equity is below `day_start_equity` by at least `daily_stop_loss_pct`.
+- Regressions cover emergency threshold currently breached, historical emergency DD breached then recovered, and daily threshold currently breached. Source CI #41861236015 SUCCESS 57/57; final CI #41861273155 on 669a7d66c50df5426e63c5490580b2d8bbc92f22 SUCCESS 57/57; log confirms all three regressions; state persistence suite 84 tests.
+- Residual observability limit: if an intraday daily-stop breach occurred and equity later recovered above the threshold before backup, the existing schema has no daily minimum-equity watermark; restore cannot independently reconstruct that prior breach if the latch itself is corrupted. Runtime persists the latch on false->true. A future schema-level daily watermark would be needed to validate recovered intraday breaches.
+- Classification: risk-control persistence integrity, not profitability evidence. No PnL/backtest, market data downloads, API, runner, paper/live or main changes.

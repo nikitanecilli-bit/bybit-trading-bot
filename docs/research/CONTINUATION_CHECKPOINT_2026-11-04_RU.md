@@ -993,3 +993,13 @@ Verification:
 - Source-only CI #41850143419 on 7238076b271bf25010d01ce2df0c1321e3652722: SUCCESS, 57/57 steps.
 
 Classification: exchange-order validity guardrail; not strategy/PnL evidence. No market replay, data download, collector, private API, runner, paper/live orders or main-branch changes.
+
+
+## 49. Current Git topology after ENG-EXEC-015 documentation — 2026-11-04
+
+- main: c87612207d145af433394f0ea992f2d29eba28d5.
+- research/market-regime-v1-main before this checkpoint-only commit: 0c30a0c32a2dc4d8347568c30b21d4d208a3c097.
+- merge base: ae599a2f3279e15fe27360662f94f0e7ef8db5be.
+- GitHub compare: diverged, 2,134 ahead / 36 behind.
+- PR #4: open, Draft, mergeable=false; head is research/market-regime-v1-main.
+- The prior topology section (2125 ahead) is superseded by this fresh snapshot. Preserve both histories; do not merge/rebase/reset/force-push. main unchanged.

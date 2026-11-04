@@ -94,7 +94,7 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
                     "page_index": 1,
                     "request_started_at": "2026-11-01T00:00:00.000Z",
                     "request_completed_at": "2026-11-01T00:00:00.100Z",
-                    "tier_count": 2, "symbol_count": 1,
+                    "tier_count": 1, "symbol_count": 1,
                     "symbols": ["BTCUSDT"], "has_next_page": True,
                 },
                 {
@@ -115,7 +115,7 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
         self.assertEqual(report["snapshots_with_page_observations"], 1)
         page = report["snapshots"][0]["page_observations"]
         self.assertEqual(page["page_count"], 2)
-        self.assertEqual(page["tier_count"], 3)
+        self.assertEqual(page["tier_count"], 2)
         self.assertEqual(page["request_duration_ms"]["max"], 150)
 
     def test_risk_tier_audit_rejects_missing_page_continuation(self):

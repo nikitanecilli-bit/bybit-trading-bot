@@ -32,7 +32,10 @@ def order(b=None, side="Buy", price="100", qty="2", arrival=1000, expiry=5000):
 
 
 def trade(ts, side, price, size, rpi="0"):
-    return {"timestamp_ms": ts, "side": side, "price": price, "size": size, "rpi": rpi}
+    return {
+        "timestamp_ms": ts, "side": side, "price": price, "size": size,
+        "rpi": rpi, "block_trade": "0",
+    }
 
 
 
@@ -501,6 +504,44 @@ def test_non_block_trade_still_consumes_queue_normally():
     assert o.block_trade_excluded_count == 0
     assert o.queue_ahead_remaining == D("0")
     assert o.filled == D("1")
+
+
+def test_missing_block_trade_flag_fails_closed():
+    o = order()
+    event = trade(1100, "Sell", "100", "10")
+    event.pop("block_trade")
+    try:
+        apply_public_trade(o, event)
+    except ValueError as exc:
+        assert "block trade boolean flag" in str(exc)
+    else:
+        raise AssertionError("missing block-trade flag must fail closed")
+    assert o.queue_ahead_remaining == D("5")
+    assert o.filled == D("0")
+
+
+def test_missing_rpi_flag_fails_closed():
+    o = order()
+    event = trade(1100, "Sell", "100", "10")
+    event.pop("rpi")
+    try:
+        apply_public_trade(o, event)
+    except ValueError as exc:
+        assert "RPI boolean flag" in str(exc)
+    else:
+        raise AssertionError("missing RPI flag must fail closed")
+    assert o.queue_ahead_remaining == D("5")
+    assert o.filled == D("0")
+
+
+def test_exchange_boolean_parser_rejects_float_coercion():
+    for value in (0.0, 1.0):
+        try:
+            l2_module.parse_exchange_bool(value, "test")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"float boolean flag accepted: {value!r}")
 
 
 def test_invalid_block_trade_flag_fails_closed():

@@ -28,7 +28,8 @@ def row(symbol="BTCUSDT", tick="0.1", status="Trading"):
 
 def write_snapshot(root, filename, fetched_at, instruments):
     payload = {
-        "schema_version": 1, "category": "linear", "fetched_at": fetched_at,
+        "schema_version": 1, "source": "Bybit V5 GET /v5/market/instruments-info",
+        "category": "linear", "fetched_at": fetched_at,
         "count": len(instruments), "instruments": instruments,
     }
     (root / filename).write_text(json.dumps(payload), encoding="utf-8")
@@ -98,6 +99,13 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cannot read"):
             InstrumentSpecHistory.from_directory(self.root)
 
+
+    def test_missing_or_mismatched_source_is_rejected(self):
+        payload = json.loads((self.root / "a.json").read_text())
+        payload.pop("source")
+        (self.root / "a.json").write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "invalid or missing Bybit instruments-info source"):
+            InstrumentSpecHistory.from_directory(self.root)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

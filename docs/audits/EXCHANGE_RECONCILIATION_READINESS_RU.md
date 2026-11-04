@@ -448,3 +448,36 @@ Research CI #41917443294 — SUCCESS, 59/59 workflow steps; tested code commit `
 - Schema v1 snapshots остаются совместимыми, поэтому report не может требовать provenance от старых captures.
 - Read-only collector не запускался вручную; CI использует FakeTransport. Реальных Bybit API calls, credentials, collector runs, archive downloads, live orders или market PnL tests не было.
 - Snapshot остаётся `CAPTURED_READ_ONLY_NOT_RECONCILED`; reconciliation PASS, live resume и strategy/execution/PnL gates остаются BLOCKED.
+
+
+### ENG-RECON-018 — обнаружение поздних executions между read-only snapshots
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
+
+В `scripts/bybit_reconciliation_report.py` добавлена чистая функция `compare_execution_snapshots(initial, refreshed)`:
+- принимает два уже сохранённых snapshot с одинаковым `saved_at_utc` (одна lifecycle start boundary);
+- валидирует оба snapshot существующим строгим parser-ом, raw SHA-256, интервалы, pagination chains и schema-v2 provenance, если она присутствует;
+- сравнивает execution по `execId`;
+- новый execId с `execTime <= initial.bybit_server_time_before_ms` классифицируется как поздно обнаруженное исполнение;
+- новый execId с более поздним event time классифицируется как последующее исполнение;
+- если один execId присутствует в обоих snapshots, но его identity/содержимое отличается, сравнение завершается ошибкой, а не выбирает одну версию.
+
+Результат содержит новые и late execId, оба server-time boundary и явные неизменяемые safety flags:
+`execution_history_complete=false`, `reconciliation_pass=false`, `live_resume_allowed=false`.
+Отсутствие новых записей означает только `NO_NEW_EXECUTIONS_OBSERVED` в сравнённых снимках, не доказательство полноты журнала.
+
+Offline tests проверяют:
+- поздний fill, обнаруженный во втором snapshot, хотя его event time предшествует первому server-time boundary;
+- конфликтующее содержимое одного execId между snapshots;
+- отсутствие автоматического повышения completeness/PASS/resume.
+
+Research CI #41917860097 — SUCCESS, 59/59 workflow steps; tested code commit `d9aeebb6bc303b497f19b7d0e524f9e7cfb0d265`.
+
+Ограничения:
+- Сравнение выполняется только над двумя caller-provided сохранёнными snapshots; повторный запрос Bybit не запускается автоматически.
+- Одинаковый `saved_at_utc` необходим, чтобы сравнивать один и тот же локальный lifecycle start; более поздний snapshot должен иметь строго больший `bybit_server_time_before_ms`.
+- Позднее обнаружение показывает, что первая выгрузка не содержала запись, известную при повторной выгрузке; оно не доказывает причину задержки и не даёт гарантии, что следующая выгрузка уже окончательна.
+- Текущий comparator сопоставляет записи по execId и отклоняет изменившуюся identity; он не удаляет fills и не переписывает локальный execution ledger.
+- Реальные Bybit API calls, credentials, collector runs, archive downloads, live orders и market PnL tests не выполнялись; CI использует offline fixtures.
+- Reconciliation PASS, live resume и strategy/execution/PnL gates остаются BLOCKED.

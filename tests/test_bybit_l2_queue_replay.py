@@ -1,10 +1,14 @@
 from decimal import Decimal as D
 import sys
+import json
+import zipfile
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import scripts.run_bybit_l2_queue_replay as l2_runner
 from bybit_l2_queue_replay import (
-    OrderBook, apply_public_trade, place_passive_order, signed_markout_bps,
+    OrderBook, apply_public_trade, capture_book_at, place_passive_order, signed_markout_bps,
 )
 
 
@@ -155,6 +159,47 @@ def test_buy_signed_markout_is_positive_when_mid_rises_after_fill():
 
 def test_sell_signed_markout_is_positive_when_mid_falls_after_fill():
     assert signed_markout_bps("Sell", D("100"), D("99.7"), D("99.9")) == D("20")
+
+
+def test_book_state_capture_excludes_same_millisecond_updates():
+    events = [
+        {"type": "snapshot", "cts": 1000, "data": {
+            "s": "AAVEUSDT", "seq": 1,
+            "b": [["100", "5"]], "a": [["101", "5"]],
+        }},
+        {"type": "delta", "cts": 2000, "data": {
+            "s": "AAVEUSDT", "seq": 2,
+            "b": [["100", "1"]], "a": [],
+        }},
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = Path(tmp) / "same_ms.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("events.data", "".join(json.dumps(event) + "\\n" for event in events))
+        book_state, observed_ts = capture_book_at(archive, 2000)
+    assert observed_ts == 1000
+    assert book_state.quantity_at("Buy", D("100")) == D("5")
+
+
+def test_post_fill_markout_snapshot_excludes_same_millisecond_updates():
+    events = [
+        {"type": "snapshot", "cts": 1000, "data": {
+            "s": "AAVEUSDT", "seq": 1,
+            "b": [["100", "5"]], "a": [["101", "5"]],
+        }},
+        {"type": "delta", "cts": 2000, "data": {
+            "s": "AAVEUSDT", "seq": 2,
+            "b": [["100", "1"]], "a": [],
+        }},
+    ]
+    original = l2_runner.iter_book_events
+    l2_runner.iter_book_events = lambda *_args: iter(events)
+    try:
+        states = l2_runner.capture_book_states_at(Path("unused.zip"), [2000])
+    finally:
+        l2_runner.iter_book_events = original
+    assert states[2000]["book_cts"] == 1000
+    assert states[2000]["bids"][D("100")] == D("5")
 
 
 if __name__ == "__main__":

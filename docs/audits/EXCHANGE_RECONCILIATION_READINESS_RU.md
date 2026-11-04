@@ -614,3 +614,25 @@ Research CI #41921356622 — SUCCESS, 59/59 workflow steps; tested code commit `
 - Advisory lock защищает только cooperative writers, использующие этот же lock protocol; сторонние процессы, игнорирующие lock, остаются вне гарантий.
 - После неожиданного повреждения/внешней замены файла состояние классифицируется как conflict и требует ручного расследования; автоматического overwrite нет.
 - Ни одна стратегия не запускалась; никаких Bybit API calls, collector runs, archive downloads, live orders или market PnL tests не выполнялось. Все execution/PnL gates остаются BLOCKED.
+
+### ENG-RECON-024 — hardening файловой границы и проверка endpoint provenance
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
+
+Изменения:
+- Plan B lock теперь открывается через `O_NOFOLLOW`; дескриптор проверяется через `fstat`: допускается только обычный файл с единственной hard link. Если платформа не поддерживает необходимые POSIX/O_NOFOLLOW гарантии, операция завершается fail-closed.
+- Для основного backup добавлена проверка через `lstat`, а чтение выполняется отдельным `O_NOFOLLOW` дескриптором с повторной проверкой типа через `fstat`. Это уменьшает TOCTOU-окно между проверкой пути и открытием.
+- Обычное сохранение больше не использует предсказуемый путь `backup.tmp`: создаётся уникальный временный файл через `mkstemp` в том же каталоге, с эксклюзивным созданием и правами платформы по умолчанию для mkstemp. Предварительно созданная symlink на старое имя не затрагивается.
+- Schema-v3 report parser самостоятельно проверяет `base_url`: только HTTPS, точный allowlist официальных Bybit API hostnames, без userinfo, нестандартного порта, path, query или fragment. Парсер не полагается только на то, что snapshot когда-то мог быть создан collector-ом.
+- Добавлены тесты для symlink lock, symlink backup при чтении/записи/restore, symlink старого фиксированного temp path, no-follow reader, endpoint вне allowlist, userinfo, HTTP, нестандартного порта и path.
+- Добавлен тест, что даже заново хешированный plan с `live_resume_allowed=true` отклоняется по запрещённому state escalation: хеш целостности не заменяет policy validation.
+
+Research CI #41922697443 — SUCCESS, 59/59 workflow steps; tested code commit `c91b5d4c0a6ec52e5efc8a72a68a8c5294e54fc6`.
+
+Остаточные границы доверия:
+- Raw SHA-256 и per-page hashes обнаруживают случайную порчу и несогласованные изменения, но не аутентифицируют snapshot: атакующий, способный переписать весь JSON, может пересчитать хеши. API-key fingerprint и base_url — scope markers, не подпись биржи и не доказательство владельца аккаунта.
+- Advisory lock защищает только cooperating writers. Процессы, которые обходят lock, могут менять backup между операциями; родительский каталог должен быть доверенным и не доступным на запись посторонним субъектам. Защита от злонамеренной подмены самих родительских каталогов/их mount namespace не заявляется.
+- `O_NOFOLLOW` защищает конечный компонент пути, но не устраняет риски подмены доверенных родительских каталогов. На неподдерживаемых платформах lock/read операции fail closed.
+- Эти проверки не доказывают, что Bybit вернул все executions, что нет поздних fills после capture boundary, и что локальный ledger полон. Никакой live-resume путь не добавлен; все verdict flags остаются false.
+- Никаких API вызовов, collectors, archive downloads, live orders или market PnL tests не выполнялось. Все execution/PnL gates остаются BLOCKED.

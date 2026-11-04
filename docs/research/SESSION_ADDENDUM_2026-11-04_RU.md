@@ -40,3 +40,14 @@ Continue static audit of report/input provenance and exchange-spec validation. P
 - Изменения кода: `8c04cde`, `ff7e5bb`, `c069075`; тесты: `f7ef140`, `c9096a7`, `3025039`.
 - Полный Research CI для head `302503937f47277ab0ee7a83c2a0247bcf51a81c`: все функциональные шаги включая instrument parser, два snapshot collectors, as-of history и sizing прошли SUCCESS; финальный статус workflow ожидает завершения post-job cleanup на момент записи.
 - CI выполняет зафиксированные offline/research проверки и аудит уже имеющихся CryptoFetch архивов; новые архивы не загружались, Bybit collectors вручную не запускались, market PnL/live/private API не запускались.
+
+## Дополнение — временная семантика instrument snapshots и lifecycle
+
+- Снимок собирается несколькими запросами/страницами; это интервал, а не атомарное наблюдение. Сборщики сохраняют `collection_started_at`, а `fetched_at` остаётся временем завершения полного снимка. As-of выбор консервативно использует только полностью завершённые снимки; снимок, сбор которого ещё шёл на момент `as_of`, не выбирается.
+- Исторические файлы без `collection_started_at` остаются читаемыми; точное окно их сбора неизвестно.
+- `deliveryTime=0` в официальном примере Bybit для perpetual означает отсутствие фиксированной даты доставки. Код трактует его как открытый lifecycle только для `Trading` LinearPerpetual. Для `Closed`, `Settling` или `Delivering` без положительной границы запись исключается из исторической выборки, а не получает вымышленную дату завершения.
+- Timestamp parser теперь принимает только десятичную строку или integer JSON value; bool, float, whitespace, знак и дробные строки отклоняются.
+- Изменения интервала сбора: `7e211c7`, `df4cbad`, `8ba2475`; тесты: `28b117e`, `0eb0b9e`, `8e03e83`, `ba410ba`.
+- Lifecycle parsing: `f3be0b7`; regression tests: `e2a3df8`. Research CI #41894500091 SUCCESS на `ba410ba`; CI для lifecycle parser/tests ожидается.
+- Основание API-семантики: [официальная документация Bybit Get Instruments Info](https://bybit-exchange.github.io/docs/v5/market/instrument), где `deliveryTime` описан как delivery time для expired futures и delisting time для perpetual; официальный пример LinearPerpetual показывает `deliveryTime: "0"`.
+- Никакие live/private API запросы, collectors, новые archive downloads, рыночные PnL-тесты или ордера не запускались.

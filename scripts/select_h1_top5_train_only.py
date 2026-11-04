@@ -26,7 +26,7 @@ from scripts.run_h1_shared_capital_portfolio_validation import (
     _directory_file_manifest,
     _file_manifest_record,
     _manifest_path,
-    H1_REPLAY_CODE_PATHS,
+    H1_REPLAY_CODE_PATHS, resolve_h1_replay_code_paths,
     load_bybit_h1_datasets,
     resolve_bybit_kline_dir,
     resolve_execution_snapshot_dirs,

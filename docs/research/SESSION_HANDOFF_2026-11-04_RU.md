@@ -231,3 +231,14 @@
 - Финальный Research CI #41846247554 на 6a257b205aef1b8724845c7f6b83fbe0b7aed1b4: SUCCESS; job tests SUCCESS; все 57 workflow steps completed, failures отсутствуют. Фактический лог подтверждает новый inverse-category regression; risk-tier history suite — 16/16 passed.
 - Нет Bybit data collection/download, PnL, private API/account access, runner registration, paper/live orders или изменений main. PR #4 остаётся Draft/open.
 - Следующий безопасный шаг: завершить read-only review snapshot metadata/type guards и проверить итоговый branch/PR state; не открывать PnL gate без датированных данных и execution evidence.
+
+
+## Session update — 2026-11-04 (строгие integer-типы metadata snapshot)
+
+- Последний read-only проход по schema guards выявил, что Python сравнивает bool как int: schema_version=true принимался как версия 1, а count/tier_count=true мог приниматься для snapshot с одной строкой.
+- Усилена проверка в InstrumentSpecHistory и RiskTierHistory: schema_version, count и tier_count теперь должны быть int, bool отклоняется отдельно, значение должно совпадать с ожидаемым.
+- Добавлены регрессии для boolean schema_version и boolean count/tier_count в обоих history loaders.
+- Коммиты source: instrument history 43765d20a61a56c0ce165f6e20c7eb163ae38987; risk-tier history b2d284529ceeddab617d4d2ba95c7974b2d0098a. Тесты: instrument history 7fd2d8623ef2ba70248b457504f868e1877afa63; risk-tier history 3b7442b32383f5c41043ea7bf74430e1acbcd7b2.
+- Финальный Research CI #41846644399 на 3b7442b32383f5c41043ea7bf74430e1acbcd7b2: SUCCESS; job tests SUCCESS; все 57 workflow steps completed, failures отсутствуют. Фактические логи подтверждают InstrumentSpecHistory 12/12 и RiskTierHistory 17/17, включая новые metadata-type regressions.
+- Никаких Bybit collectors/downloads, market PnL, private API/account access, runner registration, paper/live orders или main-branch changes. PR #4 остаётся Draft/open.
+- Следующий шаг: финально сверить текущий branch HEAD, PR #4, документацию и последние CI; затем продолжить независимый статический audit execution consumers без запуска PnL.

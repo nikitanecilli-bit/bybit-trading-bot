@@ -63,6 +63,35 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
         spec = history.get_spec("BTCUSDT", 1_793_577_599_500)
         self.assertEqual(str(spec.tick_size), "0.1")
 
+    def test_all_exchange_constraints_are_selected_from_the_as_of_snapshot(self):
+        changed = row(tick="0.01")
+        changed["priceFilter"]["minPrice"] = "0.02"
+        changed["lotSizeFilter"]["qtyStep"] = "0.01"
+        changed["lotSizeFilter"]["minOrderQty"] = "0.02"
+        changed["lotSizeFilter"]["minNotionalValue"] = "10"
+        changed["leverageFilter"]["maxLeverage"] = "25"
+        changed["leverageFilter"]["leverageStep"] = "0.1"
+        write_snapshot(self.root, "b.json", "2026-11-02T00:00:00Z", [changed])
+
+        history = InstrumentSpecHistory.from_directory(self.root)
+        before = history.get_spec("BTCUSDT", 1_793_577_599_999)
+        after = history.get_spec("BTCUSDT", 1_793_577_600_000)
+
+        self.assertEqual(str(before.tick_size), "0.1")
+        self.assertEqual(str(before.qty_step), "0.001")
+        self.assertEqual(str(before.min_order_qty), "0.001")
+        self.assertEqual(str(before.min_notional_value), "5")
+        self.assertEqual(str(before.max_leverage), "50")
+        self.assertEqual(str(before.leverage_step), "0.01")
+
+        self.assertEqual(str(after.tick_size), "0.01")
+        self.assertEqual(str(after.min_price), "0.02")
+        self.assertEqual(str(after.qty_step), "0.01")
+        self.assertEqual(str(after.min_order_qty), "0.02")
+        self.assertEqual(str(after.min_notional_value), "10")
+        self.assertEqual(str(after.max_leverage), "25")
+        self.assertEqual(str(after.leverage_step), "0.1")
+
     def test_uses_envelope_category_when_bybit_rows_omit_category(self):
         for filename in ("a.json", "b.json"):
             payload = json.loads((self.root / filename).read_text())

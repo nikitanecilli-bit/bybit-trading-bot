@@ -9,6 +9,7 @@ positionIdx, order IDs, or execution ledger.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import sys
@@ -440,13 +441,130 @@ def build_execution_merge_plan(local_backup: dict[str, Any], snapshot: dict[str,
         planned[symbol].append(candidate.to_dict())
 
     proposed = {symbol: rows for symbol, rows in planned.items() if rows}
-    return {
+    plan = {
+        "plan_schema_version": 1,
         "status": "DRY_RUN_MERGE_PLAN",
         "mode": "READ_ONLY_NO_MUTATION",
+        "base_backup_sha256": hashlib.sha256(_canonical_json_bytes(local_backup)).hexdigest(),
         "planned_insert_count": sum(len(rows) for rows in proposed.values()),
         "exact_duplicate_count": len(duplicates),
         "planned_insertions": proposed,
         "exact_duplicate_exec_ids": sorted(duplicates),
+        "execution_history_complete": False,
+        "reconciliation_pass": False,
+        "live_resume_allowed": False,
+    }
+    plan["plan_sha256"] = hashlib.sha256(_canonical_json_bytes(plan)).hexdigest()
+    return plan
+
+
+def apply_execution_merge_plan(
+    local_backup: dict[str, Any], plan: dict[str, Any],
+) -> dict[str, Any]:
+    """Apply a dry-run proposal to a detached backup copy, never to disk or engine state.
+
+    The complete backup hash prevents applying a plan after any intervening
+    state change. A canonical plan hash detects accidental plan alteration.
+    All candidate rows are validated before a replacement copy is returned.
+    """
+    if not isinstance(local_backup, dict) or not isinstance(plan, dict):
+        raise ReportError("backup and merge plan must be objects")
+    if plan.get("plan_schema_version") != 1 or plan.get("status") != "DRY_RUN_MERGE_PLAN":
+        raise ReportError("unsupported execution merge plan")
+    if plan.get("mode") != "READ_ONLY_NO_MUTATION":
+        raise ReportError("execution merge plan mode is not read-only")
+    if (plan.get("execution_history_complete") is not False
+            or plan.get("reconciliation_pass") is not False
+            or plan.get("live_resume_allowed") is not False):
+        raise ReportError("execution merge plan contains forbidden state escalation")
+    supplied_digest = plan.get("plan_sha256")
+    unsigned_plan = {key: value for key, value in plan.items() if key != "plan_sha256"}
+    expected_digest = hashlib.sha256(_canonical_json_bytes(unsigned_plan)).hexdigest()
+    if not isinstance(supplied_digest, str) or supplied_digest != expected_digest:
+        raise ReportError("execution merge plan integrity check failed")
+    current_backup_digest = hashlib.sha256(_canonical_json_bytes(local_backup)).hexdigest()
+    if plan.get("base_backup_sha256") != current_backup_digest:
+        raise ReportError("stale execution merge plan: local backup changed after planning")
+
+    insertions = plan.get("planned_insertions")
+    if not isinstance(insertions, dict):
+        raise ReportError("planned insertions must be an object")
+    expected_count = plan.get("planned_insert_count")
+    if isinstance(expected_count, bool) or not isinstance(expected_count, int) or expected_count < 0:
+        raise ReportError("planned insert count is invalid")
+    if sum(len(rows) for rows in insertions.values() if isinstance(rows, list)) != expected_count:
+        raise ReportError("planned insert count does not match insertion payload")
+
+    candidate = copy.deepcopy(local_backup)
+    positions = candidate.get("open_positions")
+    if not isinstance(positions, dict):
+        raise ReportError("local backup open_positions must be an object")
+    inserted = 0
+    for symbol, rows in insertions.items():
+        if not isinstance(symbol, str) or not isinstance(rows, list) or symbol not in positions:
+            raise ReportError("planned insertion references an unknown position")
+        state = positions[symbol]
+        if not isinstance(state, dict) or state.get("symbol", symbol) != symbol:
+            raise ReportError("local position identity is invalid")
+        try:
+            raw_position = state.get("exchange_position_identity")
+            if not isinstance(raw_position, dict):
+                raise ReportError(f"local position {symbol} lacks exchange position identity")
+            position = ExchangePositionIdentity.from_dict(raw_position)
+            if position.symbol != symbol:
+                raise ReportError(f"local position {symbol} exchange identity mismatch")
+            orders_raw = state.get("exchange_orders", [])
+            executions_raw = state.get("exchange_executions", [])
+            if not isinstance(orders_raw, list) or not isinstance(executions_raw, list):
+                raise ReportError(f"local position {symbol} ledgers must be lists")
+            orders = [ExchangeOrderIdentity.from_dict(item) for item in orders_raw]
+            executions = [ExchangeExecutionIdentity.from_dict(item) for item in executions_raw]
+            if any(item.symbol != symbol for item in orders + executions):
+                raise ReportError(f"local position {symbol} ledger symbol mismatch")
+            order_map = {item.order_id: item for item in orders}
+            exec_map = {item.exec_id: item for item in executions}
+            if len(order_map) != len(orders) or len(exec_map) != len(executions):
+                raise ReportError(f"local position {symbol} ledger contains duplicate identities")
+            new_rows = []
+            for raw in rows:
+                execution = ExchangeExecutionIdentity.from_dict(raw)
+                if execution.symbol != symbol or execution.exec_id in exec_map:
+                    raise ReportError(f"planned execution {execution.exec_id} is duplicate or mismatched")
+                order = order_map.get(execution.order_id)
+                if order is None and execution.order_id != position.entry_order_id:
+                    raise ReportError(f"planned execution {execution.exec_id} references unknown order")
+                expected_side = order.side if order is not None else position.side
+                expected_link = order.order_link_id if order is not None else position.entry_order_link_id
+                if execution.side != expected_side or (
+                    expected_link and execution.order_link_id != expected_link
+                ):
+                    raise ReportError(f"planned execution {execution.exec_id} conflicts with order identity")
+                exec_map[execution.exec_id] = execution
+                new_rows.append(execution.to_dict())
+            for order_id, order in order_map.items():
+                filled = sum(
+                    (item.exec_qty_decimal for item in exec_map.values() if item.order_id == order_id),
+                    start=__import__("decimal").Decimal("0"),
+                )
+                if filled > order.cum_exec_qty_decimal:
+                    raise ReportError(f"planned executions exceed cumulative fill for order {order_id}")
+            state["exchange_executions"] = sorted(
+                [item.to_dict() for item in exec_map.values()],
+                key=lambda item: (item["exec_time_ms"], item["exec_id"]),
+            )
+            inserted += len(new_rows)
+        except (ValueError, TypeError, ExecutionIdentityError) as exc:
+            if isinstance(exc, ReportError):
+                raise
+            raise ReportError(f"execution merge validation failed for {symbol}: {exc}") from exc
+
+    if inserted != expected_count:
+        raise ReportError("applied execution count does not match plan")
+    return {
+        "status": "DETACHED_BACKUP_CANDIDATE",
+        "mode": "NO_DISK_OR_ENGINE_MUTATION",
+        "backup": candidate,
+        "inserted": inserted,
         "execution_history_complete": False,
         "reconciliation_pass": False,
         "live_resume_allowed": False,

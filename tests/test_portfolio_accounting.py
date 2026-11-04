@@ -1653,30 +1653,49 @@ def test_full_replay_reconciles_tp1_funding_mtm_and_final_close():
 
 
 
-def _run_same_timestamp_closes_for_drawdown_order(order):
+def _run_same_timestamp_time_stops_with_mark_last_divergence(order):
     e = make_engine()
     e.cfg.daily_stop_loss_pct = 99.0
-    e.cfg.emergency_kill_switch_pct = 0.21
+    e.cfg.emergency_kill_switch_pct = 0.12
+    e.cfg.max_hold_bars = 1
     e.risk_mgr.cfg = e.cfg
+    hour = 3_600_000
+    bar_ts = 1_800_003_600_000
+    exit_ts = bar_ts + hour
     positions = {
         "BTCUSDT": make_position(symbol="BTCUSDT", size=1_000.0),
         "ETHUSDT": make_position(symbol="ETHUSDT", size=1_000.0),
     }
     e.open_positions = {symbol: positions[symbol] for symbol in order}
-    e._last_mark_prices.update({"BTCUSDT": 100.0, "ETHUSDT": 100.0})
-    exit_ts = 1_800_003_600_000
+    trade_bars = {
+        "BTCUSDT": engine_mod.Candle(
+            bar_ts, 100.0, 100.5, 98.5, 99.0, 10.0,
+        ),
+        "ETHUSDT": engine_mod.Candle(
+            bar_ts, 100.0, 101.5, 100.5, 101.0, 10.0,
+        ),
+    }
+    e._mark_price_candles = {
+        symbol: {
+            bar_ts: engine_mod.Candle(
+                bar_ts, 100.0, 101.0, 100.0, 100.0, 0.0,
+            )
+        }
+        for symbol in order
+    }
+    e._prepare_portfolio_intrabar_marks(trade_bars)
     e._update_mark_to_market(exit_ts)
     assert e.risk_mgr.kill_switch_triggered is False
 
-    exits = {
-        "BTCUSDT": (102.0, "take_profit"),
-        "ETHUSDT": (98.0, "stop_loss"),
-    }
+    histories = {}
     for symbol in order:
-        price, reason = exits[symbol]
-        e._close_position(
-            e.open_positions[symbol], price, reason, exit_ts, 0.0, 1.0,
-            final_exit_maker=False,
+        prior = engine_mod.Candle(
+            bar_ts - hour, 100.0, 101.0, 99.0, 100.0, 10.0,
+        )
+        histories[symbol] = [prior, trade_bars[symbol]]
+    for symbol in order:
+        e._manage_position(
+            symbol, histories[symbol], fill_bar=False, exit_ts=exit_ts,
         )
     return {
         "ledger": sorted((t.token, t.pnl_usdt, t.exit_reason) for t in e.closed_trades),
@@ -1688,11 +1707,11 @@ def _run_same_timestamp_closes_for_drawdown_order(order):
 
 
 def test_same_timestamp_close_batch_cannot_trip_kill_switch_by_symbol_order():
-    win_first = _run_same_timestamp_closes_for_drawdown_order(
-        ["BTCUSDT", "ETHUSDT"]
-    )
-    loss_first = _run_same_timestamp_closes_for_drawdown_order(
+    win_first = _run_same_timestamp_time_stops_with_mark_last_divergence(
         ["ETHUSDT", "BTCUSDT"]
+    )
+    loss_first = _run_same_timestamp_time_stops_with_mark_last_divergence(
+        ["BTCUSDT", "ETHUSDT"]
     )
     assert win_first["ledger"] == loss_first["ledger"]
     assert win_first["realized_equity"] == loss_first["realized_equity"]

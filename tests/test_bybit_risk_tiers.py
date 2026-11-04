@@ -52,10 +52,10 @@ class RiskTierHistoryTests(unittest.TestCase):
             history = RiskTierHistory.from_directory(tmp)
 
             before = history.get_tier(
-                "BTCUSDT", 1793577599999, "150000", leverage="80"
+                "BTCUSDT", 1793577599999, "50000", leverage="80"
             )
             after = history.get_tier(
-                "BTCUSDT", 1793577600000, "150000", leverage="80"
+                "BTCUSDT", 1793577600000, "50000", leverage="80"
             )
             self.assertEqual(before.risk_limit_value, Decimal("100000"))
             self.assertEqual(before.maintenance_margin_rate, Decimal("0.005"))

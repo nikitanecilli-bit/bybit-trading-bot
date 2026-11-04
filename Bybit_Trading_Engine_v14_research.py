@@ -1568,6 +1568,7 @@ class UnifiedQuantEngine:
         if restore_plan_b:
             self.open_positions, self.pending, self.trade_seq = self.plan_b.load_state(self.risk_mgr)
             self._last_mark_prices = dict(self.plan_b.last_mark_prices)
+            self._validate_restored_positions_market_state()
             # Даже если файл содержит только risk state, это не свежий backtest.
             self._state_restored = True
 

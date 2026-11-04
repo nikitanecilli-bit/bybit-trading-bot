@@ -164,3 +164,37 @@ Scope: this fixes a configuration/integration failure, not the historical snapsh
 The engine constructor now also rejects configuration that enables both dated instrument and risk-tier histories while omitting `max_market_state_skew_ms`. This moves the failure from first entry/restored-position validation to initialization, where the configuration error is immediately visible. The joined-entry accounting regression now supplies an explicit zero-ms fixture budget, and a new constructor regression verifies missing-budget rejection.
 
 Research CI [#41928557280](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928557280) completed SUCCESS on commit `8fa1685db728a051f37bb59921a3048446d269b1`; engine compile, H1 runner gate, portfolio accounting/risk budget and the full deterministic suite passed. This remains offline fixture/CI verification only.
+
+
+## 8. Liquidation/Mark integration follow-up (2026-11-05)
+
+Static caller review covered `mark_price_liquidation.py`, engine Mark OHLC loader, `_liquidation_exit_price`, portfolio intrabar marks, `_manage_position`, `_close_position`, TP1 quantity transitions, funding allocation and both liquidation test modules.
+
+### Confirmed model behavior
+
+- Mark OHLC is loaded separately from Last/Trade OHLC; liquidation-aware mode requires full Mark OHLC and exact timestamp match for every open symbol.
+- Mark adverse low/high drives position-level margin health; Last/Trade OHLC continues to drive stop execution. If both are crossed in one candle, liquidation takes priority because OHLC cannot establish event order.
+- Entry LP uses entry-time tier; current MM uses the tier selected at adverse Mark notional. A dynamic tier transition can therefore trigger margin shortfall before fixed LP is touched.
+- For exchange-sized positions, liquidation quantity uses exact remaining contract quantity after TP1. Legacy notional-proxy positions reconstruct quantity from entry notional and remaining fraction.
+- Funding allocated to remaining margin uses the remaining share of pre-TP1 settlements and full post-TP1 settlements on the reduced quantity; same-boundary receipts are deferred.
+- Liquidation close path is distinguished from ordinary exit fee/slippage treatment in the close accounting tests.
+
+### Confirmed limitations (not defects)
+
+1. Full-candle adverse Mark extreme is used without tick sequence. Same-candle liquidation-before-stop is a deliberate conservative ordering assumption, not event reconstruction.
+2. `evaluate_isolated_margin_health` always applies the supplied net funding cost directly to position margin. Official Bybit funding cash-routing can first debit/credit available balance; exact margin effect depends on wallet balance and account mode. Existing audit section 9 records this mismatch. Current engine is a position-level stress approximation, not wallet/account simulation.
+3. Extra margin / auto-add-margin is not persisted in the engine position lifecycle; pure calculator supports an explicit extra-margin input, but engine integration does not claim to model manual margin changes.
+4. Partial realized PnL is not implicitly transferred into remaining position margin. Cross/Portfolio Margin, collateral offsets, active-order tier aggregation, partial-liquidation ladder, AMR, insurance/ADL and exchange liquidation execution remain out of scope.
+5. Historical Mark OHLC, risk-tier and instrument snapshots are not complete/authoritative; fetched_at is observation time, not effective_from. No empirical liquidation-safety claim is possible.
+
+No new confirmed arithmetic defect was established in this static pass. No liquidation formulas or trading logic were changed.
+
+### Test fixture correction and CI
+
+One integration regression still encoded the old invalid `None` skew-budget behavior. Updated `tests/test_mark_price_engine_integration.py` to pass an explicit `0` ms fixture budget and assert the join receives `0`. The existing mocked join failure still tests fail-closed behavior; constructor and runner tests separately test missing-budget rejection.
+
+Research CI [#41928978081](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928978081) completed **SUCCESS** on commit `08afcdd6c16e6c32fa33198e2ff56c66023ce585`. All 58 workflow steps passed, including engine compile, isolated liquidation formulas, Mark OHLC integration, funding, instrument/risk snapshots, portfolio accounting and the full deterministic research suite.
+
+**Scope disclosure:** the repository's normal research-checks workflow also ran its existing read-only CryptoFetch archive integrity/overlap audit and H-A preparation-manifest step against archives already present in the repository. The workflow did not download new archives or extract files to disk; the audit opened ZIP members and streamed their contents for integrity/overlap analysis. No PnL replay, market PnL test, API call, collector, private account query, paper/live action or parameter sweep was run.
+
+The liquidation/data/strategy/paper/live readiness gates remain BLOCKED.

@@ -224,6 +224,25 @@ class MarkPriceEngineIntegrationTests(unittest.TestCase):
         assert trade.slippage_cost_usdt == 22.28
         assert trade.exit_reason == "liquidation"
 
+    def test_tp1_rejects_short_remainder_below_min_notional_at_tp2(self):
+        pos = make_position(direction="short", entry=100.0, stop=105.0, size=100.0)
+        pos.tp1_price = 90.0
+        pos.tp2_price = 80.0
+        pos.exchange_sized = True
+        pos.contract_qty = "1.0"
+        pos.remaining_contract_qty = "1.0"
+        pos.qty_step = "0.1"
+        pos.min_order_qty = "0.1"
+        pos.min_notional_value = "45"
+
+        # TP1 order is exactly at minNotional (0.5 * 90 = 45).
+        # The remaining TP2 order would be below it (0.5 * 80 = 40),
+        # although the old stop/entry-only check incorrectly accepted it.
+        applied = em.UnifiedQuantEngine._apply_tp1(pos, 3_600_000)
+        self.assertFalse(applied)
+        self.assertFalse(pos.tp1_hit)
+        self.assertEqual(pos.remaining_contract_qty, "1.0")
+
     def test_mark_price_mtm_is_separate_from_last_price_stop_mark(self):
         engine = make_engine()
         pos = make_position(direction="long", entry=100.0, stop=90.0, size=1_000.0)

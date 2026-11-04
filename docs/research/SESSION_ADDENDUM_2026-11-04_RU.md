@@ -64,3 +64,13 @@ Continue static audit of report/input provenance and exchange-spec validation. P
 
 - Regression guard: `tests/test_instrument_spec_history.py::test_later_status_is_not_applied_retroactively_to_earlier_as_of` confirms a later `Closed` snapshot does not rewrite the earlier `Trading` observation; at the later snapshot timestamp, `require_trading=True` rejects it. Test commit `1eb1234`.
 - Research CI [#41896360159](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41896360159): **SUCCESS**, all 56 job steps completed successfully. This includes offline instrument-history tests, deterministic checks, and the existing-archive provenance scan; it does not represent a live Bybit API request, a collector run, a new archive download, or a market PnL experiment.
+
+## ENG-DATA-009 — аудит временного покрытия снимков
+
+- Workflow audit подтверждён по трём YAML: Bybit linear universe, instrument specs и risk tiers запускаются только вручную ('workflow_dispatch'); расписания нет.
+- В текущем checkout отсутствуют JSON snapshots в 'data/universe_history/linear/' и 'data/instrument_specs/linear/'. Offline audit в Research CI вернул 'NO_DATA', поэтому cadence/gap нельзя численно оценить.
+- Добавлен 'scripts/audit_instrument_snapshot_coverage.py': считает число снимков, временной охват, длительность collection window, интервалы между завершением предыдущего снимка и началом следующего (или completion-to-completion для legacy файлов), overlap окон, добавленные/удалённые символы и наблюдаемые смены статусов. Нет произвольного freshness threshold; пользовательские '--max-gap-hours' и '--max-collection-minutes' опциональны. Overlap окон, malformed snapshot и duplicate fetched_at завершают аудит ошибкой.
+- Добавлено 9 offline regression tests: пустой архив, cadence, duration, символы/status changes, legacy timestamps, overlap, duplicate timestamps и явные thresholds.
+- CI workflow включает compile, тесты и offline audit. Research CI [#41897629817](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41897629817): **SUCCESS**; все 58 шагов прошли. Включённый audit честно сообщил 'NO_DATA'.
+- В процессе CI две проблемы тестового harness были пойманы и исправлены: отсутствовал repository root в 'sys.path', затем неверно ожидалась максимальная длительность двух разных fixture windows. После исправлений suite прошёл.
+- Не включал schedule и не dispatch-ил collectors: нет подтверждённого доступа/разрешённого пути получения snapshot. Никакие API requests, collector runs, archive downloads, market tests или PnL не выполнялись.

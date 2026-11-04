@@ -133,6 +133,7 @@ def place_passive_order(
     book: OrderBook, *, side: str, price: Decimal, quantity: Decimal,
     arrival_ts: int, expiry_ts: int,
     instrument_spec: ExchangeInstrumentSpec | None = None,
+    symbol: str | None = None,
 ) -> PassiveOrder:
     if side not in ("Buy", "Sell"):
         raise ValueError("side must be Buy or Sell")
@@ -140,6 +141,10 @@ def place_passive_order(
     if price <= ZERO or quantity <= ZERO or expiry_ts <= arrival_ts:
         raise ValueError("invalid price, quantity or lifetime")
     if instrument_spec is not None:
+        if not symbol:
+            raise ValueError("symbol is required when validating an instrument spec")
+        if instrument_spec.symbol != symbol.strip().upper():
+            raise ValueError("instrument spec symbol does not match passive order symbol")
         exchange_qty = instrument_spec.validate_order(quantity, price, order_type="limit")
         if exchange_qty != quantity:
             raise ValueError("order quantity is not exactly aligned to qtyStep")

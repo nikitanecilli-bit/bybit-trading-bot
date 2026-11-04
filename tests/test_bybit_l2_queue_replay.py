@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from bybit_l2_queue_replay import (
-    OrderBook, apply_public_trade, place_passive_order,
+    OrderBook, apply_public_trade, place_passive_order, signed_markout_bps,
 )
 
 
@@ -147,6 +147,14 @@ def test_non_monotonic_book_timestamp_is_rejected():
         assert "non-monotonic" in str(exc)
     else:
         raise AssertionError("non-monotonic event should fail closed")
+
+
+def test_buy_signed_markout_is_positive_when_mid_rises_after_fill():
+    assert signed_markout_bps("Buy", D("100"), D("100.1"), D("100.3")) == D("20")
+
+
+def test_sell_signed_markout_is_positive_when_mid_falls_after_fill():
+    assert signed_markout_bps("Sell", D("100"), D("99.7"), D("99.9")) == D("20")
 
 
 if __name__ == "__main__":

@@ -694,3 +694,29 @@ CI:
 Official documentation references: https://bybit-exchange.github.io/docs/v5/websocket/public/orderbook and https://bybit-exchange.github.io/docs/v5/websocket/public/full-ob. The former does not specify standard depth-200 u+1 continuity; the latter explicitly does for its separate Full Orderbook protocol.
 
 No archives were downloaded; no PnL replay, private API, or orders were run. Maker execution realism remains BLOCKED_FOR_STRATEGY_PNL.
+
+
+## 34. Runner-level deterministic tests added
+
+Static audit found that the L2 queue replay primitives had 80 tests, but the orchestration helpers in scripts/run_bybit_l2_queue_replay.py had no dedicated test module. Added tests/test_run_bybit_l2_queue_replay.py and wired it into the Research CI compile/test steps.
+
+Coverage added:
+- capture_scenarios() captures the last book state strictly before each scheduled arrival boundary, including when an event has exactly the same cts as the arrival;
+- insufficient archive duration fails rather than fabricating missing scenarios;
+- capture_book_states_at() excludes the event at the exact markout target, uses the preceding book state, and does not extrapolate beyond the archive end;
+- malformed/out-of-order archive tails are rejected even when the target timestamp occurred earlier.
+
+The first CI attempt exposed a test-only import-path issue (the repository root was not on sys.path when executing the test file directly). This was fixed; no production behavior change was needed for that failure.
+
+Final CI:
+- run 41840361238 on commit d2740c6ff444c3a7302b4b04dcc04d15ebf1dcb1: SUCCESS, 57/57 steps;
+- L2 primitive suite: 80/80 tests passed;
+- new runner chronology/markout test step: SUCCESS.
+
+Commits:
+- initial runner tests: be036969543fa05b7bfaced2ad25fb17fefd738e;
+- fixture newline correction: ee12b38811e8537fb4817ea123a2a52cf3485da3;
+- CI wiring: a969acf7e4307be299d82812d3de9331ce671339;
+- import-path correction: d2740c6ff444c3a7302b4b04dcc04d15ebf1dcb1.
+
+This adds regression coverage only; no strategy PnL, archive downloads, private API, or orders were run. Maker execution realism remains BLOCKED_FOR_STRATEGY_PNL.

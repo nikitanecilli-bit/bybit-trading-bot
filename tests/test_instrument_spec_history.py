@@ -187,6 +187,16 @@ class InstrumentSpecHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "identity changed while symbol was reused"):
             InstrumentSpecHistory.from_directory(self.root)
 
+
+    def test_symbol_reuse_after_absence_from_intermediate_snapshot_fails(self):
+        write_snapshot(self.root, "a.json", "2026-11-01T00:00:00Z", [row("BTCUSDT")])
+        write_snapshot(self.root, "b.json", "2026-11-02T00:00:00Z", [row("ETHUSDT")])
+        reused = row("BTCUSDT")
+        reused["contractType"] = "LinearFutures"
+        write_snapshot(self.root, "c.json", "2026-11-03T00:00:00Z", [reused])
+        with self.assertRaisesRegex(ValueError, "identity changed while symbol was reused"):
+            InstrumentSpecHistory.from_directory(self.root)
+
     def test_possible_symbol_rename_is_reported_but_never_merged(self):
         previous = row("BTCUSDT")
         renamed = row("XBTUSDT")

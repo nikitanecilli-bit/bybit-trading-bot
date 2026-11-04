@@ -979,3 +979,17 @@ No market PnL/backtest, Bybit collection/download, private API/account access, r
 - GitHub compare: diverged, 2125 commits ahead / 36 behind
 - PR #4: open, Draft, mergeable=false
 - Do not merge, rebase, reset, force-push or delete this research branch. Preserve both histories; future integration must use reviewed small patches/cherry-picks or a fresh integration branch.
+
+
+## 48. TP1 must preserve minNotional at the planned short TP2 exit — 2026-11-04
+
+Static audit found that _apply_tp1() checked the remaining exchange-sized quantity against min(stop_price, entry_price), but did not include TP2. For a short, TP2 can be below both entry and initial stop. The remainder could therefore pass TP1 validation while a planned TP2 reduce order would be below minNotionalValue and later fail final-close validation.
+
+Correction: remaining quantity is now checked against the lowest of stop, entry and TP2 prices. The TP1 leg continues to be checked at TP1 price. Added a regression where TP1 leg notional is exactly 45, remaining TP2 notional is 40, and minNotionalValue is 45; TP1 must be rejected with state unchanged.
+
+Verification:
+- Final Research CI #41850162961 on e01a53868885f5ac79f2ad3d3cfa3179e7207b1a: SUCCESS, 57/57 workflow steps, no failed steps.
+- Actual log: test_tp1_rejects_short_remainder_below_min_notional_at_tp2 passed; MarkPriceEngineIntegrationTests 9/9.
+- Source-only CI #41850143419 on 7238076b271bf25010d01ce2df0c1321e3652722: SUCCESS, 57/57 steps.
+
+Classification: exchange-order validity guardrail; not strategy/PnL evidence. No market replay, data download, collector, private API, runner, paper/live orders or main-branch changes.

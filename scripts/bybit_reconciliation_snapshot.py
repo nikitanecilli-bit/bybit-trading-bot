@@ -360,7 +360,8 @@ def collect_snapshot(
     }
     digest = hashlib.sha256(_canonical_json_bytes(raw)).hexdigest()
     return {
-        "schema_version": 2,
+        "schema_version": 3,
+        "api_key_fingerprint_sha256": hashlib.sha256(api_key.encode("utf-8")).hexdigest(),
         "status": "CAPTURED_READ_ONLY_NOT_RECONCILED",
         "source": "Bybit V5 authenticated read-only endpoints",
         "base_url": base_url,

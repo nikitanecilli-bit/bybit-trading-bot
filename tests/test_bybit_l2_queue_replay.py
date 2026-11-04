@@ -561,6 +561,25 @@ def test_duplicate_public_trade_id_fails_closed_before_double_counting():
     assert o.fills == []
 
 
+
+def test_replaying_same_archive_twice_does_not_consume_queue_twice():
+    o = order(qty="2")
+    events = [{**trade(1100, "Sell", "100", "3"), "trade_id": "match-once"}]
+    original = l2_module.iter_public_trades
+    l2_module.iter_public_trades = lambda *_args: iter(events)
+    try:
+        l2_module.replay_public_trades(o, Path("unused.csv.gz"))
+        assert o.queue_ahead_remaining == D("2")
+        assert o.filled == D("0")
+        l2_module.replay_public_trades(o, Path("unused.csv.gz"))
+    finally:
+        l2_module.iter_public_trades = original
+    assert o.queue_ahead_remaining == D("2")
+    assert o.filled == D("0")
+    assert o.eligible_trade_count == 1
+    assert o.processed_trade_ids == {("AAVEUSDT", "match-once")}
+
+
 def test_missing_public_trade_id_fails_closed():
     o = order()
     events = [{**trade(1100, "Sell", "100", "6"), "trade_id": None}]

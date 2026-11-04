@@ -396,5 +396,5 @@
 - Added fail-closed rejection for `update_id < last_u`, except the documented `u=1` full-snapshot reset. No contiguous-`u` requirement was added.
 - Added regression coverage for atomic rejection; existing `u=1` restart snapshot coverage remains.
 - Commits: code/test `2b71592a1431028a5e78af2bc166327a4a5f49b8`; explanatory comment `af4ad6f421b52cd24f864d5a71c581853cc569a8`.
-- Focused isolated behavior check and test-source syntax check passed. GitHub Actions did not show a run for these commits; full repository CI remains unverified after this change. Latest confirmed CI is #41875905360 on prior code/test SHA `1b50c9d`.
+- Focused isolated behavior check and test-source syntax check passed. Research CI #41881215008 on `af4ad6f` completed the `tests` job SUCCESS with 57/57 workflow steps SUCCESS; logs confirm the new regression PASS, aggregate-L2 primitives 82/82 and runner/inspector suite 13/13.
 - No market data download, collector, PnL/backtest, private API, runner, paper/live orders, or `main` changes. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains.

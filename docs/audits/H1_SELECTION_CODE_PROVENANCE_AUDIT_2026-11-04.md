@@ -402,3 +402,38 @@ No new duplicate test was added for simultaneous exits: existing tests already r
 The multi-bar limit wrapper increments order age once per eligible H1 candle, fills on configured penetration or a marketable opening gap, retains an unfilled order only while TTL is active, and removes it at expiry. However, its fill result remains all-or-none from OHLC candles. Partial executions, queue position, queue depletion, cancellations ahead, exchange acknowledgement latency, and adverse selection remain unmodeled. This is a material unresolved execution-model limitation, not a confirmed defect in the tested pending-order state machine.
 
 No market PnL replay, new Bybit archive collection, private API/account access, paper order or live order was performed.
+## Same-timestamp portfolio close ordering — confirmed defect corrected — 2026-11-04
+
+### Reproduction
+
+A deterministic H1 regression used two open long positions and synchronized Last/Mark candles:
+- both positions were marked at the same Mark Price boundary;
+- the BTC Last candle closed below its Mark adverse low, while the ETH Last candle closed above its Mark adverse low;
+- both positions reached a time-stop close at the same H1 timestamp;
+- the emergency kill-switch threshold was set between the transient drawdowns created by processing the losing close first versus the profitable close first.
+
+Before the fix, the loss-first order crossed the kill-switch threshold during the per-position close accounting while the win-first order did not. The second symbol could consequently be forcibly closed under a different reason/price. The regression failed on the pre-fix implementation, proving the effect with the engine's own Last/Mark mark construction rather than only an artificial direct-ledger sequence.
+
+### Correction
+
+Synchronized replay now treats all symbol executions on one candle-close timestamp as a batch for portfolio stop evaluation:
+- the initial portfolio-wide adverse Mark/Last check still runs before any symbol is processed;
+- while each symbol's position/order lifecycle is processed, closed PnL and remaining-position MTM are reconciled, but daily/emergency drawdown latches are not evaluated after each individual close;
+- after all active symbols have been processed, the engine performs one portfolio-wide MTM/drawdown evaluation;
+- if that final same-timestamp snapshot newly trips the emergency kill-switch, residual positions are flattened using the already prepared Last Price risk marks, while a precomputed liquidation exit retains priority;
+- dense and sparse shared-capital replay use the same batch boundary;
+- close accounting retains its normal immediate risk-evaluation behavior outside synchronized replay batches.
+
+This avoids inventing an intra-bar ordering between independent symbols and prevents an intermediate mark-to-execution reconciliation from changing the exit treatment of later symbols solely due to list order. The final portfolio snapshot still evaluates real net realized/unrealized PnL and can trigger the kill-switch; this is not a relaxation of the risk limit.
+
+### Regression and CI
+
+- The initial direct ledger-only regression failed as expected but was too abstract; it was replaced with a synchronized Last/Mark H1 time-stop reproduction.
+- The realistic regression also failed on the pre-fix engine (test_same_timestamp_close_batch_cannot_trip_kill_switch_by_symbol_order), with the ledger differing between symbol orders.
+- The batch implementation and compatibility corrections were committed in f83a8d5552b4a53c9bf8465c73681cef2666ace8, f08a6d556b51c974d886946035b4a4aa74a01349, 014961f6e5be107da8112388885ebc69fc31ba60, 6dd021f7a9922a6b75063b37ef828119fbc6124d, and 29e15d23691627a1f207f48cbeebf071e720b883.
+- Intermediate CI runs exposed two integration issues and were not counted as passing: a legacy test monkeypatched the close-accounting method with a lambda that did not accept the new optional keyword; the final implementation preserves the original method signature and defers the call in the engine instead. A sparse-replay test double did not implement the new force-flatten helper; sparse replay now calls it only when the concrete engine provides it.
+- Research CI #41821688252 — SUCCESS, all 55 numbered steps and cleanup completed. The realistic same-timestamp order regression passed, as did portfolio accounting, liquidation integration, funding accounting, and sparse replay tests.
+
+### Scope and remaining limits
+
+This correction applies to synchronized historical replay (dense and sparse). It does not create a tick-level execution chronology or solve queue/partial-fill uncertainty. OHLC Mark/Last extremes remain conservative bar-level proxies; real intrabar sequencing and execution slippage can still differ. No market PnL run, new archive download, private API/account access, paper order or live order was performed.

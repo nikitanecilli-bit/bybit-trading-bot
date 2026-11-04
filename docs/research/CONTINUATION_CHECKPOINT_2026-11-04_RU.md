@@ -1049,3 +1049,13 @@ Now `load_state()` recomputes expected TP1 gross from actual closed quantity and
 Added corrupted legacy backup regression (stored 31 vs expected 30). Updated exchange-sized fixtures to exact contract gross 3 (0.5 contract * 6 price delta), and legacy TP1 liquidity fixture to its valid 30 gross. Final CI #41854119883 on f42979860d97090120ee3a8aed79d59695d441ee SUCCESS 57/57; persistence suite 78 tests; log confirms both valid round-trips and corrupted-gross rejection. Earlier two runs failed only on stale fixtures; final full workflow green.
 
 Classification: persisted PnL integrity, not profitability evidence. No market PnL/backtest/API/runner/paper/live or main changes.
+
+
+## 55. Git topology after TP1 funding/PnL integrity checks — 2026-11-04
+
+- main: c87612207d145af433394f0ea992f2d29eba28d5.
+- Research branch HEAD before this checkpoint-only commit: 1f8283e6e41c1da9e084ce386a5d1b04edcabc36.
+- Merge base: ae599a2f3279e15fe27360662f94f0e7ef8db5be; compare main...research: diverged, 2,160 ahead / 36 behind.
+- PR #4 remains open, Draft, mergeable=false. Preserve both histories; no merge/rebase/reset/force-push; main unchanged.
+- Latest code/test commit with successful full CI: f42979860d97090120ee3a8aed79d59695d441ee; workflow #41854119883 SUCCESS, 57/57; persistence suite 78 tests.
+- Commits after that successful code/test head are documentation-only updates to handoff/checkpoint/ledger.

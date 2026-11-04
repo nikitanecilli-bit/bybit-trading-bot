@@ -132,7 +132,7 @@ class SnapshotCollectorTests(unittest.TestCase):
             snapshot = build_snapshot([instrument], "linear")
             write_snapshot(snapshot, Path(directory) / "snapshot.json")
             history = InstrumentSpecHistory.from_directory(directory)
-            spec = history.get_spec("BTCUSDT", 1793577601000)
+            spec = history.get_spec("BTCUSDT", history.snapshots[0].fetched_at_ms)
             self.assertEqual(spec.symbol, "BTCUSDT")
 
     def test_snapshot_timestamp_normalizes_offset_to_utc(self):

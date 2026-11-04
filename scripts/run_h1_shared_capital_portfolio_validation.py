@@ -61,6 +61,92 @@ H1_REPLAY_CODE_PATHS = [
 SELECTION_INPUT_KEYS = ("kline", "funding", "mark_price", "instrument_specs", "risk_tiers", "universe_snapshot")
 
 
+def resolve_h1_replay_code_paths(repo_root=None, seed_paths=None):
+    """Resolve the transitive closure of repository-local Python imports.
+
+    The explicit seed list defines replay entry points. Every local module
+    imported by those files (including transitive and package imports) is
+    added automatically, so a new import cannot silently sit outside the
+    frozen selection provenance merely because a maintainer forgot to extend
+    a second hand-maintained dependency list.
+    """
+    root = Path(repo_root) if repo_root is not None else Path(__file__).resolve().parents[1]
+    seeds = list(H1_REPLAY_CODE_PATHS if seed_paths is None else seed_paths)
+    discovered = set()
+    queue = []
+    for raw in seeds:
+        relative = Path(raw).as_posix()
+        candidate = root / relative
+        if not candidate.is_file():
+            raise SystemExit(f"Missing required H1 replay code seed: {relative}")
+        if relative not in discovered:
+            discovered.add(relative)
+            queue.append(relative)
+
+    def module_candidates(module_name):
+        if not module_name:
+            return []
+        module_path = module_name.replace(".", "/")
+        return [module_path + ".py", module_path + "/__init__.py"]
+
+    while queue:
+        relative = queue.pop()
+        source_path = root / relative
+        try:
+            tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=relative)
+        except (OSError, UnicodeError, SyntaxError) as exc:
+            raise SystemExit(f"Cannot parse H1 replay dependency {relative}: {exc}") from exc
+
+        parts = Path(relative).with_suffix("").parts
+        if parts and parts[-1] == "__init__":
+            current_module_parts = parts[:-1]
+            package_parts = current_module_parts
+        else:
+            current_module_parts = parts
+            package_parts = parts[:-1]
+
+        imported_modules = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported_modules.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                if node.level:
+                    keep = len(package_parts) - node.level + 1
+                    if keep < 0:
+                        continue
+                    base_parts = package_parts[:keep]
+                    if node.module:
+                        base_parts += tuple(node.module.split("."))
+                    base = ".".join(base_parts)
+                else:
+                    base = node.module or ""
+                if base:
+                    imported_modules.add(base)
+                for alias in node.names:
+                    if alias.name != "*":
+                        child = ".".join(part for part in (base, alias.name) if part)
+                        if child:
+                            imported_modules.add(child)
+
+        local_paths = set()
+        for module_name in imported_modules:
+            for candidate in module_candidates(module_name):
+                if (root / candidate).is_file():
+                    local_paths.add(candidate)
+            module_parts = module_name.split(".")
+            for index in range(1, len(module_parts)):
+                package_init = "/".join(module_parts[:index]) + "/__init__.py"
+                if (root / package_init).is_file():
+                    local_paths.add(package_init)
+
+        for candidate in sorted(local_paths):
+            if candidate not in discovered:
+                discovered.add(candidate)
+                queue.append(candidate)
+
+    return sorted(discovered)
+
+
 
 def resolve_ema50_200_gate(environ=None):
     """Opt-in paired comparison; default run remains baseline-only."""
@@ -1167,8 +1253,9 @@ def build_validation_manifest(
     ]
     code_files = [
         _file_manifest_record(repo_root / relative)
-        for relative in code_paths
-        if (repo_root / relative).is_file()
+        for relative in resolve_h1_replay_code_paths(
+            repo_root, [*H1_REPLAY_CODE_PATHS, ".github/workflows/h1-shared-capital-portfolio-validation.yml"]
+        )
     ]
 
     allowlist = sorted({
@@ -1328,8 +1415,7 @@ def main():
     repo_root = Path(__file__).resolve().parents[1]
     selection_code_files = [
         _file_manifest_record(repo_root / relative)
-        for relative in H1_REPLAY_CODE_PATHS
-        if (repo_root / relative).is_file()
+        for relative in resolve_h1_replay_code_paths(repo_root)
     ]
     recorded_universe = design["selection"]["input_files"].get("universe_snapshot")
     if not isinstance(recorded_universe, list) or len(recorded_universe) != 1:

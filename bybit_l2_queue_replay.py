@@ -330,6 +330,8 @@ def replay_public_trades(order: PassiveOrder, archive: Path, symbol: str = "AAVE
         previous_ts = ts
         if ts >= order.expiry_ts:
             break
+        if ts <= order.arrival_ts:
+            continue
         trade_id = trade.get("trade_id")
         if not isinstance(trade_id, str) or not trade_id:
             raise ValueError("missing public trade ID")

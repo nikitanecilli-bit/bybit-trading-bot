@@ -74,24 +74,24 @@ class InstrumentSpecHistory:
         snapshots: list[InstrumentSnapshot],
     ) -> list[dict[str, str]]:
         candidates: list[dict[str, str]] = []
-        for previous, current in zip(snapshots, snapshots[1:]):
-            previous_by_identity = {
-                identity: symbol for symbol, identity in previous.identities.items()
-            }
+        last_symbol_by_identity: dict[InstrumentIdentity, tuple[str, str]] = {}
+        for snapshot in snapshots:
             current_by_identity = {
-                identity: symbol for symbol, identity in current.identities.items()
+                identity: symbol for symbol, identity in snapshot.identities.items()
             }
-            for identity in previous_by_identity.keys() & current_by_identity.keys():
-                old_symbol = previous_by_identity[identity]
-                new_symbol = current_by_identity[identity]
-                if old_symbol != new_symbol:
-                    candidates.append({
-                        "previous_symbol": old_symbol,
-                        "current_symbol": new_symbol,
-                        "previous_fetched_at": previous.fetched_at,
-                        "current_fetched_at": current.fetched_at,
-                        "classification": "possible_rename_not_proven",
-                    })
+            for identity, new_symbol in current_by_identity.items():
+                previous = last_symbol_by_identity.get(identity)
+                if previous is not None:
+                    old_symbol, previous_fetched_at = previous
+                    if old_symbol != new_symbol:
+                        candidates.append({
+                            "previous_symbol": old_symbol,
+                            "current_symbol": new_symbol,
+                            "previous_fetched_at": previous_fetched_at,
+                            "current_fetched_at": snapshot.fetched_at,
+                            "classification": "possible_rename_not_proven",
+                        })
+                last_symbol_by_identity[identity] = (new_symbol, snapshot.fetched_at)
         return candidates
 
     @classmethod

@@ -221,10 +221,17 @@ class PointInTimeUniverseTests(unittest.TestCase):
         from scripts.snapshot_bybit_instruments import build_page_observation
         rows = [row("BTCUSDT", "Trading")]
         counts = {status: int(status == "Trading") for status in CAPTURED_STATUSES}
-        observations = [build_page_observation(
-            "default", 1, "2026-11-03T00:00:02.000Z",
-            "2026-11-03T00:00:03.000Z", rows, None,
-        )]
+        observations = []
+        for index, status in enumerate(("default", *STATUSES)):
+            page_rows = rows if status == "default" else []
+            if index == len(STATUSES):
+                started, completed = "2026-11-03T00:00:02.000Z", "2026-11-03T00:00:03.000Z"
+            else:
+                started = f"2026-11-03T00:00:00.{index * 100:03d}Z"
+                completed = f"2026-11-03T00:00:00.{index * 100 + 10:03d}Z"
+            observations.append(build_page_observation(
+                status, 1, started, completed, page_rows, None,
+            ))
         with self.assertRaisesRegex(ValueError, "after fetched_at"):
             build_universe_snapshot(
                 rows, counts, "2026-11-03T00:00:02.500Z",

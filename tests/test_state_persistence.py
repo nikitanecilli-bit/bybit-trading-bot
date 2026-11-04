@@ -983,6 +983,21 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertEqual(restored.current_equity, 9_900.0)
             self.assertEqual(restored.max_drawdown_pct, 5.0)
 
+    def test_risk_kill_switch_latch_required_when_emergency_drawdown_is_breached(self):
+        self._assert_invalid_risk_payload({
+            "realized_equity": 6_900.0, "unrealized_pnl": 0.0,
+            "current_equity": 6_900.0, "peak_equity": 10_000.0,
+            "max_drawdown_pct": 31.0, "kill_switch_triggered": False,
+        })
+
+    def test_risk_daily_stop_latch_required_when_daily_drawdown_is_breached(self):
+        self._assert_invalid_risk_payload({
+            "realized_equity": 9_400.0, "unrealized_pnl": 0.0,
+            "current_equity": 9_400.0, "peak_equity": 10_000.0,
+            "max_drawdown_pct": 6.0, "day_start_equity": 10_000.0,
+            "current_day_str": "2026-11-02", "daily_stop_triggered": False,
+        })
+
     def test_risk_nan_equity_is_rejected(self):
         self._assert_invalid_risk_payload({"current_equity": float("nan")})
 

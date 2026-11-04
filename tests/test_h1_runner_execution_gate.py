@@ -86,12 +86,39 @@ from run_h1_shared_capital_portfolio_validation import (
     resolve_bybit_kline_dir, load_bybit_h1_datasets,
     round_limit_quote_to_bybit_tick, engine_cost_stress,
     BASE_TAKER_FEE, BASE_MAKER_FEE, BASE_TAKER_SLIP,
-    resolve_validation_design, load_frozen_selection_manifest,
+    resolve_validation_design, load_frozen_selection_manifest, resolve_h1_replay_code_paths,
     validate_selection_cutoff, validate_selection_provenance, runtime_provenance,
     selection_validation_boundary, geometric_monthly_return_pct,
 )
 
 
+
+
+
+
+def test_replay_code_dependency_closure_includes_transitive_local_imports():
+    repo_root = Path(__file__).resolve().parent.parent
+    paths = resolve_h1_replay_code_paths(repo_root)
+    assert "scripts/snapshot_bybit_instruments.py" in paths
+
+
+def test_replay_code_dependency_closure_discovers_nested_package_imports():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "entry.py").write_text("from package.middle import VALUE\\n", encoding="utf-8")
+        (root / "package").mkdir()
+        (root / "package" / "__init__.py").write_text("", encoding="utf-8")
+        (root / "package" / "middle.py").write_text(
+            "from package.deep.leaf import VALUE\\n", encoding="utf-8"
+        )
+        (root / "package" / "deep").mkdir()
+        (root / "package" / "deep" / "__init__.py").write_text("", encoding="utf-8")
+        (root / "package" / "deep" / "leaf.py").write_text("VALUE = 1\\n", encoding="utf-8")
+        paths = resolve_h1_replay_code_paths(root, ["entry.py"])
+    assert paths == [
+        "entry.py", "package/__init__.py", "package/deep/__init__.py",
+        "package/deep/leaf.py", "package/middle.py",
+    ]
 
 
 def _selection_env(tmpdir):

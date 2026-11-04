@@ -182,6 +182,35 @@ class PointInTimeUniverseTests(unittest.TestCase):
                 rows, counts, "2026-11-03T00:00:01Z", "2026-11-03T00:00:02Z"
             )
 
+
+    def test_universe_snapshot_records_page_observations(self):
+        from scripts.snapshot_bybit_instruments import build_page_observation
+        rows = [row("BTCUSDT", "Trading")]
+        counts = {status: int(status == "Trading") for status in CAPTURED_STATUSES}
+        observations = [build_page_observation(
+            "default", 1, "2026-11-03T00:00:00.000Z",
+            "2026-11-03T00:00:00.250Z", rows, None,
+        )]
+        snapshot = build_universe_snapshot(
+            rows, counts, "2026-11-03T00:00:01.000Z",
+            "2026-11-03T00:00:00.000Z", observations,
+        )
+        self.assertEqual(snapshot["page_observations"], observations)
+
+    def test_universe_snapshot_rejects_page_observation_after_fetched_at(self):
+        from scripts.snapshot_bybit_instruments import build_page_observation
+        rows = [row("BTCUSDT", "Trading")]
+        counts = {status: int(status == "Trading") for status in CAPTURED_STATUSES}
+        observations = [build_page_observation(
+            "default", 1, "2026-11-03T00:00:02.000Z",
+            "2026-11-03T00:00:03.000Z", rows, None,
+        )]
+        with self.assertRaisesRegex(ValueError, "after fetched_at"):
+            build_universe_snapshot(
+                rows, counts, "2026-11-03T00:00:02.500Z",
+                "2026-11-03T00:00:00.000Z", observations,
+            )
+
     def test_snapshot_writer_round_trips(self):
         rows = [row("BTCUSDT", "Trading")]
         counts = {status: int(status == "Trading") for status in CAPTURED_STATUSES}

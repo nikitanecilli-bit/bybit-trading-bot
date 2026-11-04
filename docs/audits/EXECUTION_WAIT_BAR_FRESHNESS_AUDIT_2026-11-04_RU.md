@@ -1,8 +1,9 @@
 # Аудит много-свечного ожидания лимитных заявок — 2026-11-04
 
 Ветка: `research/market-regime-v1-main`  
-Проверенный commit: `ad9fdc79e2b5ccfe633bc4cd1adccb4dfd4a7418`  
-Research CI: [#41807674494 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41807674494)
+Проверенный кодовый commit: `adf057b4fe0f3fa0a996bf346b9b653463fed2c8`  
+Research CI: [#41807975436 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41807975436)  
+Документационный commit после проверки: `512e11f3461e04bd0b0df86f7b6be3cd314760cf`
 
 ## Подтверждённая причина
 
@@ -29,7 +30,7 @@ Research CI: [#41807674494 — SUCCESS](https://github.com/nikitanecilli-bit/byb
 - Добавлен тест последовательных попыток на нескольких свечах: guard меняется, `signal_origin_ts` остаётся неизменным.
 - В Research CI добавлена компиляция всех шести исправленных runners.
 - В CI path filters добавлены эти файлы, чтобы их изменения запускали проверку.
-- Commit `ad9fdc7`: compile step, multi-bar lifecycle tests и полный Research CI завершились SUCCESS.
+- Commit `adf057b`: compile step включает все семь исправленных runners; multi-bar lifecycle tests и полный Research CI завершились SUCCESS.
 
 ## Влияние на прежние результаты
 

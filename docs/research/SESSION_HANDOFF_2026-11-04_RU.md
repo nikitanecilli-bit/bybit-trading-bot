@@ -122,3 +122,15 @@
 - The two files were re-fetched from the working branch and the guard/test presence confirmed. CI result for these commits has not yet been retrieved; do not report the new regression as passed until the actual job/test output is inspected.
 - No market PnL, archive download, collector, API/account access, runner registration, paper/live order, or main-branch change.
 - Next safe task: continue static L2 queue-replay audit on report generation and CSV edge cases, avoiding reinspection of already-covered chronology, sequence ordering, trade-ID uniqueness, and same-ms boundaries. Then retrieve/verify the CI result for the two commits if available.
+
+
+## Session update — 2026-11-04 (full L2 archive-tail validation)
+
+- Continued the permitted static audit of `capture_book_at()`. Found that chronology and `seq` were checked after the arrival boundary, but malformed book payloads (`u`, levels, crossed reconstructed state, etc.) were skipped because future/same-ms events were not applied to the returned snapshot.
+- Added a separate validation-only OrderBook state seeded from the pre-arrival snapshot. Events at/after arrival are applied to that validator, while the returned book remains strictly pre-arrival. This preserves the no-look-ahead capture rule and validates the complete event stream.
+- Regression `test_capture_book_at_rejects_malformed_book_events_after_arrival_boundary` covers a non-integer update ID and a crossed reconstructed book in the post-arrival tail.
+- Commits: source `b79d827d7c6feadb7f4bf9f306fede7b5bd53f25`; regression `57f5263c7bbd5f123e19cd2be2f23c2a31765446`.
+- Both files were fetched again from the working branch; the validator and regression are present. No commit-associated workflow runs were returned by the available commit-runs lookup; CI outcome is therefore **unverified**, not passed.
+- Previous empty-archive correction remains: source `067109a14312c39ebd95ecf2eaede8d19375426c`; regression `54f30eeb095fb01998bf9d03b69c4ff2a1b40687`. CI for it is also unverified.
+- No PnL, archive downloads/collectors, API/account access, runner registration, paper/live orders, or main changes.
+- Next: inspect report serialization and public-trade CSV boundary cases; avoid duplicating existing chronology, duplicate-ID, flag, same-ms, and archive-tail checks. Retrieve actual CI job results before calling either new regression passed.

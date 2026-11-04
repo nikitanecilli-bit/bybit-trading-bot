@@ -181,3 +181,18 @@
 - PR #4 verified open + Draft. Its current head at the time of this check was `0f021573f4057bd046db2123c1dc0d0341a4c933` (documentation update), base merge-base `ae599a2f3279e15fe27360662f94f0e7ef8db5be`; do not merge/rebase/retarget.
 - No code change was justified by the artifact inventory. No market PnL, archive download/collector, private API/account access, runner registration, paper/live order, or main-branch change.
 - Next: preserve the blocker and continue only read-only provenance/code review until approved data becomes available; do not rerun known collectors or PnL.
+
+
+## Session update — 2026-11-04 (точность временных меток RiskTierHistory)
+
+- Независимый аудит `bybit_risk_tiers.py` выявил два дефекта временной строгости:
+  1. `get_tiers()` и `get_tier()` применяли `int(as_of_ts)`, молча принимая bool, строки и дробные значения вместо строгого integer-ms контракта, уже реализованного в `InstrumentSpecHistory`.
+  2. `_timestamp_ms()` использовал `datetime.timestamp() * 1000` через float и не отклонял субмиллисекундную точность. Это могло обрезать время получения снимка и сделать его доступным на более ранней миллисекунде.
+- Исправление: добавлен строгий `_as_of_ms()`; snapshot timestamp теперь нормализуется в UTC, проверяется на миллисекундную точность и конвертируется целочисленной арифметикой (без float).
+- Регрессии: строгая проверка типов для `get_tiers/get_tier`; отклонение `.000500` timestamp; точное преобразование timestamp с `+03:00` offset.
+- Коммиты: source `7f16b39da23a8b6fbe1b80b05c51d53aa2318fdd` (первая версия), уточнение UTC-нормализации `aa35e028dac3a6ba478e93cee36b693138708dfe`; тесты `5f6001e7620222738e8bac2b28a1078d4242d2a3` (первый запуск выявил неверное ожидаемое значение), исправленный тест `ae64222055c794584ee2b4207e940762b12fb130`.
+- CI: финальный Research CI #41844132573 на `ae64222055c794584ee2b4207e940762b12fb130` — SUCCESS; job `tests` SUCCESS; все 54 workflow steps завершились успешно. Фактический лог подтверждает 13/13 тестов `test_bybit_risk_tiers.py`, включая новые проверки; compile step и остальные deterministic suites также прошли.
+- Промежуточный CI #41844055151 на тестовой фикстуре завершился FAILURE из-за неверного ожидаемого UTC epoch в новом тесте; ошибка исправлена и покрыта финальным успешным CI. Не считать промежуточный запуск успешным.
+- Это исправление только временной/валидационной строгости. Нет новых Bybit snapshots/архивов, market PnL, collectors, private API/account access, runner registration, paper/live orders или изменений `main`.
+- Текущий code/test HEAD: `ae64222055c794584ee2b4207e940762b12fb130`. PR #4 остаётся Draft/open.
+- Следующий безопасный шаг: продолжить статический audit point-in-time контрактов и их вызывающих участков; не запускать PnL, пока execution/data gates закрыты.

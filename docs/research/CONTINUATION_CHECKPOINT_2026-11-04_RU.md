@@ -152,3 +152,23 @@ Next: obtain a terminal Research CI result through Actions UI/API with push-run 
 Queue test file содержит 27 test functions; duplicate `u` fixture keys отсутствуют. Как и для предыдущих правок, test execution в текущей сессии не подтвержден: доступный GitHub workflow-run wrapper фильтрует PR-triggered runs и не показывает push runs. Не заявлять 27/27 passed до проверки terminal CI.
 
 Следующий engineering gate: order-spec validation (tickSize, qtyStep, minOrderQty, minNotional) и measured latency/cancel assumptions. Per-fill VWAP/fee/markout accounting остаётся не реализованным. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`; никаких новых PnL, архивных загрузок, private API или ордеров.
+## 13. Exchange order constraints integrated into aggregate-L2 queue replay
+
+Первоначально при добавлении проверки tick/qty был создан локальный упрощённый InstrumentSpec. При повторном аудите обнаружен уже существующий canonical `bybit_instrument_specs.InstrumentSpec`, который дополнительно проверяет status, min/max price, maxOrderQty/maxMktOrderQty и minNotionalValue. Дублирующую структуру удалили; queue replay теперь использует canonical validator.
+
+Изменения:
+- `place_passive_order(..., instrument_spec=..., symbol=...)` при переданной спецификации вызывает canonical `InstrumentSpec.validate_order(..., order_type='limit')`.
+- Off-step quantity отклоняется, если canonical validator округлил бы его вниз: queue replay не должен менять заявленный размер незаметно.
+- При переданной спецификации symbol обязателен и должен совпадать с `spec.symbol`; cross-symbol spec reuse отклоняется.
+- Проверки покрывают валидную заявку, off-tick, off-step, minOrderQty, minNotionalValue, отсутствующий symbol и mismatch symbol.
+- Queue test file содержит 34 test functions; duplicate `u` dict keys отсутствуют.
+
+Commits: source `4ae1b4446bf7daf4f2e84d77f315b3d03b68ecf1` (первоначальная реализация), canonical refactor `8f9ccec5087aa87e1e81bb4ce18eb98c38fa9159`, final symbol binding `bdda745b27c08dc61bf4d3030947cbd3f91c8e12`; tests `2ebcf94fada4920d0fbb91377e199a8807157028`, `55987001d72892e25ac1b4d27cdd8ce16efad9f9`, `768b6eca52fe3c79f6f4294cf4dedee2a69c8ba3`.
+
+Critical limitation: this repository has an as-of snapshot loader (`instrument_spec_history.py`) and manual public snapshot collector, but no verified 2025-09-02 full-universe instrument snapshot was found in the inspected project files. Therefore the existing AAVEUSDT 2025 sample cannot be retroactively certified against the exact historical tick/qty/min-notional/status filters. Do not substitute a current snapshot or infer historical constraints. The sample runner does not yet pass a dated spec; this patch adds the validation hook and deterministic tests only.
+
+CI: `research-checks.yml` already runs `tests/test_bybit_l2_queue_replay.py` on pushes to this branch and includes source/tests in compile step. Combined statuses for latest source/test commits are empty in the available GitHub wrapper; no terminal push-run result is visible. 34 test functions are authored, not claimed passed.
+
+Branch comparison at this checkpoint: `research/market-regime-v1-main` is diverged from `main` (1962 ahead, 36 behind). Do not merge this research branch wholesale or infer that it is safe to fast-forward; preserve main and use a reviewed selective PR/cherry-pick strategy later.
+
+Next audit: inspect existing queue replay against canonical dated spec history integration and identify whether a valid historical snapshot exists in prior artifacts; if not, keep historical order-validity unknown. Then continue per-fill execution accounting and latency/cancel modeling. No new archive/API call, PnL run, private API, or live order was made.

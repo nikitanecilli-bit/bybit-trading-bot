@@ -237,6 +237,7 @@ def write_book_archive(path: Path, events: list[dict]) -> None:
 def event(kind: str, cts: int, seq: int, update_id: int, bid_qty: str) -> dict:
     return {
         "type": kind,
+        "ts": cts,
         "cts": cts,
         "data": {
             "s": "AAVEUSDT",

@@ -46,6 +46,16 @@ def test_trade_sample_inspector_uses_shared_exact_millisecond_timestamp_parser()
         else:
             raise AssertionError(f"invalid timestamp must be rejected: {value!r}")
 
+def test_trade_sample_inspector_classifies_missing_malformed_and_duplicate_ids():
+    seen = set()
+    assert trade_inspector.classify_trade_id(None, seen) == "missing"
+    assert trade_inspector.classify_trade_id("", seen) == "missing"
+    assert trade_inspector.classify_trade_id("   ", seen) == "missing"
+    assert trade_inspector.classify_trade_id(" trade-1 ", seen) == "malformed"
+    assert trade_inspector.classify_trade_id("trade-1", seen) == "unique"
+    assert trade_inspector.classify_trade_id("trade-1", seen) == "duplicate"
+    assert seen == {"trade-1"}
+
 
 
 def write_book_archive(path: Path, events: list[dict]) -> None:

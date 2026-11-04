@@ -178,7 +178,7 @@ def main() -> int:
         "fee_accounting": "not_calculated_requires_account_fee_tier_per_fill",
         "latency_model": "not_measured_or_modeled",
         "cancel_model": "no_cancel_credit_and_no_cancel_latency_model",
-        "block_trade_handling": "requires archive isBlockTrade/BT flag; fails closed if unavailable",
+        "block_trade_handling": "requires archive isBlockTrade/BT and RPI/isRPITrade flags; fails closed if either is unavailable",
         "status": "started",
     }
     with tempfile.TemporaryDirectory(prefix="bybit-l2-queue-replay-") as tmp:

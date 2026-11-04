@@ -1154,3 +1154,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Source commit `9890e9c9748372538588c9914914a9691fb4d898`; final test commit `794342bbd00342d0b7f1af660362794408da0345`. CI #41867866581 SUCCESS, 57/57 steps; runner/markout suite 6/6; aggregate-L2 primitives 81/81. Later CI #41873039139 and #41873425668 reran the updated runner suite successfully.
 - Historical exploratory artifact predates decomposition; its old markout values cannot be relabelled as pure adverse selection. Replay was not repeated because the saved trade CSV lacks BT/isBlockTrade. No new archives, PnL/backtest, API, runner, paper/live orders or main changes.
 - This is execution-diagnostic methodology, not proof of maker execution realism or profitability. Maker PnL gate remains blocked.
+
+## ENG-EXEC-022 — Validate BT/RPI aliases in historical trade inspector (2026-11-04)
+
+- Inspector previously reported BT/RPI column presence but did not validate every row's flag value or compare aliases when both were present. Replay parser already rejected missing/malformed values and conflicting aliases.
+- Added `classify_boolean_flag_aliases()` using the shared `parse_exchange_bool()` contract. Inspector now reports per-row true/false/missing/malformed/conflict counts and separate validation status for BT and RPI aliases.
+- Regression covers absent columns/values, blank/malformed values, true/false, matching aliases and conflicting aliases.
+- Source commit `83bca2b14a5cbb613e0ab849a45a2fbf4750aa71`; test commit `5f315bdd048f8abefa07a992aa667010d0ea1f5b`.
+- Source-only CI #41874223792 SUCCESS, 57/57; final CI #41874277483 on `5f315bdd` SUCCESS, 57/57, zero failures. Actual logs confirm flag-alias regression; inspector/runner suite 9/9; aggregate-L2 primitive suite 81/81.
+- Diagnostic metadata validation only; no maker-fill or PnL evidence. Historical AAVE CSV still lacks BT/isBlockTrade; no archive download or network inspector run. No PnL/backtest, collectors, API, runner, paper/live orders or main changes.

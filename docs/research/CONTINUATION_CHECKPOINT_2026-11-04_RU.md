@@ -1088,3 +1088,35 @@ Restore now requires kill switch true if max(current implied DD, historical max_
 Three regressions: current emergency breach, historical emergency breach followed by recovery, current daily breach. Source CI #41861236015 SUCCESS 57/57; final CI #41861273155 on 669a7d66c50df5426e63c5490580b2d8bbc92f22 SUCCESS 57/57; persistence suite 84 tests.
 
 Known schema limit: an intraday daily-stop breach followed by recovery before backup cannot be independently reconstructed if the latch is corrupted, because no daily minimum-equity watermark is persisted. Runtime still persists latch transitions. Classification: risk-state integrity only; no strategy PnL/backtest/API/runner/paper/live or main changes.
+
+
+
+## 58. UTC rollover CI regression was a stale test double — 2026-11-04
+
+Fresh branch inspection found Research CI #41861996487 and #41862040810 failing in `tests/test_time_model.py::test_mtm_uses_close_timestamp_for_15m_bar`. Production code had intentionally moved UTC-day rollover into `AdaptiveRiskManager.mark_to_market()`, so the equity mark is refreshed before the new-day baseline is captured. The test fixture still replaced `_update_mark_to_market` with a bare timestamp recorder and expected the old direct `on_new_timestamp()` call from `step_candle()`.
+
+Corrected the test double to model the actual production call path (`_update_mark_to_market -> risk_mgr.mark_to_market -> on_new_timestamp`). No production logic was changed for this fix. CI #41866503614 on 8816659b3a81dda7afd920203a2c84ef0839b525: SUCCESS, all 54 numbered test steps. The integrated UTC rollover regression in `tests/test_portfolio_accounting.py` remains in place and verifies the boundary equity is refreshed before daily baseline reset.
+
+Classification: stale test fixture, not a newly confirmed production defect. The earlier failing runs are retained as history; latest tested code state is green.
+
+## 59. Maker markout decomposed into spread capture and post-fill price movement — 2026-11-04
+
+Static audit found that the runner's historical `signed_mid_markout_bps` measures fill-price-to-future-mid return. This is a valid execution-return measure, but it includes the spread captured at entry and therefore does not isolate post-fill adverse selection.
+
+Runner now also captures the last valid L2 BBO strictly before each fill timestamp (same-millisecond events remain excluded; quote age is recorded), then reports two explicit measures at each 1s/5s/30s/60s horizon:
+- `signed_fill_to_future_mid_bps`: signed return from actual fill price to future midpoint; includes spread capture.
+- `signed_mid_move_from_pre_fill_bps`: signed movement from the pre-fill midpoint to future midpoint; isolates post-fill price movement from spread capture, subject to the recorded pre-fill quote age.
+
+The prior `signed_mid_markout_bps` field is retained as a compatibility alias for fill-to-future-mid. Added a deterministic runner regression proving the two measures differ when the fill captures spread but the midpoint subsequently moves. This is a measurement clarification, not a real-market result; no Bybit sample runner was invoked and no archives were downloaded.
+
+CI #41867866581 on 794342bbd00342d0b7f1af660362794408da0345: SUCCESS. Primitive L2 suite 81/81; runner chronology/markout suite 6/6; all 54 numbered workflow steps successful.
+
+## 60. Git topology and current execution gate — 2026-11-04
+
+- `main`: c87612207d145af433394f0ea992f2d29eba28d5 (unchanged).
+- Research branch latest tested code/test head before this checkpoint update: 794342bbd00342d0b7f1af660362794408da0345.
+- Merge base: ae599a2f3279e15fe27360662f94f0e7ef8db5be; compare main...research: diverged, 2,180 ahead / 36 behind.
+- PR #4 remains Draft and not mergeable; do not merge/rebase/reset/force-push.
+- Latest full Research CI: #41867866581 SUCCESS, 54/54 numbered steps; L2 primitive tests 81/81 and runner tests 6/6.
+- `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains unchanged. Aggregate L2 still lacks verified historical instrument-spec snapshots for every scenario, latency/cancel modeling, L3 priority, and a broad multi-symbol/regime validation sample. Per-fill fee rates must be explicitly supplied; none are guessed.
+- No new market archives/downloads, collectors, private Bybit API, PnL backtests, parameter sweeps, paper/live orders, or changes to `main`.

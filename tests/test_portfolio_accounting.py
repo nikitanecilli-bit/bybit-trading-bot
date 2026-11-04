@@ -100,6 +100,41 @@ def test_original_signal_timestamp_survives_delayed_fill_and_journal_export():
         assert payload["trades"][0]["signal_ts_ms"] == original_signal_ts
 
 
+def test_engine_accepts_limit_fill_on_third_wait_bar_and_preserves_origin_signal_ts():
+    e = make_engine()
+    e.cfg.enable_post_break_invalidation = False
+    origin_ts = 1_800_000_000_000
+    hour = 3_600_000
+    signal = {
+        "symbol": "BTCUSDT",
+        "direction": "long",
+        "strategy": "H1-momentum-breakout",
+        "signal_ts": origin_ts,
+        "entry_price": 100.0,
+        "stop_dist": 5.0,
+        "order_type": "limit",
+        "breakout_level": 99.0,
+        "vol_ratio": 2.0,
+    }
+    e.pending["BTCUSDT"] = signal
+
+    for wait_index in (1, 2):
+        ts = origin_ts + wait_index * hour
+        prepare_signal_for_next_bar_fill(signal, ts, hour)
+        candle = engine_mod.Candle(ts, 100.2, 101.0, 100.1, 100.5, 10.0)
+        assert e._try_fill_pending("BTCUSDT", candle) is False
+        e.pending["BTCUSDT"] = signal
+
+    fill_ts = origin_ts + 3 * hour
+    prepare_signal_for_next_bar_fill(signal, fill_ts, hour)
+    fill_candle = engine_mod.Candle(fill_ts, 100.0, 101.0, 99.9, 100.5, 10.0)
+    assert e._try_fill_pending("BTCUSDT", fill_candle) is True
+    position = e.open_positions["BTCUSDT"]
+    assert position.entry_ts == fill_ts
+    assert position.signal_ts_ms == origin_ts
+    assert signal["signal_origin_ts"] == origin_ts
+
+
 def test_final_close_funding_receipt_is_not_credited_on_ambiguous_exit_boundary():
     e = make_engine()
     e.funding_dir = "fixture"

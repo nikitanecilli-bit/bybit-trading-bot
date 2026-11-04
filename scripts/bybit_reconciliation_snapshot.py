@@ -214,6 +214,7 @@ def _collect_pages(
                 "page_index": len(pages),
                 "request_started_at_ms": request_started_at_ms,
                 "request_completed_at_ms": request_completed_at_ms,
+                "query_params": page_params,
                 "query_params_sha256": query_fingerprint,
                 "requested_cursor_sha256": cursor_fingerprint,
                 "next_cursor_sha256": next_cursor_fingerprint,
@@ -359,7 +360,7 @@ def collect_snapshot(
     }
     digest = hashlib.sha256(_canonical_json_bytes(raw)).hexdigest()
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "status": "CAPTURED_READ_ONLY_NOT_RECONCILED",
         "source": "Bybit V5 authenticated read-only endpoints",
         "base_url": base_url,

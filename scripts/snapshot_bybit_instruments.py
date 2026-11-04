@@ -212,6 +212,8 @@ def validate_page_observations(
     previous_received: str | None = None
     page_counts: dict[str, int] = {}
     page_has_next: dict[str, list[bool]] = {}
+    last_status: str | None = None
+    completed_statuses: set[str] = set()
     for item in observations:
         if not isinstance(item, dict):
             raise ValueError("page observation must be an object")
@@ -233,6 +235,12 @@ def validate_page_observations(
         if type(item["has_next_page"]) is not bool:
             raise ValueError("page observation has_next_page must be boolean")
         status = normalized["status_filter"]
+        if status != last_status:
+            if status in completed_statuses:
+                raise ValueError("page observations interleave status filter groups")
+            if last_status is not None:
+                completed_statuses.add(last_status)
+            last_status = status
         expected_index = page_counts.get(status, 0) + 1
         if normalized["page_index"] != expected_index:
             raise ValueError("page observation page_index is not sequential")
@@ -247,8 +255,8 @@ def validate_page_observations(
             raise ValueError(f"page continuation flags are inconsistent for {status}")
         if any(flag is not True for flag in continuation_flags[:-1]):
             raise ValueError(f"missing continuation link between pages for {status}")
-    if expected_status_filters is not None and set(page_has_next) != set(expected_status_filters):
-        raise ValueError("page observations do not cover the expected status filters")
+    if expected_status_filters is not None and tuple(page_has_next) != expected_status_filters:
+        raise ValueError("page observations do not cover the expected status filters in order")
     if collection_started_at is not None and validated[0]["request_started_at"] < _snapshot_timestamp(collection_started_at):
         raise ValueError("first page observation starts before collection_started_at")
     if fetched_at is not None and validated[-1]["request_completed_at"] > _snapshot_timestamp(fetched_at):

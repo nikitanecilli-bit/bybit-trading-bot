@@ -118,6 +118,14 @@ def upgrade_to_schema2(data):
     return data
 
 
+def upgrade_to_schema3(data, *, api_key="test-api-key", base_url="https://api.bybit.com"):
+    data = upgrade_to_schema2(data)
+    data["schema_version"] = 3
+    data["api_key_fingerprint_sha256"] = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+    data["base_url"] = base_url
+    return data
+
+
 def backup(positions=None, pending=None):
     return {
         "saved_at_utc": SAVED,
@@ -154,7 +162,7 @@ class ReportOnlyComparatorTests(unittest.TestCase):
             build_report(backup(), data)
 
     def test_late_execution_discovered_by_refreshed_snapshot_is_not_complete(self):
-        initial = snapshot()
+        initial = upgrade_to_schema3(snapshot())
         refreshed = copy.deepcopy(initial)
         later_bound = CAPTURE_MS + 60_000
         execution = {
@@ -176,6 +184,7 @@ class ReportOnlyComparatorTests(unittest.TestCase):
             refreshed["raw"], ensure_ascii=False, sort_keys=True,
             separators=(",", ":"), allow_nan=False,
         ).encode("utf-8")).hexdigest()
+        refreshed = upgrade_to_schema3(refreshed)
         result = compare_execution_snapshots(initial, refreshed)
         self.assertEqual(result["status"], "LATE_EXECUTIONS_DISCOVERED")
         self.assertEqual(result["late_exec_ids"], ["late-exec-1"])
@@ -185,7 +194,7 @@ class ReportOnlyComparatorTests(unittest.TestCase):
         self.assertFalse(result["live_resume_allowed"])
 
     def test_execution_snapshot_comparison_rejects_changed_duplicate_identity(self):
-        initial = snapshot()
+        initial = upgrade_to_schema3(snapshot())
         refreshed = copy.deepcopy(initial)
         execution = {
             "execId": "same-id", "orderId": "order-1", "orderLinkId": "",
@@ -212,7 +221,38 @@ class ReportOnlyComparatorTests(unittest.TestCase):
             refreshed["raw"], ensure_ascii=False, sort_keys=True,
             separators=(",", ":"), allow_nan=False,
         ).encode("utf-8")).hexdigest()
+        refreshed = upgrade_to_schema3(refreshed)
         with self.assertRaisesRegex(ReportError, "execution identity changed"):
+            compare_execution_snapshots(initial, refreshed)
+
+    def test_execution_snapshot_comparison_rejects_different_api_key_fingerprint(self):
+        initial = upgrade_to_schema3(snapshot())
+        refreshed = upgrade_to_schema3(snapshot(), api_key="different-api-key")
+        refreshed["bybit_server_time_before_ms"] += 1000
+        refreshed["bybit_server_time_after_ms"] += 1000
+        refreshed["capture_now_ms"] += 1000
+        for field in ("executions", "order_history"):
+            for page_row in refreshed["raw"][field]:
+                page_row["interval_end_ms"] += 1000
+        refreshed["order_history_coverage"]["end_ms"] += 1000
+        refreshed["order_history_coverage"]["duration_ms"] += 1000
+        refreshed = upgrade_to_schema3(refreshed, api_key="different-api-key")
+        with self.assertRaisesRegex(ReportError, "same valid API-key fingerprint"):
+            compare_execution_snapshots(initial, refreshed)
+
+    def test_execution_snapshot_comparison_rejects_different_base_url(self):
+        initial = upgrade_to_schema3(snapshot())
+        refreshed = upgrade_to_schema3(snapshot(), base_url="https://api-testnet.bybit.com")
+        refreshed["bybit_server_time_before_ms"] += 1000
+        refreshed["bybit_server_time_after_ms"] += 1000
+        refreshed["capture_now_ms"] += 1000
+        for field in ("executions", "order_history"):
+            for page_row in refreshed["raw"][field]:
+                page_row["interval_end_ms"] += 1000
+        refreshed["order_history_coverage"]["end_ms"] += 1000
+        refreshed["order_history_coverage"]["duration_ms"] += 1000
+        refreshed = upgrade_to_schema3(refreshed, base_url="https://api-testnet.bybit.com")
+        with self.assertRaisesRegex(ReportError, "same Bybit base_url"):
             compare_execution_snapshots(initial, refreshed)
 
     def test_empty_exchange_state_still_blocks_resume_without_execution_ledger(self):

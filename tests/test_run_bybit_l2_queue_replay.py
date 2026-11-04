@@ -66,11 +66,12 @@ def test_trade_sample_inspector_recognizes_both_block_trade_aliases():
 
 def test_trade_sample_inspector_summarizes_queue_replay_compatibility():
     classify = trade_inspector.trade_archive_replay_compatibility_status
-    assert classify("valid", "valid", "valid", "valid") == "valid"
-    assert classify("invalid", "valid", "valid", "valid") == "invalid_or_incomplete"
-    assert classify("valid", "invalid_or_incomplete", "valid", "valid") == "invalid_or_incomplete"
-    assert classify("valid", "valid", "invalid_or_incomplete", "valid") == "invalid_or_incomplete"
-    assert classify("valid", "valid", "valid", "invalid_or_incomplete") == "invalid_or_incomplete"
+    assert classify("valid", "valid", "valid", "valid", 1) == "valid"
+    assert classify("valid", "valid", "valid", "valid", 0) == "invalid_or_incomplete"
+    assert classify("invalid", "valid", "valid", "valid", 1) == "invalid_or_incomplete"
+    assert classify("valid", "invalid_or_incomplete", "valid", "valid", 1) == "invalid_or_incomplete"
+    assert classify("valid", "valid", "invalid_or_incomplete", "valid", 1) == "invalid_or_incomplete"
+    assert classify("valid", "valid", "valid", "invalid_or_incomplete", 1) == "invalid_or_incomplete"
 
 
 def test_trade_sample_inspector_marks_nonmonotonic_timestamps_invalid():

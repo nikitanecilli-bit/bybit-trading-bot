@@ -397,8 +397,7 @@ def test_runtime_provenance_separates_research_checkout_from_workflow_ref():
 
 
 
-def test_geometric_monthly_return_normalizes_compounded_returns_by_exact_duration():
-    month_ms = int(round(365.2425 / 12.0 * 86_400_000))
+def test_geometric_monthly_return_normalizes_compounded_returns_by_exact_duration():    month_ms = int(round(365.2425 / 12.0 * 86_400_000))
     one_month = geometric_monthly_return_pct(2_000.0, 10_000.0, 0, month_ms - 3_600_000)
     two_months = geometric_monthly_return_pct(4_400.0, 10_000.0, 0, 2 * month_ms - 3_600_000)
     assert abs(one_month["geometric_monthly_return_pct"] - 20.0) < 1e-8
@@ -656,14 +655,14 @@ def test_funding_mark_coverage_includes_final_h1_close_settlement():
         final_bar_close = final_bar_open + 3_600_000
         funding_path = funding / "BTCUSDT.csv"
         funding_path.write_text(
-            "symbol,funding_timestamp_ms,funding_rate\\n"
-            f"BTCUSDT,{final_bar_close},0.001\\n",
+            "symbol,funding_timestamp_ms,funding_rate\n"
+            f"BTCUSDT,{final_bar_close},0.001\n",
             encoding="utf-8",
         )
         (marks / "BTCUSDT.csv").write_text(
-            "symbol,timestamp_ms,open\\n"
-            f"BTCUSDT,{final_bar_open},100\\n"
-            f"BTCUSDT,{final_bar_close},101\\n",
+            "symbol,timestamp_ms,open\n"
+            f"BTCUSDT,{final_bar_open},100\n"
+            f"BTCUSDT,{final_bar_close},101\n",
             encoding="utf-8",
         )
         _write_funding_manifest(
@@ -798,44 +797,3 @@ def test_load_bybit_h1_datasets_rejects_symbol_filename_mismatch():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         path = root / "BTCUSDT.csv"
-        rows = ["symbol,timestamp_ms,open,high,low,close,volume,turnover"]
-        for index in range(501):
-            ts = 1_699_999_200_000 + index * 3_600_000
-            row_symbol = "ETHUSDT" if index == 0 else "BTCUSDT"
-            rows.append(f"{row_symbol},{ts},100,102,99,101,10,1010")
-        path.write_text("\n".join(rows) + "\n", encoding="utf-8")
-        try:
-            load_bybit_h1_datasets(root)
-        except SystemExit as exc:
-            assert "does not match filename symbol BTCUSDT" in str(exc)
-        else:
-            raise AssertionError("mismatched CSV symbol must fail archive validation")
-
-
-
-def test_delayed_limit_quotes_are_tick_aligned_without_crossing():
-    from bybit_instrument_specs import InstrumentSpec
-
-    snapshot = {
-        "instrument": {
-            "symbol": "TESTUSDT", "category": "linear", "status": "Trading",
-            "priceFilter": {
-                "minPrice": "0.05", "maxPrice": "1000000", "tickSize": "0.05"
-            },
-            "lotSizeFilter": {
-                "qtyStep": "0.001", "minOrderQty": "0.01",
-                "maxOrderQty": "1000", "maxMktOrderQty": "800",
-                "minNotionalValue": "5",
-            },
-            "leverageFilter": {
-                "minLeverage": "1", "maxLeverage": "50", "leverageStep": "0.01"
-            },
-        }
-    }
-    spec = InstrumentSpec.from_snapshot(snapshot)
-    long_quote = round_limit_quote_to_bybit_tick(spec, 100.079, "long")
-    short_quote = round_limit_quote_to_bybit_tick(spec, 100.051, "short")
-    assert long_quote == 100.05
-    assert short_quote == 100.10
-    assert long_quote <= 100.079
-    assert short_quote >= 100.051

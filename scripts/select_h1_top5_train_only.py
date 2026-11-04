@@ -370,8 +370,7 @@ def select_train_only(
     }
     code_files = [
         _file_manifest_record(ROOT / path)
-        for path in H1_REPLAY_CODE_PATHS
-        if (ROOT / path).is_file()
+        for path in resolve_h1_replay_code_paths(ROOT)
     ]
     manifest = {
         "schema_version": 1,

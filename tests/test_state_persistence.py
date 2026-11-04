@@ -525,7 +525,7 @@ class StatePersistenceTests(unittest.TestCase):
             position.maintenance_margin_usdt = "0.5"
             position.tp1_hit = True
             position.remaining_fraction = 0.5
-            position.realized_tp1_gross_usdt = 30.0
+            position.realized_tp1_gross_usdt = 3.0
             position.tp1_ts_ms = 1_790_000_003_600
             writer = engine.PlanBStatePersistence(str(path), enabled=True)
             writer.save_state(engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
@@ -585,7 +585,7 @@ class StatePersistenceTests(unittest.TestCase):
             position.min_notional_value = "5"
             position.tp1_hit = True
             position.remaining_fraction = 0.5
-            position.realized_tp1_gross_usdt = 30.0
+            position.realized_tp1_gross_usdt = 3.0
             position.tp1_ts_ms = position.entry_ts + 3_600_000
             engine.PlanBStatePersistence(str(path), enabled=True).save_state(
                 engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
@@ -614,7 +614,7 @@ class StatePersistenceTests(unittest.TestCase):
             position.min_notional_value = "5"
             position.tp1_hit = True
             position.remaining_fraction = 0.5
-            position.realized_tp1_gross_usdt = 30.0
+            position.realized_tp1_gross_usdt = 3.0
             position.tp1_ts_ms = position.entry_ts + 3_600_000
             engine.PlanBStatePersistence(str(path), enabled=True).save_state(
                 engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
@@ -675,6 +675,15 @@ class StatePersistenceTests(unittest.TestCase):
     def test_tp1_timestamp_requires_tp1_hit(self):
         def mutate(position):
             position.update({"tp1_ts_ms": position["entry_ts"] + 3_600_000})
+        self._assert_invalid_position_payload(mutate)
+
+    def test_tp1_realized_gross_must_match_closed_quantity_and_tp1_price(self):
+        def mutate(position):
+            position.update({
+                "tp1_hit": True, "remaining_fraction": 0.5,
+                "realized_tp1_gross_usdt": 31.0,
+                "tp1_ts_ms": position["entry_ts"] + 3_600_000,
+            })
         self._assert_invalid_position_payload(mutate)
 
     def test_tp1_realized_pnl_requires_tp1_hit(self):

@@ -8,11 +8,10 @@
 - Рабочая ветка: `research/market-regime-v1-main`.
 - Последний code/test commit: `2b71592a1431028a5e78af2bc166327a4a5f49b8` (L2 orderbook update-ID regression guard); explanatory comment commit: `af4ad6f421b52cd24f864d5a71c581853cc569a8`.
 - Последний подтверждённый полный CI: [Research engine checks #41875905360](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41875905360), commit `1b50c9d`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps. Этот run предшествует двум указанным коммитам; для них новый workflow run не обнаружен, полный CI после изменения пока не подтверждён.
-- Текущий branch HEAD на момент обновления handoff: `d9f6d6a10609b03319bec059b1a32dd69cefbde1`.
 - В этом CI: aggregate-L2 primitive tests 81/81; runner/inspector suite 9/9; portfolio accounting 54/54; state persistence 84/84. Логи подтверждают strict integer parsing orderbook inspector, structural checks trade CSV, BT/RPI aliases, strict trade timestamps и trade-ID diagnostics.
 - Предыдущая неудачная попытка #41872989853 была вызвана устаревшим тестом после перехода trade inspector на общий `parse_trade_timestamp_ms`; тест синхронизирован в `ec28763`, после чего полные CI #41873039139, #41873425668, #41874277483, #41875093214 и #41875905360 прошли.
 - PR #4: открыт, Draft, base `main`, head = текущая research-ветка; mergeable=false. Не сливать автоматически.
-- Сравнение с `main` на code/test snapshot `1b50c9d`: diverged, 2225 commits ahead / 36 behind. Main HEAD на момент сверки: `c87612207d145af433394f0ea992f2d29eba28d5`; merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. Точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
+- Последнее сравнение с `main` на snapshot `d9f6d6a`: diverged, 2225 commits ahead / 36 behind. Main HEAD на момент сверки: `c87612207d145af433394f0ea992f2d29eba28d5`; merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. После snapshot были только документационные обновления handoff/ledger; точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
 - `main` не менять. Не делать wholesale merge/rebase research branch. Использовать только reviewed selective PR/cherry-pick при отдельном обосновании.
 - В репозитории есть отдельная ветка `Audit` и `chore/main-repository-organization`; не предполагать, что они слиты или актуальны без проверки.
 

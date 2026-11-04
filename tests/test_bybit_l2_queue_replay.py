@@ -588,6 +588,37 @@ def test_trade_archive_requires_rpi_flag():
         else:
             raise AssertionError("archive without RPI flag must fail closed")
 
+def test_trade_archive_rejects_duplicate_column_names():
+    import gzip
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "trades.csv.gz"
+        with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
+            stream.write("timestamp,symbol,side,size,price,trdMatchID,trdMatchID,isBlockTrade,RPI\\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,match-2,False,False\\n")
+        try:
+            list(l2_module.iter_public_trades(path))
+        except ValueError as exc:
+            assert "duplicate column names" in str(exc)
+        else:
+            raise AssertionError("duplicate CSV headers must be rejected")
+
+
+def test_trade_archive_rejects_empty_or_whitespace_trade_id():
+    import gzip
+    for trade_id in ("", "   "):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "trades.csv.gz"
+            with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
+                stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\\n")
+                stream.write(f"1756771200123,AAVEUSDT,Sell,10,100,{trade_id},False,False\\n")
+            try:
+                list(l2_module.iter_public_trades(path))
+            except ValueError as exc:
+                assert "missing public trade ID" in str(exc)
+            else:
+                raise AssertionError("empty trade IDs must be rejected")
+
+
 def test_trade_archive_parses_block_trade_and_rpi_flags():
     import gzip
     with tempfile.TemporaryDirectory() as tmp:

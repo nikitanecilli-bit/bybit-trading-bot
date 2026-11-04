@@ -257,6 +257,8 @@ def apply_public_trade(order: PassiveOrder, trade: dict) -> None:
     # reader already validates every row, but direct primitive calls must not
     # silently hide malformed events outside the order's active window.
     ts = strict_int(trade.get("timestamp_ms"), "public trade timestamp_ms")
+    if ts <= 0:
+        raise ValueError("public trade timestamp must be positive")
     side = str(trade["side"])
     if side not in ("Buy", "Sell"):
         raise ValueError(f"unknown trade side: {side!r}")

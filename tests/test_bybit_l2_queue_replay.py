@@ -609,6 +609,18 @@ def test_apply_public_trade_rejects_fractional_timestamp_without_truncation():
     assert o.filled == D("0")
     assert o.queue_ahead_remaining == D("5")
 
+def test_apply_public_trade_rejects_non_positive_timestamp_without_mutation():
+    for timestamp in (0, -1):
+        o = order()
+        try:
+            apply_public_trade(o, trade(timestamp, "Sell", "100", "10"))
+        except ValueError as exc:
+            assert "timestamp must be positive" in str(exc)
+        else:
+            raise AssertionError(f"non-positive timestamp accepted: {timestamp}")
+        assert o.filled == D("0")
+        assert o.queue_ahead_remaining == D("5")
+
 
 
 def test_block_trade_does_not_consume_displayed_queue():

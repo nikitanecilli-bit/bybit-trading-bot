@@ -68,6 +68,13 @@ def validate_trade_csv_row(row: dict, row_no: int) -> None:
         raise ValueError(f"missing CSV field value at row {row_no}: {missing}")
 
 
+def validate_trade_side(value: object) -> str:
+    """Validate the exact public-trade aggressor-side token; do not trim/coerce."""
+    if value not in ("Buy", "Sell"):
+        raise ValueError(f"unexpected aggressor side: {value!r}")
+    return value
+
+
 def classify_trade_id(value: object, seen_ids: set[str]) -> str:
     """Classify a CSV trade ID using the queue replay strict identity rules."""
     if not isinstance(value, str) or not value.strip():
@@ -137,9 +144,7 @@ def main() -> int:
                 if row.get("symbol") != SYMBOL:
                     raise ValueError(f"unexpected trade symbol: {row.get('symbol')!r}")
                 ts = parse_trade_timestamp_ms(row["timestamp"])
-                side = str(row["side"]).strip()
-                if side not in ("Buy", "Sell"):
-                    raise ValueError(f"unexpected aggressor side: {side!r}")
+                side = validate_trade_side(row["side"])
                 qty = Decimal(row["size"])
                 price = Decimal(row["price"])
                 if not qty.is_finite() or qty <= 0 or not price.is_finite() or price <= 0:

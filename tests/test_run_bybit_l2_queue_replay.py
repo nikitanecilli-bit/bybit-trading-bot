@@ -47,6 +47,19 @@ def test_trade_sample_inspector_uses_shared_exact_millisecond_timestamp_parser()
         else:
             raise AssertionError(f"invalid timestamp must be rejected: {value!r}")
 
+def test_trade_sample_inspector_matches_replay_exact_side_validation():
+    validate = trade_inspector.validate_trade_side
+    assert validate("Buy") == "Buy"
+    assert validate("Sell") == "Sell"
+    for value in (" Buy", "Sell ", "BUY", "", None, 1):
+        try:
+            validate(value)
+        except ValueError as exc:
+            assert "unexpected aggressor side" in str(exc)
+        else:
+            raise AssertionError(f"non-canonical aggressor side must fail: {value!r}")
+
+
 def test_trade_sample_inspector_classifies_missing_malformed_and_duplicate_ids():
     seen = set()
     assert trade_inspector.classify_trade_id(None, seen) == "missing"

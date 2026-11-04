@@ -53,6 +53,23 @@ class FundingCoverageTests(unittest.TestCase):
         self.assertTrue(report["ok"])
         self.assertEqual(report["results"][0]["trade_candles"], 2)
 
+    def test_trade_ohlcv_allows_one_exact_terminal_mark_boundary(self):
+        self.write_funding([(3000, "0.001")])
+        self.write_marks([(1000, 100), (2000, 101), (3000, 102)])
+        self.write_trades([1000, 2000])
+        report = validate_coverage(self.funding, self.marks, trade_kline_dir=self.trades)
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["results"][0]["terminal_boundary_mark_candles"], 1)
+        self.assertEqual(report["results"][0]["trade_mark_timestamp_mismatch"], 0)
+
+    def test_trade_ohlcv_rejects_nonterminal_extra_mark_timestamp(self):
+        self.write_funding([(1000, "0.001")])
+        self.write_marks([(1000, 100), (2000, 101), (4000, 102)])
+        self.write_trades([1000, 2000])
+        report = validate_coverage(self.funding, self.marks, trade_kline_dir=self.trades)
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["results"][0]["trade_mark_timestamp_mismatch"], 1)
+
     def test_trade_ohlcv_missing_timestamp_fails_preflight(self):
         self.write_funding([(1000, "0.001")])
         self.write_marks([(1000, 100), (2000, 101)])

@@ -271,6 +271,57 @@ def _parse_exchange_snapshot(snapshot: dict[str, Any], saved_at_ms: int) -> tupl
     return positions, orders, historical_orders, executions
 
 
+def compare_execution_snapshots(initial: dict[str, Any], refreshed: dict[str, Any]) -> dict[str, Any]:
+    """Compare two read-only captures and surface executions discovered later.
+
+    Both captures must cover the same saved-backup lifecycle start. New execIds
+    whose event timestamp is at/before the first capture's server-time bound
+    are late discoveries, not proof that the first response was complete.
+    """
+    if not isinstance(initial, dict) or not isinstance(refreshed, dict):
+        raise ReportError("both execution snapshots must be objects")
+    if initial.get("saved_at_utc") != refreshed.get("saved_at_utc"):
+        raise ReportError("execution snapshots must share the same saved_at_utc")
+    saved_dt = _utc_timestamp(initial.get("saved_at_utc"), "snapshot saved_at_utc")
+    saved_at_ms = int(saved_dt.timestamp() * 1000)
+    _, _, _, initial_execs = _parse_exchange_snapshot(initial, saved_at_ms)
+    _, _, _, refreshed_execs = _parse_exchange_snapshot(refreshed, saved_at_ms)
+    initial_by_id = {item.exec_id: item for item in initial_execs}
+    refreshed_by_id = {item.exec_id: item for item in refreshed_execs}
+    conflicts = sorted(
+        exec_id for exec_id in initial_by_id.keys() & refreshed_by_id.keys()
+        if initial_by_id[exec_id] != refreshed_by_id[exec_id]
+    )
+    if conflicts:
+        raise ReportError(f"execution identity changed between snapshots: {conflicts}")
+    new_ids = sorted(refreshed_by_id.keys() - initial_by_id.keys())
+    first_bound = initial.get("bybit_server_time_before_ms")
+    later_bound = refreshed.get("bybit_server_time_before_ms")
+    if (isinstance(first_bound, bool) or not isinstance(first_bound, int)
+            or isinstance(later_bound, bool) or not isinstance(later_bound, int)
+            or later_bound <= first_bound):
+        raise ReportError("refreshed snapshot must have a strictly later server-time bound")
+    late_ids = sorted(exec_id for exec_id in new_ids
+                      if refreshed_by_id[exec_id].exec_time_ms <= first_bound)
+    subsequent_ids = sorted(set(new_ids) - set(late_ids))
+    return {
+        "status": "LATE_EXECUTIONS_DISCOVERED" if late_ids else (
+            "NEW_EXECUTIONS_DISCOVERED" if new_ids else "NO_NEW_EXECUTIONS_OBSERVED"
+        ),
+        "initial_server_time_bound_ms": first_bound,
+        "refreshed_server_time_bound_ms": later_bound,
+        "new_execution_count": len(new_ids),
+        "new_exec_ids": new_ids,
+        "late_execution_count": len(late_ids),
+        "late_exec_ids": late_ids,
+        "subsequent_execution_count": len(subsequent_ids),
+        "subsequent_exec_ids": subsequent_ids,
+        "execution_history_complete": False,
+        "reconciliation_pass": False,
+        "live_resume_allowed": False,
+    }
+
+
 def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(snapshot, dict):
         raise ReportError("exchange snapshot root must be an object")

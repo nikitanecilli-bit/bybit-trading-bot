@@ -260,6 +260,10 @@ def validate_page_observations(
         previous_completed = request_completed
     if observed_symbols != expected_symbols:
         raise ValueError("risk page symbols do not match snapshot tiers")
+    if sum(item["tier_count"] for item in validated) != sum(
+        item["tier_count"] for item in observations
+    ):
+        raise ValueError("risk page tier counts do not match snapshot tiers")
     return validated
 
 

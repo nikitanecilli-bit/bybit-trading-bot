@@ -208,3 +208,15 @@
 - Финальный Research CI #41845297286 на `729bc1a18d676e5c4dee81e3e29db37bbb21949f`: SUCCESS; job `tests` SUCCESS; 57 completed workflow steps, failures отсутствуют. Фактические логи подтверждают instrument collector **17/17** и risk-limit collector **16/16** тестов, включая round-trip в оба as-of loader.
 - Это офлайн-коррекция формата snapshot. Сами collectors не запускались; новые Bybit данные не загружались. Нет market PnL, private API/account access, runner registration, paper/live orders или изменений `main`.
 - PR #4 остаётся Draft/open. Следующий безопасный шаг — продолжить read-only аудит исторических data contracts и вызывающих участков; PnL gate остаётся закрытым из-за отсутствующих датированных снимков и execution evidence.
+
+
+## Session update — 2026-11-04 (строгая валидация mmDeduction в risk-tier history)
+
+- Дополнительная сверка RiskTierHistory с collector обнаружила fail-open несовпадение: history loader заменял отсутствующий/пустой mmDeduction на ноль для любого tier, хотя collector требует явное значение для каждого tier выше минимального. Это могло занизить/исказить maintenance margin при загрузке неполного snapshot.
+- _d() также принимал bool через Decimal(str(value)) для части numeric fields; bool не является допустимым числовым значением и должен отклоняться, как это уже делает collector.
+- Исправление: отсутствие mmDeduction допускается только у lowest tier (где ноль является определённым fallback); у остальных tier отсутствие/пустое значение отклоняется. _d() теперь явно запрещает bool.
+- Добавлены регрессии на missing mmDeduction у higher tier и boolean maintenance margin.
+- Коммиты: source 6a668cf70c26680a751ed62fd8b1d9a24799fa76; tests 625b84cc3c6eb6354a6801262ee77d77ad9efe5b.
+- Финальный Research CI #41845762278 на 625b84cc3c6eb6354a6801262ee77d77ad9efe5b: SUCCESS; job tests SUCCESS; все 57 workflow steps завершились без failure. Фактический лог подтверждает test_bybit_risk_tiers.py 15/15 passed, включая обе новые регрессии; liquidation и engine integration suites также прошли.
+- Никаких Bybit snapshots/архивов не скачивали; collectors не запускались. Нет PnL, private API/account access, runner registration, paper/live orders или изменений main.
+- Следующий безопасный шаг: read-only аудит схемы/metadata в snapshot loaders и соседних execution consumers; сохранять PnL gate закрытым до появления подтверждённых исторических данных и execution evidence.

@@ -365,20 +365,21 @@ class FundingArchiveManifestTests(unittest.TestCase):
         csv_path = funding_dir / "BTCUSDT.csv"
         csv_path.write_text(
             "symbol,funding_timestamp_ms,funding_rate\n"
-            "BTCUSDT,3600000,0.001\n",
+            "BTCUSDT,3600000,0.001\n"
+            "BTCUSDT,7200000,0.002\n",
             encoding="utf-8",
         )
         manifest_path = csv_path.with_suffix(csv_path.suffix + ".audit.json")
         record_funding_collection(
             csv_path, manifest_path, symbol="BTCUSDT", category="linear",
             api_base="https://api.bybit.com",
-            requested_start_ms=3_600_000, requested_end_ms=7_199_999,
+            requested_start_ms=3_600_000, requested_end_ms=7_200_000,
             pages=[{
                 "request_start_ms": 3_600_000,
-                "request_end_ms": 7_199_999,
-                "response_rows": 1,
+                "request_end_ms": 7_200_000,
+                "response_rows": 2,
                 "first_ts": 3_600_000,
-                "last_ts": 3_600_000,
+                "last_ts": 7_200_000,
                 "complete": True,
                 "saturated": False,
                 "out_of_window_rows": 0,
@@ -405,7 +406,7 @@ class FundingArchiveManifestTests(unittest.TestCase):
             snapshots.append(path)
         attach_funding_settlement_schedule(
             csv_path, manifest_path, symbol="BTCUSDT", category="linear",
-            required_start_ms=3_600_000, required_end_ms=7_199_999,
+            required_start_ms=3_600_000, required_end_ms=7_200_000,
             snapshot_paths=snapshots, snapshot_copy_dir=snapshot_dir,
         )
         (archive_root / "archive_manifest.json").write_text(json.dumps({

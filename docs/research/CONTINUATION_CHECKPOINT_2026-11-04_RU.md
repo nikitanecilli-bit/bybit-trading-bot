@@ -1330,3 +1330,9 @@ CI для HEAD `118acb07` не подтверждён: combined commit status н
 Trade inspector ранее считал timestamp regressions, но не публиковал явный статус совместимости с replay. Replay path отклоняет уменьшение timestamp. Добавлено поле `timestamp_order_validation_status`: `valid` только при нулевом `nonmonotonic_timestamp_count`, иначе `invalid`. Добавлен строгий classifier и deterministic regression на valid/invalid и malformed inputs.
 
 Source `0c4cf2e2`; tests `6fc17e4d`. CI не подтверждён (combined status пуст). Новые архивы и network workflows не запускались; collectors, PnL/backtest, private API, runner и paper/live orders не запускались. Maker gate закрыт.
+
+## 36. Strict CSV quoting for public trade archives (ENG-EXEC-034)
+
+В обоих trade parser paths `csv.DictReader` переведён в `strict=True`. Причина: стандартный `strict=False` принимал некоторые незакрытые quoted fields, включая malformed optional RPI value, которое могло пройти дальнейший boolean parsing. Добавлены deterministic tests для core replay и standalone inspector. Локальная проверка stdlib parser подтверждает отказ `csv.Error: unexpected end of data`.
+
+Core `81f58d0b`, inspector `d7872099`; tests `13f32dbc` + fixture correction `5f6c245d`, inspector test `06544878` + correction `9302114d`. CI не подтверждён. Новые архивы/network workflows не запускались; collectors, PnL, private API, runner и paper/live orders не использовались.

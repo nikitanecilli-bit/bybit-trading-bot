@@ -14,7 +14,7 @@ def write_book_archive(path: Path, events: list[dict]) -> None:
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
             "events.data",
-            "".join(json.dumps(event) + "\\n" for event in events),
+            "".join(json.dumps(event) + "\n" for event in events),
         )
 
 

@@ -19,6 +19,13 @@ from bybit_instrument_specs import InstrumentSpec as ExchangeInstrumentSpec
 ZERO = Decimal("0")
 
 
+def strict_int(value: object, field: str) -> int:
+    """Parse JSON integer fields without bool/string/float coercion."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{field} must be an integer")
+    return value
+
+
 def dec(value: object) -> Decimal:
     try:
         result = Decimal(str(value))
@@ -42,17 +49,15 @@ class OrderBook:
         data = event.get("data")
         if kind not in ("snapshot", "delta") or not isinstance(data, dict):
             raise ValueError("invalid order-book event")
-        cts = int(event["cts"])
-        seq = int(data["seq"])
-        raw_u = data.get("u")
-        if isinstance(raw_u, bool) or raw_u is None:
-            raise ValueError("missing or invalid order-book update ID")
-        try:
-            update_id = int(raw_u)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("missing or invalid order-book update ID") from exc
+        cts = strict_int(event.get("cts"), "cts")
+        seq = strict_int(data.get("seq"), "seq")
+        update_id = strict_int(data.get("u"), "u")
+        if cts <= 0:
+            raise ValueError("cts must be positive")
+        if seq <= 0:
+            raise ValueError("seq must be positive")
         if update_id <= 0:
-            raise ValueError("order-book update ID must be positive")
+            raise ValueError("u must be positive")
         reset_snapshot = update_id == 1
         if reset_snapshot and kind != "snapshot":
             raise ValueError("u=1 restart marker requires a full snapshot for this archive format")

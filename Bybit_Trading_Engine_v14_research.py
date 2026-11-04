@@ -2816,7 +2816,11 @@ def run_sparse_simulation_pass(
         # portfolio. If this new snapshot trips the emergency latch, flatten the
         # remaining positions as one same-timestamp batch.
         engine._update_mark_to_market(bar_close_ts)
-        engine._force_flatten_open_positions_after_kill_switch(bar_close_ts)
+        force_flatten = getattr(
+            engine, "_force_flatten_open_positions_after_kill_switch", None
+        )
+        if force_flatten is not None:
+            force_flatten(bar_close_ts)
 
         signal_context = (
             signal_context_provider(bar_close_ts, histories, engine.cfg)

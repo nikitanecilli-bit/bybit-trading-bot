@@ -6,9 +6,12 @@ import hashlib
 import json
 import tempfile
 import urllib.request
+import sys
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bybit_l2_queue_replay import (
     OrderBook, iter_book_events, place_passive_order, replay_public_trades,

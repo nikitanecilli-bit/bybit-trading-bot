@@ -647,3 +647,28 @@ CI:
 - full run 41839020044 на commit 75ff12884210356fcc58d78999befa2ec90857ba: SUCCESS, 56/56 steps; queue replay primitive test SUCCESS; no failed steps.
 
 Это закрывает нестрогую валидацию внутренних временных целей markout. Оно не меняет ограничения stale-book age, delivery latency, L3 queue priority и неизвестной полноты depth-200 archive. Новые архивы не скачивались, strategy PnL не запускался, private API и paper/live orders не использовались. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.
+
+
+## 31. Freshness of captured book state: age is observable, validity is not inferable from age alone
+
+Static audit of scripts/run_bybit_l2_queue_replay.py confirms:
+- arrival scenarios already report book_state_age_ms = arrival_ts - last_book_cts;
+- post-fill markouts already report book_state_age_ms = target_ts - last_book_cts;
+- there is no max-age cutoff or stale/fresh classification.
+
+Decision: do NOT add an arbitrary age threshold or reject an otherwise quiet book solely because its last update is old. The archive is an event stream; a long gap can mean no book changes, a capture outage, or missing archived messages. Without verified heartbeat/sequence continuity and the exact historical archive contract, timestamp age alone cannot distinguish these cases. Current output exposes the age but must not be interpreted as proof of freshness.
+
+Before using queue-fill estimates, future archive-level audit must establish whether heartbeat records, connection/session markers, or a documented continuity signal exist. If they do not, report age distributions and flag long gaps as ambiguous, not as confirmed data loss. A future report should stratify queue outcomes by observed age rather than silently treating all ages as equally reliable.
+
+## 32. CI side effects reviewed
+
+Inspected full GitHub Actions log for run 41839020044 and its workflow `.github/workflows/research-checks.yml`.
+
+- The CI job did run `scripts/audit_cryptofetch_archives.py` against the already checked-out local directory `data/archives/cryptofetch`; no network downloader or Bybit archive collector was invoked.
+- It also ran `scripts/run_h_a_relative_strength_replay.py` without `--execute`; log explicitly says `PREPARE ONLY: no market PnL replay was run`.
+- Existing local CryptoFetch audit output: 67 valid files, 64 backtest-eligible, 3 empty/too short, 0 rejected, 0 conflicting overlapping bars, 6 duplicate symbol/timeframe groups, 0 longest-file-not-superset pairs.
+- H-A preparation output: 50 H1 symbols before terminal filter and 50 included, common terminal timestamp 1792972800000; no PnL replay.
+
+Thus this CI run did not download new market archives, run the H-A PnL replay, access private Bybit API, or place orders. It did inspect existing repository OHLCV files and create/upload audit/preparation artifacts. This distinction is recorded so future workflow changes can be checked against the external-data hold.
+
+Maker execution remains blocked for strategy PnL: no measured delivery latency, no exchange-confirmed historical order lifecycle, no L3 queue priority, no verified depth-200 archive continuity contract, and no historical fee tier ledger. No arbitrary stale-age threshold was introduced.

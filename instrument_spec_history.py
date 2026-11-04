@@ -26,12 +26,21 @@ def _utc_ms(value: str) -> int:
 
 
 @dataclass(frozen=True)
+class InstrumentIdentity:
+    contract_type: str
+    base_coin: str
+    quote_coin: str
+    settle_coin: str
+
+
+@dataclass(frozen=True)
 class InstrumentSnapshot:
     fetched_at: str
     fetched_at_ms: int
     collection_started_at_ms: int | None
     category: str
     specs: dict[str, InstrumentSpec]
+    identities: dict[str, InstrumentIdentity]
 
 
 class InstrumentSpecHistory:
@@ -47,8 +56,40 @@ class InstrumentSpecHistory:
         categories = {item.category for item in ordered}
         if len(categories) != 1:
             raise ValueError("instrument snapshot categories cannot be mixed")
+        for previous, current in zip(ordered, ordered[1:]):
+            for symbol in set(previous.identities) & set(current.identities):
+                if previous.identities[symbol] != current.identities[symbol]:
+                    raise ValueError(
+                        f"instrument identity changed while symbol was reused: {symbol}"
+                    )
         self.snapshots = ordered
         self.category = ordered[0].category
+        self.possible_renames = self._find_possible_renames(ordered)
+
+    @staticmethod
+    def _find_possible_renames(
+        snapshots: list[InstrumentSnapshot],
+    ) -> list[dict[str, str]]:
+        candidates: list[dict[str, str]] = []
+        for previous, current in zip(snapshots, snapshots[1:]):
+            previous_by_identity = {
+                identity: symbol for symbol, identity in previous.identities.items()
+            }
+            current_by_identity = {
+                identity: symbol for symbol, identity in current.identities.items()
+            }
+            for identity in previous_by_identity.keys() & current_by_identity.keys():
+                old_symbol = previous_by_identity[identity]
+                new_symbol = current_by_identity[identity]
+                if old_symbol != new_symbol:
+                    candidates.append({
+                        "previous_symbol": old_symbol,
+                        "current_symbol": new_symbol,
+                        "previous_fetched_at": previous.fetched_at,
+                        "current_fetched_at": current.fetched_at,
+                        "classification": "possible_rename_not_proven",
+                    })
+        return candidates
 
     @classmethod
     def from_directory(cls, directory: str | Path,
@@ -93,7 +134,9 @@ class InstrumentSpecHistory:
                 raise ValueError(
                     f"{path}: snapshot count {payload.get('count')!r} does not match {len(rows)} rows"
                 )
-            specs: dict[str, InstrumentSpec] = {};
+            specs: dict[str, InstrumentSpec] = {}
+            identities: dict[str, InstrumentIdentity] = {}
+            identity_owners: dict[InstrumentIdentity, str] = {}
             for row in rows:
                 if not isinstance(row, dict):
                     raise ValueError(f"{path}: instrument rows must be objects")
@@ -109,13 +152,35 @@ class InstrumentSpecHistory:
                     raise ValueError(f"{path}: instrument {spec.symbol} has wrong category")
                 if spec.symbol in specs:
                     raise ValueError(f"{path}: duplicate instrument symbol {spec.symbol}")
+                identity_values = {}
+                for field in ("contractType", "baseCoin", "quoteCoin", "settleCoin"):
+                    value = instrument.get(field)
+                    if not isinstance(value, str) or not value.strip():
+                        raise ValueError(
+                            f"{path}: instrument {spec.symbol} has missing or invalid identity field {field}"
+                        )
+                    identity_values[field] = value.strip()
+                identity = InstrumentIdentity(
+                    contract_type=identity_values["contractType"],
+                    base_coin=identity_values["baseCoin"],
+                    quote_coin=identity_values["quoteCoin"],
+                    settle_coin=identity_values["settleCoin"],
+                )
+                other_symbol = identity_owners.get(identity)
+                if other_symbol is not None and other_symbol != spec.symbol:
+                    raise ValueError(
+                        f"{path}: ambiguous duplicate contract identity for {other_symbol} and {spec.symbol}"
+                    )
+                identity_owners[identity] = spec.symbol
                 specs[spec.symbol] = spec
+                identities[spec.symbol] = identity
             snapshots.append(InstrumentSnapshot(
                 fetched_at=fetched_at,
                 fetched_at_ms=fetched_at_ms,
                 collection_started_at_ms=started_at_ms,
                 category=snapshot_category,
                 specs=specs,
+                identities=identities,
             ))
         return cls(snapshots)
 

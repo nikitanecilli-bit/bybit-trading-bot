@@ -1625,10 +1625,15 @@ class StatePersistenceTests(unittest.TestCase):
             next(o for o in position.exchange_orders if o["order_id"] == "exit-old")["cum_exec_qty"],
             "0.3",
         )
+        exact_terminal_duplicate = ExchangeOrderIdentity(
+            "exit-old", "exit-link-old", "BTCUSDT", "Sell", 0,
+            "1.0", "0", "0.3", "Cancelled", True, False,
+        )
+        self.assertFalse(position.record_exchange_order(exact_terminal_duplicate))
         with self.assertRaisesRegex(ValueError, "terminal exchange order"):
             position.record_exchange_order(ExchangeOrderIdentity(
                 "exit-old", "exit-link-old", "BTCUSDT", "Sell", 0,
-                "1.0", "0", "0.3", "Cancelled", True, False,
+                "1.0", "0.7", "0.3", "PartiallyFilled", True, False,
             ))
 
     def test_filled_order_requires_full_cumulative_quantity_and_zero_leaves(self):

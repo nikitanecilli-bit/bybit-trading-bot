@@ -6,13 +6,12 @@
 
 - Репозиторий: `nikitanecilli-bit/bybit-trading-bot` (private).
 - Рабочая ветка: `research/market-regime-v1-main`.
-- Актуальный HEAD при обновлении handoff: `ec28763da6ade2635c31cd0111ae8c612625f23d`.
-- Последний code/test commit, покрытый успешным Research CI: `ec28763da6ade2635c31cd0111ae8c612625f23d`; последние изменения после него в handoff/checkpoint/ledger являются документальными.
+- Последний проверенный code/test commit: `ec28763da6ade2635c31cd0111ae8c612625f23d`; все последующие коммиты на момент этого handoff snapshot — только документальные обновления handoff/checkpoint/ledger.
 - Последний подтверждённый CI: [Research engine checks #41873039139](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41873039139), commit `ec28763`, conclusion SUCCESS, job `tests` SUCCESS, 57/57 workflow steps.
 - В этом CI: aggregate-L2 primitive tests 81/81 passed; runner chronology/markout test step 7/7 passed, включая shared strict trade-timestamp parser coverage; state persistence 84/84.
 - Предыдущая неудачная попытка #41872989853 была вызвана устаревшим тестом, который после перехода инспектора на общий `parse_trade_timestamp_ms` всё ещё обращался к удалённому локальному helper `parse_archive_timestamp_ms`. Тест синхронизирован в `ec28763`; финальный CI прошёл.
 - PR #4: открыт, Draft, base `main`, head = текущая research-ветка; mergeable=false. Не сливать автоматически.
-- Сравнение с `main`: diverged, 2192 commits ahead / 36 behind. Merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`.
+- Сравнение с `main` на code/test snapshot `ec28763`: diverged, 2192 commits ahead / 36 behind. Merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. Точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
 - `main` не менять. Не делать wholesale merge/rebase research branch. Использовать только reviewed selective PR/cherry-pick при отдельном обосновании.
 - В репозитории есть отдельная ветка `Audit` и `chore/main-repository-organization`; не предполагать, что они слиты или актуальны без проверки.
 

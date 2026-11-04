@@ -287,3 +287,25 @@ Research CI #41913543774 — SUCCESS, 59/59 workflow steps; тест persistence
 - Research CI #41914354962 — SUCCESS.
 
 Ограничение: это проверки внутреннего журнала и последовательности принятых snapshots. Они не доказывают полноту execution history, не получают order history с биржи и не подтверждают, что все варианты статусов/замены в реальном аккаунте представлены. Реальный API, handlers, collectors, live orders и market PnL не запускались. Reconciliation PASS и live resume остаются BLOCKED.
+
+
+### ENG-RECON-013 — аудит количества позиции по execution ledger
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
+
+Добавлен метод `OpenPositionState.audit_exchange_position_quantity(execution_history_complete=False)`:
+
+- Суммирует исполнения на стороне позиции как входящее количество.
+- Суммирует исполнения на противоположной стороне как выходящее количество.
+- Рассчитывает чистое количество: `entry_exec_qty - exit_exec_qty`.
+- Сравнивает результат с текущим `ExchangePositionIdentity.qty`.
+- Отрицательный остаток (выходные исполнения больше входных) отклоняется.
+- По умолчанию возвращает `INCOMPLETE`: неполный локальный журнал не выдаётся за совпадение.
+- Только при явном `execution_history_complete=True` возвращает `MATCH` или `MISMATCH`. Этот флаг — ответственность вызывающего слоя; метод сам не доказывает полноту истории.
+- Результат содержит entry/exit/net qty, snapshot position qty и signed difference как строки Decimal без float-преобразований.
+- Проверены точное совпадение после частичного закрытия, неполная история, mismatch, перепродажа сверх открытого количества.
+- Отдельный тест сохраняет и восстанавливает position identity и fills через Plan B backup, после чего повторный quantity audit возвращает MATCH.
+- Research CI #41914734752 — SUCCESS; CI #41914915742 — SUCCESS, включая тест восстановления после перезапуска (59/59 workflow steps).
+
+Ограничение: это локальный аудит записанных fills относительно переданного snapshot позиции. Он не устанавливает полноту execution history и не сравнивает данные с реальным аккаунтом. Нельзя передавать `execution_history_complete=True` без внешнего доказательства полного временного покрытия и пагинации истории исполнений. API, credentials, collectors, archive downloads, live orders и market PnL не запускались. Reconciliation PASS и live resume остаются BLOCKED.

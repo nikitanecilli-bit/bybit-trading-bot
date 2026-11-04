@@ -273,3 +273,12 @@
 - Added regression: 1.0 contract, 0.1 qtyStep, 0.1 minOrderQty, minNotionalValue 45; TP1 remainder 0.5 at TP1 90 passes exactly 45, but TP2 80 would be 40. Old code accepted TP1; new code rejects it and preserves full remaining quantity.
 - Final Research CI #41850162961 on e01a53868885f5ac79f2ad3d3cfa3179e7207b1a: SUCCESS; 57/57 workflow steps; zero failures. Actual log confirms test_tp1_rejects_short_remainder_below_min_notional_at_tp2 passed; MarkPriceEngineIntegrationTests 9/9. Source-only CI #41850143419 on 7238076b271bf25010d01ce2df0c1321e3652722 also completed SUCCESS 57/57.
 - This is an exchange-order validity guardrail, not market PnL evidence. No data downloads, collectors, private API, runner, PnL/backtest, paper/live orders or main-branch changes.
+
+
+## Session update — 2026-11-04 (exchange-sized restore + TP1 funding state)
+
+- Added fail-closed restore validation for exchange-sized positions: initial and remaining quantities must meet minOrderQty; remaining quantity must meet minNotionalValue at the lowest planned exit price among stop, entry and TP2; after TP1, the TP1 leg must also meet minOrderQty and minNotionalValue at TP1.
+- Added two state-persistence regressions for restored remaining quantity below minOrderQty and below minNotionalValue. CI #41851236490 on d50c923b2e158e951d9ca979708d093e54ae3983 passed 57/57 steps; actual log confirms both tests ran. An earlier test-only run failed because tests asserted the inner error wording while loader intentionally wraps failures; assertions were corrected to verify fail-closed rejection, and rerun passed.
+- Funding helper audit found a separate invariant gap: both accrued funding functions required tp1_ts_ms when tp1_hit=true, but accepted tp1_ts_ms when tp1_hit=false; they also accepted non-bool tp1_hit via truthiness. Both helpers now require tp1_hit to be bool and enforce timestamp iff TP1 is hit. Two regressions cover timestamp-without-hit and integer-as-bool.
+- Final CI #41851768270 on 3170738a78eac92b0a93eda66510c038660f0864 passed 57/57 steps, zero failures. Actual log confirms both new funding regressions passed; funding accounting suite ran 76 tests. Source-only CI #41851738950 on 568f5ed2552d27dadfeb82c4d1e9610cfac3cd13 also passed 57/57.
+- Scope remains technical correctness only. No PnL/backtest, market archive downloads, private API, runner, paper/live orders or main-branch changes.

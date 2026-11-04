@@ -1251,3 +1251,23 @@ CI:
 - Старый сохранённый AAVE report был создан до decomposition и не содержит pre-fill midpoint; его прежние markout числа нельзя ретроспективно трактовать как чистый adverse-selection measure.
 - Повторный replay не выполнялся: тот же сохранённый AAVE trade CSV не имеет BT/isBlockTrade и потому не проходит строгий parser. Новые архивы не скачивались.
 - Это улучшение измерения execution diagnostics, не доказательство maker fill realism или PnL. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся закрытым.
+
+## 67. Inspector validates every BT/RPI flag value and alias — 2026-11-04
+
+Сверка диагностического inspector с `iter_public_trades()` выявила ещё один разрыв: inspector сообщал только о наличии колонок BT/RPI и считал значения первого RPI alias, но не проверял каждую строку и не выявлял конфликт между одновременно присутствующими aliases. Основной replay parser уже fail-closed отклоняет missing/malformed flags и conflicting aliases.
+
+Исправление:
+- Inspector использует общий `parse_exchange_bool()` из replay parser.
+- Добавлен `classify_boolean_flag_aliases()`: `true`, `false`, `missing`, `malformed`, `conflict`.
+- Для BT/isBlockTrade и RPI/isRPITrade отдельно собираются row-status counters; отчёт выставляет `*_flag_validation_status=valid` только при наличии хотя бы одного поддерживаемого alias и отсутствии missing/malformed/conflicting строк.
+- Regression покрывает отсутствие колонок/значений, пустое значение, malformed flag, true/false, согласованные aliases и конфликтующие aliases.
+
+Коммиты:
+- Source: `83bca2b14a5cbb613e0ab849a45a2fbf4750aa71`.
+- Test: `5f315bdd048f8abefa07a992aa667010d0ea1f5b`.
+
+Проверка:
+- Source-only CI #41874223792: SUCCESS, 57/57 workflow steps.
+- Финальный Research CI #41874277483 на `5f315bdd048f8abefa07a992aa667010d0ea1f5b`: SUCCESS, job `tests` SUCCESS, 57/57 workflow steps, zero failures. Фактический лог подтверждает новую flag-alias regression; inspector/runner suite 9/9; aggregate-L2 primitives 81/81.
+
+Классификация: улучшение диагностики полноты и согласованности trade classification metadata; не execution evidence и не PnL. Сохранённый AAVE CSV не содержит BT/isBlockTrade, поэтому его нельзя переклассифицировать этим исправлением. Inspector с сетевой загрузкой не запускался; новые архивы не скачивались. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся. Нет PnL/backtest, collectors, private API, runner, paper/live orders или изменений `main`.

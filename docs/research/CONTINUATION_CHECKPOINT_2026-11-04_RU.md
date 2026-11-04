@@ -1227,3 +1227,27 @@ CI:
 - Фактический лог: runner/inspector suite 9/9; aggregate-L2 primitive suite 81/81; portfolio accounting 54/54; state persistence 84/84. Новый test `test_trade_sample_inspector_classifies_missing_malformed_and_duplicate_ids` явно отмечен PASS.
 
 Классификация: улучшение качества диагностики historical CSV; не доказательство maker execution, fill rate или PnL. Inspector с сетевой загрузкой не запускался; новые архивы не скачивались. Исторический AAVE CSV по-прежнему не имеет BT/isBlockTrade, поэтому `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL`. Никаких PnL/backtests, collectors, API, runner, paper/live orders или main changes.
+
+
+## 67. Разделение spread capture и post-fill mid-price movement — 2026-11-04
+
+Аудит markout accounting показал, что прежний `signed_mid_markout_bps` сравнивал цену fill с будущим midpoint. Для maker fill этот показатель включает как захваченный spread, так и последующее движение midpoint; трактовать его целиком как adverse selection нельзя.
+
+Исправление в `scripts/run_bybit_l2_queue_replay.py:add_post_fill_markouts()`:
+- Для каждого partial fill дополнительно фиксируется pre-fill BBO/midpoint из последнего book state строго до fill timestamp; события с тем же millisecond исключаются.
+- `signed_fill_to_future_mid_bps` сохраняет полную доходность от fill до future mid; старое поле `signed_mid_markout_bps` оставлено как compatibility alias.
+- `signed_mid_move_from_pre_fill_bps` измеряет изменение midpoint от pre-fill mid до будущего mid, отделяя движение рынка от spread capture.
+- Fill timestamp проходит `strict_int`, без усечения float/string значений.
+
+Regression:
+- Synthetic Buy fill 99 при pre-fill mid 100 и future mid 101: fill-to-future-mid около 202.02 bps; pre-fill-to-future-mid ровно 100 bps. Это подтверждает разложение, а не смешение двух компонентов.
+- Проверка также подтверждает сохранение pre-fill mid и строгое исключение same-ms book events.
+
+CI:
+- Final Research CI #41867866581 на `794342bbd00342d0b7f1af660362794408da0345`: SUCCESS, 57/57 workflow steps; runner chronology/markout suite 6/6, aggregate-L2 primitive suite 81/81.
+- Последующие #41873039139 и #41873425668 также повторно прошли markout/runner suite (7/7 и 9/9 соответственно) на более поздних code/test commits.
+
+Интерпретация:
+- Старый сохранённый AAVE report был создан до decomposition и не содержит pre-fill midpoint; его прежние markout числа нельзя ретроспективно трактовать как чистый adverse-selection measure.
+- Повторный replay не выполнялся: тот же сохранённый AAVE trade CSV не имеет BT/isBlockTrade и потому не проходит строгий parser. Новые архивы не скачивались.
+- Это улучшение измерения execution diagnostics, не доказательство maker fill realism или PnL. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся закрытым.

@@ -1463,3 +1463,16 @@ No market PnL, new archive download/collector, private API, runner registration,
 - Funding Mark candle open остаётся settlement-mark proxy; dated snapshot schedule не исключает interval change+reversion между наблюдениями. Risk tier IM/MM остаётся position-level approximation, не UTA/cross-margin liquidation engine.
 - Это read-only аудит. Тесты не запускались; CI status не обновлялся. Не использовались API, collectors, archives, market PnL, backtests, replay или parameter sweeps.
 - Все data/PnL/maker/paper/live gates остаются BLOCKED. Следующий безопасный участок — проверить integration callers, что они fail closed на missing/stale/misaligned instrument/risk snapshots и временной skew.
+
+
+## 2026-11-05 — P1 integration fix: required instrument/risk snapshot skew budget
+
+- Confirmed caller mismatch: `get_linear_market_state()` requires integer `max_snapshot_skew_ms`; H1 runner's resolver previously returned `None` if `BYBIT_MAX_MARKET_STATE_SKEW_MS` was absent; workflow did not pass this env variable. Strict joined entry path therefore rejected entries, while restored-position validation could fail at startup.
+- Fixed in code/workflow:
+  - `scripts/run_h1_shared_capital_portfolio_validation.py`: missing/blank skew budget now raises an explicit pre-run error; non-negative integer validation retained.
+  - `tests/test_h1_runner_execution_gate.py`: missing/blank env regression now expects fail-closed; explicit 0 and positive integer accepted.
+  - `.github/workflows/h1-shared-capital-portfolio-validation.yml`: required `max_market_state_skew_ms` dispatch input passed as `BYBIT_MAX_MARKET_STATE_SKEW_MS`. No arbitrary default was chosen.
+- Commits: `b1a5bb64d6df2a6389a4b4ec19cd00efa917693e` (runner), `aa862a9a49b326ec5ac623013024069c90c28311` (test), `6dffae15ac9d7525b329273b0de66a8a124c550b` (workflow).
+- Research CI [#41928296140](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928296140) completed SUCCESS on workflow commit `6dffae15ac9d7525b329273b0de66a8a124c550b`. Compile, deterministic suite, H1 runner gate, portfolio accounting/risk budget, specs/risk/funding tests all passed.
+- Follow-up details recorded in `docs/audits/ALT_SYSTEM_ACCOUNTING_CONTRACT_AUDIT_001_RU.md` (latest audit update commit `57efddd6196e5e1fa88f65e34a28507c9d797fff`).
+- This resolves the missing-budget integration failure only. The user/operator must still choose the skew budget; no default is invented. Historical effective-time and source completeness limitations remain. No market PnL replay, API, collector, archive download, paper/live, or parameter sweep was run.

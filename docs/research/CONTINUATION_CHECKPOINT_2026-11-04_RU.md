@@ -954,3 +954,28 @@ Verification:
 Read-only execution consumer review also traced optional exchange sizing, dated tier selection, exact contract quantity through partial exits/fees/funding/MTM. Documented limits remain: OHLC/L2 execution proxies, account-level tier aggregation, settlement-mark approximation, static/account-unspecific fees and no dated historical Bybit snapshots.
 
 No Bybit collection/download, PnL/backtest, private API/account access, runner registration, paper/live orders or main-branch changes. Continue static audit only; PnL gate remains closed.
+
+
+## 47. Funding timestamps must remain integer milliseconds — 2026-11-04
+
+Static audit found that the Funding accounting helpers and active Bybit Funding API parser converted timestamps with int() without checking the original type. A numeric float such as 2000.5 could therefore be silently truncated, potentially moving a settlement to a different millisecond boundary.
+
+Correction:
+- Added a positive, non-bool integer-millisecond validator for entry, as-of, TP1, final-close and event timestamps in both funding accounting helpers.
+- The active Funding parser accepts only a non-bool integer or an ASCII digit string; floats, booleans and decimal strings fail closed.
+- Added offline regressions for fractional/boolean timestamps in both accounting and API parsing.
+
+Verification:
+- Intermediate CI attempts exposed only an assertion-regex mismatch in the new test because malformed events are wrapped in a contextual ValueError. The test was corrected; no code behavior defect remained.
+- Final Research CI #41848927029 on 39af6fa583ef2074b33905e89c8b78c9b58d83a1: SUCCESS; 57/57 workflow steps, zero failures.
+- Actual logs: funding accounting 23/23; Bybit market-history parser 26/26; both new regression methods passed.
+
+No market PnL/backtest, Bybit collection/download, private API/account access, runner registration, paper/live orders or main changes. Funding archive completeness and execution-realism gates remain closed.
+
+### Current branch topology snapshot — 2026-11-04
+- main: c87612207d145af433394f0ea992f2d29eba28d5
+- research/market-regime-v1-main: 39af6fa583ef2074b33905e89c8b78c9b58d83a1
+- merge base: ae599a2f3279e15fe27360662f94f0e7ef8db5be
+- GitHub compare: diverged, 2125 commits ahead / 36 behind
+- PR #4: open, Draft, mergeable=false
+- Do not merge, rebase, reset, force-push or delete this research branch. Preserve both histories; future integration must use reviewed small patches/cherry-picks or a fresh integration branch.

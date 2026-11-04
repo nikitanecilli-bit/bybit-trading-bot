@@ -34,6 +34,15 @@ class SnapshotCollectorTests(unittest.TestCase):
         self.assertEqual([row["symbol"] for row in rows],
                          ["BIOUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT"])
 
+
+    def test_rejects_instrument_returned_under_wrong_status_filter(self):
+        def fetch(cursor, status):
+            if status == "Trading":
+                return ([{"symbol": "BTCUSDT", "status": "Closed"}], None)
+            return ([], None)
+        with self.assertRaisesRegex(ValueError, "status mismatch"):
+            fetch_all_instruments("linear", fetch)
+
     def test_identical_duplicate_from_overlapping_pages_is_deduplicated(self):
         row = {"symbol": "BTCUSDT", "status": "Trading"}
         pages = {

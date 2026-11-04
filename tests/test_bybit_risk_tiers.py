@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from decimal import Decimal
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from bybit_risk_tiers import RiskTierHistory
+from bybit_risk_tiers import RiskTierHistory, calculate_margin_requirements_from_tiers
 
 
 def payload(fetched_at="2026-11-01T00:00:00Z", tiers=None):
@@ -80,6 +80,31 @@ class RiskTierHistoryTests(unittest.TestCase):
             self.assertEqual(result.maintenance_margin, 2000)
             self.assertEqual(result.maintenance_margin_rate, Decimal("0.01"))
             self.assertEqual(result.mm_deduction, 500)
+
+    def test_margin_calculation_accepts_already_joined_tier_ladder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(payload()), encoding="utf-8")
+            tiers = RiskTierHistory.from_directory(tmp).get_tiers(
+                "BTCUSDT", 1793606400000
+            )
+            result = calculate_margin_requirements_from_tiers(
+                "BTCUSDT", "250000", leverage="10", tiers=tiers
+            )
+            self.assertEqual(result.tier_id, 2)
+            self.assertEqual(result.initial_margin, Decimal("25000"))
+            self.assertEqual(result.maintenance_margin, Decimal("2000"))
+            with self.assertRaisesRegex(ValueError, "exceeds tier 2 maxLeverage"):
+                calculate_margin_requirements_from_tiers(
+                    "BTCUSDT", "250000", leverage="60", tiers=tiers
+                )
+            with self.assertRaisesRegex(ValueError, "exceeds highest"):
+                calculate_margin_requirements_from_tiers(
+                    "BTCUSDT", "500001", leverage="10", tiers=tiers
+                )
+            with self.assertRaisesRegex(ValueError, "no joined risk tiers"):
+                calculate_margin_requirements_from_tiers(
+                    "BTCUSDT", "1000", leverage="10", tiers=()
+                )
 
     def test_margin_requirement_rejects_uncovered_position_and_invalid_tier(self):
         with tempfile.TemporaryDirectory() as tmp:

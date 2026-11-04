@@ -1157,3 +1157,17 @@ CI #41867866581 on 794342bbd00342d0b7f1af660362794408da0345: SUCCESS. Primitive 
 Следующий реальный блокер: нужен источник исторических trades с достоверным block-trade flag либо независимая проверка, позволяющая безопасно классифицировать BT. Пока такого источника нет, L2 queue replay не должен проходить в strategy PnL. Не ослаблять fail-closed parser и не повторять старый replay как будто его fills подтверждены.
 
 Artifact был получен из уже существующего CI run; никаких новых Bybit market archives не скачивалось. Main не менялся.
+
+
+## 63. Trade archive inspector: поддержка BT alias — 2026-11-04
+
+При статическом сравнении инструментов обнаружено расхождение схемы: строгий queue replay parser принимал оба официальных имени block-trade флага (isBlockTrade и BT), но вспомогательный scripts/inspect_bybit_trade_sample.py проверял только isBlockTrade. При CSV с колонкой BT инспектор мог ошибочно сообщить, что block-trade flag отсутствует.
+
+Исправлено в commit 5f9f24aa32a2ccca34407abc6a05a21a3be0160e:
+- добавлен helper block_trade_flag_columns(), распознающий оба поддерживаемых имени;
+- отчёт инспектора теперь содержит has_block_trade_flag и список фактически найденных колонок block_trade_flag_columns;
+- добавлен regression test для BT, isBlockTrade, обоих aliases и отсутствия флага.
+
+Research CI run #41870649976 завершился SUCCESS: job completed, все 57 шагов завершены без failure; шаг runner chronology/markout test также SUCCESS. Это подтверждает кодовую проверку alias helper, но не меняет вывод по сохранённому AAVE CSV: в нём по-прежнему отсутствуют оба block-trade aliases. Никакие архивы не скачивались и инспектор с сетевой загрузкой не запускался.
+
+Статус execution gate остаётся MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL: нет исторического источника с надёжным BT classification. Main не менялся (HEAD c87612207d145af433394f0ea992f2d29eba28d5).

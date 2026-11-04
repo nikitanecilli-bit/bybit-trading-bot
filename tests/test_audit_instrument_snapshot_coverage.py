@@ -129,7 +129,7 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
         page_summary = report["snapshots"][0]["page_observations"]
         self.assertEqual(page_summary["page_count"], 5)
         self.assertEqual(page_summary["status_filters"]["Closed"]["row_count"], 1)
-        self.assertEqual(page_summary["request_duration_ms"]["max"], 500)
+        self.assertEqual(page_summary["request_duration_ms"]["max"], 100)
 
     def test_audit_rejects_page_observation_symbol_mismatch(self):
         with tempfile.TemporaryDirectory() as tmp:

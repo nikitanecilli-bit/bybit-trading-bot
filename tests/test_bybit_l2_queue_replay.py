@@ -530,6 +530,20 @@ def test_trade_archive_requires_block_trade_flag():
             raise AssertionError("archive without block-trade flag must fail closed")
 
 
+def test_trade_archive_requires_rpi_flag():
+    import gzip
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "trades.csv.gz"
+        with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
+            stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,False\n")
+        try:
+            list(l2_module.iter_public_trades(path))
+        except ValueError as exc:
+            assert "missing RPI flag" in str(exc)
+        else:
+            raise AssertionError("archive without RPI flag must fail closed")
+
 def test_trade_archive_parses_block_trade_and_rpi_flags():
     import gzip
     with tempfile.TemporaryDirectory() as tmp:

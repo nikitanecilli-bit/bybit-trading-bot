@@ -358,3 +358,15 @@ Branch compare после изменений: research/market-regime-v1-main div
 Временные и markout проверки подтверждают только корректность обработки имеющихся записей, но не полноту самого архива. Следовательно, aggregate-L2 queue replay остаётся research proxy и не получает допуска к strategy PnL. Новые архивы не скачивались; runner не запускался; private API, orders и PnL не использовались. Предыдущий terminal CI run 41835268896 подтвердил 60/60 deterministic queue primitive tests на commit e7f4174; этот checkpoint update не меняет тестовый код.
 
 Источники документации (проверены 2026-11-04): стандартный public orderbook https://bybit-exchange.github.io/docs/v5/websocket/public/orderbook; отдельный Full Orderbook https://bybit-exchange.github.io/docs/v5/websocket/public/full-ob.
+
+
+## 18. Дополнительное свидетельство по depth-200 update continuity (неофициальное)
+
+Найдено вторичное описание формата quote-saver historical orderbook archive в README стороннего downloader (не Bybit): для futures/spot orderbook JSONL snapshots + deltas, файлы `*_ob200.data.zip`, а `update_id` для deltas описан как monotonically +1. Это потенциально относится к тому же семейству исторических файлов, что runner URL `quote-saver.bycsi.com/orderbook/linear/..._ob200.data.zip`.
+
+Ограничения доказательства:
+- источник не официальный Bybit и не подтверждает контракт именно текущего файла/даты;
+- описание не устанавливает, что `u` в сырых JSONL runner archive идентичен `update_id` в нормализованном Parquet schema во всех версиях;
+- фактический архив не скачивался/не проверялся из-за external-data hold.
+
+Поэтому пока не включать `u+1` enforcement и не считать continuity доказанной. При будущем разрешённом аудите уже имеющегося локального файла можно проверить фактический raw JSONL: event types, snapshot/restart behavior, repeated IDs, gaps in u, seq semantics, cts monotonicity, and archive integrity. До этого остаётся блокер completeness для queue replay. Источник: https://github.com/Anton495/bybit-data-downloader (вторичный, неофициальный; проверен 2026-11-04).

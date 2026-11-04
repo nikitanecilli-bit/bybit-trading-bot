@@ -17,6 +17,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import Bybit_Trading_Engine_v14_research as em
 from run_uploaded_dataset_backtests import read_zip_datasets
+from multibar_limit_wait import prepare_signal_for_next_bar_fill
 
 SYMBOLS = ["RAYUSDT", "PUMPUSDT", "TAOUSDT", "AAVEUSDT", "CAKEUSDT"]
 CONTEXT_SYMBOLS = ["BTCUSDT", "ETHUSDT"]
@@ -258,6 +259,7 @@ def run_fold(data, stamps, context_data, context_index, market_universe_data, ma
         ref=float(sig["entry_price"]); required=ref*(1-ENTRY_PENETRATION_BPS/10000)
         if float(candle.low)<=required:
             before=len(engine.closed_trades)
+            prepare_signal_for_next_bar_fill(sig,int(candle.ts),3_600_000)
             filled=original_fill(sym,candle)
             order_age.pop(sym,None)
             if filled:

@@ -434,3 +434,11 @@
 - Added `timestamp_order_validation_status` to the trade inspector validation block (`valid` only when `nonmonotonic_timestamp_count == 0`; otherwise `invalid`) and a strict count classifier. Added deterministic valid/invalid and malformed-input coverage.
 - Source commit `0c4cf2e2504d69d31d3113b0f408f2b236c3db09`; test commit `6fc17e4d7f3274a8d4a609b845d658fd8010df15`; note `1e8b9fcd63df6777296412b78fef9b21cfc3184a`.
 - CI status remains unconfirmed; combined status returned no check records. No archives/network inspector, collectors, market PnL, private API, runner or orders. Maker gate remains closed.
+
+## 2026-11-04 — ENG-EXEC-034 strict CSV quoting
+
+- Static parser audit found that Python `csv.DictReader` defaults to `strict=False`. An unterminated quoted optional RPI field could be returned as a string and pass later boolean parsing after whitespace trimming.
+- Both primary replay parser and standalone trade inspector now use `strict=True`. Inspector row iteration was factored into `validated_trade_csv_reader()` so the exact strict parser contract is covered without network access.
+- Added deterministic malformed-quote regressions for both parser paths. A local standard-library reproduction confirms `csv.Error: unexpected end of data`.
+- Commits: inspector `d78720991bf6a72efa05310b878505dcd5bf1123`; core `81f58d0b48705ed1e5f2db36ba80ca42c0feb50a`; tests `13f32dbc2db3e686549866a14998a0c31cf659a6` + fixture correction `5f6c245de6bbd82cd280d4db750b8e3d1434c867`; inspector test `06544878931c0daa1117980c63eb01885c8e338e` + fixture correction `9302114d0199097d834fecf112f2c6d74ec931d7`; note `69259ca59d8c653fee04e4f6ad07bb10a75d51ce`.
+- CI remains unconfirmed; no combined check records. No market archive download or network workflow, collectors, PnL, private API, runner or orders.

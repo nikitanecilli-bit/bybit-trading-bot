@@ -888,7 +888,13 @@ if __name__ == "__main__":
 
 
 def test_market_state_skew_budget_requires_explicit_nonnegative_integer():
-    assert resolve_market_state_skew_budget({}) is None
+    for env in ({}, {"BYBIT_MAX_MARKET_STATE_SKEW_MS": ""}, {"BYBIT_MAX_MARKET_STATE_SKEW_MS": "  "}):
+        try:
+            resolve_market_state_skew_budget(env)
+        except SystemExit as exc:
+            assert "is required" in str(exc)
+        else:
+            raise AssertionError("missing skew budget must fail before replay")
     assert resolve_market_state_skew_budget({"BYBIT_MAX_MARKET_STATE_SKEW_MS": "0"}) == 0
     assert resolve_market_state_skew_budget({"BYBIT_MAX_MARKET_STATE_SKEW_MS": "1500"}) == 1500
     for value in ("-1", "1.5", "true", "  +2 "):

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from scripts.snapshot_bybit_instruments import (
-    DEFAULT_BASE_URL, _request_page, _validate_base_url, write_snapshot,
+    DEFAULT_BASE_URL, _request_page, _snapshot_timestamp, _validate_base_url, write_snapshot,
 )
 
 # API Explorer status filters; the default query additionally returns PendingOpen.
@@ -131,16 +131,22 @@ def is_linear_usdt_perpetual_within_lifecycle_at(row: dict[str, Any], timestamp_
 def build_universe_snapshot(
     rows: list[dict[str, Any]], status_counts: dict[str, int], fetched_at: str | None = None
 ) -> dict[str, Any]:
-    if not rows:
-        raise ValueError("universe snapshot cannot be empty")
+    if not isinstance(rows, list) or not rows or any(not isinstance(row, dict) for row in rows):
+        raise ValueError("universe snapshot requires non-empty instrument objects")
     symbols = [row.get("symbol") for row in rows]
     if any(not isinstance(symbol, str) or not SYMBOL_RE.fullmatch(symbol) for symbol in symbols):
         raise ValueError("universe snapshot contains invalid symbols")
     if len(symbols) != len(set(symbols)):
         raise ValueError("universe snapshot contains duplicate symbols")
-    if set(status_counts) != set(CAPTURED_STATUSES) or sum(status_counts.values()) != len(rows):
+    if not isinstance(status_counts, dict) or set(status_counts) != set(CAPTURED_STATUSES):
         raise ValueError("status counts do not match the captured universe")
-    timestamp = fetched_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    if any(type(count) is not int or count < 0 for count in status_counts.values()):
+        raise ValueError("status counts must be non-negative integers")
+    observed_counts = Counter(row.get("status") for row in rows)
+    expected_counts = {status: observed_counts.get(status, 0) for status in CAPTURED_STATUSES}
+    if status_counts != expected_counts or sum(status_counts.values()) != len(rows):
+        raise ValueError("status counts do not match the captured universe")
+    timestamp = _snapshot_timestamp(fetched_at)
     return {
         "schema_version": 1,
         "source": "Bybit V5 GET /v5/market/instruments-info",

@@ -103,6 +103,22 @@ class RiskTierHistoryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "mmDeduction recurrence"):
                 RiskTierHistory.from_directory(tmp)
 
+    def test_rejects_missing_mm_deduction_on_higher_tier(self):
+        bad = payload()
+        bad["tiers"][1].pop("mmDeduction")
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(bad), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "missing mmDeduction for non-lowest tier"):
+                RiskTierHistory.from_directory(tmp)
+
+    def test_rejects_boolean_values_in_numeric_risk_tier_fields(self):
+        bad = payload()
+        bad["tiers"][0]["maintenanceMargin"] = True
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(bad), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "invalid maintenanceMargin"):
+                RiskTierHistory.from_directory(tmp)
+
     def test_rejects_invalid_tier_structure(self):
         bad = payload(tiers=[
             {"symbol":"BTCUSDT","id":1,"riskLimitValue":"100000","maintenanceMargin":"0.01","initialMargin":"0.01","maxLeverage":"100","mmDeduction":"0","isLowestRisk":1},

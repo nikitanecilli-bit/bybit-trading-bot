@@ -1356,3 +1356,11 @@ Source `86a0590f`, `68ee303e`; tests `8311daa4`, `82852d6f`. Research CI run `41
 Это ограниченная механическая модель, а не maker execution evidence. Возможен недосчёт price-through исполнений, но объём отмен впереди/позади заявки неизвестен; автоматически засчитывать better-price prints было бы необоснованно. Код/тесты не менялись. Нужна синхронная реконструкция L2+trades с подтверждённой семантикой порядка событий и fail-closed обработкой неоднозначностей. Note: `ENG_EXEC_037_PRICE_THROUGH_PASSIVE_REPLAY_BOUNDARY_RU.md`.
 
 Только статический аудит. Тесты, архивы, queue replay, PnL/backtests, collectors/network workflows, API, runner и orders не запускались. Maker gate закрыт; `main` не изменён; PR #4 не слит.
+
+## 40. Cross-stream L2/trade ordering boundary (ENG-EXEC-038)
+
+Официальная документация Bybit указывает, что orderbook `cts` коррелирует с publicTrade `T`; оба потока публикуют cross-sequence `seq`, и REST recent-trade также возвращает `seq`. Но текущий исторический pipeline сохраняет L2 `seq`, а trade normalizer отбрасывает trade `seq`; независимая монотонность двух потоков не задаёт общий порядок. Равные миллисекундные timestamps остаются неоднозначными.
+
+Runner уже консервативно исключает same-ms book events для arrival/markout snapshot и не засчитывает same-ms fills. Код не менялся. Сначала нужно подтвердить, присутствует ли trade `seq` в историческом daily CSV. Даже общий sequence не решает распределение отмен в aggregate L2. Note: `ENG_EXEC_038_CROSS_STREAM_ORDERING_BOUNDARY_RU.md`.
+
+Только статический аудит и чтение официальной документации. API-запросы, архивы, тесты, replay, PnL/backtests, collectors, runner и orders не запускались. Maker gate закрыт; `main` не изменён; PR #4 не слит.

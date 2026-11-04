@@ -450,3 +450,10 @@
 - Source commits `86a0590f6c9978675426523ba8d86ddc3fdc8b85`, `68ee303ea44744950881033f9c4660912ee8ae9e`; tests `8311daa4c4f63cebaf00d1b9bc3f5dbfe91ca381`, `82852d6f82f4a619a8838db50dcc9431e04560cb`.
 - Research CI run `41888048946` on test commit `82852d6` completed successfully; log confirms strict CSV, report writer and replay compatibility tests passed. Intermediate run `41888039132` failed on a temporary signature/test mismatch before the following test commit corrected it.
 - No market archives, collectors, PnL, private API, runner or orders. Maker gate remains closed.
+
+## 2026-11-04 — ENG-EXEC-036 L2 inspector/replay compatibility boundary
+
+- Static audit found a deliberate but important distinction: L2 inspector may finish with `status: success` while reporting missing `cts`; replay requires `cts` on every event. Scan completion is not replay compatibility.
+- Inspector rejects `cts` and `seq` regressions but does not enforce archive-wide `u` monotonicity; replay's `OrderBook.apply()` rejects non-reset `u` regressions. ENG-EXEC-031 intentionally avoids universal `u` monotonicity until the depth-200 archive contract is confirmed.
+- No code change. Do not loosen replay or add unsupported `u` assumptions. Next: define explicit L2 replay-compatibility reporting once source semantics are established.
+- Note: `ENG_EXEC_036_L2_INSPECTOR_REPLAY_COMPATIBILITY_RU.md`. No archive download, network workflow, collector, PnL, API, runner or orders. Maker gate remains closed.

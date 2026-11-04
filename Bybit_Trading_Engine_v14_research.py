@@ -50,6 +50,7 @@ from funding_accounting import accrued_funding_cost, accrued_funding_cost_for_re
 from mark_price_liquidation import evaluate_isolated_margin_health, calculate_isolated_usdt_bankruptcy_price
 from instrument_spec_history import InstrumentSpecHistory
 from bybit_risk_tiers import RiskTierHistory
+from bybit_market_state import get_linear_market_state
 from exchange_order_sizing import size_to_exchange_constraints
 
 logging.basicConfig(
@@ -1509,6 +1510,7 @@ class UnifiedQuantEngine:
         max_instrument_spec_age_ms: Optional[int] = 30 * 24 * 60 * 60 * 1000,
         risk_tiers_dir: Optional[str] = None,
         max_risk_tier_age_ms: Optional[int] = 30 * 24 * 60 * 60 * 1000,
+        max_market_state_skew_ms: Optional[int] = None,
     ):
         self._explicit_config = config_path
         self.funding_dir = funding_dir
@@ -1526,6 +1528,12 @@ class UnifiedQuantEngine:
         if max_risk_tier_age_ms is not None and max_risk_tier_age_ms < 0:
             raise ValueError("max_risk_tier_age_ms cannot be negative")
         self.max_risk_tier_age_ms = max_risk_tier_age_ms
+        if max_market_state_skew_ms is not None and (
+                isinstance(max_market_state_skew_ms, bool)
+                or not isinstance(max_market_state_skew_ms, int)
+                or max_market_state_skew_ms < 0):
+            raise ValueError("max_market_state_skew_ms must be a non-negative integer or None")
+        self.max_market_state_skew_ms = max_market_state_skew_ms
         self.liquidation_model_enabled = bool(self.risk_tier_history is not None and mark_price_dir)
         self._mark_price_candles: Dict[str, Dict[int, MarkPriceCandle]] = {}
         if bool(funding_dir) != bool(mark_price_dir):
@@ -1688,10 +1696,20 @@ class UnifiedQuantEngine:
         if not getattr(self, "liquidation_model_enabled", False):
             return None
         mark_candle = self._mark_candle_for_symbol(pos.symbol, trade_candle.ts, required=True)
-        tiers = self.risk_tier_history.get_tiers(
-            pos.symbol, as_of_ts,
-            max_age_ms=getattr(self, "max_risk_tier_age_ms", 30 * 24 * 60 * 60 * 1000),
-        )
+        if self.instrument_spec_history is not None:
+            market_state = get_linear_market_state(
+                self.instrument_spec_history, self.risk_tier_history,
+                pos.symbol, as_of_ts,
+                max_snapshot_skew_ms=getattr(self, "max_market_state_skew_ms", None),
+                max_instrument_age_ms=getattr(self, "max_instrument_spec_age_ms", None),
+                max_risk_tier_age_ms=getattr(self, "max_risk_tier_age_ms", None),
+            )
+            tiers = market_state.risk_tiers
+        else:
+            tiers = self.risk_tier_history.get_tiers(
+                pos.symbol, as_of_ts,
+                max_age_ms=getattr(self, "max_risk_tier_age_ms", 30 * 24 * 60 * 60 * 1000),
+            )
         if pos.leverage is None or not math.isfinite(float(pos.leverage)) or pos.leverage <= 0:
             raise RuntimeError(f"{pos.symbol}: missing valid entry leverage; refusing liquidation-aware replay")
         quantity = (
@@ -2150,13 +2168,30 @@ class UnifiedQuantEngine:
         instrument_spec_history = getattr(self, "instrument_spec_history", None)
         if instrument_spec_history is not None:
             try:
-                instrument_spec = instrument_spec_history.get_spec(
-                    symbol, curr.ts,
-                    max_age_ms=getattr(
-                        self, "max_instrument_spec_age_ms",
-                        30 * 24 * 60 * 60 * 1000,
-                    ),
-                )
+                risk_tier_history = getattr(self, "risk_tier_history", None)
+                if risk_tier_history is not None:
+                    market_state = get_linear_market_state(
+                        instrument_spec_history, risk_tier_history,
+                        symbol, curr.ts,
+                        max_snapshot_skew_ms=getattr(self, "max_market_state_skew_ms", None),
+                        max_instrument_age_ms=getattr(
+                            self, "max_instrument_spec_age_ms",
+                            30 * 24 * 60 * 60 * 1000,
+                        ),
+                        max_risk_tier_age_ms=getattr(
+                            self, "max_risk_tier_age_ms",
+                            30 * 24 * 60 * 60 * 1000,
+                        ),
+                    )
+                    instrument_spec = market_state.instrument_spec
+                else:
+                    instrument_spec = instrument_spec_history.get_spec(
+                        symbol, curr.ts,
+                        max_age_ms=getattr(
+                            self, "max_instrument_spec_age_ms",
+                            30 * 24 * 60 * 60 * 1000,
+                        ),
+                    )
                 instrument_spec.validate_leverage(Decimal(str(self.cfg.leverage_val)))
                 exchange_order = size_to_exchange_constraints(
                     instrument_spec, size_usdt, fill, risk_usdt,

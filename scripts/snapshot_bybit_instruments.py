@@ -316,7 +316,10 @@ def main() -> None:
 
     collection_started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     rows = fetch_all_instruments(args.category, fetch)
-    snapshot = build_snapshot(\n        rows, args.category, collection_started_at=collection_started_at,\n        page_observations=page_observations,\n    )
+    snapshot = build_snapshot(
+        rows, args.category, collection_started_at=collection_started_at,
+        page_observations=page_observations,
+    )
     fetched = datetime.fromisoformat(snapshot["fetched_at"].replace("Z", "+00:00"))
     stamp = fetched.astimezone(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     output = Path(args.output_dir) / args.category / f"{stamp}.json"

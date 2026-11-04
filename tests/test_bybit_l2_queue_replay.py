@@ -467,6 +467,63 @@ def test_apply_public_trade_rejects_fractional_timestamp_without_truncation():
     assert o.queue_ahead_remaining == D("5")
 
 
+
+def test_block_trade_does_not_consume_displayed_queue():
+    o = order(qty="2")
+    apply_public_trade(o, {**trade(1100, "Sell", "100", "10"), "block_trade": True})
+    assert o.block_trade_excluded_count == 1
+    assert o.queue_ahead_remaining == D("5")
+    assert o.filled == D("0")
+    assert o.eligible_trade_count == 0
+
+
+def test_non_block_trade_still_consumes_queue_normally():
+    o = order(qty="2")
+    apply_public_trade(o, {**trade(1100, "Sell", "100", "6"), "block_trade": False})
+    assert o.block_trade_excluded_count == 0
+    assert o.queue_ahead_remaining == D("0")
+    assert o.filled == D("1")
+
+
+def test_invalid_block_trade_flag_fails_closed():
+    o = order()
+    try:
+        apply_public_trade(o, {**trade(1100, "Sell", "100", "10"), "block_trade": "unknown"})
+    except ValueError as exc:
+        assert "block trade boolean flag" in str(exc)
+    else:
+        raise AssertionError("unknown block-trade flag must fail closed")
+    assert o.queue_ahead_remaining == D("5")
+    assert o.filled == D("0")
+
+
+def test_trade_archive_requires_block_trade_flag():
+    import gzip
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "trades.csv.gz"
+        with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
+            stream.write("timestamp,symbol,side,size,price,trdMatchID\\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1\\n")
+        try:
+            list(l2_module.iter_public_trades(path))
+        except ValueError as exc:
+            assert "missing block-trade flag" in str(exc)
+        else:
+            raise AssertionError("archive without block-trade flag must fail closed")
+
+
+def test_trade_archive_parses_block_trade_and_rpi_flags():
+    import gzip
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "trades.csv.gz"
+        with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
+            stream.write("timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\\n")
+            stream.write("1756771200123,AAVEUSDT,Sell,10,100,match-1,True,False\\n")
+        rows = list(l2_module.iter_public_trades(path))
+    assert rows[0]["block_trade"] is True
+    assert rows[0]["rpi"] is False
+
+
 def test_trade_at_or_before_arrival_is_never_credited():
     o = order()
     apply_public_trade(o, trade(1000, "Sell", "100", "100"))

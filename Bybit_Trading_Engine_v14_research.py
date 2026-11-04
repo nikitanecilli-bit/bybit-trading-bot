@@ -475,6 +475,17 @@ class OpenPositionState:
                         raise ExecutionIdentityError("same-side order cannot be reduceOnly for this position")
                     if order.close_on_trigger and not order.reduce_only:
                         raise ExecutionIdentityError("closeOnTrigger order must be reduceOnly")
+                terminal_statuses = {
+                    "Filled", "Cancelled", "Rejected",
+                    "PartiallyFilledCanceled", "Deactivated",
+                }
+                if order.order_status == "Filled":
+                    if (Decimal(order.cum_exec_qty) != Decimal(order.qty)
+                            or Decimal(order.leaves_qty) != Decimal("0")):
+                        raise ExecutionIdentityError("Filled order must have cumExecQty equal qty and zero leavesQty")
+                elif order.order_status in terminal_statuses:
+                    if Decimal(order.leaves_qty) != Decimal("0"):
+                        raise ExecutionIdentityError("terminal order must have zero leavesQty")
                 if order.order_id in orders:
                     raise ExecutionIdentityError("duplicate exchange order_id")
                 orders[order.order_id] = order
@@ -553,6 +564,12 @@ class OpenPositionState:
                 )
                 if any(existing[name] != order.to_dict()[name] for name in stable_fields):
                     raise ValueError("exchange order identity fields changed across updates")
+                terminal_statuses = {
+                    "Filled", "Cancelled", "Rejected",
+                    "PartiallyFilledCanceled", "Deactivated",
+                }
+                if existing["order_status"] in terminal_statuses:
+                    raise ValueError("terminal exchange order cannot be updated")
                 if Decimal(order.cum_exec_qty) < Decimal(existing["cum_exec_qty"]):
                     raise ValueError("exchange order cumExecQty cannot decrease")
                 if Decimal(order.leaves_qty) > Decimal(existing["leaves_qty"]):

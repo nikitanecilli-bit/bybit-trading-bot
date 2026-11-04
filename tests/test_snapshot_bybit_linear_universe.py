@@ -126,6 +126,18 @@ class PointInTimeUniverseTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "fetched_at"):
                     build_universe_snapshot(rows, counts, timestamp)
 
+    def test_collection_interval_is_recorded_and_ordered(self):
+        rows = [row("BTCUSDT", "Trading")]
+        counts = {status: int(status == "Trading") for status in CAPTURED_STATUSES}
+        snapshot = build_universe_snapshot(
+            rows, counts, "2026-11-03T00:00:02Z", "2026-11-03T00:00:01Z"
+        )
+        self.assertEqual(snapshot["collection_started_at"], "2026-11-03T00:00:01.000Z")
+        with self.assertRaisesRegex(ValueError, "cannot be after"):
+            build_universe_snapshot(
+                rows, counts, "2026-11-03T00:00:01Z", "2026-11-03T00:00:02Z"
+            )
+
     def test_snapshot_writer_round_trips(self):
         rows = [row("BTCUSDT", "Trading")]
         counts = {status: int(status == "Trading") for status in CAPTURED_STATUSES}

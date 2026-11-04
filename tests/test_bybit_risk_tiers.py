@@ -165,6 +165,23 @@ class RiskTierHistoryTests(unittest.TestCase):
             history = RiskTierHistory.from_directory(tmp)
             self.assertEqual(history.snapshots[0].fetched_at_ms, 1793491200123)
 
+    def test_snapshot_schema_version_and_tier_count_require_integer_types(self):
+        bad = payload(tiers=[
+            {"symbol":"BTCUSDT","id":1,"riskLimitValue":"100000","maintenanceMargin":"0.005","initialMargin":"0.01","maxLeverage":"100","mmDeduction":"0","isLowestRisk":1},
+        ])
+        bad["schema_version"] = True
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(bad), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unsupported risk-tier schema"):
+                RiskTierHistory.from_directory(tmp)
+
+        bad["schema_version"] = 1
+        bad["tier_count"] = True
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(bad), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "tier_count does not match"):
+                RiskTierHistory.from_directory(tmp)
+
     def test_missing_or_mismatched_source_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             bad = payload()

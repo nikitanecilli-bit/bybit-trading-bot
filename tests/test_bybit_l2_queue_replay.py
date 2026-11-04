@@ -892,7 +892,7 @@ def test_apply_public_trade_validates_normalized_rows_outside_active_window():
     assert expired.filled == D("0")
     assert expired.queue_ahead_remaining == D("5")
 
-    completed = order()
+    completed = order(qty="1")
     apply_public_trade(completed, trade(1100, "Sell", "100", "6"))
     assert completed.complete
     malformed_completed = {
@@ -905,7 +905,7 @@ def test_apply_public_trade_validates_normalized_rows_outside_active_window():
         assert "invalid block trade boolean flag" in str(exc)
     else:
         raise AssertionError("malformed normalized trade after completion must fail closed")
-    assert completed.filled == D("5")
+    assert completed.filled == D("1")
 
 
 def test_rpi_trade_does_not_consume_queue_or_fill():

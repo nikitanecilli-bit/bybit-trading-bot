@@ -157,3 +157,10 @@ Verification:
 - Compile and deterministic test suite passed; H1 runner execution-gate tests and portfolio accounting/risk-budget tests passed. No market PnL runner was dispatched.
 
 Scope: this fixes a configuration/integration failure, not the historical snapshot effective-time limitation. No default skew was invented; the operator must choose and supply an explicit budget. Data and strategy readiness remain BLOCKED.
+
+
+### Constructor-level fail-fast follow-up
+
+The engine constructor now also rejects configuration that enables both dated instrument and risk-tier histories while omitting `max_market_state_skew_ms`. This moves the failure from first entry/restored-position validation to initialization, where the configuration error is immediately visible. The joined-entry accounting regression now supplies an explicit zero-ms fixture budget, and a new constructor regression verifies missing-budget rejection.
+
+Research CI [#41928557280](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928557280) completed SUCCESS on commit `8fa1685db728a051f37bb59921a3048446d269b1`; engine compile, H1 runner gate, portfolio accounting/risk budget and the full deterministic suite passed. This remains offline fixture/CI verification only.

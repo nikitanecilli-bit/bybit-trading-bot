@@ -172,12 +172,13 @@ def main() -> int:
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "symbol": SYMBOL,
-        "method": "aggregate L2 queue-ahead; trades only; no cancellation credit; no same-ms fills",
+        "method": "aggregate L2 queue-ahead; non-block public trades only; RPI and block trades excluded; no cancellation credit; no same-ms fills",
         "warning": "Four deterministic hypothetical orders only. This is not strategy PnL, a fill-rate estimate, L3 replay, or exchange-confirmed execution.",
         "order_spec_validation": "not_performed_no_verified_historical_snapshot",
         "fee_accounting": "not_calculated_requires_account_fee_tier_per_fill",
         "latency_model": "not_measured_or_modeled",
         "cancel_model": "no_cancel_credit_and_no_cancel_latency_model",
+        "block_trade_handling": "requires archive isBlockTrade/BT flag; fails closed if unavailable",
         "status": "started",
     }
     with tempfile.TemporaryDirectory(prefix="bybit-l2-queue-replay-") as tmp:
@@ -231,6 +232,7 @@ def main() -> int:
                 ],
                 "eligible_opposing_trades_at_price": order.eligible_trade_count,
                 "rpi_trades_excluded": order.rpi_excluded_count,
+                "block_trades_excluded": order.block_trade_excluded_count,
                 "first_fill_ts_ms": order.first_fill_ts,
                 "time_to_first_fill_ms": (
                     None if order.first_fill_ts is None

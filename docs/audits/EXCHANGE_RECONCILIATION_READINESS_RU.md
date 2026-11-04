@@ -504,3 +504,29 @@ Research CI #41918766426 — SUCCESS, 59/59 workflow steps; tested code commit `
 - SHA-256 fingerprint не является server-authenticated account ID и не защищает от подделки самого snapshot; raw SHA-256 также остаётся локальной проверкой целостности.
 - Никакие реальные API calls, credentials, collector runs, archive downloads, live orders или market PnL tests не выполнялись. CI использует offline fixtures/FakeTransport.
 - Reconciliation PASS, live resume и strategy/execution/PnL gates остаются BLOCKED.
+
+### ENG-RECON-020 — read-only dry-run план слияния поздних исполнений
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / CI PENDING FINAL VERIFICATION.
+
+Добавлена функция `build_execution_merge_plan(local_backup, snapshot)` в `scripts/bybit_reconciliation_report.py`.
+
+Поведение:
+- Принимает только schema v3 snapshot и backup с совпадающим `saved_at_utc`; parser повторно проверяет raw hash, page provenance, интервалы и typed exchange records.
+- Строит план по symbol без изменения входного backup и без записи файлов.
+- Требует exchange position identity для каждой затронутой локальной позиции.
+- Проверяет, что каждый fill относится к известному локальному exchange order или entry order из position identity; проверяет symbol, side и orderLinkId.
+- Точные повторные execId учитываются как duplicates; конфликтующая запись отклоняет весь расчёт до выдачи плана.
+- Количества/цены сохраняются как Decimal text в `ExchangeExecutionIdentity`; план не применяет batch к engine state.
+- Всегда возвращает `execution_history_complete=false`, `reconciliation_pass=false`, `live_resume_allowed=false`.
+
+Offline tests: новая late fill proposal, exact duplicate и conflicting duplicate, orphan order rejection, отсутствие мутации backup.
+
+CI: первоначальные прогоны выявили ошибки импорта и оформления тестового import statement; они исправлены. Итоговый CI для последнего SHA должен быть подтверждён отдельно.
+
+Ограничения:
+- Это только read-only proposal; нет команды apply, автоматической записи Plan B или вызова `merge_exchange_execution_batch`.
+- Локальная позиция должна иметь точную exchange identity и локальные order records; legacy позиции без них fail closed.
+- Проверка не доказывает полноту биржевой истории, не устраняет задержку API и не является разрешением на resume.
+- Никакие Bybit API calls, collector runs, archive downloads, live orders или market PnL tests не выполнялись.

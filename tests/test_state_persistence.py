@@ -546,6 +546,31 @@ class StatePersistenceTests(unittest.TestCase):
             })
         self._assert_invalid_position_payload(mutate)
 
+    def test_exchange_sized_restore_uses_planned_exit_not_entry_for_min_notional(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "trailing-stop-above-entry.json"
+            position = sample_position()
+            position.stop_price = 110.0
+            position.exchange_sized = True
+            position.leverage = 5.0
+            position.contract_qty = "1.0"
+            position.remaining_contract_qty = "1.0"
+            position.qty_step = "0.1"
+            position.min_order_qty = "0.1"
+            position.min_notional_value = "105"
+            writer = engine.PlanBStatePersistence(str(path), enabled=True)
+            writer.save_state(
+                engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
+                {"BTCUSDT": position}, {}, 42,
+                last_mark_prices={"BTCUSDT": position.entry_price},
+            )
+            restored, _, _ = engine.PlanBStatePersistence(str(path)).load_state(
+                engine.AdaptiveRiskManager(engine.BotConfig())
+            )
+            # Entry notional is 100, but both actual planned exit prices
+            # (stop 110 and TP2 112) meet minNotionalValue 105.
+            self.assertEqual(restored["BTCUSDT"], position)
+
     def test_exchange_sized_restore_rejects_remaining_below_min_order_qty(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "remaining-below-min-qty.json"

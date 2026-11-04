@@ -477,3 +477,28 @@ CI:
 - final run 41837303070 on commit 26d5a46d6760fbede7c6ab88c16ffab48e05f04d: SUCCESS, job tests 56/56 steps completed successfully, including Test conservative Bybit aggregate-L2 queue replay primitives.
 
 Trade-off: each replay now scans the full CSV instead of stopping at expiry/completion. This is more CPU/I/O per hypothetical order, but avoids silently treating a malformed, out-of-order archive as a valid no-fill result. This remains deterministic input validation, not proof that the source archive itself is complete or semantically compatible. No new archive downloads, strategy PnL, private API, paper/live orders. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL remains unchanged.
+
+
+## 23. Конфликтующие алиасы block-trade и RPI
+
+В iter_public_trades() ранее выбирался один из синонимичных столбцов (isBlockTrade при наличии, иначе BT; RPI при наличии, иначе isRPITrade). Если CSV содержит оба алиаса, но значения противоречат друг другу, второй столбец игнорировался. Это могло классифицировать block/RPI print как обычную сделку и завысить модельное исполнение.
+
+Исправлено:
+- все доступные алиасы block-trade (isBlockTrade и BT) парсятся строгим boolean parser; если присутствуют оба, их значения обязаны совпадать;
+- все доступные алиасы RPI (RPI и isRPITrade) также парсятся и должны совпадать;
+- отсутствующее значение любого присутствующего алиаса или конфликт значений приводит к fail-closed ValueError;
+- при одном присутствующем алиасе поведение сохраняется.
+
+Добавлены два regression tests: конфликт isBlockTrade vs BT и конфликт RPI vs isRPITrade.
+
+Изменения в research/market-regime-v1-main:
+- source commit: 06e4ebfda9583aec9e6641276801dc94c11cf8c1;
+- regression tests: 1f518ad55433323b7af73d28074f9d8054074161;
+- fixture newline correction: 50fb0b6585104996ed3b2bf279f08c7266e36612 (текущая голова кода/тестов на момент обновления).
+
+CI:
+- source run 41837502894: SUCCESS;
+- initial test run 41837508481: FAILURE из-за неправильного newline escaping в новых CSV fixtures, в результате тест доходил до проверки отсутствующего RPI столбца, а не до проверки конфликта;
+- после fixture correction run 41837526701 на commit 50fb0b6585104996ed3b2bf279f08c7266e36612: SUCCESS, job tests 56/56 steps completed successfully, including Test conservative Bybit aggregate-L2 queue replay primitives.
+
+Это устраняет неоднозначную классификацию при наличии двух aliases, но фактическая схема исторического CSV по-прежнему не подтверждена на raw archive. Не запускались новые загрузки архивов, strategy PnL, private API, paper/live orders. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.

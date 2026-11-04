@@ -74,3 +74,13 @@ Continue static audit of report/input provenance and exchange-spec validation. P
 - CI workflow включает compile, тесты и offline audit. Research CI [#41897629817](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41897629817): **SUCCESS**; все 58 шагов прошли. Включённый audit честно сообщил 'NO_DATA'.
 - В процессе CI две проблемы тестового harness были пойманы и исправлены: отсутствовал repository root в 'sys.path', затем неверно ожидалась максимальная длительность двух разных fixture windows. После исправлений suite прошёл.
 - Не включал schedule и не dispatch-ил collectors: нет подтверждённого доступа/разрешённого пути получения snapshot. Никакие API requests, collector runs, archive downloads, market tests или PnL не выполнялись.
+
+## ENG-DATA-010 — отметки времени по каждой странице Bybit
+
+- Оба snapshot collector теперь записывают опциональный `page_observations`: status filter, page index, начало запроса, завершение клиентской обработки ответа, число строк, список символов и признак следующей страницы.
+- `request_completed_at` ставится после `_request_page` (включая JSON parse и проверку retCode/формата). Это верхняя граница клиентского запроса, не timestamp события на стороне Bybit и не точное время приёма сетевого пакета. Opaque pagination cursor не сохраняется.
+- Builder проверяет хронологию, последовательность страниц по каждому фильтру, границы общего collection window и совпадение объединения символов страниц с итоговым universe. Старые schema-v1 снимки без `page_observations` остаются совместимыми.
+- Offline auditor проверяет метаданные страниц и выдаёт per-status page counts/windows/row counts и распределение длительности запросов.
+- Research CI [#41898947956](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41898947956): **SUCCESS**, 59/59 шагов. Включает compile, tests collectors, tests temporal audit, offline audit. Промежуточный CI упал на тесте верхней границы времени, поскольку linear-universe builder ещё не передавал page metadata общему валидатору; исправлено в `d2edd46`, затем успешно перепроверено в #41898525899 и #41898947956.
+- Ограничение: это сужает окно неопределённости до отдельного запроса, но не раскрывает точный момент выборки данных backend Bybit и не фиксирует переходы статуса между запросами. Снимок остаётся последовательным наблюдением, не атомарным exchange-side universe.
+- Ни публичные/приватные API-запросы, ни collectors, ни скачивание архивов, ни рыночные/PnL-тесты не запускались.

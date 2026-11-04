@@ -1336,3 +1336,9 @@ Source `0c4cf2e2`; tests `6fc17e4d`. CI не подтверждён (combined st
 В обоих trade parser paths `csv.DictReader` переведён в `strict=True`. Причина: стандартный `strict=False` принимал некоторые незакрытые quoted fields, включая malformed optional RPI value, которое могло пройти дальнейший boolean parsing. Добавлены deterministic tests для core replay и standalone inspector. Локальная проверка stdlib parser подтверждает отказ `csv.Error: unexpected end of data`.
 
 Core `81f58d0b`, inspector `d7872099`; tests `13f32dbc` + fixture correction `5f6c245d`, inspector test `06544878` + correction `9302114d`. CI не подтверждён. Новые архивы/network workflows не запускались; collectors, PnL, private API, runner и paper/live orders не использовались.
+
+## 37. Aggregate queue-replay compatibility and empty trade archive (ENG-EXEC-035)
+
+Trade inspector теперь отдельно публикует `queue_replay_compatibility_status`: `valid` только при валидных timestamp order, trade IDs, RPI и block-trade flags, а также при числе строк > 0. Пустой/header-only архив получает `duration_hours: null` и `invalid_or_incomplete`, не аварийный расчёт с None.
+
+Source `86a0590f`, `68ee303e`; tests `8311daa4`, `82852d6f`. Research CI run `41888048946` на `82852d6` завершился success. Никаких архивов, collectors, PnL/backtest, API, runner или orders.

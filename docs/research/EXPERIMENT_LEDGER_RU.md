@@ -1172,3 +1172,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Source commit `ab27c80413c23f4d0689441cff6f131a91a0ab5d`; test commit `846279119545a7036d65b57a156c8ea38b7ae895`.
 - Source-only CI #41875043047 SUCCESS, 57/57; final CI #41875093214 on `8462791195` SUCCESS, 57/57, zero failures. Actual logs confirm the new structural regressions; inspector/runner suite 9/9; aggregate-L2 primitives 81/81.
 - Structural data-integrity only, not execution or PnL evidence. No archives downloaded and network inspector not run. No PnL/backtest, collectors, API, runner, paper/live orders or main changes.
+
+## ENG-EXEC-024 — Strict orderbook inspector integer fields (2026-11-04)
+
+- The orderbook archive inspector used `int()` for event `ts`, `cts`, `seq`, and `u`, silently accepting bools, numeric strings and fractional floats; the replay parser's `strict_int()` rejects these and enforces positive values.
+- Added `parse_event_integer_fields()` using the shared `strict_int()` contract. Missing/null `cts` remains reportable as missing; non-null cts must be a positive integer.
+- Regression covers valid timestamps/sequence IDs, missing cts, bool, float, string and non-positive fields.
+- Source commit `d6078d4f0e56c1d398b427b8c7640b1f09021b89`; test commit `1b50c9da41b99ea23d04e009e7ba6e6424d73e01`.
+- Source-only CI #41875836674 SUCCESS, 57/57; final CI #41875905360 on `1b50c9da` SUCCESS, 57/57, zero failures. Actual logs confirm the new orderbook inspector regression; inspector/runner suite 9/9; aggregate-L2 primitives 81/81.
+- Timestamp/sequence diagnostic integrity only, not maker execution or PnL evidence. No archive download or network inspector run. No PnL/backtest, collectors, API, runner, paper/live orders or main changes.

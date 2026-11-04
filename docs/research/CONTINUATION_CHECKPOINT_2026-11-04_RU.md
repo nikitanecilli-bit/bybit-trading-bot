@@ -1431,3 +1431,13 @@ No market PnL, new archive download/collector, private API, runner registration,
 - No recalculation, fixed-trade sensitivity, artifact download, PnL replay or parameter sweep was run.
 - Provenance matrix update commit `c5bc10b8360d56781c5e919e974c5b03570cf4cf`; blob read back `fc55570e4f56b07ce295b75d1be6684f1bd2bd93`. Documentation-only; no CI run.
 - P1 next decision: the old E01–E07 numbers are now version-classified but not economically corrected. With external data and PnL gates still closed, the next safe step is to consolidate the evidence/data gate and identify whether any additional useful static audit remains; do not start new market testing.
+
+
+## 2026-11-05 — P1: accounting boundary extended through E13 and H-A/H-C
+
+- Static engine-version checks now cover E08–E13 plus H-A/H-C. E08–E11 and E13 also used the old entry-notional exit-cost formula; E12 is diagnostics-only. Existing E11/E13 fixed-trade cost sensitivity is not a corrected-engine rerun and does not capture changed stop-risk sizing/portfolio sequence.
+- Resolved final H-A run #41670116033 checkout SHA from its job log: `3f762a4bf9fa3f53a61ff0912e2deaf411ead4b8`; engine blob `cc390a1f4c7345040e125ee64c1943ab944ed4be` contains corrected execution-price TP1/final cost formulas.
+- H-C run #41722545731 commit `a5e7e1799f472db4cc00824dfcc774b40058165e`; engine blob `4f2b101379cab11a351ecf4ce3ec18d01872d8a6` also contains corrected execution-price formulas.
+- Thus old-formula PnL classification applies to E01–E11 and E13, not H-A final replay or H-C reverse-time replay. Their other data/universe/funding/holdout limitations remain.
+- Provenance matrix commit `24e5549c5eae82e5651f2c73d41aba078ae82c1b`; blob read back `3beec82d86b1507df3232f8370902c99f5c201e4`. Documentation-only; no CI run.
+- No PnL rerun, artifact download, archive extraction or parameter sweep. P1 provenance is now substantially closed; remaining irreducible gaps are source dataset byte hashes for early experiments and any artifact contents not already documented. Do not download them under current gates.

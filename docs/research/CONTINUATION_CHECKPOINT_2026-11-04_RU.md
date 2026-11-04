@@ -889,3 +889,23 @@ Verification:
 - Actual log confirms risk-tier history 15/15 tests passed, including both new regressions; mark-price liquidation and engine integration suites also passed.
 
 No collector execution, Bybit data download, PnL, private API/account access, runner registration, paper/live orders or main-branch change. PR #4 remains Draft/open. Continue read-only schema and execution-consumer review; strategy PnL remains blocked pending verified historical snapshots and execution evidence.
+
+
+## 44. RiskTierHistory is explicitly restricted to linear contracts — 2026-11-04
+
+Static review found that RiskTierHistory and calculate_margin_requirements() implement Bybit linear/USDT risk-tier semantics, but the loader and direct constructor could accept category=inverse. That would permit inverse tiers to be evaluated with linear IM/MM formulas.
+
+Correction:
+- RiskTierHistory now rejects every snapshot category except linear.
+- The separate snapshot collector may still archive inverse category data, but this linear margin model cannot consume it.
+- Added a regression for constructing RiskTierHistory from an inverse-category snapshot.
+
+Commits:
+- source: 2959547ab8c5150ebb9648e54c2792965ea1d06e;
+- tests: 6a257b205aef1b8724845c7f6b83fbe0b7aed1b4.
+
+Verification:
+- Research CI #41846247554 on 6a257b205aef1b8724845c7f6b83fbe0b7aed1b4: SUCCESS; job tests SUCCESS; all 57 workflow steps completed without failure.
+- Actual logs confirm the new inverse-category regression and risk-tier history suite **16/16 passed**.
+
+No Bybit data collection/download, PnL, private API/account access, runner registration, paper/live orders or main-branch changes. PR #4 remains Draft/open. Continue read-only metadata and type-guard review; the PnL gate remains closed.

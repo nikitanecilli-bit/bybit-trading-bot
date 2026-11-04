@@ -1,3 +1,4 @@
+import csv
 from decimal import Decimal as D
 import sys
 import json
@@ -705,6 +706,26 @@ def test_trade_archive_requires_rpi_flag():
             assert "missing RPI flag" in str(exc)
         else:
             raise AssertionError("archive without RPI flag must fail closed")
+
+
+def test_trade_archive_rejects_unterminated_quoted_optional_flag():
+    import gzip
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "malformed.csv.gz"
+        with gzip.open(path, "wt", encoding="utf-8", newline="") as stream:
+            stream.write(
+                "timestamp,symbol,side,size,price,trdMatchID,isBlockTrade,RPI\\n"
+            )
+            stream.write(
+                '1756771200123,AAVEUSDT,Sell,10,100,match-1,False,"False\\n'
+            )
+        try:
+            list(l2_module.iter_public_trades(path))
+        except csv.Error as exc:
+            assert "unexpected end of data" in str(exc)
+        else:
+            raise AssertionError("unterminated quoted CSV field must be rejected")
+
 
 def test_trade_archive_rejects_duplicate_column_names():
     import gzip

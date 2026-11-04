@@ -70,6 +70,21 @@ def validate_trade_csv_row(row: dict, row_no: int) -> None:
 
 
 
+
+def validated_trade_csv_reader(stream):
+    """Build a strict CSV reader and validate every row's width."""
+    reader = csv.DictReader(stream, strict=True)
+    fields = list(reader.fieldnames or [])
+    validate_trade_csv_header(fields)
+
+    def rows():
+        for row_no, row in enumerate(reader, 2):
+            validate_trade_csv_row(row, row_no)
+            yield row_no, row
+
+    return fields, rows()
+
+
 def trade_timestamp_order_status(nonmonotonic_count: int) -> str:
     """Classify whether archive trade timestamps are replay-order compatible."""
     if isinstance(nonmonotonic_count, bool) or not isinstance(nonmonotonic_count, int):
@@ -145,13 +160,10 @@ def main() -> int:
         total_notional = Decimal("0")
         fields = []
         with gzip.open(archive, "rt", encoding="utf-8", newline="") as stream:
-            reader = csv.DictReader(stream)
-            fields = list(reader.fieldnames or [])
-            validate_trade_csv_header(fields)
+            fields, rows_iter = validated_trade_csv_reader(stream)
             block_flags = block_trade_flag_columns(fields)
             rpi_flags = [name for name in ("RPI", "isRPITrade") if name in fields]
-            for row_no, row in enumerate(reader, 2):
-                validate_trade_csv_row(row, row_no)
+            for row_no, row in rows_iter:
                 if row.get("symbol") != SYMBOL:
                     raise ValueError(f"unexpected trade symbol: {row.get('symbol')!r}")
                 ts = parse_trade_timestamp_ms(row["timestamp"])

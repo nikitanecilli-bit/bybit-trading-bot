@@ -425,6 +425,23 @@ def test_u1_restart_snapshot_replaces_book_and_preserves_cross_sequence_order():
 
 
 
+def test_non_reset_orderbook_update_id_regression_fails_closed_atomically():
+    b = book()
+    b.apply({"type": "delta", "cts": 1100, "data": {
+        "seq": 2, "u": 3, "b": [["100", "7"]], "a": [],
+    }})
+    before = (dict(b.bids), dict(b.asks), b.last_cts, b.last_seq, b.last_u)
+    try:
+        b.apply({"type": "delta", "cts": 1200, "data": {
+            "seq": 3, "u": 2, "b": [["100", "9"]], "a": [],
+        }})
+    except ValueError as exc:
+        assert "non-monotonic order-book update ID" in str(exc)
+    else:
+        raise AssertionError("non-reset update ID regression must fail closed")
+    assert (b.bids, b.asks, b.last_cts, b.last_seq, b.last_u) == before
+
+
 def test_u1_restart_snapshot_does_not_bypass_cross_sequence_ordering():
     b = book()
     b.apply({"type": "delta", "cts": 1050, "data": {

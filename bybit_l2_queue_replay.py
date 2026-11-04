@@ -85,6 +85,8 @@ class OrderBook:
         reset_snapshot = update_id == 1
         if reset_snapshot and kind != "snapshot":
             raise ValueError("u=1 restart marker requires a full snapshot for this archive format")
+        if self.last_u is not None and update_id < self.last_u and not reset_snapshot:
+            raise ValueError("non-monotonic order-book update ID")
         if self.last_cts is not None and cts < self.last_cts:
             raise ValueError("non-monotonic matching-engine timestamp")
         # u=1 resets the book contents, but seq remains a separate cross-sequence

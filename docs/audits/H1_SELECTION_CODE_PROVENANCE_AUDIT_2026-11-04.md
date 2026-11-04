@@ -330,3 +330,42 @@ An intermediate set of CI runs failed on Python indentation/compilation after fi
 The H1 OHLC wrapper still treats a qualifying limit touch as an all-or-none fill. It does not model partial fills, queue position, cancellations ahead, spread crossing or adverse selection. The separate aggregate-L2 diagnostic does not make the H1 replay queue-aware. This remains a material execution-model limitation; no fill-rate or profitability claim follows from the OHLC fill proxy.
 
 No market PnL replay, new Bybit archive collection, private API/account access, paper order or live order was performed.
+## Funding archive collector — inclusive final-close boundary — 2026-11-04
+
+### Confirmed collector/preflight incompatibility — corrected
+
+The previous archive collector treated end_ms as an exclusive boundary for trade OHLCV, funding history and Mark Price alike. It queried the funding endpoint only through end_ms - 1, recorded the same exclusive-minus-one limit in the sidecar, and generated the dated settlement schedule only through end_ms - 1. Therefore the stricter H1 fold preflight could require a final-close settlement that the archive collector was structurally unable to collect or attest.
+
+### Correction
+
+- Trade H1 OHLCV remains [start_ms, end_ms), unchanged.
+- Funding history is queried through end_ms inclusive by passing end_ms + 1 to the collector's exclusive helper; the query sidecar records request_end_ms=end_ms.
+- The dated settlement schedule and archive-level validator now require coverage through end_ms inclusive.
+- Only when the dated settlement grid expects a settlement exactly at end_ms, the collector requests one additional Mark Price candle at timestamp end_ms. This is not an extra trade candle.
+- Coverage validation allows exactly one additional Mark timestamp at the terminal H1 boundary, provided all trade timestamps have matching marks and the trade grid is regular. Extra timestamps elsewhere and missing trade marks remain hard failures.
+- The additional terminal Mark candle must be closed when collected; no Last Price or incomplete-candle substitution is allowed.
+
+### Regression and verification
+
+- test_archive_symbol_writes_funding_query_sidecar_through_final_close verifies funding query/manifest/schedule include the exact final boundary and that the extra Mark candle is requested only for a scheduled terminal settlement.
+- test_trade_ohlcv_allows_one_exact_terminal_mark_boundary accepts the exact extra boundary; test_trade_ohlcv_rejects_nonterminal_extra_mark_timestamp rejects any other extra mark.
+- The archive-level manifest test now verifies lifecycle-clipped funding coverage through the inclusive final close.
+- Research CI [#41819498000](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41819498000) — **SUCCESS**, 58 successful workflow steps, no failures. The collector, funding/mark coverage, funding manifest and portfolio accounting test steps all passed.
+
+## Simultaneous exits and portfolio equity — reviewed
+
+No confirmed order-dependent capital-accounting defect was found in the deterministic synthetic exit tests. The engine pre-marks the synchronized portfolio before processing per-symbol position management. Existing passing regressions include:
+- test_two_positions_stopped_on_same_bar_reconcile_once_independent_of_order;
+- test_sparse_replay_kill_switch_flattens_all_positions_order_invariantly;
+- test_same_bar_tp1_on_one_symbol_and_stop_on_another_is_order_independent; and
+- test_drawdown_is_order_independent_for_simultaneous_trade_closes.
+
+This is evidence for the tested synchronized OHLC scenarios, not a claim that exchange-side event ordering or partial fills are modeled.
+
+### Execution limitations unchanged
+
+- The H1 OHLC limit wrapper remains all-or-none; it does not model partial fills or queue position.
+- The three-bar wait policy expires unfilled orders and clears their local wait state/risk budget; its unit lifecycle tests pass. This is a deterministic OHLC simulation, not a live exchange cancellation acknowledgement.
+- Spread, queue priority, hidden liquidity, partial fills and adverse selection remain outside the H1 execution model.
+
+No new Bybit archive was downloaded, no market PnL replay was run, and no private API/account access or order was used.

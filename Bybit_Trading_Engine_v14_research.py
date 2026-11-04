@@ -1112,6 +1112,27 @@ class PlanBStatePersistence:
                             raise ValueError(f"позиция {sym}: TP1/remaining contract quantities не сходятся")
                     elif tp1_qty != 0 or remaining_qty != initial_qty:
                         raise ValueError(f"позиция {sym}: до TP1 весь contract_qty должен оставаться открытым")
+                    min_qty = parsed_qty["min_order_qty"]
+                    min_notional = parsed_qty["min_notional_value"]
+                    if initial_qty < min_qty or remaining_qty < min_qty:
+                        raise ValueError(f"позиция {sym}: открытая contract quantity ниже minOrderQty")
+                    lowest_planned_exit = min(
+                        Decimal(str(pos_dict["stop_price"])),
+                        Decimal(str(pos_dict["entry_price"])),
+                        Decimal(str(pos_dict["tp2_price"])),
+                    )
+                    if remaining_qty * lowest_planned_exit < min_notional:
+                        raise ValueError(
+                            f"позиция {sym}: remaining contract quantity нарушает minNotionalValue "
+                            "на минимальной плановой цене выхода"
+                        )
+                    if tp1_hit and (
+                        tp1_qty < min_qty
+                        or tp1_qty * Decimal(str(pos_dict["tp1_price"])) < min_notional
+                    ):
+                        raise ValueError(
+                            f"позиция {sym}: TP1 contract quantity нарушает minOrderQty/minNotionalValue"
+                        )
                 expected_remaining = 1.0 - TP1_FRACTION if tp1_hit else 1.0
                 if pos_dict.get("exchange_sized", False):
                     expected_remaining = float(

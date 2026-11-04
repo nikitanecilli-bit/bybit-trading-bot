@@ -59,6 +59,8 @@ class InstrumentSpecHistory:
             if not isinstance(payload, dict) or payload.get("schema_version") != 1:
                 raise ValueError(f"{path}: unsupported instrument snapshot schema")
             snapshot_category = str(payload.get("category") or "")
+            if payload.get("source") != "Bybit V5 GET /v5/market/instruments-info":
+                raise ValueError(f"{path}: invalid or missing Bybit instruments-info source")
             if snapshot_category != category:
                 raise ValueError(f"{path}: expected category {category}, got {snapshot_category!r}")
             fetched_at = str(payload.get("fetched_at") or "")

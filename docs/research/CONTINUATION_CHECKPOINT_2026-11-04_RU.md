@@ -121,3 +121,19 @@ Regression coverage: reset snapshot заменяет старые уровни; 
 The previously inspected AAVEUSDT 2025-09-02 sample had zero u=1 resets, so this is a parser-integrity guard, not a correction to the four-order sample metrics. No archive was re-downloaded, no strategy signal was replayed, no PnL was run, and no Bybit account/API/order operation occurred.
 
 Next static audit items remain: order-spec/tick/qty validation, per-fill fee and VWAP markout lifecycle, latency/cancel assumptions, and duplicate public-trade ID handling. Keep MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL.
+## 11. L2 parser follow-up audit: test-fixture correction and atomic state application
+
+Во время повторной проверки предыдущей серии автоправок обнаружены дефекты в самих regression fixtures: повторяющиеся ключи u в двух Python dict literals (последний ключ молча перезаписывал первый), а также неконсистентное имя/ожидание теста restart snapshot. Исправлено до использования тестов как доказательства.
+
+Дополнительно выявлен настоящий robustness-дефект: OrderBook.apply() очищал/менял live book до полной проверки всех уровней. Некорректный snapshot/delta мог оставить частично изменённое состояние после исключения. Исправлено транзакционным применением: строится candidate book, проверяются уровни и crossed state, затем одним шагом заменяются bids/asks и sequence metadata.
+
+Изменения:
+- `bybit_l2_queue_replay.py`: atomic candidate-state apply; malformed decimal values нормализуются в ValueError.
+- `tests/test_bybit_l2_queue_replay.py`: restart fixture очищен от duplicate dict keys; restart snapshot использует seq=3 после seq=2 и проверяет сохранение cross-sequence ordering; добавлены два regression tests на atomic failure для malformed delta и snapshot.
+- Queue replay test file сейчас содержит 25 test functions; duplicate `u` keys отсутствуют.
+
+Последние commits: atomic source `38b17dcc50f59d17f746cc38ebf61ed68b429eb5`; test repair/atomic regressions `6207866ea5ec6deff952cd42b0c90dac8154842e`; decimal validation `b1922c98b194b1c45501c59b0df9d1bc426e6404`; strict ValueError assertion `afb1e090b00fc45f9329cea5ce02e744764995a7`.
+
+CI state: combined commit status and available commit-workflow lookup returned no runs/statuses for these push commits. The available wrapper only exposes PR-triggered runs. Therefore tests are committed but execution is NOT independently verified in this session; do not claim 25/25 passed. No local runner was available in this tool context.
+
+Next: obtain a terminal Research CI result through Actions UI/API with push-run visibility; then continue order-spec validation and duplicate trade-ID audit. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains unchanged. No strategy PnL, data re-download, private API or live order was used.

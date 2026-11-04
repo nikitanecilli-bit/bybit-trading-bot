@@ -1114,3 +1114,13 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Three regression tests cover zero favorable, long favorable below entry, and short adverse below entry.
 - Source CI #41854906684 SUCCESS 57/57; final CI #41854947672, 4c7744c22180a97fa868547eac034cdf91b69491 SUCCESS 57/57; state persistence 81 tests.
 - Persisted excursion-metric integrity only; no PnL/backtest or exchange operations.
+
+
+## ENG-RISK-004 — Restore must preserve drawdown stop latches (2026-11-04)
+
+- Restore rejects `kill_switch_triggered=false` when current implied DD or historical max_drawdown_pct reaches emergency threshold; this preserves the latch after equity recovery.
+- Restore rejects `daily_stop_triggered=false` when current-day DD reaches daily stop threshold and current_day_str is active.
+- Three regressions cover current emergency breach, recovered historical emergency breach, and current daily breach.
+- Source CI #41861236015 SUCCESS 57/57; final CI #41861273155, 669a7d66c50df5426e63c5490580b2d8bbc92f22 SUCCESS 57/57; state persistence suite 84 tests.
+- Limitation: recovered intraday daily breach cannot be inferred from existing schema if latch is corrupted; no daily equity-low watermark exists.
+- Risk-control state integrity only; no PnL/backtest or exchange operations.

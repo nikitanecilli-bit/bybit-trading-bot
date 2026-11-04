@@ -869,3 +869,23 @@ Verification:
 - Actual logs confirm `tests/test_snapshot_bybit_instruments.py` **17/17 passed** and `tests/test_snapshot_bybit_risk_limits.py` **16/16 passed**, including both generated-snapshot round-trip tests.
 
 No Bybit collectors or downloads, market PnL, private API/account access, runner registration, paper/live orders, or main-branch changes. PR #4 remains Draft/open. Continue read-only data-contract review; strategy PnL remains blocked by missing dated exchange snapshots and execution evidence.
+
+
+## 43. Risk-tier history rejects missing higher-tier mmDeduction and boolean numerics — 2026-11-04
+
+Static comparison of the history loader with the snapshot collector found a fail-open mismatch: RiskTierHistory.from_directory() defaulted a missing/empty mmDeduction to zero for every tier, while the collector requires this field on every tier above the lowest. A malformed archive could therefore load with incorrect maintenance-margin deduction. The shared Decimal parser also accepted bool values as numeric 0/1 in some fields.
+
+Correction:
+- Only the lowest tier may omit mmDeduction; missing/empty deduction on a higher tier now fails closed.
+- _d() explicitly rejects booleans.
+- Added regressions for missing higher-tier deduction and boolean maintenance-margin input.
+
+Commits:
+- source: 6a668cf70c26680a751ed62fd8b1d9a24799fa76;
+- tests: 625b84cc3c6eb6354a6801262ee77d77ad9efe5b.
+
+Verification:
+- Research CI #41845762278 on 625b84cc3c6eb6354a6801262ee77d77ad9efe5b: SUCCESS; job tests SUCCESS; all 57 workflow steps completed without failure.
+- Actual log confirms risk-tier history 15/15 tests passed, including both new regressions; mark-price liquidation and engine integration suites also passed.
+
+No collector execution, Bybit data download, PnL, private API/account access, runner registration, paper/live orders or main-branch change. PR #4 remains Draft/open. Continue read-only schema and execution-consumer review; strategy PnL remains blocked pending verified historical snapshots and execution evidence.

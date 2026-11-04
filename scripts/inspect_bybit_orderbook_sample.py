@@ -18,6 +18,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bybit_l2_queue_replay import strict_int
+from report_io import write_json_report
 
 URL = "https://quote-saver.bycsi.com/orderbook/linear/AAVEUSDT/2025-09-02_AAVEUSDT_ob200.data.zip"
 TRADES_URL = "https://public.bybit.com/trading/AAVEUSDT/AAVEUSDT2025-09-02.csv.gz"
@@ -227,7 +228,7 @@ def main() -> int:
             report["stream_validation"] = inspect_member(zf, data_members[0])
         report["status"] = "success"
     output = Path("bybit_orderbook_sample_inspection.json")
-    output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    write_json_report(output, report)
     print(json.dumps(report, indent=2))
     return 0
 

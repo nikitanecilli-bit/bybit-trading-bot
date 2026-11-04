@@ -1153,6 +1153,27 @@ def test_book_state_capture_excludes_same_millisecond_updates():
     assert book_state.quantity_at("Buy", D("100")) == D("5")
 
 
+def test_markout_state_capture_rejects_non_integer_targets():
+    original = l2_runner.iter_book_events
+    l2_runner.iter_book_events = lambda *_args: iter([])
+    try:
+        for target in (1000.5, True, "1000"):
+            try:
+                l2_runner.capture_book_states_at(Path("unused.zip"), [target])
+            except ValueError as exc:
+                assert "markout target timestamp" in str(exc)
+            else:
+                raise AssertionError("non-integer markout target must be rejected")
+        try:
+            l2_runner.capture_book_states_at(Path("unused.zip"), [0])
+        except ValueError as exc:
+            assert "must be positive" in str(exc)
+        else:
+            raise AssertionError("zero markout target must be rejected")
+    finally:
+        l2_runner.iter_book_events = original
+
+
 def test_post_fill_markout_snapshot_excludes_same_millisecond_updates():
     events = [
         {"type": "snapshot", "cts": 1000, "data": {

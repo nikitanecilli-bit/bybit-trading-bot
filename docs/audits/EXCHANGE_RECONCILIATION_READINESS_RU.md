@@ -268,3 +268,22 @@ Research CI #41913543774 — SUCCESS, 59/59 workflow steps; тест persistence
 Ограничение: правила проверяются только когда position identity известна. Для legacy backup без exchange identity данные не восстанавливаются догадками. Это локальная проверка связности ордеров, не полная верификация всех Bybit order types/position modes; реальный обменный протокол и обработчики ордеров не запускались.
 
 Не выполнялись API calls, credentials, collectors, archive downloads, live orders или market PnL tests. Reconciliation PASS и live resume остаются BLOCKED.
+
+
+### ENG-RECON-012 — несколько ордеров, частичные исполнения, отмена и замена
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
+
+- Журнал сохраняет каждый ордер по отдельному `orderId`; несколько параллельных выходных ордеров одной позиции не объединяются.
+- Исполнения привязываются к конкретному `orderId` и `execId`; повторная доставка идентичного execution остаётся идемпотентной, конфликтующий повторный `execId` отклоняется.
+- Сумма известных исполнений проверяется отдельно для каждого ордера и не может превышать его `cumExecQty`.
+- Частично исполненный ордер может перейти в `Cancelled`, сохранив накопленный `cumExecQty`, при этом `leavesQty` должен стать нулём. История частичных fills остаётся привязанной к старому `orderId`.
+- Замена после отмены учитывается как новый ордер с новым `orderId`; старый ордер и его fills не перезаписываются.
+- Терминальные статусы `Filled`, `Cancelled`, `Rejected`, `PartiallyFilledCanceled`, `Deactivated` не могут быть изменены последующими обновлениями. Идентичный повтор терминального snapshot идемпотентен.
+- Для `Filled` требуется `cumExecQty == qty` и `leavesQty == 0`; для остальных перечисленных терминальных статусов требуется `leavesQty == 0`.
+- Добавлены тесты нескольких параллельных ордеров, fills на нескольких ордерах, partial-fill cancellation, replacement с новым orderId, terminal-state immutability и quantity consistency.
+- Первый CI выявил неточность теста: он ожидал ошибку на точном повторе уже сохранённого terminal snapshot. Это противоречило требованию идемпотентности; тест исправлен так, чтобы принимать точный повтор и отклонять попытку изменить terminal order.
+- Research CI #41914354962 — SUCCESS.
+
+Ограничение: это проверки внутреннего журнала и последовательности принятых snapshots. Они не доказывают полноту execution history, не получают order history с биржи и не подтверждают, что все варианты статусов/замены в реальном аккаунте представлены. Реальный API, handlers, collectors, live orders и market PnL не запускались. Reconciliation PASS и live resume остаются BLOCKED.

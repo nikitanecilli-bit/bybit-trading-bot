@@ -1098,3 +1098,11 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Test fixture default corrected: full remaining quantity when TP1 false. Three regressions added for contradictory TP1/quantity states.
 - Final CI #41853410298, 0cf45d16809a04e2653325934b37723b009097d0: SUCCESS 57/57; actual log confirms all three regressions and 28 funding tests. Intermediate source-only run failed because it still had the prior contradictory fixture; corrected in test commit and final run green.
 - Technical correctness only; no PnL/backtest or exchange operations.
+
+
+## ENG-EXEC-017 — Validate persisted realized TP1 gross (2026-11-04)
+
+- Restore now recomputes realized TP1 gross from actual closed leg and TP1 price; rejects arbitrary/stale values. Exchange-sized: exact TP1 contract quantity × price move. Legacy: initial notional × closed fraction × relative price move. 4-decimal rounding tolerance.
+- Regression corrupts legacy realized TP1 gross 30→31 and expects fail-closed restore. Exchange-sized fixtures now use exact gross 3; legacy liquidity fixture uses gross 30.
+- Final CI #41854119883, f42979860d97090120ee3a8aed79d59695d441ee: SUCCESS 57/57; state persistence 78 tests. Earlier runs exposed stale fixture values, corrected before final green run.
+- Persisted PnL integrity guardrail only; no PnL/backtest or exchange operations.

@@ -1059,3 +1059,12 @@ Classification: persisted PnL integrity, not profitability evidence. No market P
 - PR #4 remains open, Draft, mergeable=false. Preserve both histories; no merge/rebase/reset/force-push; main unchanged.
 - Latest code/test commit with successful full CI: f42979860d97090120ee3a8aed79d59695d441ee; workflow #41854119883 SUCCESS, 57/57; persistence suite 78 tests.
 - Commits after that successful code/test head are documentation-only updates to handoff/checkpoint/ledger.
+
+
+## 56. Restore validates directional MFE/MAE extrema — 2026-11-04
+
+Restore now rejects non-positive persisted max_favorable_px/max_adverse_px (which `__post_init__` would otherwise silently replace with entry), and enforces directional consistency: long favorable >= entry/adverse <= entry; short favorable <= entry/adverse >= entry. Missing legacy fields still default to entry.
+
+Three regressions added: zero favorable extreme, long favorable below entry, short adverse below entry. Source CI #41854906684 SUCCESS 57/57; final test CI #41854947672 on 4c7744c22180a97fa868547eac034cdf91b69491 SUCCESS 57/57; state persistence suite 81 tests, actual logs confirm all three tests.
+
+Classification: restored excursion-metric integrity only; no strategy PnL/backtest/API/runner/paper/live or main changes.

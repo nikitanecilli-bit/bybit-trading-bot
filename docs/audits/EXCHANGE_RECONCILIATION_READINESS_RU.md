@@ -338,3 +338,39 @@ Research CI #41915745339 — SUCCESS, 59/59 workflow steps; протестиро
 - Нет персистентного журнала page cursors/coverage windows и нет collector integration; эти задачи требуют отдельного контракта источника и не должны симулироваться локальными fixtures.
 
 Никаких Bybit API calls, credentials, collectors, archive downloads, live orders или market PnL tests не выполнялось. Reconciliation PASS, live resume и strategy/execution/PnL gates остаются BLOCKED.
+
+
+### ENG-RECON-015 — интервалы покрытия execution history
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
+
+Добавлен immutable контракт `ExchangeExecutionCoverage` и поле `OpenPositionState.exchange_execution_coverage`, которое автоматически сохраняется/восстанавливается через Plan B вместе с остальным состоянием позиции.
+
+Контракт окна:
+- `coverage_id` — стабильный идентификатор аттестации окна;
+- `symbol` — инструмент;
+- `window_start_ms`, `window_end_ms` — полуоткрытый интервал `[start, end)`;
+- `page_count` — положительное число страниц;
+- `pagination_complete` и `terminal_page_seen` — отдельные bool-флаги; нельзя объявить пагинацию завершённой без наблюдения terminal page.
+- Точный повтор `coverage_id` идемпотентен; конфликтующий повтор отклоняется. Другая символика и неизвестные/пропущенные поля отклоняются строгим контрактом.
+
+Добавлены методы:
+- `record_exchange_execution_coverage()` — сохраняет caller-attested окно, не выводя покрытие из списка fills.
+- `audit_exchange_execution_coverage(lifecycle_start_ms, audit_end_ms)` — объединяет перекрывающиеся/смежные завершённые окна, сообщает временные gaps, учитывает только окна с завершённой пагинацией и проверяет, что известные fills попадают хотя бы в одно полное окно.
+- Начало аудита обязано совпадать с `position.entry_ts`; нельзя случайно получить COMPLETE, проверив только укороченный интервал.
+
+Offline tests:
+- overlapping windows дают непрерывное покрытие;
+- незавершённая пагинация не закрывает gap;
+- conflicting coverage ID и неверный symbol отклоняются;
+- подмена lifecycle start отклоняется;
+- coverage metadata сохраняется и восстанавливается через Plan B.
+
+Research CI #41916337116 — SUCCESS, 59/59 workflow steps; протестированный commit `6b30deb3ef279ac6bc30960fc776f57f687695db`.
+
+Критическое ограничение:
+- `COMPLETE` означает только, что сохранённые caller-attested интервалы покрывают заданный lifecycle interval без разрывов, все их pagination flags заявлены завершёнными и известные fills попадают в окна.
+- Этот код не проверяет фактические HTTP-запросы, server-side snapshot consistency, корректность cursor chain, задержанные биржевые события или полноту выдачи API. `pagination_complete` и `terminal_page_seen` — аттестации вызывающего слоя, а не криптографическое/биржевое доказательство.
+- Нельзя выставлять `execution_history_complete=True` только на основании локального coverage audit без надёжного collector provenance и независимо проверенной пагинации.
+- Нет Bybit API calls, credentials, collectors, archive downloads, live orders или market PnL tests. Reconciliation PASS, live resume и strategy/execution/PnL gates остаются BLOCKED.

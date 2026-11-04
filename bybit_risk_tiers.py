@@ -76,6 +76,37 @@ class RiskTierSnapshot:
     tiers_by_symbol: dict[str, tuple[RiskTier, ...]]
 
 
+def calculate_margin_requirements_from_tiers(
+    symbol: str, position_value: Decimal | str | float,
+    *, leverage: Decimal | str | float, tiers: tuple[RiskTier, ...],
+) -> RiskMarginRequirement:
+    """Calculate IM/MM from a risk-tier ladder already selected by a joined as-of state."""
+    value = _d(position_value, "position_value")
+    lev = _d(leverage, "leverage")
+    if value <= 0 or lev <= 0:
+        raise ValueError("position_value and leverage must be > 0")
+    if not tiers:
+        raise ValueError(f"{symbol} has no joined risk tiers")
+    tier = next((item for item in tiers if value <= item.risk_limit_value), None)
+    if tier is None:
+        raise ValueError(f"{symbol} position value exceeds highest riskLimitValue")
+    if lev > tier.max_leverage:
+        raise ValueError(
+            f"{symbol} leverage {lev} exceeds tier {tier.tier_id} maxLeverage {tier.max_leverage}"
+        )
+    initial_margin = value / lev
+    maintenance_margin = value * tier.maintenance_margin_rate - tier.mm_deduction
+    if initial_margin <= 0 or maintenance_margin < 0:
+        raise ValueError(f"{symbol} tier {tier.tier_id} produced invalid IM/MM requirement")
+    return RiskMarginRequirement(
+        position_value=value, leverage=lev, max_leverage=tier.max_leverage,
+        initial_margin=initial_margin, maintenance_margin=maintenance_margin,
+        tier_id=tier.tier_id, risk_limit_value=tier.risk_limit_value,
+        maintenance_margin_rate=tier.maintenance_margin_rate,
+        mm_deduction=tier.mm_deduction,
+    )
+
+
 class RiskTierHistory:
     """Loads archived Bybit V5 risk-limit pages and performs as-of tier selection."""
 

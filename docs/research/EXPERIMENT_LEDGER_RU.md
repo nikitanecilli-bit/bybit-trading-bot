@@ -1219,4 +1219,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Code commit: `3733f7c679edb98b4d6164a0c37b973d34390431`; corrected completed-order regression fixture in `94daea107f1e76c9d733d2a3673666d537c2f0c6`.
 - CI #41884569767 initially failed because the test used the default quantity and was only partially filled; fixture now uses a quantity that is actually completed. CI #41884668466 on `94daea1` completed SUCCESS, 57/57 workflow steps; logs confirm `PASS test_apply_public_trade_validates_normalized_rows_outside_active_window` and aggregate-L2 suite 83/83.
 - This hardens direct primitive validation; archive replay semantics/PnL are unchanged. No archive download, collector, backtest, API, runner, paper/live order or main change.
+## ENG-EXEC-030 — Reconstruct book state and reject crossed books in standalone inspector (2026-11-04)
+
+- Static comparison found that the standalone inspector validated each level's shape/price/quantity but did not reconstruct state across snapshots and deltas. It could therefore accept a crossed snapshot or a delta that crossed the reconstructed book, while the primary `OrderBook.apply()` rejects crossed reconstructed states atomically.
+- Added local candidate-state reconstruction for snapshots/deltas, including absolute level updates and zero-quantity deletes; duplicate-level validation remains atomic, and crossed state now fails closed.
+- Code/test commit: `948c7a161682d677fe6c284bf1877fbac5fe6964`.
+- Regression covers a crossed initial snapshot and a delta that crosses a previously valid book.
+- Research CI #41885051272 on this commit completed SUCCESS, job `tests` SUCCESS, 57/57 workflow steps; actual logs confirm `PASS test_orderbook_inspector_rejects_crossed_snapshot_and_delta_books`, aggregate-L2 83/83 and runner/inspector 19/19.
+- Diagnostic data-integrity only; no archive download, PnL/backtest, collector, API, runner, paper/live order or main change.
 

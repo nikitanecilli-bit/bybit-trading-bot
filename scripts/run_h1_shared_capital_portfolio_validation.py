@@ -274,11 +274,45 @@ def validate_selection_provenance(selection, current_input_files, current_code_f
     recorded_code = selection.get("code_files")
     if not isinstance(recorded_code, list):
         raise SystemExit("Selection manifest lacks replay code hashes")
-    actual_code = {row.get("path"): row for row in current_code_files}
-    for expected_row in recorded_code:
-        actual_row = actual_code.get(expected_row.get("path"))
-        if actual_row is None or (actual_row.get("sha256"), actual_row.get("size_bytes")) != (expected_row.get("sha256"), expected_row.get("size_bytes")):
-            raise SystemExit(f"H1 replay code changed since selection: {expected_row.get('path')}; rerun train-only selection")
+
+    def index_code_rows(rows, source):
+        indexed = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                raise SystemExit(f"Invalid {source} replay code provenance row")
+            path = row.get("path")
+            sha256 = row.get("sha256")
+            size_bytes = row.get("size_bytes")
+            if (not isinstance(path, str) or not path.strip()
+                    or not isinstance(sha256, str) or not sha256.strip()
+                    or isinstance(size_bytes, bool) or not isinstance(size_bytes, int)
+                    or size_bytes < 0):
+                raise SystemExit(f"Invalid {source} replay code provenance fields")
+            if path in indexed:
+                raise SystemExit(f"Duplicate {source} replay code provenance path: {path}")
+            indexed[path] = row
+        return indexed
+
+    expected_code = index_code_rows(recorded_code, "selection manifest")
+    actual_code = index_code_rows(current_code_files, "current checkout")
+    expected_paths = set(expected_code)
+    actual_paths = set(actual_code)
+    if expected_paths != actual_paths:
+        missing = sorted(expected_paths - actual_paths)
+        added = sorted(actual_paths - expected_paths)
+        raise SystemExit(
+            "H1 replay dependency set changed since selection; rerun train-only selection. "
+            f"missing dependencies={missing}, added dependencies={added}"
+        )
+    for path in sorted(expected_paths):
+        expected_row = expected_code[path]
+        actual_row = actual_code[path]
+        if (actual_row["sha256"], actual_row["size_bytes"]) != (
+            expected_row["sha256"], expected_row["size_bytes"]
+        ):
+            raise SystemExit(
+                f"H1 replay code changed since selection: {path}; rerun train-only selection"
+            )
 
 
 def load_frozen_selection_manifest(environ=None):

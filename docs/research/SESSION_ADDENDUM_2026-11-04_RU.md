@@ -142,3 +142,12 @@ CI: run [41901402434](https://github.com/nikitanecilli-bit/bybit-trading-bot/act
 - Research CI [#41903071454](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41903071454): **SUCCESS**, 59/59 шагов.
 - Важное ограничение: `fetched_at` — время завершения клиентского сбора, не общий серверный snapshot token. Даже нулевой skew не доказывает атомарность ответов Bybit или синхронность данных внутри последовательной пагинации. Порог skew должен быть обоснован отдельно; здесь не назначается произвольное production-значение.
 - Только offline CI. Реальные API requests, collectors, archive downloads, live orders и market PnL tests не запускались.
+
+## ENG-DATA-016 — аудит подключения согласованного market state
+
+- Усилен `get_linear_market_state()`: проверяются непустой symbol и тип/знак обоих max-age budgets; `bool`, float и отрицательные значения отклоняются. Для instrument lookup явно требуется статус `Trading`.
+- Добавлены 2 offline tests на некорректные max-age budgets и пустой symbol.
+- Аудит runtime path обнаружил, что `Bybit_Trading_Engine_v14_research.py` по-прежнему отдельно вызывает `InstrumentSpecHistory.get_spec()` при проверке/размере entry, `RiskTierHistory.calculate_margin_requirements()` при risk-margin проверке и `RiskTierHistory.get_tiers()` при mark-price liquidation check. H1 runner использует instrument history для tick rounding; одновременно передаёт обе директории в engine, но пока не вызывает `get_linear_market_state()`.
+- Поэтому согласованный join пока является отдельным проверенным API, а не обязательным runtime guard. Нельзя утверждать, что временной skew уже ограничен во всех entry/liquidation путях. Автоматическое включение без явно утверждённого skew budget означало бы выбор произвольного порога; это не сделано.
+- Research CI [#41903447996](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41903447996): **SUCCESS**, полный job завершён; 59 шагов, ошибок нет. Включает compile, deterministic tests и offline checks.
+- Только offline CI и чтение исходников. Реальные API requests, collectors, archive downloads, live orders и market PnL tests не запускались. Стратегические execution/PnL gates остаются BLOCKED.

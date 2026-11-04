@@ -136,7 +136,7 @@ class RiskTierHistory:
                     raise ValueError(f"{path}: duplicate tier {key}")
                 seen.add(key)
                 lowest = row.get("isLowestRisk")
-                if isinstance(lowest, bool) or lowest not in (0, 1):
+                if isinstance(lowest, bool) or not isinstance(lowest, int) or lowest not in (0, 1):
                     raise ValueError(f"{path}: isLowestRisk must be integer 0 or 1")
                 deduction_raw = row.get("mmDeduction")
                 if deduction_raw in (None, "") and lowest != 1:

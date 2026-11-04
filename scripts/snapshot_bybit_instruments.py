@@ -158,8 +158,13 @@ def _snapshot_timestamp(value: str | None) -> str:
 
 
 def build_snapshot(rows: list[dict[str, Any]], category: str,
-                   fetched_at: str | None = None) -> dict[str, Any]:
+                   fetched_at: str | None = None,
+                   collection_started_at: str | None = None) -> dict[str, Any]:
     timestamp = _snapshot_timestamp(fetched_at)
+    started_at = (_snapshot_timestamp(collection_started_at)
+                  if collection_started_at is not None else None)
+    if started_at is not None and started_at > timestamp:
+        raise ValueError("snapshot collection_started_at cannot be after fetched_at")
     if not rows or any(not isinstance(row, dict) for row in rows):
         raise ValueError("snapshot requires non-empty instrument objects")
     raw_symbols = [row.get("symbol") for row in rows]
@@ -168,7 +173,7 @@ def build_snapshot(rows: list[dict[str, Any]], category: str,
     symbols = [symbol.strip().upper() for symbol in raw_symbols]
     if len(symbols) != len(set(symbols)):
         raise ValueError("snapshot contains duplicate symbols")
-    return {
+    snapshot = {
         "schema_version": SCHEMA_VERSION,
         "source": "Bybit V5 GET /v5/market/instruments-info",
         "category": category,
@@ -176,6 +181,9 @@ def build_snapshot(rows: list[dict[str, Any]], category: str,
         "count": len(rows),
         "instruments": rows,
     }
+    if started_at is not None:
+        snapshot["collection_started_at"] = started_at
+    return snapshot
 
 
 def write_snapshot(snapshot: dict[str, Any], output: str | Path) -> Path:
@@ -216,8 +224,9 @@ def main() -> None:
             time.sleep(args.pause)
         return page, next_cursor
 
+    collection_started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     rows = fetch_all_instruments(args.category, fetch)
-    snapshot = build_snapshot(rows, args.category)
+    snapshot = build_snapshot(rows, args.category, collection_started_at=collection_started_at)
     fetched = datetime.fromisoformat(snapshot["fetched_at"].replace("Z", "+00:00"))
     stamp = fetched.astimezone(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     output = Path(args.output_dir) / args.category / f"{stamp}.json"

@@ -123,6 +123,32 @@ class MarkPriceEngineIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(exit_price, 100_980.0)
 
+    def test_liquidation_requires_joined_market_state_when_both_histories_exist(self):
+        engine = make_engine()
+        pos = make_position()
+        ts = pos.entry_ts
+        close_ts = ts + 3_600_000
+        engine.liquidation_model_enabled = True
+        engine.risk_tier_history = make_risk_history(close_ts)
+        engine.instrument_spec_history = object()
+        engine.max_market_state_skew_ms = None
+        engine._mark_price_candles = {"BTCUSDT": {
+            ts: em.MarkPriceCandle(
+                ts, Decimal("99000"), Decimal("100450"),
+                Decimal("98500"), Decimal("100000"),
+            )
+        }}
+        with patch.object(
+            em, "get_linear_market_state",
+            side_effect=ValueError("max_snapshot_skew_ms must be a non-negative integer"),
+        ) as joined:
+            with self.assertRaisesRegex(ValueError, "max_snapshot_skew_ms"):
+                engine._liquidation_exit_price(
+                    pos, em.Candle(ts, 99000, 100500, 98500, 100000, 1), close_ts,
+                )
+        joined.assert_called_once()
+        self.assertIsNone(joined.call_args.kwargs["max_snapshot_skew_ms"])
+
     def test_liquidation_margin_uses_only_remaining_share_of_pre_tp1_funding(self):
         engine = make_engine()
         pos = make_position(direction="long", stop=98_000.0)

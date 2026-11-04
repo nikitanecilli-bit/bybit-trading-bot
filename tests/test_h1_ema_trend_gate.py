@@ -282,6 +282,7 @@ if __name__ == "__main__":
         test_paired_ema_comparison_matches_identical_configs_and_costs,
         test_paired_ema_comparison_rejects_different_baskets_or_windows,
         test_paired_ema_comparison_fails_closed_for_unpaired_rows,
+        test_paired_ema_comparison_rejects_unmatched_extra_baseline_rows,
         test_ema_gate_precomputes_full_history_and_uses_exact_scored_timestamp,
         test_ema_gate_fails_closed_without_1000_pre_roll_bars,
         test_ema_gate_fails_closed_for_missing_symbol_or_history,

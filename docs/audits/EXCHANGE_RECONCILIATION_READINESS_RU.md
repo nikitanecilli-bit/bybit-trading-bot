@@ -508,7 +508,7 @@ Research CI #41918766426 — SUCCESS, 59/59 workflow steps; tested code commit `
 ### ENG-RECON-020 — read-only dry-run план слияния поздних исполнений
 
 Дата: 2026-11-05  
-Статус: IMPLEMENTED / CI PENDING FINAL VERIFICATION.
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
 
 Добавлена функция `build_execution_merge_plan(local_backup, snapshot)` в `scripts/bybit_reconciliation_report.py`.
 
@@ -523,7 +523,7 @@ Research CI #41918766426 — SUCCESS, 59/59 workflow steps; tested code commit `
 
 Offline tests: новая late fill proposal, exact duplicate и conflicting duplicate, orphan order rejection, отсутствие мутации backup.
 
-CI: первоначальные прогоны выявили ошибки импорта и оформления тестового import statement; они исправлены. Итоговый CI для последнего SHA должен быть подтверждён отдельно.
+CI #41919550697 — SUCCESS, 59/59 workflow steps; tested code commit `a32254a011ff77f80ee8ee4e35a46103e208a22e`. Первоначальные прогоны выявили ошибки импорта и оформления тестового import statement; они исправлены, финальный полный прогон успешен.
 
 Ограничения:
 - Это только read-only proposal; нет команды apply, автоматической записи Plan B или вызова `merge_exchange_execution_batch`.

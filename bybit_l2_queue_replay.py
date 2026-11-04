@@ -213,6 +213,8 @@ def place_passive_order(
 ) -> PassiveOrder:
     if side not in ("Buy", "Sell"):
         raise ValueError("side must be Buy or Sell")
+    arrival_ts = strict_int(arrival_ts, "arrival_ts")
+    expiry_ts = strict_int(expiry_ts, "expiry_ts")
     price, quantity = dec(price), dec(quantity)
     if price <= ZERO or quantity <= ZERO or expiry_ts <= arrival_ts:
         raise ValueError("invalid price, quantity or lifetime")

@@ -13,9 +13,11 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "BNBUSDT", "SUIUSDT", "PEPEUSDT"]
 URLS = [
-    "https://quote-saver.bycsi.com/orderbook/linear/XRPUSDT/2024-12-01_XRPUSDT_ob500.data.zip",
-    "https://quote-saver.bycsi.com/orderbook/linear/BTCUSDT/2024-12-01_BTCUSDT_ob500.data.zip",
+    f"https://quote-saver.bycsi.com/orderbook/linear/{symbol}/{date}_{symbol}_{depth}.data.zip"
+    for date, depth in (("2024-12-01", "ob500"), ("2025-09-02", "ob200"))
+    for symbol in SYMBOLS
 ]
 
 def request_once(url: str, method: str) -> dict:

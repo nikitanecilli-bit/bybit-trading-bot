@@ -293,6 +293,36 @@ def test_paired_donchian48_rejects_missing_shared_invariant():
         raise AssertionError("missing shared portfolio boundary must fail closed")
 
 
+def test_paired_donchian48_rejects_missing_or_invalid_arm_metadata():
+    base = {
+        "fold": 1, "min_volume_ratio": 1.6, "min_breakout_atr": 0.1,
+        "cost_multiplier": 2.0, "timeframe": "1h",
+        "symbol_list": "BTCUSDT;ETHUSDT", "symbols": 2,
+        "common_h1_bars": 4000, "test_start_ts": 1_000_000,
+        "test_end_ts": 2_000_000, "shared_starting_capital": 10_000.0,
+        "max_concurrent_positions": 5, "net_pnl": -100.0, "trades": 40,
+    }
+    valid_rows = [
+        dict(base, donchian_period=period, ema50_200_gate=ema)
+        for period, ema in ((20, False), (48, False), (48, True))
+    ]
+    missing_period = [dict(row) for row in valid_rows]
+    missing_period[0].pop("donchian_period")
+    invalid_ema = [dict(row) for row in valid_rows]
+    invalid_ema[2]["ema50_200_gate"] = "true"
+
+    for rows, expected in (
+        (missing_period, "lacks explicit variant metadata"),
+        (invalid_ema, "invalid Donchian EMA gate marker"),
+    ):
+        try:
+            build_paired_donchian48_comparison(rows, enabled=True)
+        except ValueError as exc:
+            assert expected in str(exc)
+        else:
+            raise AssertionError("missing or invalid arm metadata must fail closed")
+
+
 if __name__ == "__main__":
     tests = [
         test_h1_execution_risk_settings_are_explicitly_frozen,
@@ -308,6 +338,7 @@ if __name__ == "__main__":
         test_donchian48_ablation_is_opt_in_and_freezes_exact_three_arms,
         test_paired_donchian48_comparison_requires_three_exact_arms,
         test_paired_donchian48_rejects_missing_shared_invariant,
+        test_paired_donchian48_rejects_missing_or_invalid_arm_metadata,
     ]
     for test in tests:
         test()

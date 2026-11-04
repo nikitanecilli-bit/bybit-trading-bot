@@ -199,12 +199,14 @@ def build_page_observation(
 def validate_page_observations(
     observations: Any, *, expected_symbols: set[str] | None = None,
     collection_started_at: str | None = None, fetched_at: str | None = None,
+    expected_status_filters: tuple[str, ...] | None = None,
 ) -> list[dict[str, Any]]:
     if not isinstance(observations, list) or not observations:
         raise ValueError("page_observations must be a non-empty list")
     validated = []
     previous_received: str | None = None
     page_counts: dict[str, int] = {}
+    page_has_next: dict[str, list[bool]] = {}
     for item in observations:
         if not isinstance(item, dict):
             raise ValueError("page observation must be an object")
@@ -232,8 +234,16 @@ def validate_page_observations(
         if previous_received is not None and normalized["request_started_at"] < previous_received:
             raise ValueError("page observations are not chronological")
         page_counts[status] = expected_index
+        page_has_next.setdefault(status, []).append(normalized["has_next_page"])
         previous_received = normalized["request_completed_at"]
         validated.append(normalized)
+    for status, continuation_flags in page_has_next.items():
+        if any(flag is False for flag in continuation_flags[:-1]) or continuation_flags[-1] is not False:
+            raise ValueError(f"page continuation flags are inconsistent for {status}")
+        if any(flag is not True for flag in continuation_flags[:-1]):
+            raise ValueError(f"missing continuation link between pages for {status}")
+    if expected_status_filters is not None and set(page_has_next) != set(expected_status_filters):
+        raise ValueError("page observations do not cover the expected status filters")
     if collection_started_at is not None and validated[0]["request_started_at"] < _snapshot_timestamp(collection_started_at):
         raise ValueError("first page observation starts before collection_started_at")
     if fetched_at is not None and validated[-1]["request_completed_at"] > _snapshot_timestamp(fetched_at):
@@ -276,6 +286,7 @@ def build_snapshot(rows: list[dict[str, Any]], category: str,
         snapshot["page_observations"] = validate_page_observations(
             page_observations, expected_symbols=set(symbols),
             collection_started_at=started_at, fetched_at=timestamp,
+            expected_status_filters=INSTRUMENT_STATUS_FILTERS.get(category),
         )
     return snapshot
 

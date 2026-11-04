@@ -29,6 +29,7 @@ def _utc_ms(value: str) -> int:
 class InstrumentSnapshot:
     fetched_at: str
     fetched_at_ms: int
+    collection_started_at_ms: int | None
     category: str
     specs: dict[str, InstrumentSpec]
 
@@ -71,8 +72,18 @@ class InstrumentSpecHistory:
                 raise ValueError(f"{path}: invalid or missing Bybit instruments-info source")
             if snapshot_category != category:
                 raise ValueError(f"{path}: expected category {category}, got {snapshot_category!r}")
-            fetched_at = str(payload.get("fetched_at") or "")
+            raw_fetched_at = payload.get("fetched_at")
+            if not isinstance(raw_fetched_at, str) or not raw_fetched_at:
+                raise ValueError(f"{path}: fetched_at must be a non-empty ISO-8601 string")
+            fetched_at = raw_fetched_at
             fetched_at_ms = _utc_ms(fetched_at)
+            raw_started_at = payload.get("collection_started_at")
+            if raw_started_at is not None and (
+                    not isinstance(raw_started_at, str) or not raw_started_at):
+                raise ValueError(f"{path}: collection_started_at must be an ISO-8601 string")
+            started_at_ms = _utc_ms(raw_started_at) if raw_started_at is not None else None
+            if started_at_ms is not None and started_at_ms > fetched_at_ms:
+                raise ValueError(f"{path}: collection_started_at cannot be after fetched_at")
             rows = payload.get("instruments")
             if not isinstance(rows, list) or not rows:
                 raise ValueError(f"{path}: instruments must be a non-empty list")
@@ -102,6 +113,7 @@ class InstrumentSpecHistory:
             snapshots.append(InstrumentSnapshot(
                 fetched_at=fetched_at,
                 fetched_at_ms=fetched_at_ms,
+                collection_started_at_ms=started_at_ms,
                 category=snapshot_category,
                 specs=specs,
             ))

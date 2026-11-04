@@ -220,3 +220,14 @@
 - Финальный Research CI #41845762278 на 625b84cc3c6eb6354a6801262ee77d77ad9efe5b: SUCCESS; job tests SUCCESS; все 57 workflow steps завершились без failure. Фактический лог подтверждает test_bybit_risk_tiers.py 15/15 passed, включая обе новые регрессии; liquidation и engine integration suites также прошли.
 - Никаких Bybit snapshots/архивов не скачивали; collectors не запускались. Нет PnL, private API/account access, runner registration, paper/live orders или изменений main.
 - Следующий безопасный шаг: read-only аудит схемы/metadata в snapshot loaders и соседних execution consumers; сохранять PnL gate закрытым до появления подтверждённых исторических данных и execution evidence.
+
+
+## Session update — 2026-11-04 (RiskTierHistory ограничен linear-контрактами)
+
+- Статический аудит выявил, что RiskTierHistory заявлен как linear/USDT модель, а calculate_margin_requirements() применяет linear IM/MM формулы, но from_directory(category="inverse") и прямой конструктор могли принимать inverse snapshot. Это создавало возможность ошибочно рассчитать inverse risk tiers по linear формуле.
+- Исправление: конструктор RiskTierHistory теперь отклоняет любую категорию, кроме linear. Это не запрещает collector архивировать inverse snapshots, но не позволяет использовать их в linear margin model.
+- Добавлена регрессия на попытку создать RiskTierHistory с category="inverse".
+- Коммиты: source 2959547ab8c5150ebb9648e54c2792965ea1d06e; tests 6a257b205aef1b8724845c7f6b83fbe0b7aed1b4.
+- Финальный Research CI #41846247554 на 6a257b205aef1b8724845c7f6b83fbe0b7aed1b4: SUCCESS; job tests SUCCESS; все 57 workflow steps completed, failures отсутствуют. Фактический лог подтверждает новый inverse-category regression; risk-tier history suite — 16/16 passed.
+- Нет Bybit data collection/download, PnL, private API/account access, runner registration, paper/live orders или изменений main. PR #4 остаётся Draft/open.
+- Следующий безопасный шаг: завершить read-only review snapshot metadata/type guards и проверить итоговый branch/PR state; не открывать PnL gate без датированных данных и execution evidence.

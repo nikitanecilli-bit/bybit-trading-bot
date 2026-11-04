@@ -76,6 +76,8 @@ def inspect_snapshot(path: Path) -> dict[str, Any]:
         page_has_next: dict[str, list[bool]] = {}
         by_status: dict[str, dict[str, Any]] = {}
         previous_received: int | None = None
+        last_status: str | None = None
+        completed_statuses: set[str] = set()
         for item in page_observations:
             if not isinstance(item, dict):
                 raise ValueError(f"{path}: page observation must be an object")
@@ -93,6 +95,12 @@ def inspect_snapshot(path: Path) -> dict[str, Any]:
                 raise ValueError(f"{path}: page request starts before collection_started_at")
             if received > fetched_ms:
                 raise ValueError(f"{path}: page response is after fetched_at")
+            if status != last_status:
+                if status in completed_statuses:
+                    raise ValueError(f"{path}: page observations interleave status filter groups")
+                if last_status is not None:
+                    completed_statuses.add(last_status)
+                last_status = status
             expected_index = page_counts.get(status, 0) + 1
             if index != expected_index:
                 raise ValueError(f"{path}: page indexes are not sequential for {status}")
@@ -132,16 +140,16 @@ def inspect_snapshot(path: Path) -> dict[str, Any]:
                 raise ValueError(f"{path}: page continuation flags are inconsistent for {status}")
         category = payload.get("category")
         if "universe_history" in path.parts:
-            expected_filters = {"default", "PreLaunch", "Settling", "Delivering", "Closed"}
+            expected_filters = ("default", "PreLaunch", "Settling", "Delivering", "Closed")
         else:
             expected_filters = {
-                "linear": {"PreLaunch", "Trading", "Settling", "Delivering", "Closed"},
-                "inverse": {"PreLaunch", "Trading", "Settling", "Delivering", "Closed"},
-                "spot": {"Trading"},
-                "option": {"PreLaunch", "Trading", "Delivering", "Closed"},
+                "linear": ("PreLaunch", "Trading", "Settling", "Delivering", "Closed"),
+                "inverse": ("PreLaunch", "Trading", "Settling", "Delivering", "Closed"),
+                "spot": ("Trading",),
+                "option": ("PreLaunch", "Trading", "Delivering", "Closed"),
             }.get(category)
-        if expected_filters is not None and set(page_has_next) != expected_filters:
-            raise ValueError(f"{path}: page observations do not cover expected status filters")
+        if expected_filters is not None and tuple(page_has_next) != expected_filters:
+            raise ValueError(f"{path}: page observations do not cover expected status filters in order")
         if page_symbols != set(symbols):
             raise ValueError(f"{path}: page observation symbols do not match snapshot instruments")
         page_summary = {

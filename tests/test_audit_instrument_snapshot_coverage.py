@@ -109,11 +109,12 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
                 "Settling": [], "Delivering": [], "Closed": ["OLDUSDT"],
             }
             for index, (status, page_symbols) in enumerate(pages.items()):
-                start_ms = index * 1000
+                start_ms = index * 400
+                end_ms = start_ms + 100
                 observations.append({
                     "status_filter": status, "page_index": 1,
-                    "request_started_at": f"2026-11-01T00:00:{start_ms // 1000:02d}.000Z",
-                    "request_completed_at": f"2026-11-01T00:00:{start_ms // 1000:02d}.250Z",
+                    "request_started_at": f"2026-11-01T00:00:{start_ms // 1000:02d}.{start_ms % 1000:03d}Z",
+                    "request_completed_at": f"2026-11-01T00:00:{end_ms // 1000:02d}.{end_ms % 1000:03d}Z",
                     "row_count": len(page_symbols), "symbols": page_symbols,
                     "has_next_page": False,
                 })

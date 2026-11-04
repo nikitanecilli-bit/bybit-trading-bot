@@ -530,3 +530,27 @@ CI #41919550697 — SUCCESS, 59/59 workflow steps; tested code commit `a32254a01
 - Локальная позиция должна иметь точную exchange identity и локальные order records; legacy позиции без них fail closed.
 - Проверка не доказывает полноту биржевой истории, не устраняет задержку API и не является разрешением на resume.
 - Никакие Bybit API calls, collector runs, archive downloads, live orders или market PnL tests не выполнялись.
+
+### ENG-RECON-021 — stale-plan guard и атомарное применение в detached backup
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
+
+Усилен read-only workflow ENG-RECON-020:
+- План содержит SHA-256 канонического полного local backup (`base_backup_sha256`) и собственный digest `plan_sha256`.
+- `apply_execution_merge_plan()` отклоняет план, если после планирования изменилось любое поле backup, изменился payload плана или выставлены запрещённые флаги reconciliation/live-resume.
+- Применение выполняется только к deep-copy backup и возвращает отдельный `DETACHED_BACKUP_CANDIDATE`; исходный объект, работающий engine и файл Plan B не изменяются.
+- До возврата результата проверяются typed execution identity, symbol, known order/entry order, side, orderLinkId, уникальность execId и сумма fill quantity против cumExecQty.
+- Порядок записей детерминирован по `(exec_time_ms, exec_id)`.
+- Повторное применение того же плана к уже изменённой копии отклоняется как stale, а не дублирует fills.
+- Любая ошибка в любом элементе приводит к исключению до возврата кандидата; исходный backup остаётся неизменным.
+- Точные Decimal text значения используются в quantity guard без float conversion.
+
+Тесты: успешное detached apply и неизменность исходника; stale backup; изменённый plan digest; invalid second row после valid first row (all-or-nothing); повторное применение плана. Полный тестовый модуль reconciliation report — 33 tests OK. Research CI #41919978355 — SUCCESS, 59/59 workflow steps; tested code commit `e7254b76ae71cf082e3e70cc9fb034fe53d96f15`.
+
+Границы:
+- Это не запись в Plan B и не изменение `OpenPositionState` в работающем engine. Полученный backup-кандидат пока не имеет production apply/persist path.
+- `plan_sha256` — checksum целостности от случайного повреждения, не подпись и не защита от злонамеренного автора, который может пересчитать digest.
+- `base_backup_sha256` обеспечивает optimistic stale-state guard, но не заменяет файловую блокировку или compare-and-swap при будущей интеграции с Plan B.
+- Успешное применение не доказывает полноту execution history; флаги `execution_history_complete`, `reconciliation_pass` и `live_resume_allowed` остаются false.
+- Никакие Bybit API calls, collector runs, archive downloads, live orders или market PnL tests не выполнялись. Все execution/PnL gates остаются BLOCKED.

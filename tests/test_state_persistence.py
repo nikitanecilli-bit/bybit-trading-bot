@@ -26,6 +26,20 @@ def sample_risk_data():
     return engine.AdaptiveRiskManager(engine.BotConfig()).to_dict()
 
 
+def execution_page_chain(start_ms, count, *, final_has_next=False):
+    from exchange_execution_identity import ExchangeExecutionPageObservation
+    return tuple(
+        ExchangeExecutionPageObservation(
+            page_index=index,
+            request_started_at_ms=start_ms + index * 10,
+            request_completed_at_ms=start_ms + index * 10 + 5,
+            row_count=0,
+            has_next_page=(index < count - 1) or final_has_next,
+        )
+        for index in range(count)
+    )
+
+
 class StatePersistenceTests(unittest.TestCase):
     def _restored_engine_with_joined_histories(self):
         from types import SimpleNamespace
@@ -1809,8 +1823,8 @@ class StatePersistenceTests(unittest.TestCase):
         from exchange_execution_identity import ExchangeExecutionCoverage
         position = sample_position()
         start = position.entry_ts
-        first = ExchangeExecutionCoverage("page-set-1", "BTCUSDT", start, start + 100, 3, True, True)
-        second = ExchangeExecutionCoverage("page-set-2", "BTCUSDT", start + 90, start + 200, 2, True, True)
+        first = ExchangeExecutionCoverage("page-set-1", "BTCUSDT", start, start + 100, execution_page_chain(start, 3))
+        second = ExchangeExecutionCoverage("page-set-2", "BTCUSDT", start + 90, start + 200, execution_page_chain(start + 90, 2))
         self.assertTrue(position.record_exchange_execution_coverage(first))
         self.assertFalse(position.record_exchange_execution_coverage(first))
         self.assertTrue(position.record_exchange_execution_coverage(second))
@@ -1826,10 +1840,10 @@ class StatePersistenceTests(unittest.TestCase):
         position = sample_position()
         start = position.entry_ts
         position.record_exchange_execution_coverage(ExchangeExecutionCoverage(
-            "complete-before-gap", "BTCUSDT", start, start + 40, 1, True, True,
+            "complete-before-gap", "BTCUSDT", start, start + 40, execution_page_chain(start, 1),
         ))
         position.record_exchange_execution_coverage(ExchangeExecutionCoverage(
-            "incomplete-after-gap", "BTCUSDT", start + 60, start + 100, 2, False, False,
+            "incomplete-after-gap", "BTCUSDT", start + 60, start + 100, execution_page_chain(start + 60, 2, final_has_next=True),
         ))
         audit = position.audit_exchange_execution_coverage(
             lifecycle_start_ms=start, audit_end_ms=start + 100,
@@ -1838,6 +1852,24 @@ class StatePersistenceTests(unittest.TestCase):
         self.assertEqual(audit["gaps"], [
             {"start_ms": start + 40, "end_ms": start + 100},
         ])
+
+    def test_execution_coverage_rejects_broken_page_chain(self):
+        from exchange_execution_identity import (
+            ExchangeExecutionCoverage, ExchangeExecutionPageObservation,
+        )
+        start = sample_position().entry_ts
+        broken = (
+            ExchangeExecutionPageObservation(0, start, start + 2, 1, False),
+            ExchangeExecutionPageObservation(1, start + 3, start + 5, 0, False),
+        )
+        with self.assertRaisesRegex(ValueError, "non-terminal page"):
+            ExchangeExecutionCoverage("broken-chain", "BTCUSDT", start, start + 100, broken)
+        overlapping_requests = (
+            ExchangeExecutionPageObservation(0, start, start + 10, 1, True),
+            ExchangeExecutionPageObservation(1, start + 9, start + 12, 0, False),
+        )
+        with self.assertRaisesRegex(ValueError, "sequential and non-overlapping"):
+            ExchangeExecutionCoverage("overlap-pages", "BTCUSDT", start, start + 100, overlapping_requests)
 
     def test_execution_coverage_requires_actual_position_entry_boundary(self):
         position = sample_position()
@@ -1851,15 +1883,15 @@ class StatePersistenceTests(unittest.TestCase):
         from exchange_execution_identity import ExchangeExecutionCoverage
         position = sample_position()
         start = position.entry_ts
-        original = ExchangeExecutionCoverage("coverage-x", "BTCUSDT", start, start + 10, 1, True, True)
+        original = ExchangeExecutionCoverage("coverage-x", "BTCUSDT", start, start + 10, execution_page_chain(start, 1))
         self.assertTrue(position.record_exchange_execution_coverage(original))
         with self.assertRaisesRegex(ValueError, "conflicting duplicate"):
             position.record_exchange_execution_coverage(ExchangeExecutionCoverage(
-                "coverage-x", "BTCUSDT", start, start + 20, 1, True, True,
+                "coverage-x", "BTCUSDT", start, start + 20, execution_page_chain(start, 1),
             ))
         with self.assertRaisesRegex(ValueError, "symbol mismatch"):
             position.record_exchange_execution_coverage(ExchangeExecutionCoverage(
-                "coverage-y", "ETHUSDT", start, start + 10, 1, True, True,
+                "coverage-y", "ETHUSDT", start, start + 10, execution_page_chain(start, 1),
             ))
 
     def test_exchange_quantity_audit_survives_plan_b_restart(self):
@@ -1876,7 +1908,7 @@ class StatePersistenceTests(unittest.TestCase):
             from exchange_execution_identity import ExchangeExecutionCoverage
             position.record_exchange_execution_coverage(ExchangeExecutionCoverage(
                 "restart-coverage", "BTCUSDT", position.entry_ts,
-                position.entry_ts + 10_000, 2, True, True,
+                position.entry_ts + 10_000, execution_page_chain(position.entry_ts, 2),
             ))
             position.record_exchange_order(ExchangeOrderIdentity(
                 "exit-restart", "", "BTCUSDT", "Sell", 0,

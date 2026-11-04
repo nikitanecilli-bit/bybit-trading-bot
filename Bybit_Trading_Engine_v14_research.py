@@ -642,11 +642,15 @@ class AdaptiveRiskManager:
             self.day_start_equity = self.current_equity
             self.daily_stop_triggered = False
 
-    def register_closed_trade_pnl(self, net_pnl_usdt: float, ts_ms: int) -> Dict[str, bool]:
+    def register_closed_trade_pnl(
+        self, net_pnl_usdt: float, ts_ms: int, *, evaluate_stops: bool = True,
+    ) -> Dict[str, bool]:
         self.on_new_timestamp(ts_ms)
         self.realized_equity = round(self.realized_equity + net_pnl_usdt, 4)
         self.current_equity = round(self.realized_equity + self.unrealized_pnl, 4)
-        return self._evaluate_drawdown_stops()
+        if evaluate_stops:
+            return self._evaluate_drawdown_stops()
+        return {"daily_stop_hit": False, "kill_switch_hit": False}
 
     def mark_to_market(self, unrealized_pnl_usdt: float, ts_ms: int) -> Dict[str, bool]:
         """Обновляет equity с учётом плавающего PnL и проверяет лимиты риска."""
@@ -1759,7 +1763,17 @@ class UnifiedQuantEngine:
         return total
 
     def _update_mark_to_market(self, ts_ms: int) -> None:
-        alerts = self.risk_mgr.mark_to_market(self._unrealized_pnl_at_marks(ts_ms), ts_ms)
+        unrealized = self._unrealized_pnl_at_marks(ts_ms)
+        if getattr(self, "_defer_close_risk_evaluation", False):
+            # A synchronized replay bar has no known intra-bar ordering between
+            # symbols. Refresh the ledger/equity snapshot, but evaluate portfolio
+            # stops only after every symbol's same-timestamp execution is applied.
+            self.risk_mgr.unrealized_pnl = float(unrealized)
+            self.risk_mgr.current_equity = round(
+                self.risk_mgr.realized_equity + self.risk_mgr.unrealized_pnl, 4
+            )
+            return {"daily_stop_hit": False, "kill_switch_hit": False}
+        alerts = self.risk_mgr.mark_to_market(unrealized, ts_ms)
         # Protective latches must survive a process restart even when this MTM
         # update does not close the currently stepped symbol. Persist only on the
         # false->true transition, not on every candle.
@@ -2448,7 +2462,10 @@ class UnifiedQuantEngine:
 
         # Учитываем закрытый PnL и переоцениваем оставшиеся позиции без двойного счёта закрываемой.
         self.risk_mgr.unrealized_pnl = self._unrealized_pnl_at_marks(exit_ts)
-        alerts = self.risk_mgr.register_closed_trade_pnl(net_pnl, exit_ts)
+        alerts = self.risk_mgr.register_closed_trade_pnl(
+            net_pnl, exit_ts,
+            evaluate_stops=not getattr(self, "_defer_close_risk_evaluation", False),
+        )
         if alerts.get("kill_switch_hit"):
             self.tg.send_message(
                 f"🚨 KILL-SWITCH [{self.cfg.bot_version}]: просадка от пика достигла -{self.cfg.emergency_kill_switch_pct}%. "
@@ -2457,6 +2474,41 @@ class UnifiedQuantEngine:
             self.tg.send_message(
                 f"⏸ ДНЕВНОЙ СТОП [{self.cfg.bot_version}]: дневная просадка превысила -{self.cfg.daily_stop_loss_pct}%. "
                 f"Новые входы заблокированы до 00:00 UTC (открытые позиции ведутся по плану).")
+        if not getattr(self, "_defer_close_risk_evaluation", False):
+            self._persist()
+
+    def _force_flatten_open_positions_after_kill_switch(self, exit_ts: int) -> None:
+        """Flatten residual positions after a post-execution, portfolio-wide risk check."""
+        if not self.risk_mgr.kill_switch_triggered or not self.open_positions:
+            return
+        previous_defer = getattr(self, "_defer_close_risk_evaluation", False)
+        self._defer_close_risk_evaluation = True
+        try:
+            for symbol, pos in list(self.open_positions.items()):
+                liquidation_exit = getattr(self, "_intrabar_liquidation_exits", {}).get(symbol)
+                if liquidation_exit is not None:
+                    exit_price, reason = liquidation_exit, "liquidation"
+                else:
+                    exit_price = getattr(self, "_intrabar_risk_marks", {}).get(
+                        symbol, self._last_mark_prices.get(symbol, pos.entry_price)
+                    )
+                    reason = "kill_switch"
+                stop_dist = max(1e-8, pos.initial_stop_dist)
+                if pos.direction == "long":
+                    mae_r = max(0.0, (pos.entry_price - pos.max_adverse_px) / stop_dist)
+                    mfe_r = max(0.0, (pos.max_favorable_px - pos.entry_price) / stop_dist)
+                    pos.max_adverse_px = min(pos.max_adverse_px, exit_price)
+                else:
+                    mae_r = max(0.0, (pos.max_adverse_px - pos.entry_price) / stop_dist)
+                    mfe_r = max(0.0, (pos.entry_price - pos.max_favorable_px) / stop_dist)
+                    pos.max_adverse_px = max(pos.max_adverse_px, exit_price)
+                self._close_position(
+                    pos, float(exit_price), reason, exit_ts, mae_r, mfe_r,
+                    final_exit_maker=False,
+                )
+        finally:
+            self._defer_close_risk_evaluation = previous_defer
+        self._update_mark_to_market(exit_ts)
         self._persist()
 
     def finalize_open_positions(self, marks: Dict[str, Candle],
@@ -2740,19 +2792,28 @@ def run_sparse_simulation_pass(
 
         signal_candidates = []
         histories = {}
-        for sym in symbols:
-            item = event.get(sym)
-            if item is None:
-                continue
-            index, _ = item
-            if index < 25:
-                continue
-            lo = max(0, index + 1 - CALC_WINDOW)
-            history = trimmed[sym][lo:index + 1]
-            histories[sym] = history
-            if engine.step_candle(sym, history, evaluate_new_signal=False):
-                signal_candidates.append(sym)
+        engine._defer_close_risk_evaluation = True
+        try:
+            for sym in symbols:
+                item = event.get(sym)
+                if item is None:
+                    continue
+                index, _ = item
+                if index < 25:
+                    continue
+                lo = max(0, index + 1 - CALC_WINDOW)
+                history = trimmed[sym][lo:index + 1]
+                histories[sym] = history
+                if engine.step_candle(sym, history, evaluate_new_signal=False):
+                    signal_candidates.append(sym)
+        finally:
+            engine._defer_close_risk_evaluation = False
         engine._bar_entry_risk_budgets.clear()
+        # Evaluate drawdown once against the complete synchronized post-execution
+        # portfolio. If this new snapshot trips the emergency latch, flatten the
+        # remaining positions as one same-timestamp batch.
+        engine._update_mark_to_market(bar_close_ts)
+        engine._force_flatten_open_positions_after_kill_switch(bar_close_ts)
 
         signal_context = (
             signal_context_provider(bar_close_ts, histories, engine.cfg)
@@ -2830,12 +2891,21 @@ def run_simulation_pass(engine: UnifiedQuantEngine, candles: Dict[str, List[Cand
         engine._update_mark_to_market(bar_close_ts)
         engine._prepare_pending_entry_risk_budgets()
         signal_candidates = []
-        for sym in symbols:
-            if engine.step_candle(
-                sym, candles[sym][lo:bar + 1], evaluate_new_signal=False,
-            ):
-                signal_candidates.append(sym)
+        engine._defer_close_risk_evaluation = True
+        try:
+            for sym in symbols:
+                if engine.step_candle(
+                    sym, candles[sym][lo:bar + 1], evaluate_new_signal=False,
+                ):
+                    signal_candidates.append(sym)
+        finally:
+            engine._defer_close_risk_evaluation = False
         engine._bar_entry_risk_budgets.clear()
+        # Do not let the order of simultaneous symbol closes create a transient
+        # peak/drawdown. Reconcile the full bar, then force-flat if the final
+        # post-execution portfolio snapshot trips the emergency kill-switch.
+        engine._update_mark_to_market(bar_close_ts)
+        engine._force_flatten_open_positions_after_kill_switch(bar_close_ts)
 
         # Discover every eligible signal from the same post-execution portfolio
         # state. Position-slot priority is applied to the complete pending batch

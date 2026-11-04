@@ -9,7 +9,7 @@ import csv
 import gzip
 import json
 import zipfile
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Iterator
@@ -105,6 +105,14 @@ class OrderBook:
         return dict(self.bids), dict(self.asks)
 
 
+@dataclass(frozen=True)
+class PassiveFill:
+    timestamp_ms: int
+    side: str
+    price: Decimal
+    quantity: Decimal
+
+
 @dataclass
 class PassiveOrder:
     side: str
@@ -119,6 +127,7 @@ class PassiveOrder:
     eligible_trade_count: int = 0
     rpi_excluded_count: int = 0
     first_fill_ts: int | None = None
+    fills: list[PassiveFill] = field(default_factory=list)
 
     @property
     def remaining(self) -> Decimal:
@@ -127,6 +136,42 @@ class PassiveOrder:
     @property
     def complete(self) -> bool:
         return self.remaining == ZERO
+
+    @property
+    def filled_notional(self) -> Decimal:
+        return sum((fill.price * fill.quantity for fill in self.fills), ZERO)
+
+    @property
+    def filled_vwap(self) -> Decimal | None:
+        if self.filled == ZERO:
+            return None
+        return self.filled_notional / self.filled
+
+
+def per_fill_fee_ledger(
+    order: PassiveOrder, maker_fee_rates: list[Decimal | str | int | float],
+) -> list[dict]:
+    """Calculate quote-currency fees only from explicit per-fill fee rates.
+
+    Rates are supplied per fill so tier changes/rebates are never guessed.
+    Negative rates are allowed to represent an explicit maker rebate.
+    """
+    if len(maker_fee_rates) != len(order.fills):
+        raise ValueError("one explicit maker fee rate is required for each fill")
+    ledger = []
+    for index, (fill, raw_rate) in enumerate(zip(order.fills, maker_fee_rates), 1):
+        rate = dec(raw_rate)
+        notional = fill.price * fill.quantity
+        ledger.append({
+            "fill_index": index,
+            "timestamp_ms": fill.timestamp_ms,
+            "price": fill.price,
+            "quantity": fill.quantity,
+            "notional": notional,
+            "maker_fee_rate": rate,
+            "fee": notional * rate,
+        })
+    return ledger
 
 
 def place_passive_order(
@@ -190,6 +235,9 @@ def apply_public_trade(order: PassiveOrder, trade: dict) -> None:
         if fill > ZERO:
             order.filled += fill
             order.fill_count += 1
+            order.fills.append(PassiveFill(
+                timestamp_ms=ts, side=order.side, price=order.price, quantity=fill,
+            ))
             if order.first_fill_ts is None:
                 order.first_fill_ts = ts
 
@@ -264,7 +312,7 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
 def replay_public_trades(order: PassiveOrder, archive: Path, symbol: str = "AAVEUSDT") -> PassiveOrder:
     previous_ts = None
     seen_trade_ids: set[str] = set()
-    working_order = replace(order)
+    working_order = replace(order, fills=list(order.fills))
     for trade in iter_public_trades(archive, symbol):
         ts = trade["timestamp_ms"]
         if previous_ts is not None and ts < previous_ts:

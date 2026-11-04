@@ -310,3 +310,12 @@
 - Final CI #41854119883 on f42979860d97090120ee3a8aed79d59695d441ee: SUCCESS, 57/57 workflow steps; state persistence suite 78 tests; log confirms corrupt-gross rejection and valid legacy/exchange-sized round trips.
 - Earlier attempts #41853865541 and #41853997743 failed on stale test fixtures inconsistent with the new source invariant (legacy TP1 liquidity fixture omitted gross; exchange-sized fixtures used legacy-sized gross). Fixtures corrected; final full workflow green.
 - Classification: persisted PnL integrity guardrail, not strategy profitability evidence. No PnL/backtest, market archive downloads, private API, runner, paper/live orders, or main changes.
+
+
+## Session update — restored MFE/MAE invariants (2026-11-04)
+
+- Backup restore previously accepted zero extrema and directionally impossible favorable/adverse prices. `OpenPositionState.__post_init__` silently replaces non-positive extrema with entry, potentially masking corrupt state and losing recorded excursion history.
+- `load_state()` now rejects non-positive saved max_favorable_px/max_adverse_px and enforces directional invariants: long favorable >= entry and adverse <= entry; short favorable <= entry and adverse >= entry. Missing legacy fields still use the dataclass entry-price default.
+- Added three regressions: zero favorable extreme, long favorable below entry, short adverse below entry.
+- Source CI #41854906684 SUCCESS, 57/57; final source+tests CI #41854947672 on 4c7744c22180a97fa868547eac034cdf91b69491 SUCCESS, 57/57; actual log confirms all three new regressions; state persistence suite 81 tests.
+- Classification: persisted trade-excursion metrics integrity; no PnL/backtest, archive downloads, API, runner, paper/live or main changes.

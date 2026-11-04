@@ -218,6 +218,10 @@ def place_passive_order(
     price, quantity = dec(price), dec(quantity)
     if price <= ZERO or quantity <= ZERO or expiry_ts <= arrival_ts:
         raise ValueError("invalid price, quantity or lifetime")
+    if book.last_cts is None:
+        raise ValueError("passive order requires a timestamped order-book state")
+    if book.last_cts >= arrival_ts:
+        raise ValueError("order-book state must be strictly earlier than order arrival")
     if instrument_spec is not None:
         if not symbol:
             raise ValueError("symbol is required when validating an instrument spec")

@@ -174,6 +174,8 @@ def main() -> int:
         "symbol": SYMBOL,
         "method": "aggregate L2 queue-ahead; trades only; no cancellation credit; no same-ms fills",
         "warning": "Four deterministic hypothetical orders only. This is not strategy PnL, a fill-rate estimate, L3 replay, or exchange-confirmed execution.",
+        "order_spec_validation": "not_performed_no_verified_historical_snapshot",
+        "fee_accounting": "not_calculated_requires_account_fee_tier_per_fill",
         "status": "started",
     }
     with tempfile.TemporaryDirectory(prefix="bybit-l2-queue-replay-") as tmp:
@@ -214,6 +216,8 @@ def main() -> int:
                 "fill_count": order.fill_count,
                 "filled_notional": str(order.filled_notional),
                 "filled_vwap": None if order.filled_vwap is None else str(order.filled_vwap),
+                "fee_ledger": None,
+                "fee_ledger_status": "not_calculated_requires_explicit_historical_fee_rate_per_fill",
                 "fills": [
                     {
                         "timestamp_ms": fill.timestamp_ms,

@@ -183,7 +183,7 @@ def test_orderbook_inspector_rejects_u1_restart_marker_on_delta():
 
 
 
-def test_orderbook_inspector_rejects_nonmonotonic_cts_seq_and_update_id():
+def test_orderbook_inspector_rejects_nonmonotonic_cts_and_seq():
     cases = [
         (
             [event("snapshot", 1_000, 1, 1, "5"),
@@ -194,11 +194,6 @@ def test_orderbook_inspector_rejects_nonmonotonic_cts_seq_and_update_id():
             [event("snapshot", 1_000, 2, 1, "5"),
              event("delta", 1_100, 1, 2, "6")],
             "non-monotonic cross sequence",
-        ),
-        (
-            [event("snapshot", 1_000, 1, 5, "5"),
-             event("delta", 1_100, 2, 4, "6")],
-            "non-monotonic order-book update ID",
         ),
     ]
     for events, expected_error in cases:

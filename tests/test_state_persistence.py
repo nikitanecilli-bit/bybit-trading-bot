@@ -27,6 +27,66 @@ def sample_risk_data():
 
 
 class StatePersistenceTests(unittest.TestCase):
+    def _restored_engine_with_joined_histories(self):
+        from types import SimpleNamespace
+        bot = engine.UnifiedQuantEngine.__new__(engine.UnifiedQuantEngine)
+        bot.open_positions = {"BTCUSDT": sample_position()}
+        bot.instrument_spec_history = object()
+        bot.risk_tier_history = object()
+        bot.max_market_state_skew_ms = 1500
+        bot.max_instrument_spec_age_ms = 86_400_000
+        bot.max_risk_tier_age_ms = 86_400_000
+        position = bot.open_positions["BTCUSDT"]
+        position.leverage = 5.0
+        position.risk_tier_id = 2
+        position.risk_limit_value = "500000"
+        position.maintenance_margin_rate = "0.01"
+        position.maintenance_margin_deduction = "500"
+        position.risk_tier_max_leverage = "10"
+        position.initial_margin_usdt = "200"
+        position.maintenance_margin_usdt = "5"
+        spec = SimpleNamespace(validate_leverage=lambda value: value)
+        state = SimpleNamespace(instrument_spec=spec, risk_tiers=("dated-tier-ladder",))
+        margin = SimpleNamespace(
+            tier_id=2, risk_limit_value=engine.Decimal("500000"),
+            maintenance_margin_rate=engine.Decimal("0.01"),
+            mm_deduction=engine.Decimal("500"), max_leverage=engine.Decimal("10"),
+            initial_margin=engine.Decimal("200"), maintenance_margin=engine.Decimal("5"),
+        )
+        return bot, state, margin
+
+    def test_restored_position_is_checked_against_joined_entry_time_market_state(self):
+        bot, state, margin = self._restored_engine_with_joined_histories()
+        with patch.object(engine, "get_linear_market_state", return_value=state) as joined, \\
+             patch.object(engine, "calculate_margin_requirements_from_tiers", return_value=margin) as calc:
+            bot._validate_restored_positions_market_state()
+        joined.assert_called_once_with(
+            bot.instrument_spec_history, bot.risk_tier_history, "BTCUSDT",
+            bot.open_positions["BTCUSDT"].entry_ts,
+            max_snapshot_skew_ms=1500,
+            max_instrument_age_ms=86_400_000,
+            max_risk_tier_age_ms=86_400_000,
+        )
+        calc.assert_called_once_with(
+            "BTCUSDT", engine.Decimal("1000.0"),
+            leverage=engine.Decimal("5.0"), tiers=state.risk_tiers,
+        )
+
+    def test_restored_position_rejects_mismatched_entry_risk_tier(self):
+        bot, state, margin = self._restored_engine_with_joined_histories()
+        bot.open_positions["BTCUSDT"].risk_tier_id = 1
+        with patch.object(engine, "get_linear_market_state", return_value=state), \\
+             patch.object(engine, "calculate_margin_requirements_from_tiers", return_value=margin):
+            with self.assertRaisesRegex(ValueError, "risk_tier_id differs"):
+                bot._validate_restored_positions_market_state()
+
+    def test_restored_position_requires_entry_risk_provenance_in_joined_mode(self):
+        bot, state, margin = self._restored_engine_with_joined_histories()
+        bot.open_positions["BTCUSDT"].risk_tier_id = None
+        with patch.object(engine, "get_linear_market_state", return_value=state):
+            with self.assertRaisesRegex(ValueError, "lacks entry risk-tier provenance"):
+                bot._validate_restored_positions_market_state()
+
     def test_missing_backup_is_a_clean_cold_start(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "missing.json"

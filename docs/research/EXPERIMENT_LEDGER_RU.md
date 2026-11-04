@@ -1089,3 +1089,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Исправлено на min(stop, TP2) и в TP1 guard, и в restore validation; TP1-ордер по-прежнему отдельно проверяется по TP1 price.
 - Регрессия: long entry 100, trailing stop 110, TP2 112, qty 1, minNotional 105 — restore разрешён, так как обе реальные цены выхода проходят ограничение.
 - CI #41852293859, c88e587d01739eb7c0ee6fe94e0369b28aff664c: SUCCESS 57/57; state persistence 77/77, новая регрессия подтверждена логом.
+
+
+## ENG-FUND-007 — TP1 flag must agree with funding quantity state (2026-11-04)
+
+- Both funding helpers now reject `tp1_hit=false` with partial remaining quantity and `tp1_hit=true` with unchanged initial quantity. Remaining-margin helper validates remaining_fraction [0,1].
+- Exact contract quantity remains authoritative over stale/rounded display fraction.
+- Test fixture default corrected: full remaining quantity when TP1 false. Three regressions added for contradictory TP1/quantity states.
+- Final CI #41853410298, 0cf45d16809a04e2653325934b37723b009097d0: SUCCESS 57/57; actual log confirms all three regressions and 28 funding tests. Intermediate source-only run failed because it still had the prior contradictory fixture; corrected in test commit and final run green.
+- Technical correctness only; no PnL/backtest or exchange operations.

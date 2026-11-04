@@ -652,7 +652,9 @@ def validate_archive_funding_manifests(
         report = validate_funding_manifest(
             csv_path, manifest_path, symbol=symbol,
             required_start_ms=effective_start,
-            required_end_ms=effective_end_exclusive - 1,
+            # Funding/Mark accounting includes the final H1 close boundary,
+            # unlike the end-exclusive trade OHLCV candle range.
+            required_end_ms=effective_end_exclusive,
         )
         reports.append({"symbol": symbol, **report})
 

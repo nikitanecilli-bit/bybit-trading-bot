@@ -572,6 +572,82 @@ def apply_execution_merge_plan(
     }
 
 
+
+def persist_execution_merge_plan(
+    local_backup: dict[str, Any], plan: dict[str, Any], *,
+    persistence: Any, risk_mgr: Any,
+) -> dict[str, Any]:
+    """Apply a verified plan and persist it with retry-safe commit classification.
+
+    This is an explicit local Plan B operation. It never talks to Bybit, mutates
+    a live engine instance, or promotes any reconciliation/live-resume gate.
+    """
+    result = apply_execution_merge_plan(local_backup, plan)
+    candidate = result["backup"]
+    candidate_digest = hashlib.sha256(_canonical_json_bytes(candidate)).hexdigest()
+    base_digest = plan.get("base_backup_sha256")
+    if not isinstance(base_digest, str):
+        raise ReportError("execution merge plan lacks base backup digest")
+
+    try:
+        observed = persistence.inspect_reconciliation_persistence(
+            expected_backup_sha256=base_digest,
+            candidate_sha256=candidate_digest,
+        )
+    except Exception as exc:
+        raise ReportError(f"cannot classify Plan B reconciliation state: {exc}") from exc
+
+    if observed == "CANDIDATE_INSTALLED_DURABLE":
+        status = "ALREADY_APPLIED_DURABLE"
+        persisted_digest = candidate_digest
+    elif observed == "BASE_UNCHANGED":
+        try:
+            persisted_digest = persistence.save_reconciliation_candidate(
+                candidate, expected_backup_sha256=base_digest, risk_mgr=risk_mgr,
+            )
+        except Exception as save_error:
+            # os.replace may have succeeded even if directory fsync or the
+            # acknowledgement failed. Inspect and re-fsync before deciding.
+            try:
+                after_error = persistence.inspect_reconciliation_persistence(
+                    expected_backup_sha256=base_digest,
+                    candidate_sha256=candidate_digest,
+                )
+            except Exception as inspect_error:
+                raise ReportError(
+                    f"Plan B save outcome is uncertain; save={save_error}; "
+                    f"inspection={inspect_error}"
+                ) from save_error
+            if after_error == "CANDIDATE_INSTALLED_DURABLE":
+                status = "PERSISTED_RECOVERED_AFTER_ACK_ERROR"
+                persisted_digest = candidate_digest
+            elif after_error == "BASE_UNCHANGED":
+                raise ReportError(f"Plan B candidate was not installed: {save_error}") from save_error
+            else:
+                raise ReportError(
+                    f"Plan B changed during interrupted save; observed={after_error}"
+                ) from save_error
+        else:
+            if persisted_digest != candidate_digest:
+                raise ReportError("Plan B persistence returned an unexpected candidate digest")
+            status = "PERSISTED"
+    elif observed == "BACKUP_MISSING":
+        raise ReportError("Plan B backup disappeared before reconciliation persistence")
+    else:
+        raise ReportError(
+            f"stale reconciliation plan: current Plan B state is {observed}"
+        )
+
+    return {
+        "status": status,
+        "persisted_backup_sha256": persisted_digest,
+        "inserted": result["inserted"],
+        "execution_history_complete": False,
+        "reconciliation_pass": False,
+        "live_resume_allowed": False,
+    }
+
+
 def build_report(local_backup: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(snapshot, dict):
         raise ReportError("exchange snapshot root must be an object")

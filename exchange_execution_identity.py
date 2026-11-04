@@ -134,15 +134,45 @@ class ExchangeExecutionIdentity:
 
 
 @dataclass(frozen=True)
+class ExchangeExecutionPageObservation:
+    """Client-observed metadata for one sequential page request."""
+    page_index: int
+    request_started_at_ms: int
+    request_completed_at_ms: int
+    row_count: int
+    has_next_page: bool
+
+    def __post_init__(self) -> None:
+        _integer(self.page_index, "page_index", minimum=0)
+        _integer(self.request_started_at_ms, "request_started_at_ms", minimum=1)
+        _integer(self.request_completed_at_ms, "request_completed_at_ms", minimum=1)
+        if self.request_completed_at_ms < self.request_started_at_ms:
+            raise ExecutionIdentityError("page request completion precedes request start")
+        _integer(self.row_count, "row_count", minimum=0)
+        if not isinstance(self.has_next_page, bool):
+            raise ExecutionIdentityError("has_next_page must be boolean")
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> "ExchangeExecutionPageObservation":
+        if not isinstance(value, Mapping):
+            raise ExecutionIdentityError("page observation must be an object")
+        expected = set(cls.__dataclass_fields__)
+        if set(value) != expected:
+            raise ExecutionIdentityError("page observation fields mismatch")
+        return cls(**dict(value))
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ExchangeExecutionCoverage:
-    """Caller-attested, half-open execution-history query window [start, end)."""
+    """Execution-history query window [start, end) with observed page chain."""
     coverage_id: str
     symbol: str
     window_start_ms: int
     window_end_ms: int
-    page_count: int
-    pagination_complete: bool
-    terminal_page_seen: bool
+    page_observations: tuple[ExchangeExecutionPageObservation, ...]
 
     def __post_init__(self) -> None:
         _text(self.coverage_id, "coverage_id")
@@ -151,11 +181,31 @@ class ExchangeExecutionCoverage:
         _integer(self.window_end_ms, "window_end_ms", minimum=1)
         if self.window_end_ms <= self.window_start_ms:
             raise ExecutionIdentityError("coverage window_end_ms must exceed window_start_ms")
-        _integer(self.page_count, "page_count", minimum=1)
-        if not isinstance(self.pagination_complete, bool) or not isinstance(self.terminal_page_seen, bool):
-            raise ExecutionIdentityError("coverage pagination flags must be booleans")
-        if self.pagination_complete and not self.terminal_page_seen:
-            raise ExecutionIdentityError("complete pagination requires terminal page observation")
+        if not isinstance(self.page_observations, tuple) or not self.page_observations:
+            raise ExecutionIdentityError("coverage requires a non-empty tuple of page observations")
+        previous_completed = None
+        for index, page in enumerate(self.page_observations):
+            if not isinstance(page, ExchangeExecutionPageObservation):
+                raise ExecutionIdentityError("page_observations must contain typed page observations")
+            if page.page_index != index:
+                raise ExecutionIdentityError("page observation indexes must be sequential from zero")
+            if previous_completed is not None and page.request_started_at_ms < previous_completed:
+                raise ExecutionIdentityError("page requests must be sequential and non-overlapping")
+            if index < len(self.page_observations) - 1 and not page.has_next_page:
+                raise ExecutionIdentityError("non-terminal page must declare has_next_page=true")
+            previous_completed = page.request_completed_at_ms
+
+    @property
+    def page_count(self) -> int:
+        return len(self.page_observations)
+
+    @property
+    def pagination_complete(self) -> bool:
+        return not self.page_observations[-1].has_next_page
+
+    @property
+    def terminal_page_seen(self) -> bool:
+        return self.pagination_complete
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "ExchangeExecutionCoverage":
@@ -167,10 +217,22 @@ class ExchangeExecutionCoverage:
                 f"execution coverage fields mismatch: missing={sorted(expected-set(value))}, "
                 f"unknown={sorted(set(value)-expected)}"
             )
-        return cls(**dict(value))
+        raw_pages = value["page_observations"]
+        if not isinstance(raw_pages, (list, tuple)):
+            raise ExecutionIdentityError("page_observations must be a list")
+        pages = tuple(ExchangeExecutionPageObservation.from_dict(item) for item in raw_pages)
+        return cls(
+            coverage_id=value["coverage_id"], symbol=value["symbol"],
+            window_start_ms=value["window_start_ms"], window_end_ms=value["window_end_ms"],
+            page_observations=pages,
+        )
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return {
+            "coverage_id": self.coverage_id, "symbol": self.symbol,
+            "window_start_ms": self.window_start_ms, "window_end_ms": self.window_end_ms,
+            "page_observations": [page.to_dict() for page in self.page_observations],
+        }
 
 
 @dataclass(frozen=True)

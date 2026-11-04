@@ -497,11 +497,19 @@ class OpenPositionState:
             raise TypeError("order must be ExchangeOrderIdentity")
         if order.symbol != self.symbol:
             raise ValueError("exchange order symbol mismatch")
-        for existing in self.exchange_orders:
+        for index, existing in enumerate(self.exchange_orders):
             if existing["order_id"] == order.order_id:
                 if existing == order.to_dict():
                     return False
-                raise ValueError("conflicting exchange order_id update")
+                stable_fields = (
+                    "order_link_id", "symbol", "side", "position_idx", "qty",
+                    "reduce_only", "close_on_trigger",
+                )
+                if any(existing[name] != order.to_dict()[name] for name in stable_fields):
+                    raise ValueError("exchange order identity fields changed across updates")
+                self.exchange_orders[index] = order.to_dict()
+                self._validate_exchange_identity_state()
+                return True
         self.exchange_orders.append(order.to_dict())
         self._validate_exchange_identity_state()
         return True

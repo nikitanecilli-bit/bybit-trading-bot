@@ -954,7 +954,8 @@ class PlanBStatePersistence:
             )
             if risk_data["max_drawdown_pct"] + 1e-6 < implied_drawdown:
                 raise ValueError("risk.max_drawdown_pct меньше просадки, следующей из peak/current equity")
-            if (implied_drawdown >= risk_mgr.cfg.emergency_kill_switch_pct
+            if (max(risk_data["max_drawdown_pct"], implied_drawdown)
+                    >= risk_mgr.cfg.emergency_kill_switch_pct
                     and not risk_data["kill_switch_triggered"]):
                 raise ValueError(
                     "risk.kill_switch_triggered=false при просадке, достигшей emergency порога"

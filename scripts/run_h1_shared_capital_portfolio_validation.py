@@ -330,6 +330,25 @@ def build_paired_donchian48_comparison(result_rows, enabled):
     return {"mode": "paired_donchian20_vs_donchian48_vs_donchian48_ema", "pair_count": len(pairs), "pairs": pairs}
 
 
+def build_paired_h1_comparison_summaries(result_rows, design):
+    """Build compatible paired summaries for either EMA-only or three-arm D48 mode."""
+    rows = list(result_rows)
+    donchian48_enabled = bool(design.get("donchian48_ema_ablation_enabled", False))
+    ema_enabled = bool(design.get("ema50_200_gate_enabled", False))
+    ema_rows = rows
+    if donchian48_enabled:
+        # The three-arm experiment deliberately has no D20+EMA arm. Its EMA
+        # contrast is D48 baseline vs D48+EMA; D20 is the control for the
+        # separate three-arm comparison below.
+        ema_rows = [row for row in rows if row.get("donchian_period") == 48]
+    return {
+        "paired_ema_comparison": build_paired_ema_comparison(ema_rows, ema_enabled),
+        "paired_donchian48_comparison": build_paired_donchian48_comparison(
+            rows, donchian48_enabled
+        ),
+    }
+
+
 def build_ema50_200_label_maps(base_candles, symbols, end_idx, first_scored_ts):
     """Precompute causal same-bar EMA50/200 labels with a 1,000-H1-bar burn-in."""
     labels_by_symbol = {}
@@ -1274,6 +1293,7 @@ def build_validation_manifest(
         "training_cutoff_timestamp_ms": selection["training_cutoff_timestamp_ms"],
         "generated_at_utc": selection["generated_at_utc"],
     }
+    paired_summaries = build_paired_h1_comparison_summaries(result_rows, design)
     return {
         "schema_version": 1,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -1373,12 +1393,8 @@ def build_validation_manifest(
             ),
             "duration_days": "inclusive H1 fold duration from first candle open through last candle close",
         },
-        "paired_ema_comparison": build_paired_ema_comparison(
-            result_rows, bool(design.get("ema50_200_gate_enabled", False))
-        ),
-        "paired_donchian48_comparison": build_paired_donchian48_comparison(
-            result_rows, bool(design.get("donchian48_ema_ablation_enabled", False))
-        ),
+        "paired_ema_comparison": paired_summaries["paired_ema_comparison"],
+        "paired_donchian48_comparison": paired_summaries["paired_donchian48_comparison"],
         "result_rows": result_rows,
     }
 

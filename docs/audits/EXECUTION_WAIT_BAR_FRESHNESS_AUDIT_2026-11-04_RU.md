@@ -44,3 +44,14 @@ Research CI: [#41807975436 — SUCCESS](https://github.com/nikitanecilli-bit/byb
 - Не моделируются bid/ask spread, L2 queue priority, partial fills, cancel latency и adverse selection.
 - Поэтому maker fills остаются оптимистичной верхней границей, а не доказанным исполнением Bybit.
 - Никакие реальные ордера не размещались.
+
+
+## Дополнительная проверка E11/E13 runners (2026-11-04)
+
+Статический аудит обнаружил ту же потенциальную проблему в optional limit-execution ветках:
+- `scripts/run_e11_h1_shared_capital_replay.py`
+- `scripts/run_e13_h1_compression_gate_replay.py`
+
+В обеих ветках `execution_mode="limit"` повторные попытки теперь обновляют freshness guard через `prepare_signal_for_next_bar_fill()`, сохраняя исходный timestamp сигнала. Эти два runner добавлены в Research CI compile step и path filters.
+
+**Важная оговорка по историческим результатам:** проверены workflow-файлы и точки вызова `run_fold()`. Исторические E11 run [#41361376448](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41361376448) и E13 run [#41362217727](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41362217727) запускали `execution_mode="market"`. Поэтому их опубликованные market-mode результаты не затрагиваются этим дефектом. Проблема относилась к поддерживаемой в коде limit-mode ветке, но не к конфигурации этих двух архивных прогонов. Не объявлять E11/E13 PnL недействительным по этой причине.

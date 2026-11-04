@@ -15,7 +15,8 @@ def payload(fetched_at="2026-11-01T00:00:00Z", tiers=None):
         {"symbol":"BTCUSDT","id":2,"riskLimitValue":"500000","maintenanceMargin":"0.01","initialMargin":"0.02","maxLeverage":"50","mmDeduction":"500","isLowestRisk":0},
     ]
     return {
-        "schema_version": 1, "category": "linear", "fetched_at": fetched_at,
+        "schema_version": 1, "source": "Bybit V5 GET /v5/market/risk-limit",
+        "category": "linear", "fetched_at": fetched_at,
         "tier_count": len(rows), "tiers": rows,
     }
 
@@ -112,6 +113,14 @@ class RiskTierHistoryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "MMR decreases"):
                 RiskTierHistory.from_directory(tmp)
 
+
+    def test_missing_or_mismatched_source_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = payload()
+            bad.pop("source")
+            Path(tmp, "risk.json").write_text(json.dumps(bad), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "invalid or missing Bybit risk-limit source"):
+                RiskTierHistory.from_directory(tmp)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

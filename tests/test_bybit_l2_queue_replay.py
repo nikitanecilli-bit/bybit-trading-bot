@@ -414,6 +414,35 @@ def test_u1_restart_marker_on_delta_fails_closed_without_mutating_book():
     assert b.last_u == 1
 
 
+def test_passive_order_rejects_book_state_at_or_after_arrival():
+    b = book()
+    for cts in (1000, 1001):
+        b.last_cts = cts
+        try:
+            place_passive_order(
+                b, side="Buy", price=D("100"), quantity=D("1"),
+                arrival_ts=1000, expiry_ts=5000,
+            )
+        except ValueError as exc:
+            assert "strictly earlier" in str(exc)
+        else:
+            raise AssertionError("same-ms or future book state must not seed queue position")
+
+
+def test_passive_order_rejects_book_without_timestamp():
+    b = book()
+    b.last_cts = None
+    try:
+        place_passive_order(
+            b, side="Buy", price=D("100"), quantity=D("1"),
+            arrival_ts=1000, expiry_ts=5000,
+        )
+    except ValueError as exc:
+        assert "timestamped order-book state" in str(exc)
+    else:
+        raise AssertionError("untimestamped book must not seed queue position")
+
+
 def test_buy_order_queue_ahead_is_initial_displayed_bid_size():
     o = order()
     assert o.queue_ahead_initial == D("5")

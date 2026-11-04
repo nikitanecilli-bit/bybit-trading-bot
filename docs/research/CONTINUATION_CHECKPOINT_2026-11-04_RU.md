@@ -1411,3 +1411,13 @@ No market PnL, new archive download/collector, private API, runner registration,
 - Re-read confirmation: data contract blob `4c605a54d137fe4ae8b305e0cd8de325d414094a`; provenance matrix blob `86b4c483cd956c87e4824439c0901d4d90a10ed0`.
 - State check: `main` remains at `c06af3aa084d3513a3c2d7b183f02dba312be230`; PR #4 remains open Draft/unmerged and non-mergeable; PR #13 remains open/unmerged. No merges or main writes.
 - Next safe step: continue read-only reconciliation of E01–E07 run/script/config provenance and historical accounting-version impact; if exact links cannot be established from existing records, record the gap rather than infer. After that, finalize data-readiness decision; do not start market PnL while the explicit hold remains active.
+
+
+## 2026-11-05 — P1 follow-up: E01–E07 workflow provenance recovered
+
+- Read-only fetched Actions job logs for E01–E07. Exact checked-out research commits are now recorded in `docs/audits/ALT_SYSTEM_PROVENANCE_MATRIX_001_RU.md`: E01–E03 `4e27b6ad...`; E04 `4b291265...`; E05 `c0b61c2e...`; E06 `9601f4d8...`; E07 `a5a98516...`.
+- Recovered exact runner script blob SHAs and uploaded artifact ZIP SHA-256 digests for E01–E04/E06/E07. E05 failed before holdout execution after six public Bybit HTTP 403 responses and produced no artifact.
+- Recovered frozen script configs: E01 four direction/execution variants; E02 train-only per-symbol execution policy selection; E03 70/30 per-symbol split with 0/5/10/20 bps × 1/3/5-bar variants; E04 selected five-symbol chase grid; E06 diagnostics only; E07 108 shared-capital fold/config runs over a 5-symbol primary and 5-symbol reserve matrix.
+- Key unresolved item: historical experiment scripts do not provide complete immutable SHA-256 manifests for the CryptoFetch input archive bytes. Artifact ZIP hashes are not input dataset hashes. No artifact or source archive was downloaded.
+- Updated provenance matrix commit: `2db060b140b258bb3d71152082f30933eb16b3a6`; blob read back as `adfbe96e1acf5d8ff6b2f8d2814db564ee05e9ee`. Documentation-only; no CI run.
+- Next: inspect exact historical engine/accounting commits and identify which old E01–E07 numbers predate fee/slippage accounting corrections. Do not recalculate PnL; only classify historical results by code version and known impact.

@@ -53,9 +53,9 @@ class OrderBook:
             raise ValueError("u=1 restart marker requires a full snapshot for this archive format")
         if self.last_cts is not None and cts < self.last_cts:
             raise ValueError("non-monotonic matching-engine timestamp")
-        # Bybit documents u=1 as a service-restart reset. Its new snapshot
-        # starts a fresh sequence epoch, so the previous seq must not reject it.
-        if (not reset_snapshot and self.last_seq is not None and seq < self.last_seq):
+        # u=1 resets the book contents, but seq remains a separate cross-sequence
+        # ordering signal; do not infer that its ordering epoch also reset.
+        if self.last_seq is not None and seq < self.last_seq:
             raise ValueError("non-monotonic cross sequence")
         if kind == "snapshot":
             self.bids.clear()

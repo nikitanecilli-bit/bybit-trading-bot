@@ -77,6 +77,41 @@ class PointInTimeUniverseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid deliveryTime"):
             validate_instrument_row(missing_delivery, None)
 
+    def test_lifecycle_zero_delivery_is_open_ended_only_for_trading_perpetual(self):
+        perpetual = row("BTCUSDT", "Trading", delivery="0")
+        self.assertTrue(is_linear_usdt_perpetual_within_lifecycle_at(perpetual, 10_000))
+        self.assertFalse(is_linear_usdt_perpetual_within_lifecycle_at(
+            row("OLDUSDT", "Closed", delivery="0"), 10_000
+        ))
+        self.assertFalse(is_linear_usdt_perpetual_within_lifecycle_at(
+            row("OLDUSDT", "Settling", delivery="0"), 10_000
+        ))
+        self.assertFalse(is_linear_usdt_perpetual_within_lifecycle_at(
+            row("OLDUSDT", "Delivering", delivery="0"), 10_000
+        ))
+
+    def test_lifecycle_timestamp_parser_rejects_implicit_coercions(self):
+        for value in (True, False, 1000.0, " 1000", "1000 ", "+1000", "-1", "1.5"):
+            with self.subTest(value=value):
+                malformed = row("BTCUSDT", "Trading")
+                malformed["launchTime"] = value
+                with self.assertRaisesRegex(ValueError, "invalid launchTime"):
+                    validate_instrument_row(malformed, None)
+        for value in (True, 1000.0, " 0", "+0", "-0", "0.0"):
+            with self.subTest(delivery=value):
+                malformed = row("BTCUSDT", "Trading")
+                malformed["deliveryTime"] = value
+                with self.assertRaisesRegex(ValueError, "invalid deliveryTime"):
+                    validate_instrument_row(malformed, None)
+
+    def test_lifecycle_timestamp_integer_values_are_accepted(self):
+        instrument = row("BTCUSDT", "Trading")
+        instrument["launchTime"] = 1000
+        instrument["deliveryTime"] = 0
+        validated = validate_instrument_row(instrument, None)
+        self.assertEqual(validated["launchTime"], 1000)
+        self.assertTrue(is_linear_usdt_perpetual_within_lifecycle_at(validated, 1000))
+
     def test_point_in_time_lifecycle_respects_launch_and_delivery_boundaries(self):
         closed = row("BTCUSDT", "Closed", launch="1000", delivery="3000")
         self.assertFalse(is_linear_usdt_perpetual_within_lifecycle_at(closed, 999))

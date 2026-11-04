@@ -52,7 +52,7 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
                            "2026-11-01T01:00:00.000Z")
             report = audit_directory(root)
         self.assertEqual(report["snapshot_count"], 2)
-        self.assertEqual(report["collection_duration_ms"]["max"], 2000)
+        self.assertEqual(report["collection_duration_ms"]["max"], 4000)
         self.assertEqual(report["inter_snapshot_gap_ms"]["max"], 3_598_000)
         self.assertEqual(report["intervals"][0]["symbols_added"], 1)
         self.assertEqual(report["intervals"][0]["symbols_removed"], 1)

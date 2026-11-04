@@ -16,7 +16,7 @@ from pathlib import Path
 SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "BNBUSDT", "SUIUSDT", "PEPEUSDT"]
 URLS = [
     f"https://quote-saver.bycsi.com/orderbook/linear/{symbol}/{date}_{symbol}_{depth}.data.zip"
-    for date, depth in (("2024-12-01", "ob500"), ("2025-09-02", "ob200"))
+    for date, depth in (("2024-12-01", "ob500"), ("2025-09-02", "ob200"), ("2026-09-02", "ob200"))
     for symbol in SYMBOLS
 ]
 

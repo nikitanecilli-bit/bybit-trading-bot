@@ -1326,9 +1326,6 @@ class StatePersistenceTests(unittest.TestCase):
                 engine.PlanBStatePersistence(str(path)).load_state(risk)
 
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
-
 
     def test_exchange_identity_position_orders_and_executions_round_trip(self):
         from exchange_execution_identity import (
@@ -1423,3 +1420,7 @@ if __name__ == "__main__":
             self.assertIsNone(restored.exchange_position_identity)
             self.assertEqual(restored.exchange_orders, [])
             self.assertEqual(restored.exchange_executions, [])
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

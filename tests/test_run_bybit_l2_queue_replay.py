@@ -4,6 +4,9 @@ import json
 import tempfile
 import zipfile
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.run_bybit_l2_queue_replay import (
     HOUR_MS, capture_book_states_at, capture_scenarios,

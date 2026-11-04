@@ -343,6 +343,7 @@ def capture_book_at(
     if arrival_ts <= 0:
         raise ValueError("arrival_ts must be positive")
     book = OrderBook()
+    validation_book = None
     previous_cts = None
     previous_seq = None
     for event in iter_book_events(archive, symbol):
@@ -358,9 +359,16 @@ def capture_book_at(
             raise ValueError("non-monotonic seq in full order-book archive")
         previous_cts = cts
         previous_seq = seq
-        # Keep scanning after arrival to validate archive chronology and cross
-        # sequence ordering, but never apply same-ms/future events to the book.
+        # Keep validating the complete archive after arrival, but never apply
+        # same-ms/future events to the returned pre-arrival book snapshot.
         if cts >= arrival_ts:
+            if validation_book is None:
+                validation_book = OrderBook()
+                validation_book.bids, validation_book.asks = book.copy_levels()
+                validation_book.last_cts = book.last_cts
+                validation_book.last_seq = book.last_seq
+                validation_book.last_u = book.last_u
+            validation_book.apply(event)
             continue
         book.apply(event)
     if book.last_cts is None:

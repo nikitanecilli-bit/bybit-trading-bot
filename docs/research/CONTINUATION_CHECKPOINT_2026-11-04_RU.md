@@ -258,3 +258,23 @@ Runner report now declares mandatory BT/RPI metadata and counts excluded block t
 - test blob: `a458dd69875bba1ad4cbc40aece0166389fa44ce`
 
 Проверка на данный момент статическая: изменения записаны в GitHub, но локальный Python test runner недоступен, а доступный workflow-run lookup показывает только PR-triggered runs. Поэтому тесты добавлены, но не объявляются пройденными; CI status требует отдельного подтверждения. `main` не затронут. Новые рыночные архивы, PnL, private API и ордера не запускались.
+
+
+## 13. L2 / public-trade event-time alignment audit
+
+Сверены временные поля в replay с актуальной официальной документацией Bybit:
+- orderbook `cts` — matching-engine timestamp, на который создано состояние стакана;
+- public trade `T` — timestamp исполнения сделки;
+- Bybit описывает `cts` как поле, которое можно коррелировать с `T`, но не предоставляет в этих публичных payloads общий sequence number, который однозначно упорядочивает гипотетическую заявку относительно событий с одинаковой миллисекундой.
+
+Текущая реализация:
+- для состояния стакана на момент прихода заявки берёт только book events с `cts < arrival_ts`;
+- для markout на горизонте берёт только состояние до первого события с `cts >= target`;
+- public trades с `T <= arrival_ts` не засчитываются в fill;
+- таким образом, события на той же миллисекунде исключаются, а не упорядочиваются предположительно.
+
+Это правильная консервативная граница для имеющейся точности timestamp, но не доказывает точную очередность событий и не заменяет exchange sequence/L3. Отдельно остаётся подтвердить на уже имеющемся архивном файле, что CSV поле `timestamp` соответствует документированному времени исполнения `T` и что единицы/формат распознаны корректно. Новые архивы для этой проверки не скачивались.
+
+Официальные источники: Bybit Orderbook docs указывают matching-engine смысл `cts` и корреляцию с `T`; Public Trade docs определяют `T` как время исполнения, а `i` как trade ID и `BT`/`RPI` как специальные признаки. См. https://bybit-exchange.github.io/docs/v5/websocket/public/orderbook и https://bybit-exchange.github.io/docs/v5/websocket/public/trade.
+
+Итог: timestamp boundary реализована консервативно; временная модель остаётся proxy, пока не будет проверен формат конкретного сохранённого CSV и пока не будет измерена реальная задержка доставки/постановки заявки. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` без изменений.

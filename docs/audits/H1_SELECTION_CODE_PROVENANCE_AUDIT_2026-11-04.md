@@ -90,3 +90,93 @@ Correction:
 - Added regression tests proving the previously omitted Bybit instrument module is captured and a synthetic nested import chain is resolved.
 
 This closes the identified static local-import omission. Dynamic imports, runtime-loaded plugins, external package versions, interpreter/environment differences and workflow-level behavior are separate provenance dimensions and are not claimed to be covered by Python import closure alone. No market PnL was run.
+
+
+## H1 replay variant-isolation and execution audit — 2026-11-04
+
+### Confirmed Donchian ablation confound — corrected
+
+The first D20/D48 implementation passed the selected Donchian period into
+`compute_donchian_and_volume()`, which used the same lookback for both channel
+high/low and average volume. Therefore D48 changed two signal inputs:
+1. the breakout channel window; and
+2. the rolling volume baseline used by `vol_ratio`.
+
+This meant D20 vs D48 was not a one-factor Donchian comparison.
+
+Correction:
+- `compute_donchian_and_volume()` now accepts an independent optional
+  `volume_period`; omitted values preserve legacy behavior.
+- The H1 validation runner freezes `volume_lookback_period=20` for D20,
+  D48 and D48+EMA.
+- The train-only Top-5 selector explicitly uses Donchian20 and records both
+  Donchian and volume lookbacks in `strategy_config`.
+- Each replay result and the validation manifest record the fixed volume
+  lookback. The paired three-arm comparison rejects missing or unequal
+  `volume_lookback_period` metadata.
+
+Regression coverage:
+- `test_donchian48_keeps_volume_baseline_fixed_at_20_bars`
+- `test_paired_donchian48_rejects_changed_volume_lookback`
+
+### Shared-capital ordering and risk allocation — code-reviewed
+
+The H1 runner supplies a sorted, synchronized five-symbol basket to
+`run_simulation_pass()`. For each completed H1 timestamp, the engine:
+- computes portfolio adverse marks for all symbols before processing any one
+  symbol;
+- preallocates the remaining 2% portfolio stop-risk budget across eligible
+  pending entries, with at most five open positions;
+- ranks scarce slots by signal priority/volume ratio, then symbol as a stable
+  tie-breaker; and
+- processes the complete pending batch using the preallocated equity and risk
+  shares, so iteration order cannot consume another symbol's risk budget.
+
+Existing regression `test_simultaneous_entries_share_risk_budget_independent_of_symbol_order`
+checks reversed symbol iteration and confirms the total risk remains within
+200 USDT on a 10,000 USDT account. This is a deterministic engine test, not
+evidence of exchange execution or profitability.
+
+### Limit-fill model — remaining material limitation
+
+The H1 wrapper places a buy limit 20 bps below the signal close, waits up to
+three eligible H1 candles, and requires either a marketable opening gap or
+five bps of OHLC penetration beyond the limit. Marketable-at-open entries are
+classified as taker; intrabar penetration fills are credited at the limit and
+treated as maker.
+
+The H1 runner does **not** consume historical bid/ask or L2 events. It cannot
+verify queue position, spread crossing, partial fills, cancellations ahead,
+or adverse selection. The repository's aggregate-L2 queue primitives are a
+separate research probe; they are not wired into the H1 strategy replay and
+are not a fill-rate or PnL result. Accordingly, the current H1 intrabar maker
+fill assumption remains optimistic and must be stress-tested before any
+positive result can be treated as credible.
+
+### Result retention
+
+The H1 runner writes every fold/config/cost result row to the CSV and stores
+the full `result_rows` array in the JSON manifest. Paired summaries are
+additional comparisons; they do not replace or filter the raw rows. The
+train-only selector also retains evaluated candidates with exclusion reasons,
+rather than promoting weak or negative candidates into the Top-5.
+
+### Validation evidence and status
+
+- Fixed volume-window implementation commits:
+  - engine: `2a58e0c9981566808eb00d6eb1b2133c9637b2df`
+  - runner: `891f366157e2ab7e512f0b23ca1219031d4e2317`
+  - regression tests: `b449c3d114c818bdbdc12d5a6bd59e02743521ec`
+  - selector metadata: `78cca4d57f604e17de381c424fb615a5fd4a447e`
+- The dependency-provenance scanner was also made transitive using Python AST
+  imports. Its parser and workflow-file handling received follow-up fixes;
+  the final Research CI run below passed.
+- Research CI: [run 41813449170](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41813449170) — **SUCCESS**.
+- The H1 runner execution gate, Top-5 selector tests, EMA/Donchian tests and
+  H1 validation manifest provenance tests all completed successfully.
+- No H1 market PnL replay, archive download, Bybit account/API access, paper
+  orders or real orders were performed by this audit.
+
+Decision: D20/D48/D48+EMA is now a cleaner one-factor/one-gate ablation at the
+signal-definition level. It is still not execution-realistic enough to
+validate a positive edge because the H1 maker fill proxy is not queue-aware.

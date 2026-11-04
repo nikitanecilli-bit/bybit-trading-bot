@@ -184,6 +184,7 @@ def build_universe_snapshot(
         snapshot["page_observations"] = validate_page_observations(
             page_observations, expected_symbols=set(symbols),
             collection_started_at=started_at, fetched_at=timestamp,
+            expected_status_filters=("default", *STATUSES),
         )
     return snapshot
 

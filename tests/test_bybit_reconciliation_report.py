@@ -118,10 +118,10 @@ def upgrade_to_schema2(data):
     return data
 
 
-def upgrade_to_schema3(data, *, api_key="test-api-key", base_url="https://api.bybit.com"):
+def upgrade_to_schema3(data, *, key_material="fixture-account-a", base_url="https://api.bybit.com"):
     data = upgrade_to_schema2(data)
     data["schema_version"] = 3
-    data["api_key_fingerprint_sha256"] = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+    data["api_key_fingerprint_sha256"] = hashlib.sha256(key_material.encode("utf-8")).hexdigest()
     data["base_url"] = base_url
     return data
 
@@ -228,7 +228,7 @@ class ReportOnlyComparatorTests(unittest.TestCase):
 
     def test_execution_snapshot_comparison_rejects_different_api_key_fingerprint(self):
         initial = upgrade_to_schema3(snapshot())
-        refreshed = upgrade_to_schema3(snapshot(), api_key="different-api-key")
+        refreshed = upgrade_to_schema3(snapshot(), key_material="fixture-account-b")
         refreshed["bybit_server_time_before_ms"] += 1000
         refreshed["bybit_server_time_after_ms"] += 1000
         refreshed["capture_now_ms"] += 1000

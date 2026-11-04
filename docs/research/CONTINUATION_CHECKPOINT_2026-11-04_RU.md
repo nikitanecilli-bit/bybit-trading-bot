@@ -92,3 +92,10 @@ Queue prototype прошёл 14 synthetic tests и CI #41812777279; same-millise
 - Четыре hypothetical orders остаются только smoke test.
 - Maker execution gate остаётся CLOSED для strategy PnL.
 - Не запускались новые рыночные PnL backtests, parameter sweeps, private API, paper/live orders.
+
+## 9. Final CI/network-trigger state after hardening
+
+- `bybit-orderbook-archive-probe.yml` also switched to manual dispatch only (commit `83d10f9c9f6c2f707afb6f2bfaaa4063d2fd729e`).
+- Research CI after removing the bounded network probe: [#41828681722](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41828681722) SUCCESS.
+- Both sample-inspection runs caused by the two parser commits completed SUCCESS; they re-read only the same existing AAVEUSDT 2025-09-02 sample, not a new date or symbol.
+- All data-collection / sample-download workflows now require explicit manual dispatch; default deterministic CI no longer runs Bybit network probes or full L2 downloads.

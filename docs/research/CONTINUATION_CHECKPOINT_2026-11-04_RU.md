@@ -56,3 +56,39 @@ Queue prototype прошёл 14 synthetic tests и CI #41812777279; same-millise
 5. Не запускать PnL replay, пока не будет явно пересмотрен data/execution gate в соответствии с решением пользователя.
 
 Документ фиксирует состояние и ограничения; торговую логику и параметры стратегии не меняет.
+
+## 6. Исправление fail-closed в aggregate-L2 trade parser (2026-11-04, продолжение)
+
+Подтверждённый дефект в `apply_public_trade()`:
+- неизвестная сторона aggressor trade проверялась только после сравнения цены с лимитом; malformed row на другой цене молча игнорировалась;
+- любое неизвестное значение RPI, кроме нескольких false-подобных строк, автоматически считалось RPI и исключалось из очереди;
+- неположительные price/size не всегда отклонялись как ошибка данных.
+
+Исправление:
+- side валидируется строго как Buy/Sell до проверки цены;
+- RPI принимается только из явно допустимых true/false значений; неизвестные значения вызывают ValueError;
+- price и size должны быть положительными;
+- malformed rows fail closed, а не исчезают из статистики.
+
+Добавлены 3 regression tests; aggregate-L2 tests теперь **19/19 passed** в Research CI [#41828681722](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41828681722). Предыдущий Research CI после исправления parser также прошёл [#41828545268](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41828545268). Это parser/data-integrity verification, не strategy PnL.
+
+## 7. Снижение ненужных сетевых запусков CI
+
+Обнаружено, что push изменений queue parser/tests автоматически запускал отдельный Bybit sample workflow, который заново скачивал уже проверенный AAVEUSDT L2 и public-trade день. Два последовательных коммита вызвали два повторных sample runs; оба завершились SUCCESS:
+- [#41828512197](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41828512197)
+- [#41828545237](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41828545237)
+
+Чтобы не повторять это при каждом изменении кода:
+- `.github/workflows/bybit-orderbook-sample-inspection.yml` переведён на `workflow_dispatch` only;
+- bounded Bybit order-book archive probe удалён из обычного `research-checks.yml`; теперь обычный CI не делает сетевой запрос за Bybit archive probe;
+- deterministic parser tests остаются в обычном Research CI.
+
+Изменение workflow проверено успешным Research CI [#41828681722](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41828681722). Полный sample-inspection запуск оставлен ручным, чтобы сетевой сбор/повторное скачивание происходили только при осознанном отдельном запуске.
+
+## 8. Текущие ограничения без изменений
+
+- Queue replay остаётся aggregate-L2 approximation, не L3 и не exchange-confirmed execution.
+- Нет tick/qty step validation, latency/cancel model, per-fill VWAP markout/fee lifecycle, broad-symbol/regime sample.
+- Четыре hypothetical orders остаются только smoke test.
+- Maker execution gate остаётся CLOSED для strategy PnL.
+- Не запускались новые рыночные PnL backtests, parameter sweeps, private API, paper/live orders.

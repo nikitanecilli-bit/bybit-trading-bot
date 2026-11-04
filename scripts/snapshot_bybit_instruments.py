@@ -123,9 +123,10 @@ def fetch_all_instruments(
                 raise RuntimeError("Bybit instrument pagination exceeded safety limit")
             rows, next_cursor = fetch_page(cursor, status)
             for row in rows:
-                symbol = str(row.get("symbol") or "").strip().upper()
-                if not symbol:
-                    raise ValueError("instrument row is missing symbol")
+                raw_symbol = row.get("symbol")
+                if not isinstance(raw_symbol, str) or not raw_symbol.strip():
+                    raise ValueError("instrument row is missing or has invalid symbol")
+                symbol = raw_symbol.strip().upper()
                 if symbol in by_symbol and by_symbol[symbol] != row:
                     raise ValueError(f"conflicting duplicate instrument row: {symbol}")
                 by_symbol[symbol] = row
@@ -159,9 +160,12 @@ def _snapshot_timestamp(value: str | None) -> str:
 def build_snapshot(rows: list[dict[str, Any]], category: str,
                    fetched_at: str | None = None) -> dict[str, Any]:
     timestamp = _snapshot_timestamp(fetched_at)
-    symbols = [str(row.get("symbol") or "").strip().upper() for row in rows]
-    if not rows or any(not symbol for symbol in symbols):
-        raise ValueError("snapshot requires non-empty rows with symbols")
+    if not rows or any(not isinstance(row, dict) for row in rows):
+        raise ValueError("snapshot requires non-empty instrument objects")
+    raw_symbols = [row.get("symbol") for row in rows]
+    if any(not isinstance(symbol, str) or not symbol.strip() for symbol in raw_symbols):
+        raise ValueError("snapshot requires non-empty string symbols")
+    symbols = [symbol.strip().upper() for symbol in raw_symbols]
     if len(symbols) != len(set(symbols)):
         raise ValueError("snapshot contains duplicate symbols")
     return {

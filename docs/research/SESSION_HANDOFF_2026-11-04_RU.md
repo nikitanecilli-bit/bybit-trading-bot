@@ -457,3 +457,10 @@
 - Inspector rejects `cts` and `seq` regressions but does not enforce archive-wide `u` monotonicity; replay's `OrderBook.apply()` rejects non-reset `u` regressions. ENG-EXEC-031 intentionally avoids universal `u` monotonicity until the depth-200 archive contract is confirmed.
 - No code change. Do not loosen replay or add unsupported `u` assumptions. Next: define explicit L2 replay-compatibility reporting once source semantics are established.
 - Note: `ENG_EXEC_036_L2_INSPECTOR_REPLAY_COMPATIBILITY_RU.md`. No archive download, network workflow, collector, PnL, API, runner or orders. Maker gate remains closed.
+
+## 2026-11-04 — ENG-EXEC-037 price-through and passive replay boundary
+
+- Static audit of `apply_public_trade()` and tests confirmed exact-price-only trade matching. Opposing-aggressor prints at a better price are ignored; post-arrival L2 deletions/price-through/reappearance do not update the hypothetical order. Initial queue-ahead remains unchanged after L2 cancellations/new size.
+- This is a limited mechanical sanity model, not evidence of maker fill realism. It can miss price-through fills, but cancellation allocation is unknown; blindly crediting better-price prints could also overstate fills.
+- No code/test changes. Require synchronized L2/trade replay and confirmed timestamp/side semantics before changing fills. Note: `ENG_EXEC_037_PRICE_THROUGH_PASSIVE_REPLAY_BOUNDARY_RU.md`.
+- No tests, archives, network workflows, PnL, API, runner or orders. Maker gate remains closed; `main` unchanged; PR #4 remains Draft/unmerged.

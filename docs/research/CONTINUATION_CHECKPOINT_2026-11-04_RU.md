@@ -806,3 +806,20 @@ Verification:
 - Actual log: aggregate L2 primitives **81/81 passed**; L2 runner chronology/markout suite **5/5 passed**.
 - Read-only audit of report serialization and CSV schema found no additional reproducible issue. No networked runner `main()` or market-data download was executed.
 - No PnL, archive collection/download, private API/account access, runner registration, paper/live order, or main-branch change.
+
+
+## 40. Dated Bybit specs, risk tiers and account fee provenance remain absent — 2026-11-04
+
+Read-only GitHub inventory:
+- `data/archives/` contains only the existing `cryptofetch/` directory.
+- `data/archives/bybit/`, `data/instrument_specs/`, and `data/risk_tiers/` are absent (GitHub Contents API returned 404).
+- No new archives or collector workflows were run.
+
+Interpretation:
+- `InstrumentSpecHistory` and `RiskTierHistory` implement strict dated/as-of loading, but there are no committed historical Bybit snapshots to supply those loaders. Current specs cannot be substituted for historical snapshots.
+- L2 report explicitly records `order_spec_validation=not_performed_no_verified_historical_snapshot` and `fee_accounting=not_calculated_requires_account_fee_tier_per_fill`.
+- Existing maker/taker/slippage constants are modeled assumptions, not account-specific historical fee evidence. No private API/account access was used.
+- Execution-realism audit continues to block maker PnL because spread, queue, partial-fill latency, cancel latency/adverse-selection and dated account fee evidence remain incomplete.
+- PR #4 is still open + Draft. No main-branch changes, merge/rebase/retarget, PnL, market data downloads, API, runner registration or orders.
+
+No code change was justified by the artifact inventory. Continue read-only review only until the required dated public data/snapshots and execution evidence can be acquired within the project's approved gates.

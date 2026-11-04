@@ -68,6 +68,22 @@ class RiskLimitSnapshotTests(unittest.TestCase):
         self.assertEqual(snapshot["tier_count"], 3)
         self.assertEqual(snapshot["fetched_at"], "2026-11-02T00:00:00Z")
 
+    def test_default_snapshot_timestamp_has_millisecond_precision(self):
+        snapshot = build_snapshot([row()], "linear")
+        self.assertRegex(snapshot["fetched_at"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
+
+    def test_snapshot_timestamp_requires_timezone_and_millisecond_precision(self):
+        for value in ("2026-11-02T00:00:00", "2026-11-02T00:00:00.000500Z"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "timezone|millisecond precision"):
+                    build_snapshot([row()], "linear", value)
+
+    def test_snapshot_timestamp_normalizes_offset_to_utc(self):
+        snapshot = build_snapshot(
+            [row()], "linear", "2026-11-02T03:00:00.123+03:00"
+        )
+        self.assertEqual(snapshot["fetched_at"], "2026-11-02T00:00:00.123Z")
+
     def test_tier_group_checks_monotonic_rates_and_mm_deduction_recurrence(self):
         valid = [
             row("BTCUSDT", 1, "100000", mm="0.005", im="0.01", lowest=1, leverage="100", deduction="0"),

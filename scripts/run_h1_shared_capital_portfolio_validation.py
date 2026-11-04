@@ -926,6 +926,7 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
             limit_price=float(sig["entry_price"]),
             penetration_bps=ENTRY_PENETRATION_BPS,
             age=meta["age"],
+            open_price=float(candle.open),
             max_wait_bars=WAIT_BARS,
         )
         if decision == "fill":

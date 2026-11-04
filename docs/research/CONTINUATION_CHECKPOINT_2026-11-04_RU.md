@@ -787,3 +787,22 @@ Final verification:
 - CI #41842036275 succeeded but did not execute the runner test functions; do not use it as evidence for those tests.
 
 No market PnL, market archive download/collector, Bybit private/account API, self-hosted runner, paper/live order, or main-branch change. PR #4 remains Draft/open. Continue with independent static review only unless a new reproducible defect is found.
+
+
+## 39. Exact millisecond timestamp cutoff fixed and verified — 2026-11-04
+
+Static CSV parser review found that `parse_trade_timestamp_ms()` classified values as milliseconds only when strictly greater than `1_000_000_000_000`. Therefore the exact valid millisecond timestamp `1000000000000` was incorrectly treated as seconds and multiplied by 1,000.
+
+Correction:
+- Changed the cutoff to `>= Decimal("1000000000000")`.
+- Added an exact-boundary regression assertion in `test_trade_timestamp_parser_preserves_exact_seconds_and_milliseconds`.
+
+Commits:
+- source: `e972a4466ed8053b0471eead932144a18ee91790`
+- test: `a9443b1c9ee81d63ab80150ffe3650af78aff560`
+
+Verification:
+- Research CI #41842908843 on `a9443b1c9ee81d63ab80150ffe3650af78aff560`: SUCCESS; job `tests` SUCCESS; all 56 workflow steps completed.
+- Actual log: aggregate L2 primitives **81/81 passed**; L2 runner chronology/markout suite **5/5 passed**.
+- Read-only audit of report serialization and CSV schema found no additional reproducible issue. No networked runner `main()` or market-data download was executed.
+- No PnL, archive collection/download, private API/account access, runner registration, paper/live order, or main-branch change.

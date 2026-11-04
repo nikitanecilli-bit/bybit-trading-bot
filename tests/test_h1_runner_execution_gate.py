@@ -181,6 +181,19 @@ def test_confirm_mode_requires_matching_frozen_strategy_arm_set():
             "H1_VALIDATION_MODE": "confirm",
             "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
             "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10",
+        })
+        try:
+            resolve_validation_design(env)
+        except SystemExit as exc:
+            assert "requires H1_FROZEN_STRATEGY_MODE" in str(exc)
+        else:
+            raise AssertionError("confirm mode must require an explicit frozen strategy mode")
+    with tempfile.TemporaryDirectory() as tmp:
+        env = _selection_env(tmp)
+        env.update({
+            "H1_VALIDATION_MODE": "confirm",
+            "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
+            "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10",
             "H1_DONCHIAN48_EMA_ABLATION": "1",
             "H1_FROZEN_STRATEGY_MODE": "d20_d48_d48_ema",
         })
@@ -435,6 +448,7 @@ def test_confirm_mode_rejects_missing_or_unregistered_config():
         with tempfile.TemporaryDirectory() as tmp:
             env = _selection_env(tmp)
             env["H1_VALIDATION_MODE"] = "confirm"
+            env["H1_FROZEN_STRATEGY_MODE"] = "d20_baseline"
             if volume is not None:
                 env["H1_FROZEN_MIN_VOLUME_RATIO"] = volume
             if breakout is not None:

@@ -71,7 +71,10 @@ class InstrumentSpec:
         price_filter = instrument.get("priceFilter") or {}
         lot_filter = instrument.get("lotSizeFilter") or {}
         leverage_filter = instrument.get("leverageFilter") or {}
-        symbol = str(instrument.get("symbol") or "").strip()
+        raw_symbol = instrument.get("symbol")
+        if not isinstance(raw_symbol, str) or not raw_symbol.strip():
+            raise ValueError("instrument symbol is required")
+        symbol = raw_symbol.strip()
         raw_category = instrument.get("category")
         if not isinstance(raw_category, str) or not raw_category.strip():
             raise ValueError("instrument category is required")

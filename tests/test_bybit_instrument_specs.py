@@ -128,6 +128,17 @@ class InstrumentSpecTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "instrument category is required"):
                     InstrumentSpec.from_snapshot(broken)
 
+    def test_missing_or_non_string_symbol_fails_closed(self):
+        for value in (None, "", "   ", 123, True):
+            with self.subTest(symbol=value):
+                broken = {"instrument": dict(SNAPSHOT["instrument"])}
+                if value is None:
+                    broken["instrument"].pop("symbol")
+                else:
+                    broken["instrument"]["symbol"] = value
+                with self.assertRaisesRegex(ValueError, "instrument symbol is required"):
+                    InstrumentSpec.from_snapshot(broken)
+
     def test_non_trading_instrument_cannot_be_sized(self):
         broken = {"instrument": dict(SNAPSHOT["instrument"])}
         broken["instrument"]["status"] = "PendingOpen"

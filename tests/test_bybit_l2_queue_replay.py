@@ -16,7 +16,7 @@ def book():
     b = OrderBook()
     b.apply({
         "type": "snapshot", "cts": 1000,
-        "data": {"seq": 1, "b": [["100", "5"], ["99", "8"]],
+        "data": {"seq": 1, "u": 1, "b": [["100", "5"], ["99", "8"]],
                  "a": [["101", "6"], ["102", "9"]]},
     })
     return b
@@ -42,6 +42,37 @@ def test_snapshot_and_delta_are_absolute_level_updates_and_zero_deletes():
     assert b.quantity_at("Buy", D("100")) == D("7")
     assert b.quantity_at("Buy", D("99")) == 0
     assert b.quantity_at("Sell", D("101")) == D("4")
+
+
+
+def test_u1_restart_snapshot_resets_book_and_allows_new_sequence_epoch():
+    b = book()
+    b.apply({"type": "delta", "cts": 1100, "data": {
+        "u": 2, "seq": 2, "b": [["100", "7"]], "a": [],
+    }})
+    b.apply({"type": "snapshot", "cts": 1200, "data": {
+        "u": 1, "seq": 1, "b": [["98", "4"]], "a": [["99", "6"]],
+    }})
+    assert b.last_u == 1
+    assert b.last_seq == 1
+    assert b.quantity_at("Buy", D("100")) == 0
+    assert b.quantity_at("Buy", D("98")) == D("4")
+    assert b.quantity_at("Sell", D("99")) == D("6")
+
+
+def test_u1_restart_marker_on_delta_fails_closed_without_mutating_book():
+    b = book()
+    before = b.copy_levels()
+    try:
+        b.apply({"type": "delta", "cts": 1100, "data": {
+            "u": 1, "seq": 1, "b": [["100", "0"]], "a": [],
+        }})
+    except ValueError as exc:
+        assert "requires a full snapshot" in str(exc)
+    else:
+        raise AssertionError("u=1 delta must not be applied as a complete book")
+    assert b.copy_levels() == before
+    assert b.last_u == 1
 
 
 def test_buy_order_queue_ahead_is_initial_displayed_bid_size():
@@ -195,11 +226,11 @@ def test_sell_signed_markout_is_positive_when_mid_falls_after_fill():
 def test_book_state_capture_excludes_same_millisecond_updates():
     events = [
         {"type": "snapshot", "cts": 1000, "data": {
-            "s": "AAVEUSDT", "seq": 1,
+            "s": "AAVEUSDT", "seq": 1, "u": 1,
             "b": [["100", "5"]], "a": [["101", "5"]],
         }},
         {"type": "delta", "cts": 2000, "data": {
-            "s": "AAVEUSDT", "seq": 2,
+            "s": "AAVEUSDT", "seq": 2, "u": 2,
             "b": [["100", "1"]], "a": [],
         }},
     ]

@@ -309,3 +309,32 @@ Research CI #41913543774 — SUCCESS, 59/59 workflow steps; тест persistence
 - Research CI #41914734752 — SUCCESS; CI #41914915742 — SUCCESS, включая тест восстановления после перезапуска (59/59 workflow steps).
 
 Ограничение: это локальный аудит записанных fills относительно переданного snapshot позиции. Он не устанавливает полноту execution history и не сравнивает данные с реальным аккаунтом. Нельзя передавать `execution_history_complete=True` без внешнего доказательства полного временного покрытия и пагинации истории исполнений. API, credentials, collectors, archive downloads, live orders и market PnL не запускались. Reconciliation PASS и live resume остаются BLOCKED.
+
+
+### ENG-RECON-014 — атомарное объединение execution batches и поздние fills
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
+
+Добавлен `OpenPositionState.merge_exchange_execution_batch(executions)`:
+
+- Принимает пакет типизированных `ExchangeExecutionIdentity`; для каждой записи применяется существующая проверка symbol, orderId, side, orderLinkId и per-order cumExecQty.
+- Точный повтор `execId` учитывается как duplicate и не создаёт вторую запись; конфликтующий повтор с отличающимися полями отклоняет весь пакет.
+- Любая некорректная запись откатывает весь batch: fills, добавленные ранее в том же вызове, не остаются в журнале.
+- После успешного объединения журнал сортируется детерминированно по `(exec_time_ms, exec_id)`. Поэтому поздно полученный fill с более ранним exchange event time занимает правильное место в журнале.
+- Метод возвращает счётчики `inserted`, `duplicates`, `total`.
+
+Добавлены offline regressions:
+- overlapping pages с повторной доставкой одного execId;
+- поздний fill, пришедший после более нового события;
+- quantity audit после merge: численное совпадение остаётся `INCOMPLETE` по умолчанию;
+- orphan execution и конфликтующий execId отклоняют batch без частичного изменения журнала.
+
+Research CI #41915745339 — SUCCESS, 59/59 workflow steps; протестированный commit `ec85084323363f6372952e6d783757af9d26edc7`.
+
+Ограничения:
+- Это локальная идемпотентность по execId и атомарность обновления объекта. Она не доказывает, что биржа выдала все страницы или что временные окна покрывают весь жизненный цикл позиции.
+- Пустая страница, отсутствие повторов или совпадение количества сами по себе не означают полноту истории. `execution_history_complete=True` по-прежнему нельзя выставлять без независимого доказательства coverage и завершённой пагинации.
+- Нет персистентного журнала page cursors/coverage windows и нет collector integration; эти задачи требуют отдельного контракта источника и не должны симулироваться локальными fixtures.
+
+Никаких Bybit API calls, credentials, collectors, archive downloads, live orders или market PnL tests не выполнялось. Reconciliation PASS, live resume и strategy/execution/PnL gates остаются BLOCKED.

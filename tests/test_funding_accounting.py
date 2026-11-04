@@ -147,6 +147,33 @@ class AccruedFundingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duplicate"):
             accrued_funding_cost(position(), EVENTS + [dict(EVENTS[0])], MARKS, SETTLE_2)
 
+    def test_rejects_non_integer_funding_and_position_timestamps(self):
+        with self.assertRaisesRegex(ValueError, "funding event timestamp"):
+            accrued_funding_cost(
+                position(), [{"ts": SETTLE_1 + 0.5, "rate": "0.01"}],
+                MARKS, SETTLE_1,
+            )
+        with self.assertRaisesRegex(ValueError, "funding event timestamp"):
+            accrued_funding_cost(
+                position(), [{"ts": True, "rate": "0.01"}], MARKS, SETTLE_1,
+            )
+        bad_entry = position()
+        bad_entry.entry_ts = ENTRY + 0.5
+        with self.assertRaisesRegex(ValueError, "entry_ts"):
+            accrued_funding_cost(bad_entry, EVENTS, MARKS, SETTLE_2)
+        with self.assertRaisesRegex(ValueError, "as_of_ts"):
+            accrued_funding_cost(position(), EVENTS, MARKS, SETTLE_2 + 0.5)
+
+    def test_rejects_non_integer_tp1_and_close_timestamps(self):
+        pos = position(tp1=True, tp1_ts=SETTLE_1 + 0.5)
+        with self.assertRaisesRegex(ValueError, "tp1_ts_ms"):
+            accrued_funding_cost(pos, EVENTS, MARKS, SETTLE_2)
+        with self.assertRaisesRegex(ValueError, "closed_ts_ms"):
+            accrued_funding_cost(
+                position(), EVENTS, MARKS, SETTLE_2,
+                closed_ts_ms=SETTLE_2 + 0.5,
+            )
+
     def test_invalid_position_state_rejected(self):
         with self.assertRaisesRegex(ValueError, "tp1_ts_ms"):
             accrued_funding_cost(position(tp1=True), EVENTS, MARKS, SETTLE_2)

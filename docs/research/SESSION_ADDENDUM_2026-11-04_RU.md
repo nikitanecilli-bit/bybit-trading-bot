@@ -211,3 +211,12 @@ CI: run [41901402434](https://github.com/nikitanecilli-bit/bybit-trading-bot/act
 - Regression test проверяет валидный page metadata, отклонение неверной суммы tier rows и collection start после fetched_at. Существующие тесты продолжают проверять загрузку старых снимков без optional metadata.
 - Research CI [#41908898109](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41908898109): **SUCCESS**, 59/59 шагов, tested code HEAD ``1cc503608a238141a70b6ab8f8cb81ef0824ad3b``.
 - Только offline unit tests/CI. Сборщик, Bybit API, архивные загрузки, live orders и market PnL не запускались. Никакие execution/PnL gates не изменялись.
+
+
+## ENG-DATA-022 — runtime loader валидирует pagination metadata instrument snapshots
+
+- Статический аудит показал аналогичный разрыв в ``InstrumentSpecHistory.from_directory``: ``collection_started_at`` уже проверялся, но присутствующий ``page_observations`` не проверялся runtime loader-ом.
+- Runtime loader теперь при наличии page observations требует collection start и проверяет точную схему полей, разрешённые status filters для категории (linear/inverse: PreLaunch, Trading, Settling, Delivering, Closed; spot: Trading; option: PreLaunch, Trading, Delivering, Closed), порядок и непрерывность status groups, последовательные page indexes, хронологию и границы времени, row_count/symbols, отсутствие повторов внутри страницы, continuation flags и точное совпадение объединения page symbols с итоговым snapshot.
+- Legacy snapshots без ``page_observations`` остаются совместимыми. Добавлены regression tests на корректный набор страниц, пропущенный status group и неверный порядок status groups.
+- Первый CI выявил off-by-one в runtime проверке порядка status groups; исправлена формула ожидаемого индекса группы. Итоговый Research CI [#41909339669](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41909339669): **SUCCESS**, 59/59 шагов, tested code HEAD ``794d1ca3ab57511559e2513436147c7583a1c555``.
+- Только offline unit tests/CI. Collector, Bybit API, архивные загрузки, live orders и market PnL не запускались. Strategy/execution/PnL gates остаются BLOCKED.

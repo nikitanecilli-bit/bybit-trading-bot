@@ -222,3 +222,20 @@ External-data hold remains in force: do not dispatch collectors, configure self-
 Commits: initial idempotency source `f318a21d0d13676ce79390decaaea24aa6951b91`; test `c5b2e036b3af98f7a4d5d203acf671ab3ee6feb1`; duplicate-vs-prior-ID correction `539adee9722887aec4c26a30de4f413aa597ad93`; active-window ID retention `4852ebb7ed4fc32e0cd622b89301db1c60119129`.
 
 Bybit trade archive runner remains a one-pass per-order probe. Persistent ID state makes the primitive safe for overlapping/restarted replay use; it does not improve the underlying aggregate-L2 queue approximation or prove fills. CI is still not terminally verified for latest push commits; no tests-pass claim. No new data, private API, PnL or orders.
+## 17. Trade-time precision, block-trade/RPI filtering, and initial snapshot guard
+
+Следующий статический audit нашёл три существенных источника ложного queue consumption:
+
+1. Public trade timestamp parser использовал `float()` + `round()`, а `apply_public_trade()` — `int()`. Fractional ms могли округляться/усекаться и перемещать print через arrival boundary. Теперь archive timestamp разбирается через Decimal без float; секунды преобразуются в ms точно; sub-ms значения отклоняются; replay/apply и hypothetical order arrival/expiry требуют strict integer timestamps.
+2. Bybit public trade stream имеет `BT` (block trade) и `RPI` flags. Стандартный orderbook feed не включает RPI orders. Block-trade prints не должны уменьшать displayed L2 queue, а RPI prints также не сопоставимы с обычным displayed book. Ранее queue replay игнорировал BT и допускал отсутствие RPI flag. Теперь replay исключает BT/RPI, считает их отдельно и fail-closed отклоняет архив, если отсутствует любой из этих классификаторов (`isBlockTrade`/`BT` и `RPI`/`isRPITrade`).
+3. `OrderBook.apply()` принимал delta как первое событие и мог инициализировать reconstructed book без полного snapshot. Теперь первый event обязан быть snapshot.
+
+Добавлены regression tests на точный timestamp parser (seconds/ms), запрет sub-ms округления, invalid timestamp values, direct apply/replay rollback, integer arrival timestamp, исключение block trades, сохранение normal prints, invalid flags, обязательные BT/RPI columns и parser aliases. Исправлены newline escapes в gzip CSV test fixtures. Queue test file содержит 56 test functions.
+
+Commits: exact trade timestamp source `8911feb143ce8160e7fb897aba284c1be6c6df6a`; source integration `f392f7c3c81b2a4ed7da3e1e2209e70e9d0aeae9`; initial-snapshot source `b09de7d3bfebf5f41d630c983eb0d08cd9fb51bf`; block-trade source `efbb20ca4110ea70cb2c269d8dd8c7801b7a5360`; RPI-required source `012ae49d29fbdcfc4da1a2261ed32568eccc3410`; order timestamp source `ad9c8145a3ebde52e3928428b42ac82809858fca`; timestamp tests `57a4ca71fdb3a5cf9742d6bfb6ee4cfc7c91390c`; newline fixture repair `9f244a82dc80544d96335aa88f9efad7411465c3`; block-trade tests `e63497bacf6cdfca18c58dfaddf09f693906a169`; RPI tests `cf22d6927bdca97c78544c29592cebaa97b5dc77`; final order timestamp tests `4c78ad78c4c6d149cfc83e1c883253a68103e215`.
+
+Official Bybit docs: public trade stream defines `T` as fill timestamp, `S` as taker side, `BT` as block-trade flag, and `RPI` as RPI flag: https://bybit-exchange.github.io/docs/v5/websocket/public/trade. Standard orderbook docs state RPI orders are not included and `cts` can be correlated with public-trade `T`: https://bybit-exchange.github.io/docs/v5/websocket/public/orderbook.
+
+Latest validation is static only: source/test/runner files re-fetched and reviewed; 56 test functions present. CI execution is not confirmed. GitHub combined statuses remain empty for these push commits, and available workflow-run wrapper only surfaces PR-triggered runs; no workflow_dispatch action is available through current connector. No tests-pass claim.
+
+Runner report now declares mandatory BT/RPI metadata and counts excluded block trades. No historical archives downloaded or replayed, no new network collector invoked, no private API/live/paper orders. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains.

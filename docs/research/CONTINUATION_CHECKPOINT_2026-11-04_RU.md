@@ -99,3 +99,31 @@ Queue prototype прошёл 14 synthetic tests и CI #41812777279; same-millise
 - Research CI after removing the bounded network probe: [#41828681722](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41828681722) SUCCESS.
 - Both sample-inspection runs caused by the two parser commits completed SUCCESS; they re-read only the same existing AAVEUSDT 2025-09-02 sample, not a new date or symbol.
 - All data-collection / sample-download workflows now require explicit manual dispatch; default deterministic CI no longer runs Bybit network probes or full L2 downloads.
+
+## 10. Bybit L2 update-ID restart semantics — исправление внесено, CI не подтверждён
+
+Официальная Bybit V5 orderbook документация определяет u как update ID и указывает, что u=1 означает snapshot после service restart; локальный стакан должен быть заменён новым snapshot. seq — cross sequence; для full-depth документации он монотонный, но не обязан быть consecutive. Источник: https://bybit-exchange.github.io/docs/v5/websocket/public/orderbook.
+
+Подтверждённый дефект в прежнем OrderBook.apply():
+- код очищал стакан только при type=snapshot, но не читал data.u;
+- проверка seq < last_seq выполнялась до очистки snapshot, поэтому корректный restart snapshot с новой sequence epoch мог быть отвергнут;
+- u=1 на delta мог быть применён как обычный incremental update, хотя без полного snapshot такой state нельзя считать синхронизированным.
+
+Исправление в research branch:
+- u обязателен, положителен и не может быть bool;
+- u=1 принимается только вместе с type=snapshot; такой snapshot сбрасывает старые уровни и разрешает новую seq epoch;
+- u=1 на delta отклоняется fail-closed;
+- обычная монотонная проверка cts сохраняется, а для non-reset событий сохраняется проверка non-decreasing seq.
+
+Regression coverage:
+- restart snapshot с уменьшившимся seq очищает старые уровни и загружает новые;
+- u=1 delta отклоняется без изменения предыдущего стакана;
+- отсутствие u отклоняется;
+- существующие synthetic fixtures дополнены update IDs.
+- Source commit: 46d264d40a567438c0311bd227f76b0b753700ef.
+- Test commits: 5687cd39ff869b9bcabc2f12a55f51596b899e63, ed03e42bbba772d2e0b9c55a3282f05b3df4fdf9, 7d8f54318552d8d8aa3b9d7ae08d0feb61bb0ebb; current queue test file contains 22 tests.
+- The Research CI workflow is configured to run on pushes touching these paths. Its new run is not visible through the available PR-only workflow-run lookup; do not mark this patch CI-passed until a terminal push-run result is checked.
+
+The previously inspected AAVEUSDT 2025-09-02 sample had zero u=1 resets, so this is a future-data integrity guard, not a correction to the four-order sample metrics. No archive was re-downloaded, no strategy signal was replayed, no PnL was run, and no Bybit account/API/order operation occurred.
+
+Next static audit items remain: order-spec/tick/qty validation, per-fill fee and VWAP markout lifecycle, latency/cancel assumptions, and duplicate public-trade ID handling. Keep MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL.

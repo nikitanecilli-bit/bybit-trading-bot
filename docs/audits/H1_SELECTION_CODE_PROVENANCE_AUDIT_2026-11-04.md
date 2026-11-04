@@ -350,7 +350,8 @@ The previous archive collector treated end_ms as an exclusive boundary for trade
 - test_archive_symbol_writes_funding_query_sidecar_through_final_close verifies funding query/manifest/schedule include the exact final boundary and that the extra Mark candle is requested only for a scheduled terminal settlement.
 - test_trade_ohlcv_allows_one_exact_terminal_mark_boundary accepts the exact extra boundary; test_trade_ohlcv_rejects_nonterminal_extra_mark_timestamp rejects any other extra mark.
 - The archive-level manifest test now verifies lifecycle-clipped funding coverage through the inclusive final close.
-- Research CI [#41819498000](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41819498000) — **SUCCESS**, 58 successful workflow steps, no failures. The collector, funding/mark coverage, funding manifest and portfolio accounting test steps all passed.
+- The collector now removes partial per-symbol outputs if the extra terminal Mark fetch fails, while retaining content-addressed instrument snapshot copies for a safe retry in the same output root. Regression test: test_archive_symbol_cleans_partial_outputs_when_terminal_mark_is_unavailable.
+- Research CI [#41819867269](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41819867269) — **SUCCESS**, 58 successful workflow steps, no failures. The retry-cleanup test, final-close collector test, terminal Mark-grid tests, funding manifest tests and portfolio accounting tests all passed.
 
 ## Simultaneous exits and portfolio equity — reviewed
 

@@ -374,3 +374,37 @@ Research CI #41916337116 — SUCCESS, 59/59 workflow steps; протестиро
 - Этот код не проверяет фактические HTTP-запросы, server-side snapshot consistency, корректность cursor chain, задержанные биржевые события или полноту выдачи API. `pagination_complete` и `terminal_page_seen` — аттестации вызывающего слоя, а не криптографическое/биржевое доказательство.
 - Нельзя выставлять `execution_history_complete=True` только на основании локального coverage audit без надёжного collector provenance и независимо проверенной пагинации.
 - Нет Bybit API calls, credentials, collectors, archive downloads, live orders или market PnL tests. Reconciliation PASS, live resume и strategy/execution/PnL gates остаются BLOCKED.
+
+
+### ENG-RECON-016 — проверка цепочки наблюдений страниц
+
+Дата: 2026-11-05  
+Статус: IMPLEMENTED / OFFLINE CI VERIFIED.
+
+Усилен контракт `ExchangeExecutionCoverage`: завершённость пагинации больше не задаётся входными boolean-полями. Она выводится из сохранённой последовательности `ExchangeExecutionPageObservation`.
+
+Каждое наблюдение содержит:
+- `page_index` — индекс от нуля, строго последовательный;
+- `request_started_at_ms` и `request_completed_at_ms` — client-observed временные границы запроса;
+- `row_count` — неотрицательное число строк страницы;
+- `has_next_page` — признак наличия следующей страницы.
+
+Валидация цепочки:
+- наблюдения должны идти с индексами 0..N-1;
+- время завершения каждой страницы не может быть раньше старта;
+- следующий запрос не может начаться до завершения предыдущего;
+- каждая не последняя страница обязана иметь `has_next_page=true`;
+- последняя страница считается terminal только при `has_next_page=false`;
+- пустая последовательность страниц недопустима;
+- `page_count`, `pagination_complete` и `terminal_page_seen` теперь вычисляются из page observations, а не принимаются как отдельные утверждения.
+
+Тесты покрывают корректную цепочку, отсутствие terminal page, преждевременный terminal flag и пересекающиеся request windows. Plan B round-trip сохраняет observations.
+
+Research CI #41916699655 — SUCCESS, 59/59 workflow steps; протестированный commit `195c3278e5791cbe12b3905b98b399ff4b9b5663`.
+
+Ограничения:
+- Метки времени request — клиентские наблюдения, а не server-side event time и не доказательство атомарного снимка.
+- Наблюдения пока передаются вызывающим слоем; реальный execution collector не подключён. Контракт проверяет сохранённую последовательность, но не доказывает, что метаданные получены от настоящих HTTP-ответов.
+- Сырые opaque cursors намеренно не сохраняются; нет подтверждения, что backend не пропустил/не продублировал события между страницами.
+- Даже корректная terminal page chain не доказывает, что задержанные исполнения уже появились в API или что границы временного запроса полностью соответствуют lifecycle позиции.
+- Реальные API, credentials, collectors, archive downloads, live orders и market PnL tests не запускались. Reconciliation PASS, live resume и strategy/execution/PnL gates остаются BLOCKED.

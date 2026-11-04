@@ -1571,6 +1571,56 @@ class UnifiedQuantEngine:
             # Даже если файл содержит только risk state, это не свежий backtest.
             self._state_restored = True
 
+    def _validate_restored_positions_market_state(self) -> None:
+        """Revalidate restored open positions against joined metadata at entry time."""
+        if not self.open_positions:
+            return
+        if self.instrument_spec_history is None or self.risk_tier_history is None:
+            return
+        for symbol, position in self.open_positions.items():
+            state = get_linear_market_state(
+                self.instrument_spec_history, self.risk_tier_history,
+                symbol, position.entry_ts,
+                max_snapshot_skew_ms=self.max_market_state_skew_ms,
+                max_instrument_age_ms=self.max_instrument_spec_age_ms,
+                max_risk_tier_age_ms=self.max_risk_tier_age_ms,
+            )
+            if position.leverage is None:
+                raise ValueError(
+                    f"{symbol}: restored position lacks entry leverage provenance"
+                )
+            leverage = Decimal(str(position.leverage))
+            state.instrument_spec.validate_leverage(leverage)
+            if position.risk_tier_id is None:
+                raise ValueError(
+                    f"{symbol}: restored position lacks entry risk-tier provenance"
+                )
+            margin = calculate_margin_requirements_from_tiers(
+                symbol, Decimal(str(position.size_usdt)),
+                leverage=leverage, tiers=state.risk_tiers,
+            )
+            expected = {
+                "risk_tier_id": margin.tier_id,
+                "risk_limit_value": margin.risk_limit_value,
+                "maintenance_margin_rate": margin.maintenance_margin_rate,
+                "maintenance_margin_deduction": margin.mm_deduction,
+                "risk_tier_max_leverage": margin.max_leverage,
+                "initial_margin_usdt": margin.initial_margin,
+                "maintenance_margin_usdt": margin.maintenance_margin,
+            }
+            for name, value in expected.items():
+                stored = getattr(position, name, None)
+                if stored is None:
+                    raise ValueError(f"{symbol}: restored position lacks {name}")
+                try:
+                    matches = int(stored) == value if name == "risk_tier_id" else Decimal(str(stored)) == value
+                except (TypeError, ValueError, ArithmeticError):
+                    matches = False
+                if not matches:
+                    raise ValueError(
+                        f"{symbol}: restored {name} differs from dated entry-time Bybit metadata"
+                    )
+
     def _load_funding_history(self, directory: str) -> None:
         """Load <SYMBOL>.csv with funding_timestamp_ms and funding_rate columns."""
         if not os.path.isdir(directory):

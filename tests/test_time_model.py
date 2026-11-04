@@ -30,8 +30,20 @@ def bare_engine(timeframe="15m"):
     e.pending = {}
     seen = []
     risk_timestamps = []
-    e.risk_mgr = type("RiskSpy", (), {"on_new_timestamp": lambda self, ts: risk_timestamps.append(ts)})()
-    e._update_mark_to_market = lambda ts: seen.append(ts)
+    class RiskSpy:
+        def on_new_timestamp(self, ts):
+            risk_timestamps.append(ts)
+
+        def mark_to_market(self, unrealized_pnl, ts):
+            # Match the production call path: _update_mark_to_market delegates
+            # timestamp rollover to mark_to_market after refreshing equity.
+            self.on_new_timestamp(ts)
+
+    e.risk_mgr = RiskSpy()
+    def update_mark_to_market(ts):
+        seen.append(ts)
+        e.risk_mgr.mark_to_market(0.0, ts)
+    e._update_mark_to_market = update_mark_to_market
     e._risk_timestamps = risk_timestamps
     e._persist = lambda: None
     e.step_candle = engine_mod.UnifiedQuantEngine.step_candle.__get__(e, engine_mod.UnifiedQuantEngine)

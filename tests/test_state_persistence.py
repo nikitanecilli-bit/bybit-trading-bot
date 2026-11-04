@@ -2043,6 +2043,30 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertEqual(restored.exchange_execution_coverage, position.exchange_execution_coverage)
 
 
+    def test_plan_b_save_does_not_follow_precreated_fixed_temp_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            backup = Path(tmp) / "state.json"
+            outside = Path(tmp) / "outside.json"
+            outside.write_text("do-not-touch", encoding="utf-8")
+            Path(str(backup) + ".tmp").symlink_to(outside)
+            persistence = engine.PlanBStatePersistence(str(backup), enabled=True)
+            cfg = engine.BotConfig()
+            risk_mgr = engine.AdaptiveRiskManager(cfg)
+            persistence.save_state(cfg, risk_mgr, {}, {}, 0, last_mark_prices={})
+            self.assertTrue(backup.is_file())
+            self.assertEqual(outside.read_text(encoding="utf-8"), "do-not-touch")
+            self.assertTrue(Path(str(backup) + ".tmp").is_symlink())
+
+    def test_plan_b_reader_uses_nofollow_open(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "real.json"
+            target.write_text(json.dumps({"sentinel": True}), encoding="utf-8")
+            link = Path(tmp) / "linked.json"
+            link.symlink_to(target)
+            with self.assertRaises(OSError):
+                engine.PlanBStatePersistence._read_backup_payload(str(link))
+            self.assertEqual(json.loads(target.read_text(encoding="utf-8")), {"sentinel": True})
+
     def test_plan_b_lock_rejects_symlink_without_touching_target(self):
         with tempfile.TemporaryDirectory() as tmp:
             backup = Path(tmp) / "state.json"

@@ -1380,6 +1380,11 @@ class StatePersistenceTests(unittest.TestCase):
             "exec-dup", "order-1", "", "BTCUSDT", "Buy",
             "0.2", "100", position.entry_ts + 1,
         )
+        from exchange_execution_identity import ExchangeOrderIdentity
+        position.record_exchange_order(ExchangeOrderIdentity(
+            "order-1", "", "BTCUSDT", "Buy", 0,
+            "1", "0.9", "0.1", "PartiallyFilled", False, False,
+        ))
         self.assertTrue(position.record_exchange_execution(first))
         with self.assertRaisesRegex(ValueError, "conflicting duplicate"):
             position.record_exchange_execution(conflicting)
@@ -1420,6 +1425,89 @@ class StatePersistenceTests(unittest.TestCase):
             self.assertIsNone(restored.exchange_position_identity)
             self.assertEqual(restored.exchange_orders, [])
             self.assertEqual(restored.exchange_executions, [])
+
+
+    def test_execution_sum_cannot_exceed_order_cumulative_fill_and_failure_rolls_back(self):
+        from exchange_execution_identity import ExchangeExecutionIdentity, ExchangeOrderIdentity
+        position = sample_position()
+        order = ExchangeOrderIdentity(
+            "order-overfill", "", "BTCUSDT", "Sell", 0,
+            "1", "0.7", "0.3", "PartiallyFilled", True, True,
+        )
+        position.record_exchange_order(order)
+        first = ExchangeExecutionIdentity(
+            "exec-a", "order-overfill", "", "BTCUSDT", "Sell",
+            "0.2", "95", position.entry_ts + 1,
+        )
+        second = ExchangeExecutionIdentity(
+            "exec-b", "order-overfill", "", "BTCUSDT", "Sell",
+            "0.2", "95", position.entry_ts + 2,
+        )
+        self.assertTrue(position.record_exchange_execution(first))
+        with self.assertRaisesRegex(ValueError, "sum exceeds order cumExecQty"):
+            position.record_exchange_execution(second)
+        self.assertEqual([x["exec_id"] for x in position.exchange_executions], ["exec-a"])
+
+    def test_execution_must_reference_known_order_and_match_side(self):
+        from exchange_execution_identity import ExchangeExecutionIdentity, ExchangeOrderIdentity
+        position = sample_position()
+        orphan = ExchangeExecutionIdentity(
+            "orphan", "missing-order", "", "BTCUSDT", "Sell",
+            "0.1", "95", position.entry_ts + 1,
+        )
+        with self.assertRaisesRegex(ValueError, "unknown orderId"):
+            position.record_exchange_execution(orphan)
+        self.assertEqual(position.exchange_executions, [])
+
+        position.record_exchange_order(ExchangeOrderIdentity(
+            "known-order", "link-1", "BTCUSDT", "Sell", 0,
+            "1", "0.9", "0.1", "PartiallyFilled", True, True,
+        ))
+        wrong_side = ExchangeExecutionIdentity(
+            "wrong-side", "known-order", "link-1", "BTCUSDT", "Buy",
+            "0.1", "95", position.entry_ts + 1,
+        )
+        with self.assertRaisesRegex(ValueError, "side differs"):
+            position.record_exchange_execution(wrong_side)
+        self.assertEqual(position.exchange_executions, [])
+
+    def test_order_lifecycle_update_cannot_reduce_cumulative_fill_or_increase_leaves(self):
+        from exchange_execution_identity import ExchangeOrderIdentity
+        position = sample_position()
+        first = ExchangeOrderIdentity(
+            "monotonic-order", "", "BTCUSDT", "Sell", 0,
+            "1", "0.7", "0.3", "PartiallyFilled", True, True,
+        )
+        position.record_exchange_order(first)
+        lower_cumulative = ExchangeOrderIdentity(
+            "monotonic-order", "", "BTCUSDT", "Sell", 0,
+            "1", "0.8", "0.2", "PartiallyFilled", True, True,
+        )
+        with self.assertRaisesRegex(ValueError, "cumExecQty cannot decrease"):
+            position.record_exchange_order(lower_cumulative)
+        self.assertEqual(position.exchange_orders, [first.to_dict()])
+        increased_leaves = ExchangeOrderIdentity(
+            "monotonic-order", "", "BTCUSDT", "Sell", 0,
+            "1", "0.8", "0.3", "PartiallyFilled", True, True,
+        )
+        with self.assertRaisesRegex(ValueError, "leavesQty cannot increase"):
+            position.record_exchange_order(increased_leaves)
+        self.assertEqual(position.exchange_orders, [first.to_dict()])
+
+    def test_execution_link_id_must_match_order_link_id(self):
+        from exchange_execution_identity import ExchangeExecutionIdentity, ExchangeOrderIdentity
+        position = sample_position()
+        position.record_exchange_order(ExchangeOrderIdentity(
+            "linked-order", "expected-link", "BTCUSDT", "Sell", 0,
+            "1", "0.9", "0.1", "PartiallyFilled", True, True,
+        ))
+        execution = ExchangeExecutionIdentity(
+            "linked-exec", "linked-order", "different-link", "BTCUSDT", "Sell",
+            "0.1", "95", position.entry_ts + 1,
+        )
+        with self.assertRaisesRegex(ValueError, "orderLinkId differs"):
+            position.record_exchange_execution(execution)
+        self.assertEqual(position.exchange_executions, [])
 
 
 if __name__ == "__main__":

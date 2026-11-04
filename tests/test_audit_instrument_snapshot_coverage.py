@@ -7,6 +7,9 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scripts.audit_instrument_snapshot_coverage import audit_directory, build_report, main
 

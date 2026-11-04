@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import scripts.run_bybit_l2_queue_replay as runner
 import scripts.inspect_bybit_trade_sample as trade_inspector
+import scripts.inspect_bybit_orderbook_sample as book_inspector
 from scripts.run_bybit_l2_queue_replay import (
     HOUR_MS, capture_book_states_at, capture_scenarios,
 )
@@ -115,6 +116,30 @@ def test_trade_sample_inspector_rejects_extra_or_missing_row_fields():
         assert "missing CSV field value" in str(exc)
     else:
         raise AssertionError("missing row values must be rejected")
+
+
+def test_orderbook_inspector_uses_strict_integer_timestamp_and_sequence_fields():
+    parse_fields = book_inspector.parse_event_integer_fields
+    valid = {"ts": 1000, "cts": 999, "data": {"seq": 2, "u": 3}}
+    assert parse_fields(valid) == (1000, 999, 2, 3)
+    missing_cts = {"ts": 1000, "data": {"seq": 2, "u": 3}}
+    assert parse_fields(missing_cts) == (1000, None, 2, 3)
+
+    cases = [
+        ({"ts": True, "cts": 999, "data": {"seq": 2, "u": 3}}, "ts must be an integer"),
+        ({"ts": 1000.5, "cts": 999, "data": {"seq": 2, "u": 3}}, "ts must be an integer"),
+        ({"ts": 1000, "cts": 999.5, "data": {"seq": 2, "u": 3}}, "cts must be an integer"),
+        ({"ts": 1000, "cts": 999, "data": {"seq": "2", "u": 3}}, "seq must be an integer"),
+        ({"ts": 1000, "cts": 999, "data": {"seq": 2, "u": True}}, "u must be an integer"),
+        ({"ts": 0, "cts": 999, "data": {"seq": 2, "u": 3}}, "must be positive"),
+    ]
+    for event, expected in cases:
+        try:
+            parse_fields(event)
+        except ValueError as exc:
+            assert expected in str(exc)
+        else:
+            raise AssertionError(f"invalid order-book integer fields must fail: {event!r}")
 
 
 

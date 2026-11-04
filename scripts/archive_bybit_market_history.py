@@ -108,7 +108,15 @@ def parse_funding_rows(rows: Any, symbol: str) -> list[dict[str, Any]]:
         if row_symbol != symbol:
             raise ValueError(f"funding symbol mismatch: expected {symbol}, got {row_symbol}")
         try:
-            ts = int(raw["fundingRateTimestamp"])
+            raw_ts = raw["fundingRateTimestamp"]
+            if isinstance(raw_ts, bool):
+                raise ValueError("boolean timestamp")
+            if isinstance(raw_ts, int):
+                ts = raw_ts
+            elif isinstance(raw_ts, str) and raw_ts.isascii() and raw_ts.isdigit():
+                ts = int(raw_ts)
+            else:
+                raise ValueError("timestamp must be an integer or digit string")
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("invalid funding timestamp") from exc
         rate = _decimal(raw.get("fundingRate"), "funding rate")

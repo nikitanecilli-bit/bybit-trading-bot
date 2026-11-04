@@ -41,9 +41,9 @@ def parse_trade_timestamp_ms(value: object) -> int:
 
 
 def parse_exchange_bool(value: object, field: str) -> bool:
-    if value is True or value == 1 or value == "1" or value == "True" or value == "true":
+    if value is True or (type(value) is int and value == 1) or value in ("1", "True", "true"):
         return True
-    if value is False or value == 0 or value == "0" or value == "False" or value == "false":
+    if value is False or (type(value) is int and value == 0) or value in ("0", "False", "false"):
         return False
     raise ValueError(f"invalid {field} boolean flag: {value!r}")
 
@@ -247,10 +247,12 @@ def apply_public_trade(order: PassiveOrder, trade: dict) -> None:
     price, qty = dec(trade["price"]), dec(trade["size"])
     if price <= ZERO or qty <= ZERO:
         raise ValueError("public trade price and size must be positive")
-    if parse_exchange_bool(trade.get("block_trade", False), "block trade"):
+    # Normalized public-trade events must carry both classification flags.
+    # Missing metadata is unknown, not equivalent to a confirmed False value.
+    if parse_exchange_bool(trade.get("block_trade"), "block trade"):
         order.block_trade_excluded_count += 1
         return
-    if parse_exchange_bool(trade.get("rpi", False), "RPI"):
+    if parse_exchange_bool(trade.get("rpi"), "RPI"):
         order.rpi_excluded_count += 1
         return
     if price != order.price:

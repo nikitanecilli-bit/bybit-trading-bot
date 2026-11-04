@@ -59,11 +59,20 @@ class SnapshotCollectorTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "cursor repeated"):
             fetch_all_instruments("linear", fetch)
 
-    def test_empty_universe_and_missing_symbol_are_rejected(self):
+    def test_empty_universe_and_missing_or_malformed_symbol_are_rejected(self):
         with self.assertRaisesRegex(RuntimeError, "empty instrument"):
             fetch_all_instruments("linear", lambda cursor, status: ([], None))
-        with self.assertRaisesRegex(ValueError, "missing symbol"):
-            fetch_all_instruments("linear", lambda cursor, status: ([{}], None))
+        for symbol in (None, 123, True, "", "   "):
+            with self.subTest(symbol=symbol):
+                row = {} if symbol is None else {"symbol": symbol}
+                with self.assertRaisesRegex(ValueError, "missing or has invalid symbol"):
+                    fetch_all_instruments("linear", lambda cursor, status: ([row], None))
+
+    def test_snapshot_builder_rejects_non_string_symbols(self):
+        for symbol in (123, True, "", "   "):
+            with self.subTest(symbol=symbol):
+                with self.assertRaisesRegex(ValueError, "string symbols"):
+                    build_snapshot([{"symbol": symbol}], "linear")
 
     def test_strict_retcode_rejects_boolean_false(self):
         with self.assertRaisesRegex(RuntimeError, "non-zero or invalid retCode"):

@@ -6,12 +6,12 @@
 
 - Репозиторий: `nikitanecilli-bit/bybit-trading-bot` (private).
 - Рабочая ветка: `research/market-regime-v1-main`.
-- Последний code/test commit: `2b71592a1431028a5e78af2bc166327a4a5f49b8` (L2 orderbook update-ID regression guard); explanatory comment commit: `af4ad6f421b52cd24f864d5a71c581853cc569a8`.
-- Последний CI после L2 update-ID guard: [Research engine checks #41881215008](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41881215008), commit `af4ad6f`; job `tests` завершился SUCCESS, все 57/57 workflow steps SUCCESS. Логи подтверждают aggregate-L2 primitives 82/82 (включая новую regression) и runner/inspector suite 13/13. Последний ранее полностью подтверждённый run-level SUCCESS до этой правки — #41875905360.
+- Последний code/test commit: `b54e5cb90393b4334e736b4e96db7b7bfdefac7d` — duplicate-JSON-key rejection in the standalone orderbook archive inspector; added regression test in `tests/test_run_bybit_l2_queue_replay.py`.
+- Последний подтверждённый CI: [Research engine checks #41881215008](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41881215008), commit `af4ad6f`; SUCCESS, 57/57 workflow steps. Он предшествует `b54e5cb`; для нового коммита GitHub Actions run пока не обнаружен, поэтому новую regression и полный suite считать pending/unverified.
 - В предыдущем CI #41875905360 до новой regression: aggregate-L2 primitive tests 81/81; runner/inspector suite 9/9; portfolio accounting 54/54; state persistence 84/84. В новом CI #41881215008 эти L2 suites расширились до 82/82 и 13/13 соответственно.
 - Предыдущая неудачная попытка #41872989853 была вызвана устаревшим тестом после перехода trade inspector на общий `parse_trade_timestamp_ms`; тест синхронизирован в `ec28763`, после чего полные CI #41873039139, #41873425668, #41874277483, #41875093214 и #41875905360 прошли.
 - PR #4: открыт, Draft, base `main`, head = текущая research-ветка; mergeable=false. Не сливать автоматически.
-- Последнее сравнение с `main` на snapshot `d9f6d6a`: diverged, 2225 commits ahead / 36 behind. Main HEAD на момент сверки: `c87612207d145af433394f0ea992f2d29eba28d5`; merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. После snapshot были только документационные обновления handoff/ledger; точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
+- Последнее сравнение с `main` на snapshot `d9f6d6a`: diverged, 2225 commits ahead / 36 behind. Main HEAD на момент сверки: `c87612207d145af433394f0ea992f2d29eba28d5`; merge-base: `ae599a2f3279e15fe27360662f94f0e7ef8db5be`. После snapshot добавлен code/test commit `b54e5cb` и обновления handoff/ledger; точный текущий branch HEAD всегда перепроверять через GitHub перед следующей работой.
 - `main` не менять. Не делать wholesale merge/rebase research branch. Использовать только reviewed selective PR/cherry-pick при отдельном обосновании.
 - В репозитории есть отдельная ветка `Audit` и `chore/main-repository-organization`; не предполагать, что они слиты или актуальны без проверки.
 
@@ -389,6 +389,14 @@
 - Source-only CI #41875836674 SUCCESS, 57/57; final CI #41875905360 на `1b50c9d`: SUCCESS, 57/57. Фактический лог подтверждает strict orderbook inspector regression; inspector/runner suite 9/9 и aggregate-L2 primitives 81/81.
 - Это timestamp/sequence integrity guardrail диагностического инструмента, не execution evidence и не PnL. Inspector не запускался с сетевой загрузкой; новые архивы не скачивались. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся.
 - Нет PnL/backtests, collectors, API, runner, paper/live orders или изменений `main`.
+
+## Session update — duplicate JSON-key rejection in standalone orderbook inspector (2026-11-04)
+
+- Сверка scripts/inspect_bybit_orderbook_sample.py с основным replay reader выявила несогласованность: replay использовал object_pairs_hook и отклонял duplicate JSON keys, а standalone inspector вызывал обычный json.loads, который молча оставляет последнее значение повторного ключа.
+- Добавлен локальный _unique_json_object() и передан как object_pairs_hook; добавлен regression test, где повторяется ключ u в data.
+- Commit: b54e5cb90393b4334e736b4e96db7b7bfdefac7d.
+- На момент handoff новый workflow run для этого commit не обнаружен. Последний подтверждённый CI #41881215008 на af4ad6f предшествует изменению. Regression/full suite pending; не заявлять PASS до фактического run/log.
+- Это усиление диагностического инструмента, не изменение replay/fill semantics и не PnL evidence. Никакие архивы не скачивались.
 
 ## Session update — non-reset orderbook update-ID regression guard (2026-11-04)
 

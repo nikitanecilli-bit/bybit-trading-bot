@@ -1190,3 +1190,11 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Code + regression commit: `2b71592a1431028a5e78af2bc166327a4a5f49b8`; explanatory comment commit: `af4ad6f421b52cd24f864d5a71c581853cc569a8`.
 - Focused isolated reproduction passed for the regression and valid `u=1` reset; inserted test syntax compiled. Research CI #41881215008 on commit `af4ad6f`: job `tests` SUCCESS, all 57/57 workflow steps SUCCESS; actual logs confirm the new regression PASS, aggregate-L2 primitives 82/82 and runner/inspector suite 13/13. This validates the full deterministic Research CI job for the code/test change.
 - This is order-book archive integrity hardening only, not maker execution evidence or PnL. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` remains. No archive download, collector, PnL/backtest, API, runner, paper/live order, or `main` change.
+## ENG-EXEC-026 — Reject duplicate JSON keys in standalone orderbook inspector (2026-11-04)
+
+- Static comparison found that the primary replay reader used an object_pairs_hook to reject duplicate JSON object keys, but scripts/inspect_bybit_orderbook_sample.py used plain json.loads(). A malformed event such as two u keys could therefore be silently interpreted using only the last value by the standalone inspector.
+- Added _unique_json_object() and wired it as the inspector's object_pairs_hook; duplicate keys now fail closed. Added a regression using a ZIP member with a duplicated data.u key.
+- Commit: b54e5cb90393b4334e736b4e96db7b7bfdefac7d.
+- CI status: no GitHub Actions run for this commit was visible at handoff time. The latest confirmed Research CI #41881215008 on af4ad6f predates this change. New regression and full suite are pending/unverified; do not infer success from test presence.
+- This is diagnostic archive-integrity hardening only. The primary replay reader already rejected duplicate JSON keys; no replay fill semantics, datasets, PnL or strategy engine changed. No archives were downloaded; no collectors, PnL/backtests, API, runner, paper/live orders, or main changes.
+

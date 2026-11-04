@@ -372,6 +372,11 @@ def iter_public_trades(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict
             if row.get("symbol") != symbol:
                 raise ValueError(f"unexpected trade symbol at CSV row {row_no}")
             timestamp_ms = parse_trade_timestamp_ms(row["timestamp"])
+            if row["side"] not in ("Buy", "Sell"):
+                raise ValueError(f"invalid public trade side at CSV row {row_no}")
+            price, size = dec(row["price"]), dec(row["size"])
+            if price <= ZERO or size <= ZERO:
+                raise ValueError(f"public trade price and size must be positive at CSV row {row_no}")
             trade_id = row.get("trdMatchID")
             if not isinstance(trade_id, str) or not trade_id.strip():
                 raise ValueError(f"missing public trade ID at CSV row {row_no}")

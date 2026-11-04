@@ -133,21 +133,45 @@ def capture_book_states_at(book_archive: Path, targets: list[int]) -> dict[int, 
 
 
 def add_post_fill_markouts(book_archive: Path, results: list[dict]) -> None:
+    """Attach fill-to-mid returns and mid-to-mid adverse-selection diagnostics.
+
+    The fill-to-future-mid measure includes spread capture. The mid-to-mid
+    measure isolates price movement after the fill from the pre-fill midpoint.
+    Both book snapshots exclude events sharing the target millisecond.
+    """
     horizons = (1_000, 5_000, 30_000, 60_000)
     target_keys = {}
     for result in results:
-        fills = result.get("fills", [])
-        for fill in fills:
-            fill_ts = int(fill["timestamp_ms"])
+        for fill in result.get("fills", []):
+            fill_ts = strict_int(fill["timestamp_ms"], "fill timestamp")
             fill["post_fill_markout"] = []
+            fill["pre_fill_book_state"] = None
+            target_keys.setdefault(fill_ts, []).append((fill, 0))
             for horizon in horizons:
-                target = fill_ts + horizon
-                target_keys.setdefault(target, []).append((fill, horizon))
+                target_keys.setdefault(fill_ts + horizon, []).append((fill, horizon))
 
     states = capture_book_states_at(book_archive, list(target_keys))
     for target, keys in target_keys.items():
         state = states.get(target)
         for fill, horizon in keys:
+            if horizon == 0:
+                if state is None or not state["bids"] or not state["asks"]:
+                    fill["pre_fill_book_state"] = {"status": "no_book_state"}
+                    continue
+                best_bid = max(state["bids"])
+                best_ask = min(state["asks"])
+                if best_bid > best_ask:
+                    raise ValueError("crossed book in pre-fill snapshot")
+                fill["pre_fill_book_state"] = {
+                    "status": "ok",
+                    "book_state_cts_ms": state["book_cts"],
+                    "book_state_age_ms": target - state["book_cts"],
+                    "best_bid": str(best_bid),
+                    "best_ask": str(best_ask),
+                    "mid_price": str((best_bid + best_ask) / Decimal("2")),
+                }
+                continue
+
             if state is None or not state["bids"] or not state["asks"]:
                 fill["post_fill_markout"].append({
                     "horizon_ms": horizon, "status": "no_book_state",
@@ -157,8 +181,18 @@ def add_post_fill_markouts(book_archive: Path, results: list[dict]) -> None:
             best_ask = min(state["asks"])
             if best_bid > best_ask:
                 raise ValueError("crossed book in post-fill markout snapshot")
-            signed = signed_markout_bps(
-                fill["side"], Decimal(fill["price"]), best_bid, best_ask,
+            future_mid = (best_bid + best_ask) / Decimal("2")
+            fill_price = Decimal(fill["price"])
+            fill_to_future = signed_markout_bps(
+                fill["side"], fill_price, best_bid, best_ask,
+            )
+            prefill = fill.get("pre_fill_book_state") or {}
+            prefill_mid = (
+                Decimal(prefill["mid_price"]) if prefill.get("status") == "ok" else None
+            )
+            mid_to_mid = (
+                None if prefill_mid is None else
+                signed_markout_bps(fill["side"], prefill_mid, best_bid, best_ask)
             )
             fill["post_fill_markout"].append({
                 "horizon_ms": horizon,
@@ -166,8 +200,17 @@ def add_post_fill_markouts(book_archive: Path, results: list[dict]) -> None:
                 "book_state_age_ms": target - state["book_cts"],
                 "best_bid": str(best_bid),
                 "best_ask": str(best_ask),
-                "mid_price": str((best_bid + best_ask) / Decimal("2")),
-                "signed_mid_markout_bps": str(signed),
+                "mid_price": str(future_mid),
+                # Retain the historical field name as a compatibility alias.
+                "signed_mid_markout_bps": str(fill_to_future),
+                "signed_fill_to_future_mid_bps": str(fill_to_future),
+                "signed_mid_move_from_pre_fill_bps": (
+                    None if mid_to_mid is None else str(mid_to_mid)
+                ),
+                "pre_fill_mid_price": (
+                    None if prefill_mid is None else str(prefill_mid)
+                ),
+                "pre_fill_book_state_cts_ms": prefill.get("book_state_cts_ms"),
             })
 
 

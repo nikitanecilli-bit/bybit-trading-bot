@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -28,8 +28,9 @@ def _timestamp_ms(value: str) -> int:
         raise ValueError("risk-tier fetched_at must include timezone")
     if parsed.microsecond % 1000:
         raise ValueError("risk-tier fetched_at must have millisecond precision")
-    epoch = datetime(1970, 1, 1, tzinfo=parsed.tzinfo)
-    delta = parsed - epoch
+    normalized = parsed.astimezone(timezone.utc)
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    delta = normalized - epoch
     return ((delta.days * 86_400 + delta.seconds) * 1000
             + delta.microseconds // 1000)
 

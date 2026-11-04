@@ -28,6 +28,28 @@ class MultiBarLimitWaitTests(unittest.TestCase):
     def test_short_order_waits_when_high_does_not_penetrate(self):
         self.assertEqual(evaluate_limit_wait("short", 99.0, 100.04, 100.0, 5.0, 1, 3), ("wait", 2))
 
+    def test_long_marketable_gap_at_open_fills_without_extra_penetration(self):
+        self.assertEqual(
+            evaluate_limit_wait("long", 99.90, 100.10, 100.0, 5.0, 0, 3, open_price=99.95),
+            ("fill", 1),
+        )
+
+    def test_short_marketable_gap_at_open_fills_without_extra_penetration(self):
+        self.assertEqual(
+            evaluate_limit_wait("short", 99.90, 100.10, 100.0, 5.0, 0, 3, open_price=100.05),
+            ("fill", 1),
+        )
+
+    def test_non_marketable_open_still_requires_penetration(self):
+        self.assertEqual(
+            evaluate_limit_wait("long", 99.97, 100.10, 100.0, 5.0, 0, 3, open_price=100.02),
+            ("wait", 1),
+        )
+
+    def test_invalid_open_outside_ohlc_rejected(self):
+        with self.assertRaises(ValueError):
+            evaluate_limit_wait("long", 99.90, 100.10, 100.0, 5.0, 0, 3, open_price=100.20)
+
     def test_invalid_direction_rejected(self):
         with self.assertRaises(ValueError):
             evaluate_limit_wait("sideways", 99.0, 101.0, 100.0, 5.0, 0, 3)

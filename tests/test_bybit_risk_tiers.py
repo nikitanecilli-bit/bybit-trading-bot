@@ -119,6 +119,16 @@ class RiskTierHistoryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "invalid maintenanceMargin"):
                 RiskTierHistory.from_directory(tmp)
 
+    def test_rejects_inverse_category_for_linear_margin_history(self):
+        from bybit_risk_tiers import RiskTierSnapshot
+        with self.assertRaisesRegex(ValueError, "only supports linear contracts"):
+            RiskTierHistory([RiskTierSnapshot(
+                fetched_at="2026-11-01T00:00:00Z",
+                fetched_at_ms=1793491200000,
+                category="inverse",
+                tiers_by_symbol={},
+            )])
+
     def test_rejects_invalid_tier_structure(self):
         bad = payload(tiers=[
             {"symbol":"BTCUSDT","id":1,"riskLimitValue":"100000","maintenanceMargin":"0.01","initialMargin":"0.01","maxLeverage":"100","mmDeduction":"0","isLowestRisk":1},

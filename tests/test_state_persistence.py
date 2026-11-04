@@ -1476,19 +1476,19 @@ class StatePersistenceTests(unittest.TestCase):
         position = sample_position()
         first = ExchangeOrderIdentity(
             "monotonic-order", "", "BTCUSDT", "Sell", 0,
-            "1", "0.7", "0.3", "PartiallyFilled", True, True,
+            "3", "2.5", "0.3", "PartiallyFilled", True, True,
         )
         position.record_exchange_order(first)
         lower_cumulative = ExchangeOrderIdentity(
             "monotonic-order", "", "BTCUSDT", "Sell", 0,
-            "1", "0.8", "0.2", "PartiallyFilled", True, True,
+            "3", "2.6", "0.2", "PartiallyFilled", True, True,
         )
         with self.assertRaisesRegex(ValueError, "cumExecQty cannot decrease"):
             position.record_exchange_order(lower_cumulative)
         self.assertEqual(position.exchange_orders, [first.to_dict()])
         increased_leaves = ExchangeOrderIdentity(
             "monotonic-order", "", "BTCUSDT", "Sell", 0,
-            "1", "0.8", "0.3", "PartiallyFilled", True, True,
+            "3", "2.6", "0.3", "PartiallyFilled", True, True,
         )
         with self.assertRaisesRegex(ValueError, "leavesQty cannot increase"):
             position.record_exchange_order(increased_leaves)

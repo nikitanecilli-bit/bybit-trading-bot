@@ -626,3 +626,24 @@ CI:
 - full run 41838847266 на commit 4362daa0b6bd9941e5ac32109389d23eb7b42eee: SUCCESS, 56/56 steps; queue replay primitive test SUCCESS; no failed steps.
 
 Исправление гарантирует, что point-in-time capture не принимает архив с нарушенной хронологией после точки отсечения. Оно не подтверждает непрерывность update IDs depth-200 и не заменяет доказательство полноты архива. Новые архивы не скачивались, strategy PnL не запускался, private API и paper/live orders не использовались. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.
+
+
+## 30. Строгая валидация target timestamps в markout state capture
+
+scripts/run_bybit_l2_queue_replay.py:capture_book_states_at() принимал targets напрямую через sorted(set(targets)); float/bool/string значения могли попасть в расчёт возраста состояния книги и markout target без строгой проверки. Также после основного capture loop находился недостижимый второй цикл для ordered[next_index] == cts: первый цикл уже обрабатывал все targets <= cts.
+
+Исправлено:
+- каждый markout target проходит общий strict_int parser (bool/float/string coercion запрещены);
+- все target timestamps должны быть положительными;
+- удалён недостижимый дублирующий цикл, не меняя правило исключения same-ms updates: capture выполняется до применения события с cts >= target.
+
+Добавлен regression test для fractional, bool, string и нулевого target.
+
+Изменения в research/market-regime-v1-main:
+- runner commit: 75ff12884210356fcc58d78999befa2ec90857ba;
+- regression tests: c9722e0a3998bccb061a65bc7c0a1e1c33075a12.
+
+CI:
+- full run 41839020044 на commit 75ff12884210356fcc58d78999befa2ec90857ba: SUCCESS, 56/56 steps; queue replay primitive test SUCCESS; no failed steps.
+
+Это закрывает нестрогую валидацию внутренних временных целей markout. Оно не меняет ограничения stale-book age, delivery latency, L3 queue priority и неизвестной полноты depth-200 archive. Новые архивы не скачивались, strategy PnL не запускался, private API и paper/live orders не использовались. MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL остаётся без изменений.

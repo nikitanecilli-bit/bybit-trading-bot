@@ -127,13 +127,21 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
                 cts_missing += 1
 
             bids, asks = data.get("b"), data.get("a")
+            if kind == "delta" and first_snapshot is None:
+                raise ValueError(f"delta received before initial snapshot at row {rows + 1}")
             if kind == "snapshot":
                 if not isinstance(bids, list) or not isinstance(asks, list):
                     raise ValueError(f"snapshot missing full bid/ask arrays at row {rows + 1}")
-                for level in bids:
-                    validate_level(level)
-                for level in asks:
-                    validate_level(level)
+                for side, levels in (("bid", bids), ("ask", asks)):
+                    seen_prices = set()
+                    for level in levels:
+                        validate_level(level)
+                        price = Decimal(str(level[0]))
+                        if price in seen_prices:
+                            raise ValueError(
+                                f"duplicate {side} price level in snapshot at row {rows + 1}"
+                            )
+                        seen_prices.add(price)
                 max_bid_levels = max(max_bid_levels, len(bids))
                 max_ask_levels = max(max_ask_levels, len(asks))
                 if first_snapshot is None:
@@ -146,8 +154,16 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
             else:
                 if not isinstance(bids, list) or not isinstance(asks, list):
                     raise ValueError(f"delta missing bid/ask change arrays at row {rows + 1}")
-                for level in bids + asks:
-                    validate_level(level)
+                for side, levels in (("bid", bids), ("ask", asks)):
+                    seen_prices = set()
+                    for level in levels:
+                        validate_level(level)
+                        price = Decimal(str(level[0]))
+                        if price in seen_prices:
+                            raise ValueError(
+                                f"duplicate {side} price level in delta at row {rows + 1}"
+                            )
+                        seen_prices.add(price)
 
             item = {"type": kind, "ts": ts, "seq": seq, "u": update_id}
             if len(first_events) < 5:

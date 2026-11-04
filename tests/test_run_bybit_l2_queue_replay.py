@@ -137,6 +137,57 @@ def test_orderbook_inspector_rejects_duplicate_json_object_keys():
                 raise AssertionError("duplicate JSON keys must be rejected by the inspector")
 
 
+def test_orderbook_inspector_rejects_delta_before_initial_snapshot():
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = Path(tmp) / "delta_before_snapshot.zip"
+        write_book_archive(archive, [
+            event("delta", 1_000, 1, 2, "5"),
+            event("snapshot", 1_100, 2, 3, "6"),
+        ])
+        with zipfile.ZipFile(archive) as zf:
+            try:
+                book_inspector.inspect_member(zf, "events.data")
+            except ValueError as exc:
+                assert "delta received before initial snapshot" in str(exc)
+            else:
+                raise AssertionError("delta before initial snapshot must be rejected")
+
+
+def test_orderbook_inspector_rejects_duplicate_price_levels_in_snapshot_and_delta():
+    cases = [
+        (
+            [dict(event("snapshot", 1_000, 1, 1, "5"), data={
+                "s": "AAVEUSDT", "seq": 1, "u": 1,
+                "b": [["100", "5"], ["100", "6"]],
+                "a": [["101", "5"]],
+            })],
+            "duplicate bid price level in snapshot",
+        ),
+        (
+            [
+                event("snapshot", 1_000, 1, 1, "5"),
+                dict(event("delta", 1_100, 2, 2, "6"), data={
+                    "s": "AAVEUSDT", "seq": 2, "u": 2,
+                    "b": [["100", "6"], ["100", "7"]],
+                    "a": [],
+                }),
+            ],
+            "duplicate bid price level in delta",
+        ),
+    ]
+    for events, expected in cases:
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / "duplicate_price.zip"
+            write_book_archive(archive, events)
+            with zipfile.ZipFile(archive) as zf:
+                try:
+                    book_inspector.inspect_member(zf, "events.data")
+                except ValueError as exc:
+                    assert expected in str(exc)
+                else:
+                    raise AssertionError("duplicate price levels must be rejected")
+
+
 def test_orderbook_inspector_uses_strict_integer_timestamp_and_sequence_fields():
     parse_fields = book_inspector.parse_event_integer_fields
     valid = {"ts": 1000, "cts": 999, "data": {"seq": 2, "u": 3}}

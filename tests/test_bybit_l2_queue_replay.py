@@ -287,6 +287,24 @@ def test_order_book_rejects_fractional_matching_engine_timestamp():
         raise AssertionError("fractional cts must not be truncated")
 
 
+
+def test_order_book_rejects_delta_before_initial_snapshot():
+    b = OrderBook()
+    event = {
+        "type": "delta", "cts": 1000,
+        "data": {"seq": 1, "u": 2, "b": [["100", "5"]], "a": [["101", "6"]]},
+    }
+    try:
+        b.apply(event)
+    except ValueError as exc:
+        assert "begin with a full snapshot" in str(exc)
+    else:
+        raise AssertionError("delta cannot initialize a reconstructed book")
+    assert b.bids == {}
+    assert b.asks == {}
+    assert b.last_u is None
+
+
 def test_snapshot_and_delta_are_absolute_level_updates_and_zero_deletes():
     b = book()
     b.apply({"type": "delta", "cts": 1100, "data": {

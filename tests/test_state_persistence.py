@@ -546,6 +546,66 @@ class StatePersistenceTests(unittest.TestCase):
             })
         self._assert_invalid_position_payload(mutate)
 
+    def test_exchange_sized_restore_rejects_remaining_below_min_order_qty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "remaining-below-min-qty.json"
+            position = sample_position()
+            position.exchange_sized = True
+            position.leverage = 5.0
+            position.contract_qty = "1.0"
+            position.tp1_contract_qty = "0.5"
+            position.remaining_contract_qty = "0.5"
+            position.qty_step = "0.1"
+            position.min_order_qty = "0.1"
+            position.min_notional_value = "5"
+            position.tp1_hit = True
+            position.remaining_fraction = 0.5
+            position.realized_tp1_gross_usdt = 30.0
+            position.tp1_ts_ms = position.entry_ts + 3_600_000
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
+                {"BTCUSDT": position}, {}, 42,
+                last_mark_prices={"BTCUSDT": position.entry_price},
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["open_positions"]["BTCUSDT"]["min_order_qty"] = "0.6"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "ниже minOrderQty"):
+                engine.PlanBStatePersistence(str(path)).load_state(
+                    engine.AdaptiveRiskManager(engine.BotConfig())
+                )
+
+    def test_exchange_sized_restore_rejects_remaining_below_min_notional_at_planned_exit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "remaining-below-min-notional.json"
+            position = sample_position()
+            position.exchange_sized = True
+            position.leverage = 5.0
+            position.contract_qty = "1.0"
+            position.tp1_contract_qty = "0.5"
+            position.remaining_contract_qty = "0.5"
+            position.qty_step = "0.1"
+            position.min_order_qty = "0.1"
+            position.min_notional_value = "5"
+            position.tp1_hit = True
+            position.remaining_fraction = 0.5
+            position.realized_tp1_gross_usdt = 30.0
+            position.tp1_ts_ms = position.entry_ts + 3_600_000
+            engine.PlanBStatePersistence(str(path), enabled=True).save_state(
+                engine.BotConfig(), engine.AdaptiveRiskManager(engine.BotConfig()),
+                {"BTCUSDT": position}, {}, 42,
+                last_mark_prices={"BTCUSDT": position.entry_price},
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            # TP1 leg remains valid: 0.5 * 106 = 53. Remaining leg at the
+            # lowest planned exit (stop 95) is only 47.5, below minNotional 50.
+            payload["open_positions"]["BTCUSDT"]["min_notional_value"] = "50"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "нарушает minNotionalValue"):
+                engine.PlanBStatePersistence(str(path)).load_state(
+                    engine.AdaptiveRiskManager(engine.BotConfig())
+                )
+
     def test_valid_tp1_partial_position_round_trips(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "tp1-state.json"

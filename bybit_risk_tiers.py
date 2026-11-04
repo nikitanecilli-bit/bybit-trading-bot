@@ -26,7 +26,18 @@ def _timestamp_ms(value: str) -> int:
         raise ValueError(f"invalid risk-tier fetched_at: {value!r}") from exc
     if parsed.tzinfo is None:
         raise ValueError("risk-tier fetched_at must include timezone")
-    return int(parsed.timestamp() * 1000)
+    if parsed.microsecond % 1000:
+        raise ValueError("risk-tier fetched_at must have millisecond precision")
+    epoch = datetime(1970, 1, 1, tzinfo=parsed.tzinfo)
+    delta = parsed - epoch
+    return ((delta.days * 86_400 + delta.seconds) * 1000
+            + delta.microseconds // 1000)
+
+
+def _as_of_ms(value: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("as_of_ts must be an integer millisecond timestamp")
+    return value
 
 
 @dataclass(frozen=True)
@@ -161,7 +172,7 @@ class RiskTierHistory:
         if Mark Price moves them into a tier whose maxLeverage is below their
         historical entry leverage.
         """
-        timestamp = int(as_of_ts)
+        timestamp = _as_of_ms(as_of_ts)
         eligible = [item for item in self.snapshots if item.fetched_at_ms <= timestamp]
         if not eligible:
             raise ValueError(f"no {self.category} risk-tier snapshot at or before {timestamp}")
@@ -179,7 +190,7 @@ class RiskTierHistory:
 
     def get_tier(self, symbol: str, as_of_ts: int, position_value: Decimal | str | float,
                  *, leverage: Decimal | str | float, max_age_ms: int | None = None) -> RiskTier:
-        timestamp = int(as_of_ts)
+        timestamp = _as_of_ms(as_of_ts)
         value = _d(position_value, "position_value")
         lev = _d(leverage, "leverage")
         if value <= 0 or lev <= 0:

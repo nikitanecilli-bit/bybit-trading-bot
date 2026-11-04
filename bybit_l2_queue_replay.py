@@ -14,6 +14,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Iterator
 
+from bybit_instrument_specs import InstrumentSpec as ExchangeInstrumentSpec
+
 ZERO = Decimal("0")
 
 
@@ -103,37 +105,6 @@ class OrderBook:
         return dict(self.bids), dict(self.asks)
 
 
-@dataclass(frozen=True)
-class InstrumentSpec:
-    """Dated Bybit linear-instrument order constraints, supplied by the caller."""
-    tick_size: Decimal
-    qty_step: Decimal
-    min_order_qty: Decimal
-    min_notional: Decimal
-
-
-def validate_order_against_spec(
-    *, price: Decimal, quantity: Decimal, spec: InstrumentSpec,
-) -> None:
-    price, quantity = dec(price), dec(quantity)
-    tick_size = dec(spec.tick_size)
-    qty_step = dec(spec.qty_step)
-    min_order_qty = dec(spec.min_order_qty)
-    min_notional = dec(spec.min_notional)
-    if min(tick_size, qty_step, min_order_qty, min_notional) <= ZERO:
-        raise ValueError("instrument order constraints must all be positive")
-    if price <= ZERO or quantity <= ZERO:
-        raise ValueError("order price and quantity must be positive")
-    if price % tick_size != ZERO:
-        raise ValueError("order price is not aligned to tickSize")
-    if quantity % qty_step != ZERO:
-        raise ValueError("order quantity is not aligned to qtyStep")
-    if quantity < min_order_qty:
-        raise ValueError("order quantity is below minOrderQty")
-    if price * quantity < min_notional:
-        raise ValueError("order notional is below minNotionalValue")
-
-
 @dataclass
 class PassiveOrder:
     side: str
@@ -161,7 +132,7 @@ class PassiveOrder:
 def place_passive_order(
     book: OrderBook, *, side: str, price: Decimal, quantity: Decimal,
     arrival_ts: int, expiry_ts: int,
-    instrument_spec: InstrumentSpec | None = None,
+    instrument_spec: ExchangeInstrumentSpec | None = None,
 ) -> PassiveOrder:
     if side not in ("Buy", "Sell"):
         raise ValueError("side must be Buy or Sell")
@@ -169,7 +140,9 @@ def place_passive_order(
     if price <= ZERO or quantity <= ZERO or expiry_ts <= arrival_ts:
         raise ValueError("invalid price, quantity or lifetime")
     if instrument_spec is not None:
-        validate_order_against_spec(price=price, quantity=quantity, spec=instrument_spec)
+        exchange_qty = instrument_spec.validate_order(quantity, price, order_type="limit")
+        if exchange_qty != quantity:
+            raise ValueError("order quantity is not exactly aligned to qtyStep")
     best_bid, _ = book.best_bid()
     best_ask, _ = book.best_ask()
     if (side == "Buy" and price >= best_ask) or (side == "Sell" and price <= best_bid):

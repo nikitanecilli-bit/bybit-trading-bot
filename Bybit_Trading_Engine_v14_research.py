@@ -642,15 +642,11 @@ class AdaptiveRiskManager:
             self.day_start_equity = self.current_equity
             self.daily_stop_triggered = False
 
-    def register_closed_trade_pnl(
-        self, net_pnl_usdt: float, ts_ms: int, *, evaluate_stops: bool = True,
-    ) -> Dict[str, bool]:
+    def register_closed_trade_pnl(self, net_pnl_usdt: float, ts_ms: int) -> Dict[str, bool]:
         self.on_new_timestamp(ts_ms)
         self.realized_equity = round(self.realized_equity + net_pnl_usdt, 4)
         self.current_equity = round(self.realized_equity + self.unrealized_pnl, 4)
-        if evaluate_stops:
-            return self._evaluate_drawdown_stops()
-        return {"daily_stop_hit": False, "kill_switch_hit": False}
+        return self._evaluate_drawdown_stops()
 
     def mark_to_market(self, unrealized_pnl_usdt: float, ts_ms: int) -> Dict[str, bool]:
         """Обновляет equity с учётом плавающего PnL и проверяет лимиты риска."""
@@ -2462,10 +2458,17 @@ class UnifiedQuantEngine:
 
         # Учитываем закрытый PnL и переоцениваем оставшиеся позиции без двойного счёта закрываемой.
         self.risk_mgr.unrealized_pnl = self._unrealized_pnl_at_marks(exit_ts)
-        alerts = self.risk_mgr.register_closed_trade_pnl(
-            net_pnl, exit_ts,
-            evaluate_stops=not getattr(self, "_defer_close_risk_evaluation", False),
-        )
+        if getattr(self, "_defer_close_risk_evaluation", False):
+            self.risk_mgr.on_new_timestamp(exit_ts)
+            self.risk_mgr.realized_equity = round(
+                self.risk_mgr.realized_equity + net_pnl, 4
+            )
+            self.risk_mgr.current_equity = round(
+                self.risk_mgr.realized_equity + self.risk_mgr.unrealized_pnl, 4
+            )
+            alerts = {"daily_stop_hit": False, "kill_switch_hit": False}
+        else:
+            alerts = self.risk_mgr.register_closed_trade_pnl(net_pnl, exit_ts)
         if alerts.get("kill_switch_hit"):
             self.tg.send_message(
                 f"🚨 KILL-SWITCH [{self.cfg.bot_version}]: просадка от пика достигла -{self.cfg.emergency_kill_switch_pct}%. "

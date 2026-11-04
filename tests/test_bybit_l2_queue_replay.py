@@ -118,11 +118,22 @@ def test_marketable_orders_are_rejected_from_maker_model():
         raise AssertionError("marketable sell should be rejected")
 
 
-def test_cancellations_do_not_reduce_queue_ahead():
-    o = order()
-    # An L2 size reduction may be a cancellation. The replay intentionally
-    # has no cancellation-to-queue-ahead path.
+def test_l2_cancellations_and_new_size_do_not_rewrite_existing_queue_ahead():
+    b = book()
+    o = order(b)
+    # An L2 size reduction may be a cancellation, but cannot be assigned
+    # to a position ahead of or behind our hypothetical order.
+    b.apply({"type": "delta", "cts": 1100, "data": {
+        "seq": 2, "b": [["100", "0"]], "a": [],
+    }})
+    assert b.quantity_at("Buy", D("100")) == 0
     assert o.queue_ahead_remaining == D("5")
+
+    # New displayed size after our arrival is not added ahead of us.
+    b.apply({"type": "delta", "cts": 1200, "data": {
+        "seq": 3, "b": [["100", "9"]], "a": [],
+    }})
+    assert b.quantity_at("Buy", D("100")) == D("9")
     assert o.queue_ahead_remaining == D("5")
 
 

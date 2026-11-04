@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import scripts.run_bybit_l2_queue_replay as l2_runner
 import bybit_l2_queue_replay as l2_module
 from bybit_l2_queue_replay import (
-    OrderBook, apply_public_trade, capture_book_at, place_passive_order, signed_markout_bps,
+    InstrumentSpec, OrderBook, apply_public_trade, capture_book_at, place_passive_order, signed_markout_bps, validate_order_against_spec,
 )
 
 
@@ -32,6 +32,68 @@ def order(b=None, side="Buy", price="100", qty="2", arrival=1000, expiry=5000):
 
 def trade(ts, side, price, size, rpi="0"):
     return {"timestamp_ms": ts, "side": side, "price": price, "size": size, "rpi": rpi}
+
+
+
+def test_order_spec_accepts_exact_tick_qty_and_minimum_constraints():
+    spec = InstrumentSpec(
+        tick_size=D("0.1"), qty_step=D("0.01"),
+        min_order_qty=D("0.05"), min_notional=D("5"),
+    )
+    validate_order_against_spec(price=D("100.2"), quantity=D("0.05"), spec=spec)
+
+
+def test_order_spec_rejects_price_off_tick():
+    spec = InstrumentSpec(D("0.5"), D("0.01"), D("0.01"), D("1"))
+    try:
+        validate_order_against_spec(price=D("100.2"), quantity=D("1"), spec=spec)
+    except ValueError as exc:
+        assert "tickSize" in str(exc)
+    else:
+        raise AssertionError("off-tick price must be rejected")
+
+
+def test_order_spec_rejects_quantity_off_step():
+    spec = InstrumentSpec(D("0.1"), D("0.05"), D("0.05"), D("1"))
+    try:
+        validate_order_against_spec(price=D("100"), quantity=D("0.06"), spec=spec)
+    except ValueError as exc:
+        assert "qtyStep" in str(exc)
+    else:
+        raise AssertionError("off-step quantity must be rejected")
+
+
+def test_order_spec_rejects_below_minimum_quantity():
+    spec = InstrumentSpec(D("0.1"), D("0.01"), D("0.1"), D("1"))
+    try:
+        validate_order_against_spec(price=D("100"), quantity=D("0.09"), spec=spec)
+    except ValueError as exc:
+        assert "minOrderQty" in str(exc)
+    else:
+        raise AssertionError("below-minimum quantity must be rejected")
+
+
+def test_order_spec_rejects_below_minimum_notional():
+    spec = InstrumentSpec(D("0.1"), D("0.01"), D("0.01"), D("10"))
+    try:
+        validate_order_against_spec(price=D("100"), quantity=D("0.09"), spec=spec)
+    except ValueError as exc:
+        assert "minNotionalValue" in str(exc)
+    else:
+        raise AssertionError("below-minimum notional must be rejected")
+
+
+def test_passive_order_applies_instrument_spec_when_provided():
+    spec = InstrumentSpec(D("0.5"), D("0.1"), D("0.1"), D("1"))
+    try:
+        place_passive_order(
+            book(), side="Buy", price=D("100.2"), quantity=D("1"),
+            arrival_ts=1000, expiry_ts=5000, instrument_spec=spec,
+        )
+    except ValueError as exc:
+        assert "tickSize" in str(exc)
+    else:
+        raise AssertionError("passive order must enforce supplied instrument spec")
 
 
 def test_snapshot_and_delta_are_absolute_level_updates_and_zero_deletes():

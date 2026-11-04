@@ -97,3 +97,14 @@ The previous blocker should be refined: the repository has no order-book/trade a
 This is a promising non-API-key route and may avoid the GitHub Actions REST-host 403. **Availability is not yet verified** for the exact linear symbols, date ranges, depth granularity, update cadence, and file formats needed by our frozen H1 universe. The portal page is dynamically rendered in the accessible web view, so no downloadable dataset has been claimed or committed.
 
 Next safe acquisition step: inspect the portal's product/category filters, then download a small representative BTCUSDT + one lower-liquidity target-symbol sample for a short date window. Validate schema, timestamps, sequence/update IDs, coverage and file hashes before attempting a full universe export. Do not treat a single order-book snapshot per minute as a queue replay; the feed cadence must be sufficient to reconstruct order arrival and consumption around each hypothetical order.
+
+
+### Fee-rate verification against current public schedule
+
+The two engine fee constants do match Bybit's published **VIP 0 / non-VIP baseline** for perpetual and futures contracts: maker 0.0200%, taker 0.0550%. However, Bybit's current fee-structure page (last updated 2026-09-02) explicitly says rates vary by VIP/Pro tier and region, and the applicable account rate should be checked in My Fee Rate. Thus the constants are reasonable baseline defaults, not evidence of the user's actual rate.
+
+Official references:
+- https://www.bybit.com/en/help-center/article/Trading-Fee-Structure
+- https://www.bybit.com/en/help-center/article/FAQ-USDT-Perpetual-and-Expiry-Contracts
+
+The 0.0225% per-leg taker slippage constant is not a published Bybit fee. It remains a local modelling assumption and needs symbol/time/size-specific execution evidence.

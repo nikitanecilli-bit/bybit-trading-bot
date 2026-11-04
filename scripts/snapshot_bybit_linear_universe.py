@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 from scripts.snapshot_bybit_instruments import (
-    DEFAULT_BASE_URL, _request_page, _snapshot_timestamp, _validate_base_url,\n    build_page_observation, validate_page_observations, write_snapshot,
+    DEFAULT_BASE_URL, _request_page, _snapshot_timestamp, _validate_base_url,
+    build_page_observation, validate_page_observations, write_snapshot,
 )
 
 # API Explorer status filters; the default query additionally returns PendingOpen.
@@ -213,7 +214,10 @@ def main() -> None:
 
     collection_started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     rows, counts = fetch_linear_universe(fetch_page)
-    snapshot = build_universe_snapshot(\n        rows, counts, collection_started_at=collection_started_at,\n        page_observations=page_observations,\n    )
+    snapshot = build_universe_snapshot(
+        rows, counts, collection_started_at=collection_started_at,
+        page_observations=page_observations,
+    )
     fetched = datetime.fromisoformat(snapshot["fetched_at"].replace("Z", "+00:00"))
     stamp = fetched.astimezone(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     output = Path(args.output_dir) / "linear" / f"{stamp}.json"

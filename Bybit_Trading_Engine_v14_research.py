@@ -650,6 +650,38 @@ class OpenPositionState:
             raise
         return True
 
+    def merge_exchange_execution_batch(
+        self, executions: List[ExchangeExecutionIdentity],
+    ) -> Dict[str, int]:
+        """Atomically merge an overlapping execution batch by execId.
+
+        Exact repeats are ignored; conflicting execIds or any invalid row roll
+        back the entire batch. Stored executions are ordered by event time/id.
+        This does not establish pagination or history completeness.
+        """
+        if not isinstance(executions, (list, tuple)):
+            raise TypeError("executions must be a list or tuple")
+        previous = list(self.exchange_executions)
+        inserted = 0
+        duplicates = 0
+        try:
+            for execution in executions:
+                if not isinstance(execution, ExchangeExecutionIdentity):
+                    raise TypeError("each execution must be ExchangeExecutionIdentity")
+                if self.record_exchange_execution(execution):
+                    inserted += 1
+                else:
+                    duplicates += 1
+            self.exchange_executions.sort(
+                key=lambda item: (item["exec_time_ms"], item["exec_id"])
+            )
+            self._validate_exchange_identity_state()
+        except Exception:
+            self.exchange_executions = previous
+            raise
+        return {"inserted": inserted, "duplicates": duplicates,
+                "total": len(self.exchange_executions)}
+
 
 @dataclass
 class TradeRecord:

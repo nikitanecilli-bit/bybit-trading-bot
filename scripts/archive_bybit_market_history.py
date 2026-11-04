@@ -435,8 +435,9 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
     funding_manifest_path = funding_path.with_suffix(funding_path.suffix + ".audit.json")
     kline_path = root / "kline" / f"{symbol.upper()}.csv"
     mark_path = root / "mark_price" / f"{symbol.upper()}.csv"
+    schedule_path = funding_path.parent / f"{symbol}.schedule.json"
     existing_outputs = [
-        funding_path, funding_manifest_path, kline_path, mark_path,
+        funding_path, funding_manifest_path, schedule_path, kline_path, mark_path,
     ]
     if any(path.exists() for path in existing_outputs):
         raise FileExistsError(
@@ -473,11 +474,19 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
     # closed Mark candle only when the dated settlement grid requires it.
     terminal_settlement = end_ms in set(schedule["expected_settlement_timestamps_ms"])
     mark_end_exclusive = end_ms + interval_ms if terminal_settlement else end_ms
-    marks = fetch_mark_klines(
-        symbol, start_ms, mark_end_exclusive, interval, base_url=base_url, pause=pause
-    )
-    _atomic_csv(kline_path, ["symbol", "timestamp_ms", "open", "high", "low", "close", "volume", "turnover"], klines)
-    _atomic_csv(mark_path, ["symbol", "timestamp_ms", "open", "high", "low", "close"], marks)
+    try:
+        marks = fetch_mark_klines(
+            symbol, start_ms, mark_end_exclusive, interval, base_url=base_url, pause=pause
+        )
+        _atomic_csv(kline_path, ["symbol", "timestamp_ms", "open", "high", "low", "close", "volume", "turnover"], klines)
+        _atomic_csv(mark_path, ["symbol", "timestamp_ms", "open", "high", "low", "close"], marks)
+    except Exception:
+        # Do not strand a partially written archive when the extra terminal
+        # Mark candle is not yet closed or unavailable. Snapshot copies are
+        # content-addressed and safe to reuse on a retry in the same output root.
+        for path in (funding_path, funding_manifest_path, schedule_path, kline_path, mark_path):
+            path.unlink(missing_ok=True)
+        raise
     return {
         "symbol": symbol.upper(), "funding_events": len(funding), "trade_candles": len(klines), "mark_candles": len(marks),
         "start_ms": start_ms, "end_exclusive_ms": end_ms,

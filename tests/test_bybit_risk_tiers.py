@@ -119,6 +119,14 @@ class RiskTierHistoryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "invalid maintenanceMargin"):
                 RiskTierHistory.from_directory(tmp)
 
+    def test_rejects_float_is_lowest_risk_metadata(self):
+        bad = payload()
+        bad["tiers"][0]["isLowestRisk"] = 1.0
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "risk.json").write_text(json.dumps(bad), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "isLowestRisk must be integer 0 or 1"):
+                RiskTierHistory.from_directory(tmp)
+
     def test_rejects_inverse_category_for_linear_margin_history(self):
         from bybit_risk_tiers import RiskTierSnapshot
         with self.assertRaisesRegex(ValueError, "only supports linear contracts"):

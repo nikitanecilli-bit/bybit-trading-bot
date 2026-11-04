@@ -53,8 +53,8 @@ from bybit_risk_tiers import RiskTierHistory, calculate_margin_requirements_from
 from bybit_market_state import get_linear_market_state
 from exchange_order_sizing import size_to_exchange_constraints
 from exchange_execution_identity import (
-    ExchangeExecutionIdentity, ExchangeOrderIdentity, ExchangePositionIdentity,
-    ExecutionIdentityError,
+    ExchangeExecutionCoverage, ExchangeExecutionIdentity, ExchangeOrderIdentity,
+    ExchangePositionIdentity, ExecutionIdentityError,
 )
 
 logging.basicConfig(
@@ -439,6 +439,7 @@ class OpenPositionState:
     exchange_position_identity: Optional[Dict[str, Any]] = None
     exchange_orders: List[Dict[str, Any]] = field(default_factory=list)
     exchange_executions: List[Dict[str, Any]] = field(default_factory=list)
+    exchange_execution_coverage: List[Dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.max_favorable_px <= 0.0:
@@ -490,6 +491,17 @@ class OpenPositionState:
                     raise ExecutionIdentityError("duplicate exchange order_id")
                 orders[order.order_id] = order
 
+            if not isinstance(self.exchange_execution_coverage, list):
+                raise ExecutionIdentityError("exchange_execution_coverage must be a list")
+            coverage_ids = set()
+            for raw in self.exchange_execution_coverage:
+                coverage = ExchangeExecutionCoverage.from_dict(raw)
+                if coverage.symbol != self.symbol:
+                    raise ExecutionIdentityError("execution coverage symbol differs from local position")
+                if coverage.coverage_id in coverage_ids:
+                    raise ExecutionIdentityError("duplicate execution coverage_id")
+                coverage_ids.add(coverage.coverage_id)
+
             if not isinstance(self.exchange_executions, list):
                 raise ExecutionIdentityError("exchange_executions must be a list")
             executions = {}
@@ -532,6 +544,71 @@ class OpenPositionState:
                     )
         except ExecutionIdentityError as exc:
             raise ValueError(f"позиция {self.symbol}: invalid exchange identity state: {exc}") from exc
+
+    def record_exchange_execution_coverage(
+        self, coverage: ExchangeExecutionCoverage,
+    ) -> bool:
+        """Record one caller-attested query window; never infer it from fills."""
+        if not isinstance(coverage, ExchangeExecutionCoverage):
+            raise TypeError("coverage must be ExchangeExecutionCoverage")
+        if coverage.symbol != self.symbol:
+            raise ValueError("execution coverage symbol mismatch")
+        for existing in self.exchange_execution_coverage:
+            if existing["coverage_id"] == coverage.coverage_id:
+                if existing == coverage.to_dict():
+                    return False
+                raise ValueError("conflicting duplicate execution coverage_id")
+        self.exchange_execution_coverage.append(coverage.to_dict())
+        try:
+            self._validate_exchange_identity_state()
+        except Exception:
+            self.exchange_execution_coverage.pop()
+            raise
+        return True
+
+    def audit_exchange_execution_coverage(
+        self, *, lifecycle_start_ms: int, audit_end_ms: int,
+    ) -> Dict[str, Any]:
+        """Check gap-free coverage by complete, caller-attested half-open windows.
+
+        This verifies stored attestations only. It cannot independently prove that
+        the collector queried the exchange correctly or that the exchange API was complete.
+        """
+        for name, value in (("lifecycle_start_ms", lifecycle_start_ms),
+                            ("audit_end_ms", audit_end_ms)):
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{name} must be a positive integer")
+        if audit_end_ms <= lifecycle_start_ms:
+            raise ValueError("audit_end_ms must exceed lifecycle_start_ms")
+        self._validate_exchange_identity_state()
+        complete = []
+        for raw in self.exchange_execution_coverage:
+            item = ExchangeExecutionCoverage.from_dict(raw)
+            if item.pagination_complete and item.terminal_page_seen:
+                complete.append((item.window_start_ms, item.window_end_ms))
+        complete.sort()
+        cursor = lifecycle_start_ms
+        gaps = []
+        for start, end in complete:
+            if end <= cursor:
+                continue
+            if start > cursor:
+                gaps.append({"start_ms": cursor, "end_ms": min(start, audit_end_ms)})
+            cursor = max(cursor, end)
+            if cursor >= audit_end_ms:
+                break
+        if cursor < audit_end_ms:
+            gaps.append({"start_ms": cursor, "end_ms": audit_end_ms})
+        gaps = [gap for gap in gaps if gap["end_ms"] > gap["start_ms"]]
+        covered_until = min(cursor, audit_end_ms)
+        return {
+            "status": "COMPLETE" if not gaps else "INCOMPLETE",
+            "lifecycle_start_ms": lifecycle_start_ms,
+            "audit_end_ms": audit_end_ms,
+            "covered_until_ms": covered_until,
+            "complete_window_count": len(complete),
+            "gaps": gaps,
+        }
 
     def audit_exchange_position_quantity(
         self, *, execution_history_complete: bool = False,

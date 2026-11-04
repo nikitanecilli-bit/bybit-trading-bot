@@ -855,6 +855,50 @@ def test_duplicate_public_trade_id_fails_closed_before_double_counting():
 
 
 
+def test_replay_rejects_out_of_order_trade_after_first_post_expiry_row():
+    o = order(expiry=1150)
+    events = [
+        {**trade(1200, "Sell", "100", "10"), "trade_id": "after-expiry"},
+        {**trade(1100, "Sell", "100", "10"), "trade_id": "inside-window"},
+    ]
+    original = l2_module.iter_public_trades
+    l2_module.iter_public_trades = lambda *_args: iter(events)
+    try:
+        try:
+            l2_module.replay_public_trades(o, Path("unused.csv.gz"))
+        except ValueError as exc:
+            assert "non-monotonic public trade timestamps" in str(exc)
+        else:
+            raise AssertionError("post-expiry row must not hide later out-of-order in-window trade")
+    finally:
+        l2_module.iter_public_trades = original
+    assert o.filled == D("0")
+    assert o.queue_ahead_remaining == D("5")
+    assert o.processed_trade_ids == set()
+
+
+def test_replay_checks_duplicate_ids_outside_order_active_window():
+    o = order(expiry=1150)
+    events = [
+        {**trade(1200, "Sell", "100", "10"), "trade_id": "duplicate-outside"},
+        {**trade(1300, "Sell", "100", "10"), "trade_id": "duplicate-outside"},
+    ]
+    original = l2_module.iter_public_trades
+    l2_module.iter_public_trades = lambda *_args: iter(events)
+    try:
+        try:
+            l2_module.replay_public_trades(o, Path("unused.csv.gz"))
+        except ValueError as exc:
+            assert "duplicate public trade ID" in str(exc)
+        else:
+            raise AssertionError("duplicate IDs anywhere in archive must fail closed")
+    finally:
+        l2_module.iter_public_trades = original
+    assert o.filled == D("0")
+    assert o.queue_ahead_remaining == D("5")
+    assert o.processed_trade_ids == set()
+
+
 def test_replaying_same_archive_twice_does_not_consume_queue_twice():
     o = order(qty="2")
     events = [{**trade(1100, "Sell", "100", "3"), "trade_id": "match-once"}]

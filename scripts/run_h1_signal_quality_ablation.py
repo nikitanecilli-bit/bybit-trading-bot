@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import Bybit_Trading_Engine_v14_research as em
 from run_uploaded_dataset_backtests import read_zip_datasets
+from multibar_limit_wait import prepare_signal_for_next_bar_fill
 
 FOLDS=[(1,0.50,0.65),(2,0.65,0.80),(3,0.80,1.00)]
 VOL_THRESHOLDS=[1.2,1.6,2.0,2.5]
@@ -63,6 +64,9 @@ def run_segment(symbol, tf, candles, start_idx, end_idx, min_vol, min_breakout_a
         ref=float(sig["entry_price"])
         required_low=ref*(1.0-ENTRY_PENETRATION_BPS/10000.0)
         if float(candle.low)<=required_low:
+            timeframe_ms = {"1h": 3_600_000}.get(str(tf).strip().lower())
+            if timeframe_ms is None: raise ValueError(f"unsupported delayed-limit timeframe: {tf!r}")
+            prepare_signal_for_next_bar_fill(sig,int(candle.ts),timeframe_ms)
             filled=original_fill(sym,candle)
             if filled:
                 ages.pop(sym,None); return True
@@ -70,6 +74,9 @@ def run_segment(symbol, tf, candles, start_idx, end_idx, min_vol, min_breakout_a
             return False
         # Use engine's normal no-touch path while retaining the intended limit.
         sig["entry_price"]=min(ref,float(candle.low))*(1.0-1e-10)
+        timeframe_ms = {"1h": 3_600_000}.get(str(tf).strip().lower())
+        if timeframe_ms is None: raise ValueError(f"unsupported delayed-limit timeframe: {tf!r}")
+        prepare_signal_for_next_bar_fill(sig,int(candle.ts),timeframe_ms)
         original_fill(sym,candle)
         sig["entry_price"]=ref
         if meta["age"]<WAIT_BARS:

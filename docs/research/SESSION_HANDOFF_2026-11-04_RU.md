@@ -254,3 +254,13 @@
 - Independent engine review confirms optional exchange sizing is fail-closed when dated instrument specs are supplied; risk tiers are selected as-of entry notional; exact contract quantity is propagated through TP1, close PnL, fees, funding and mark-to-market. Known limitations remain documented: OHLC/L2 execution proxies, account-level tier aggregation, actual funding settlement mark, account-specific fees, and absence of archived historical Bybit snapshots.
 - No Bybit collectors or downloads executed; no PnL/backtest, private API/account access, runner registration, paper/live orders or changes to main. PR #4 remains research-only.
 - Continue read-only review of execution consumers and provenance; do not relax the PnL gate until verified historical data and execution realism evidence exist.
+
+
+## Session update — 2026-11-04 (strict funding timestamp validation)
+
+- Static audit found silent integer coercion at two funding boundaries: the accounting helpers used int() on event/position timestamps, and the Bybit Funding parser used int() on the raw API timestamp. Numeric floats such as 2000.5 could be truncated rather than rejected.
+- Added a positive non-bool integer-millisecond guard for entry/as-of/TP1/final-close and funding event timestamps in both funding accounting helpers. The active Bybit Funding parser now accepts only integer values or ASCII digit strings; booleans and floats fail closed.
+- Added regressions for fractional/boolean timestamps in accounting and API parsing. Intermediate CI runs exposed an assertion-regex mismatch in the new test (the helper intentionally wraps malformed events); the test expectation was corrected. No production-code failure remained.
+- Final Research CI #41848927029 on commit 39af6fa583ef2074b33905e89c8b78c9b58d83a1: SUCCESS; 57/57 workflow steps; zero failed steps. Logs confirm funding accounting 23/23 and Bybit market-history parser 26/26, including the new regressions.
+- Current Git snapshot: main c87612207d145af433394f0ea992f2d29eba28d5; research HEAD 39af6fa583ef2074b33905e89c8b78c9b58d83a1; merge base ae599a2f3279e15fe27360662f94f0e7ef8db5be; compare diverged 2125 ahead / 36 behind. PR #4 remains open Draft and mergeable=false. Existing branch-divergence policy remains: do not merge/rebase/reset/force-push; integrate only reviewed small patches later. main unchanged.
+- No market PnL/backtest, Bybit data collection/download, private API/account access, runner registration, paper/live orders. Data completeness and execution-realism gates remain closed.

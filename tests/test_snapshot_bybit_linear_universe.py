@@ -57,6 +57,14 @@ class PointInTimeUniverseTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "cursor repeated"):
             fetch_status(None, lambda cursor: ([row("BTCUSDT", "Trading")], "loop"))
 
+    def test_symbol_must_be_a_non_empty_string(self):
+        for symbol in (None, 123, True, "", "   "):
+            with self.subTest(symbol=symbol):
+                malformed = row("BTCUSDT", "Trading")
+                malformed["symbol"] = symbol
+                with self.assertRaisesRegex(ValueError, "invalid symbol"):
+                    validate_instrument_row(malformed, None)
+
     def test_status_mismatch_and_invalid_timestamps_fail_closed(self):
         with self.assertRaisesRegex(ValueError, "status mismatch"):
             validate_instrument_row(row("BTCUSDT", "Closed"), "Settling")

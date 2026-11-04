@@ -759,3 +759,13 @@ Verification:
 - The available commit-associated workflow lookup returned no runs for the test commit. CI is **unverified**; no claim that the new test passed.
 - The immediately preceding empty-arrival-archive guard is recorded in section 35; its CI status is also unverified.
 - No market PnL, archive collection/download, private API/account access, paper/live order, or main-branch change.
+
+
+## 37. Final L2 archive-tail validation update — 2026-11-04
+
+- Added a validation-only reconstructed book after the arrival boundary in `capture_book_at()`. This catches malformed update IDs and invalid reconstructed states in the archive tail while keeping the returned snapshot strictly pre-arrival.
+- Regression: `test_capture_book_at_rejects_malformed_book_events_after_arrival_boundary` covers a non-integer update ID and a crossed book.
+- Commits: source `b79d827d7c6feadb7f4bf9f306fede7b5bd53f25`; test `57f5263c7bbd5f123e19cd2be2f23c2a31765446`.
+- This follows section 35's empty-archive handling fix (`067109a14312c39ebd95ecf2eaede8d19375426c`; regression `54f30eeb095fb01998bf9d03b69c4ff2a1b40687`).
+- Both code/test pairs were re-fetched from the research branch and their changes confirmed. The available commit-associated workflow lookup returned no runs for the latest test commit; new tests remain **CI-unverified**. The last verified Research CI is still #41840361238 on `d2740c6`, SUCCESS, 57/57 steps.
+- No market PnL, archive download/collector, API/account access, runner registration, paper/live orders, or main-branch changes.

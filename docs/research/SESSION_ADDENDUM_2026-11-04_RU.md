@@ -151,3 +151,13 @@ CI: run [41901402434](https://github.com/nikitanecilli-bit/bybit-trading-bot/act
 - Поэтому согласованный join пока является отдельным проверенным API, а не обязательным runtime guard. Нельзя утверждать, что временной skew уже ограничен во всех entry/liquidation путях. Автоматическое включение без явно утверждённого skew budget означало бы выбор произвольного порога; это не сделано.
 - Research CI [#41903447996](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41903447996): **SUCCESS**, полный job завершён; 59 шагов, ошибок нет. Включает compile, deterministic tests и offline checks.
 - Только offline CI и чтение исходников. Реальные API requests, collectors, archive downloads, live orders и market PnL tests не запускались. Стратегические execution/PnL gates остаются BLOCKED.
+
+## ENG-DATA-017 — runtime enforcement of joined market state
+
+- `UnifiedQuantEngine` теперь использует `get_linear_market_state()` перед sizing entry, когда одновременно загружены instrument specs и risk tiers. Спецификация для tick/lot sizing берётся из joined state; age limits и skew budget передаются явно. Ошибка join, включая отсутствующий skew budget, отклоняет entry до открытия позиции.
+- При liquidation-aware расчёте, если доступны обе истории, risk-tier ladder берётся из joined state; отдельный `get_tiers()` в этом пути больше не используется. Это сохраняет point-in-time selection для as-of timestamp расчёта и не допускает применения будущего снимка.
+- Добавлен параметр движка `max_market_state_skew_ms`, без значения по умолчанию. Для H1 replay он задаётся через `BYBIT_MAX_MARKET_STATE_SKEW_MS`; отсутствие переменной означает fail-closed отказ на entry/ошибку при joined liquidation path. Допустим только неотрицательный integer; ноль разрешает только одинаковые client-observed completion timestamps.
+- Для совместимости изолированные режимы с единственным источником (только instrument specs либо только risk tiers) сохраняют прежний независимый as-of/age guard; они не дают гарантии межисточникового skew. H1 execution replay передаёт обе директории и использует общий join. Live/PnL gate остаётся заблокированным.
+- Regression tests: H1 env budget parser; entry передаёт budget в joined helper; liquidation path fail-closed при отсутствующем budget. Первый CI запуск выявил фиктивный engine fixture, не учитывавший новый joined contract; fixture исправлен и повторный полный CI завершился успешно.
+- Research CI [#41904156219](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41904156219): **SUCCESS**, 59/59 шагов. Проверен code commit `9e16de8f7433359955c758f159d47dcf4cbe8503`.
+- Только deterministic/offline CI. Реальные API requests, collectors, archive downloads, live orders и market PnL tests не запускались.

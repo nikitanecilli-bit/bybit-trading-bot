@@ -77,3 +77,16 @@ Evidence:
 - Logs show PASS for both Donchian pairing regressions; the H1 EMA/Donchian test module completed 13 tests and the H1 runner execution-gate module completed 74 tests, all OK.
 
 No market PnL replay was run.
+
+
+## Additional transitive-import dependency finding — 2026-11-04
+
+A follow-up static import audit found that the exact-set guard still depended on a manually maintained seed list. The Top-5 selector imports `scripts.snapshot_bybit_linear_universe`, which in turn imports `scripts.snapshot_bybit_instruments`; the latter was absent from `H1_REPLAY_CODE_PATHS`. Therefore the exact-set comparison could pass while a transitive local Python dependency was not hashed.
+
+Correction:
+- Added recursive AST-based discovery of repository-local Python imports, including nested package imports and transitive dependencies.
+- Both the train-only selector and H1 validation now build code provenance from the same resolved dependency closure.
+- Required seed files fail closed if missing or syntactically invalid.
+- Added regression tests proving the previously omitted Bybit instrument module is captured and a synthetic nested import chain is resolved.
+
+This closes the identified static local-import omission. Dynamic imports, runtime-loaded plugins, external package versions, interpreter/environment differences and workflow-level behavior are separate provenance dimensions and are not claimed to be covered by Python import closure alone. No market PnL was run.

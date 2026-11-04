@@ -1955,7 +1955,8 @@ class UnifiedQuantEngine:
                     risk_mark if stop_crossed else
                     float(mark_candle.low if pos_for_risk.direction == "long" else mark_candle.high)
                 )
-        self.risk_mgr.on_new_timestamp(bar_close_ts)
+        # Let mark_to_market refresh the boundary equity before it rolls the UTC day.
+        # Calling on_new_timestamp here first would lock in the previous bar's stale equity.
         self._update_mark_to_market(bar_close_ts)
 
         if symbol in self.open_positions:

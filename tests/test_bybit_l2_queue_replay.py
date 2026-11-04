@@ -1097,6 +1097,42 @@ def test_capture_book_at_rejects_fractional_cts_even_when_boundary_would_skip_ev
             raise AssertionError("fractional cts must not be skipped by int truncation")
 
 
+def test_capture_book_at_rejects_out_of_order_event_after_arrival_boundary():
+    events = [
+        {"type": "snapshot", "cts": 1000, "data": {
+            "s": "AAVEUSDT", "seq": 1, "u": 1,
+            "b": [["100", "5"]], "a": [["101", "5"]],
+        }},
+        {"type": "delta", "cts": 3000, "data": {
+            "s": "AAVEUSDT", "seq": 3, "u": 3,
+            "b": [["100", "4"]], "a": [],
+        }},
+        {"type": "delta", "cts": 1500, "data": {
+            "s": "AAVEUSDT", "seq": 2, "u": 2,
+            "b": [["100", "3"]], "a": [],
+        }},
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = Path(tmp) / "out_of_order_after_arrival.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("events.data", "".join(json.dumps(event) + chr(10) for event in events))
+        try:
+            capture_book_at(archive, 2000)
+        except ValueError as exc:
+            assert "non-monotonic cts" in str(exc)
+        else:
+            raise AssertionError("out-of-order event after arrival must invalidate archive")
+
+
+def test_capture_book_at_rejects_non_integer_arrival_timestamp():
+    try:
+        capture_book_at(Path("unused.zip"), 2000.5)
+    except ValueError as exc:
+        assert "arrival_ts" in str(exc)
+    else:
+        raise AssertionError("fractional arrival timestamp must be rejected")
+
+
 def test_book_state_capture_excludes_same_millisecond_updates():
     events = [
         {"type": "snapshot", "cts": 1000, "data": {

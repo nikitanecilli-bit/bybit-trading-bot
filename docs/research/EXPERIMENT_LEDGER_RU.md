@@ -1067,3 +1067,17 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Регрессия: 0.5 контракта * TP1 90 = 45 (ровно minNotional), остаток 0.5 * TP2 80 = 40 (ниже minNotional 45). Старый код принимал TP1; новый отклоняет без изменения состояния.
 - Final Research CI #41850162961, commit e01a53868885f5ac79f2ad3d3cfa3179e7207b1a: SUCCESS, 57/57 steps; MarkPriceEngineIntegrationTests 9/9; новая регрессия подтверждена в логе.
 - Классификация: exchange validity guardrail, не PnL evidence. No market replay, data downloads, private API, runner, paper/live orders.
+
+
+## ENG-EXEC-016 — fail-closed exchange-sized state restore (2026-11-04)
+
+- Restore validation now enforces minOrderQty for initial/remaining quantity, minNotionalValue for remaining quantity at min(stop, entry, TP2), and minOrderQty/minNotionalValue for TP1 quantity at TP1 price.
+- Added two regressions for below-minimum restored remaining quantity and below-minimum remaining exit notional.
+- CI #41851236490, d50c923b2e158e951d9ca979708d093e54ae3983: SUCCESS 57/57. First test run had assertion-text mismatch only; corrected to assert wrapped fail-closed RuntimeError.
+
+## ENG-FUND-006 — enforce TP1 flag/timestamp invariant in funding helpers (2026-11-04)
+
+- Both funding accounting helpers now reject non-bool tp1_hit, require tp1_ts_ms when TP1 is hit, and reject a TP1 timestamp when tp1_hit=false.
+- Added two regression tests for timestamp-without-hit and integer-as-bool.
+- Final CI #41851768270, 3170738a78eac92b0a93eda66510c038660f0864: SUCCESS 57/57; actual log confirms both tests passed; funding accounting suite ran 76 tests. Source-only CI #41851738950 also SUCCESS 57/57.
+- These are correctness gates, not PnL evidence; no live/paper activity.

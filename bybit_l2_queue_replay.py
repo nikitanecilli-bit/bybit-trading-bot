@@ -301,10 +301,17 @@ def iter_book_events(archive: Path, symbol: str = "AAVEUSDT") -> Iterator[dict]:
                 if not raw.strip():
                     continue
                 event = json.loads(raw)
-                if event.get("data", {}).get("s") != symbol:
+                if not isinstance(event, dict):
+                    raise ValueError(f"invalid order-book event at row {line_no}")
+                data = event.get("data")
+                if not isinstance(data, dict):
+                    raise ValueError(f"invalid order-book data at row {line_no}")
+                if data.get("s") != symbol:
                     raise ValueError(f"unexpected symbol at order-book row {line_no}")
-                if event.get("cts") is None:
-                    raise ValueError(f"missing cts at order-book row {line_no}")
+                try:
+                    strict_int(event.get("cts"), "cts")
+                except ValueError as exc:
+                    raise ValueError(f"invalid cts at order-book row {line_no}: {exc}") from exc
                 yield event
 
 

@@ -1693,10 +1693,16 @@ def _run_same_timestamp_time_stops_with_mark_last_divergence(order):
             bar_ts - hour, 100.0, 101.0, 99.0, 100.0, 10.0,
         )
         histories[symbol] = [prior, trade_bars[symbol]]
-    for symbol in order:
-        e._manage_position(
-            symbol, histories[symbol], fill_bar=False, exit_ts=exit_ts,
-        )
+    e._defer_close_risk_evaluation = True
+    try:
+        for symbol in order:
+            e._manage_position(
+                symbol, histories[symbol], fill_bar=False, exit_ts=exit_ts,
+            )
+    finally:
+        e._defer_close_risk_evaluation = False
+    e._update_mark_to_market(exit_ts)
+    e._force_flatten_open_positions_after_kill_switch(exit_ts)
     return {
         "ledger": sorted((t.token, t.pnl_usdt, t.exit_reason) for t in e.closed_trades),
         "realized_equity": round(e.risk_mgr.realized_equity, 4),

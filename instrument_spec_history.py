@@ -69,6 +69,8 @@ def _validate_page_observations(
         if status != last_filter:
             if status in completed_filters:
                 raise ValueError(f"{path}: instrument page status groups are interleaved")
+            if expected_filters.index(status) != len(completed_filters):
+                raise ValueError(f"{path}: instrument page status groups are out of order")
             if last_filter is not None:
                 completed_filters.add(last_filter)
             last_filter = status

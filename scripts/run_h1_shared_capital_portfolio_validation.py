@@ -28,6 +28,7 @@ from multibar_limit_wait import evaluate_limit_wait, prepare_signal_for_next_bar
 FOLDS = [(1, 0.50, 0.65), (2, 0.65, 0.80), (3, 0.80, 1.00)]
 VOL_THRESHOLDS = [1.2, 1.6, 2.0, 2.5]
 BREAKOUT_ATR_THRESHOLDS = [0.0, 0.10, 0.25]
+VOLUME_LOOKBACK_PERIOD = 20  # held fixed across Donchian20/48 arms
 ENTRY_OFFSET_BPS = 20.0
 ENTRY_PENETRATION_BPS = 5.0
 WAIT_BARS = 3
@@ -300,7 +301,7 @@ def build_paired_donchian48_comparison(result_rows, enabled):
     invariants = (
         "timeframe", "symbol_list", "symbols", "common_h1_bars",
         "test_start_ts", "test_end_ts", "shared_starting_capital",
-        "max_concurrent_positions",
+        "max_concurrent_positions", "volume_lookback_period",
     )
     for key in sorted(indexed):
         d20, d48, d48ema = (
@@ -927,6 +928,7 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
     cfg.daily_stop_loss_pct = 5.0
     cfg.emergency_kill_switch_pct = 30.0
     cfg.donchian_period = int(donchian_period)
+    cfg.volume_lookback_period = VOLUME_LOOKBACK_PERIOD
     cfg.atr_period = 14
     cfg.min_volume_ratio = min_vol
     cfg.stop_atr_mult = 2.5
@@ -1065,6 +1067,7 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
             donchian_period=donchian_period,
         ),
         "donchian_period": int(donchian_period),
+        "volume_lookback_period": VOLUME_LOOKBACK_PERIOD,
         "ema50_200_gate": ema_trend_labels_by_symbol is not None,
         "cost_multiplier": cost_multiplier,
         "min_volume_ratio": min_vol,
@@ -1341,6 +1344,7 @@ def build_validation_manifest(
             "accelerated_atr_trail_after_1_5r": ACCELERATED_ATR_TRAIL_AFTER_1_5R,
             "enable_post_break_invalidation": ENABLE_POST_BREAK_INVALIDATION,
             "donchian_period": int(design.get("primary_donchian_period", 20)),
+            "volume_lookback_period": VOLUME_LOOKBACK_PERIOD,
             "donchian_variant_modes": design.get(
                 "donchian_variant_modes", [{"donchian_period": 20, "ema50_200_gate": False}]
             ),

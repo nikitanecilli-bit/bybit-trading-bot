@@ -282,3 +282,11 @@
 - Funding helper audit found a separate invariant gap: both accrued funding functions required tp1_ts_ms when tp1_hit=true, but accepted tp1_ts_ms when tp1_hit=false; they also accepted non-bool tp1_hit via truthiness. Both helpers now require tp1_hit to be bool and enforce timestamp iff TP1 is hit. Two regressions cover timestamp-without-hit and integer-as-bool.
 - Final CI #41851768270 on 3170738a78eac92b0a93eda66510c038660f0864 passed 57/57 steps, zero failures. Actual log confirms both new funding regressions passed; funding accounting suite ran 76 tests. Source-only CI #41851738950 on 568f5ed2552d27dadfeb82c4d1e9610cfac3cd13 also passed 57/57.
 - Scope remains technical correctness only. No PnL/backtest, market archive downloads, private API, runner, paper/live orders or main-branch changes.
+
+
+## Follow-up correction — planned exit prices only (2026-11-04)
+
+- Refined ENG-EXEC-015 / ENG-EXEC-016 minNotional guard: entry price is not itself a planned exit order. Including it in the minimum could falsely reject a valid restored long position after its trailing stop had moved above entry.
+- Both TP1 and restore checks now use min(stop_price, tp2_price), i.e. the actual planned stop/target exit levels; TP1 leg remains checked separately at TP1 price.
+- Added regression for an exchange-sized long with entry 100, trailing stop 110, TP2 112, qty 1, minNotional 105: restore must succeed because both planned exits satisfy the threshold even though entry notional does not.
+- CI #41852293859 on c88e587d01739eb7c0ee6fe94e0369b28aff664c: SUCCESS, 57/57 steps, zero failures. Actual log confirms the new restore regression passed; state-persistence suite 77/77.

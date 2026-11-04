@@ -1124,3 +1124,12 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Source CI #41861236015 SUCCESS 57/57; final CI #41861273155, 669a7d66c50df5426e63c5490580b2d8bbc92f22 SUCCESS 57/57; state persistence suite 84 tests.
 - Limitation: recovered intraday daily breach cannot be inferred from existing schema if latch is corrupted; no daily equity-low watermark exists.
 - Risk-control state integrity only; no PnL/backtest or exchange operations.
+
+## ENG-EXEC-019 — Inspector и replay используют строгий trade timestamp parser (2026-11-04)
+
+- В `scripts/inspect_bybit_trade_sample.py` обнаружено округление CSV timestamp через `float()` + `round()`. Sub-millisecond timestamps могли быть приняты после потери точности, в отличие от строгого queue replay parser.
+- Инспектор переведён на общий `parse_trade_timestamp_ms()` из `bybit_l2_queue_replay.py`; отдельный parser удалён. Сохраняются точные seconds/milliseconds, запрещены non-finite/non-positive и sub-millisecond timestamps.
+- Regression coverage: exact seconds and milliseconds; rejection of sub-millisecond, NaN/Infinity, zero/negative and malformed values.
+- Финальный CI #41873039139 на `ec28763da6ade2635c31cd0111ae8c612625f23d`: SUCCESS, 57/57 workflow steps, zero failures; inspector/runner suite 7/7; aggregate-L2 primitive suite 81/81.
+- Промежуточный #41872989853 failed только потому, что тест ссылался на удалённый helper `parse_archive_timestamp_ms` после refactor к shared parser; тест синхронизирован в `ec28763`, полный финальный CI прошёл.
+- Это timestamp-integrity guardrail диагностического инструмента, не доказательство исполнения или доходности. Никакие архивы не скачивались; inspector с сетевым вызовом не запускался. No PnL/backtest, API, runner, paper/live orders or main changes.

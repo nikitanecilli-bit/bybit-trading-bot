@@ -24,7 +24,7 @@ def book():
     return b
 
 
-def order(b=None, side="Buy", price="100", qty="2", arrival=1000, expiry=5000):
+def order(b=None, side="Buy", price="100", qty="2", arrival=1001, expiry=5000):
     return place_passive_order(
         b or book(), side=side, price=D(price), quantity=D(qty),
         arrival_ts=arrival, expiry_ts=expiry,
@@ -50,7 +50,7 @@ def test_passive_order_accepts_exact_exchange_instrument_constraints():
     }})
     o = place_passive_order(
         book(), side="Buy", price=D("100"), quantity=D("0.05"),
-        arrival_ts=1000, expiry_ts=5000, instrument_spec=spec, symbol="TESTUSDT",
+        arrival_ts=1001, expiry_ts=5000, instrument_spec=spec, symbol="TESTUSDT",
     )
     assert o.quantity == D("0.05")
 
@@ -66,7 +66,7 @@ def test_passive_order_rejects_price_off_tick_from_exchange_spec():
     try:
         place_passive_order(
             book(), side="Buy", price=D("100.2"), quantity=D("1"),
-            arrival_ts=1000, expiry_ts=5000, instrument_spec=spec, symbol="TESTUSDT",
+            arrival_ts=1001, expiry_ts=5000, instrument_spec=spec, symbol="TESTUSDT",
         )
     except ValueError as exc:
         assert "tickSize" in str(exc)
@@ -85,7 +85,7 @@ def test_passive_order_rejects_quantity_off_step_instead_of_silently_rounding():
     try:
         place_passive_order(
             book(), side="Buy", price=D("100"), quantity=D("0.06"),
-            arrival_ts=1000, expiry_ts=5000, instrument_spec=spec, symbol="TESTUSDT",
+            arrival_ts=1001, expiry_ts=5000, instrument_spec=spec, symbol="TESTUSDT",
         )
     except ValueError as exc:
         assert "qtyStep" in str(exc)
@@ -104,7 +104,7 @@ def test_passive_order_rejects_below_exchange_min_order_qty():
     try:
         place_passive_order(
             book(), side="Buy", price=D("100"), quantity=D("0.09"),
-            arrival_ts=1000, expiry_ts=5000, instrument_spec=spec, symbol="TESTUSDT",
+            arrival_ts=1001, expiry_ts=5000, instrument_spec=spec, symbol="TESTUSDT",
         )
     except ValueError as exc:
         assert "minOrderQty" in str(exc)
@@ -123,7 +123,7 @@ def test_passive_order_rejects_below_exchange_min_notional():
     try:
         place_passive_order(
             book(), side="Buy", price=D("100"), quantity=D("0.09"),
-            arrival_ts=1000, expiry_ts=5000, instrument_spec=spec, symbol="TESTUSDT",
+            arrival_ts=1001, expiry_ts=5000, instrument_spec=spec, symbol="TESTUSDT",
         )
     except ValueError as exc:
         assert "minNotionalValue" in str(exc)
@@ -143,7 +143,7 @@ def test_passive_order_rejects_instrument_spec_for_different_symbol():
     try:
         place_passive_order(
             book(), side="Buy", price=D("100"), quantity=D("1"),
-            arrival_ts=1000, expiry_ts=5000, instrument_spec=spec,
+            arrival_ts=1001, expiry_ts=5000, instrument_spec=spec,
             symbol="BTCUSDT",
         )
     except ValueError as exc:
@@ -163,7 +163,7 @@ def test_passive_order_requires_symbol_when_spec_is_supplied():
     try:
         place_passive_order(
             book(), side="Buy", price=D("100"), quantity=D("1"),
-            arrival_ts=1000, expiry_ts=5000, instrument_spec=spec,
+            arrival_ts=1001, expiry_ts=5000, instrument_spec=spec,
         )
     except ValueError as exc:
         assert "symbol is required" in str(exc)

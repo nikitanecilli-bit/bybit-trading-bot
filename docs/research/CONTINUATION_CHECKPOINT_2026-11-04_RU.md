@@ -1291,3 +1291,22 @@ CI:
 - Финальный Research CI #41875093214 на `846279119545a7036d65b57a156c8ea38b7ae895`: SUCCESS, job `tests` SUCCESS, 57/57 workflow steps, zero failures. Фактический лог подтверждает новые header/row-shape regressions; inspector/runner suite 9/9; aggregate-L2 primitives 81/81.
 
 Классификация: structural data-integrity guardrail диагностического инструмента, не execution evidence и не PnL. Архивы не скачивались; inspector с сетевой загрузкой не запускался. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся. Нет PnL/backtest, collectors, private API, runner, paper/live orders или изменений `main`.
+
+## 69. Orderbook inspector использует strict integer contract replay parser — 2026-11-04
+
+Read-only comparison `scripts/inspect_bybit_orderbook_sample.py` с `OrderBook.apply()` выявил coercion через `int()` для `ts`, `cts`, `seq` и `u`. Это принимало bool, floats (с truncation) и numeric strings, хотя основной replay parser через `strict_int()` требует именно JSON integer и отдельно проверяет положительность.
+
+Исправление:
+- Inspector теперь импортирует общий `strict_int()` и использует `parse_event_integer_fields()`.
+- `ts`, `seq`, `u` обязательны, должны быть положительными non-bool integers; `cts` также strict integer, если присутствует.
+- Отсутствующий или null `cts` по-прежнему учитывается как missing; null теперь считается так же, как отсутствующее поле.
+
+Коммиты:
+- Source: `d6078d4f0e56c1d398b427b8c7640b1f09021b89`.
+- Test: `1b50c9da41b99ea23d04e009e7ba6e6424d73e01`.
+
+Проверка:
+- Source-only CI #41875836674: SUCCESS, 57/57 workflow steps.
+- Финальный Research CI #41875905360 на `1b50c9da41b99ea23d04e009e7ba6e6424d73e01`: SUCCESS, job `tests` SUCCESS, 57/57 workflow steps, zero failures. Фактический лог подтверждает strict orderbook inspector regression; inspector/runner suite 9/9, aggregate-L2 primitives 81/81.
+
+Классификация: strict timestamp/sequence provenance guardrail диагностического инструмента; не execution evidence и не PnL. Inspector не запускался с сетевой загрузкой, новые архивы не скачивались. `MAKER_EXECUTION_REALISM = BLOCKED_FOR_STRATEGY_PNL` остаётся. Нет PnL/backtest, collectors, private API, runner, paper/live orders или изменений `main`.

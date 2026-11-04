@@ -105,15 +105,15 @@ def test_replay_code_dependency_closure_includes_transitive_local_imports():
 def test_replay_code_dependency_closure_discovers_nested_package_imports():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
-        (root / "entry.py").write_text("from package.middle import VALUE\\n", encoding="utf-8")
+        (root / "entry.py").write_text("from package.middle import VALUE\n", encoding="utf-8")
         (root / "package").mkdir()
         (root / "package" / "__init__.py").write_text("", encoding="utf-8")
         (root / "package" / "middle.py").write_text(
-            "from package.deep.leaf import VALUE\\n", encoding="utf-8"
+            "from package.deep.leaf import VALUE\n", encoding="utf-8"
         )
         (root / "package" / "deep").mkdir()
         (root / "package" / "deep" / "__init__.py").write_text("", encoding="utf-8")
-        (root / "package" / "deep" / "leaf.py").write_text("VALUE = 1\\n", encoding="utf-8")
+        (root / "package" / "deep" / "leaf.py").write_text("VALUE = 1\n", encoding="utf-8")
         paths = resolve_h1_replay_code_paths(root, ["entry.py"])
     assert paths == [
         "entry.py", "package/__init__.py", "package/deep/__init__.py",

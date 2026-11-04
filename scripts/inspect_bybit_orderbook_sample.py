@@ -129,6 +129,8 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
             bids, asks = data.get("b"), data.get("a")
             if kind == "delta" and first_snapshot is None:
                 raise ValueError(f"delta received before initial snapshot at row {rows + 1}")
+            if update_id == 1 and kind != "snapshot":
+                raise ValueError(f"u=1 restart marker requires snapshot at row {rows + 1}")
             if kind == "snapshot":
                 if not isinstance(bids, list) or not isinstance(asks, list):
                     raise ValueError(f"snapshot missing full bid/ask arrays at row {rows + 1}")

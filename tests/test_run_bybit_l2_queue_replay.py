@@ -166,6 +166,22 @@ def test_orderbook_inspector_rejects_delta_before_initial_snapshot():
                 raise AssertionError("delta before initial snapshot must be rejected")
 
 
+def test_orderbook_inspector_rejects_u1_restart_marker_on_delta():
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = Path(tmp) / "u1_delta.zip"
+        write_book_archive(archive, [
+            event("snapshot", 1_000, 1, 1, "5"),
+            event("delta", 1_100, 2, 1, "6"),
+        ])
+        with zipfile.ZipFile(archive) as zf:
+            try:
+                book_inspector.inspect_member(zf, "events.data")
+            except ValueError as exc:
+                assert "u=1 restart marker requires snapshot" in str(exc)
+            else:
+                raise AssertionError("u=1 delta must be rejected by the inspector")
+
+
 def test_orderbook_inspector_rejects_duplicate_price_levels_in_snapshot_and_delta():
     cases = [
         (

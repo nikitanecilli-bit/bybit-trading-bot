@@ -769,3 +769,21 @@ Verification:
 - This follows section 35's empty-archive handling fix (`067109a14312c39ebd95ecf2eaede8d19375426c`; regression `54f30eeb095fb01998bf9d03b69c4ff2a1b40687`).
 - Both code/test pairs were re-fetched from the research branch and their changes confirmed. The available commit-associated workflow lookup returned no runs for the latest test commit; new tests remain **CI-unverified**. The last verified Research CI is still #41840361238 on `d2740c6`, SUCCESS, 57/57 steps.
 - No market PnL, archive download/collector, API/account access, runner registration, paper/live orders, or main-branch changes.
+
+
+## 38. Runner test file was not executing its plain test functions; fixed and verified — 2026-11-04
+
+A direct audit of the actual CI log for run #41842036275 revealed that the step `python tests/test_run_bybit_l2_queue_replay.py` emitted no test output. The file contained plain `test_*` functions but no `unittest`/pytest discovery or `__main__` invocation. Therefore that earlier successful CI step had not executed the runner tests. Previous checkpoint statements describing the runner test step as executed evidence are superseded by this finding.
+
+Correction and validation:
+- Commit `60d9202b0f93fccd1938c99137cbeefd3094f9d5` added a `__main__` runner that calls each `test_*` function and reports individual PASS lines and the count.
+- The first real execution (CI #41842455791) correctly failed on an existing incorrect test expectation: it expected a book state after the final archive event, despite the function's deliberate no-extrapolation rule. This was a test-fixture defect, not a production-code defect.
+- Commit `19ca8bcfe407cecea18a2bfc6ad5c86cf54085af` fixed the fixture by adding a later archive event to bracket the intermediate target, while preserving the assertion that a target after the final event is not extrapolated.
+
+Final verification:
+- Research CI #41842592947 on `19ca8bcfe407cecea18a2bfc6ad5c86cf54085af`: run conclusion SUCCESS; job `tests` SUCCESS; all 56 workflow steps completed successfully.
+- Actual log output: runner chronology/markout file **5/5 tests passed**; aggregate L2 primitive suite **81/81 tests passed**, including `test_capture_book_at_rejects_malformed_book_events_after_arrival_boundary`.
+- The empty archive regression `test_capture_scenarios_rejects_empty_order_book_archive` also appears in the 5/5 executed runner suite.
+- CI #41842036275 succeeded but did not execute the runner test functions; do not use it as evidence for those tests.
+
+No market PnL, market archive download/collector, Bybit private/account API, self-hosted runner, paper/live order, or main-branch change. PR #4 remains Draft/open. Continue with independent static review only unless a new reproducible defect is found.

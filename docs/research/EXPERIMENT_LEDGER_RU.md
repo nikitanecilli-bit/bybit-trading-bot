@@ -1185,7 +1185,7 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 ## ENG-EXEC-025 — Reject non-reset orderbook update-ID regressions (2026-11-04)
 
 - Static review of `OrderBook.apply()` found that `u` was type/positivity checked and the documented `u=1` restart marker was handled, but a lower non-`1` update ID after a higher ID was still accepted. This could apply stale/out-of-order book state while `cts` and `seq` happened to increase.
-- Added a fail-closed guard: reject `update_id < last_u` unless the event is the documented `u=1` full-snapshot reset. The change deliberately does not require contiguous `u) increments; it only rejects regressions outside the reset marker.
+- Added a fail-closed guard: reject `update_id < last_u` unless the event is the documented `u=1` full-snapshot reset. The change deliberately does not require contiguous `u` increments; it only rejects regressions outside the reset marker.
 - Added a regression test proving the stale update is rejected atomically without mutating bids, asks, timestamps, sequence, or update ID. Existing `u=1` restart-snapshot tests remain in place.
 - Code + regression commit: `2b71592a1431028a5e78af2bc166327a4a5f49b8`; explanatory comment commit: `af4ad6f421b52cd24f864d5a71c581853cc569a8`.
 - Focused isolated reproduction passed for the regression and valid `u=1` reset; inserted test syntax compiled. **No GitHub Actions run was observed for these commits**, so the full repository test suite is not yet confirmed. Last confirmed full Research CI remains #41875905360 on `1b50c9d`, before this change.

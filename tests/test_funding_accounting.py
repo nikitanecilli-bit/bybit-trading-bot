@@ -174,6 +174,21 @@ class AccruedFundingTests(unittest.TestCase):
                 closed_ts_ms=SETTLE_2 + 0.5,
             )
 
+    def test_funding_helpers_reject_tp1_timestamp_without_tp1_hit(self):
+        inconsistent = position(tp1=False, tp1_ts=SETTLE_1, remaining="0.5")
+        for helper in (accrued_funding_cost, accrued_funding_cost_for_remaining_margin):
+            with self.subTest(helper=helper.__name__):
+                with self.assertRaisesRegex(ValueError, "cannot be set when tp1_hit is false"):
+                    helper(inconsistent, EVENTS, MARKS, SETTLE_2)
+
+    def test_funding_helpers_require_boolean_tp1_hit(self):
+        invalid = position(tp1=False, tp1_ts=None, remaining="1")
+        invalid.tp1_hit = 1
+        for helper in (accrued_funding_cost, accrued_funding_cost_for_remaining_margin):
+            with self.subTest(helper=helper.__name__):
+                with self.assertRaisesRegex(ValueError, "tp1_hit must be bool"):
+                    helper(invalid, EVENTS, MARKS, SETTLE_2)
+
     def test_invalid_position_state_rejected(self):
         with self.assertRaisesRegex(ValueError, "tp1_ts_ms"):
             accrued_funding_cost(position(tp1=True), EVENTS, MARKS, SETTLE_2)

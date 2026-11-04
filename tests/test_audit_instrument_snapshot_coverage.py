@@ -16,11 +16,12 @@ from scripts.audit_instrument_snapshot_coverage import audit_directory, build_re
 
 def write_snapshot(root: Path, name: str, fetched_at: str, instruments: list[dict],
                    started_at: str | None = None,
-                   page_observations: list[dict] | None = None) -> None:
+                   page_observations: list[dict] | None = None,
+                   category: str = "linear") -> None:
     payload = {
         "schema_version": 1,
         "source": "Bybit V5 GET /v5/market/instruments-info",
-        "category": "linear",
+        "category": category,
         "fetched_at": fetched_at,
         "count": len(instruments),
         "instruments": instruments,
@@ -126,7 +127,7 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
             report = audit_directory(target)
         self.assertEqual(report["snapshots_with_page_observations"], 1)
         page_summary = report["snapshots"][0]["page_observations"]
-        self.assertEqual(page_summary["page_count"], 2)
+        self.assertEqual(page_summary["page_count"], 5)
         self.assertEqual(page_summary["status_filters"]["Closed"]["row_count"], 1)
         self.assertEqual(page_summary["request_duration_ms"]["max"], 500)
 
@@ -193,7 +194,7 @@ class InstrumentSnapshotCoverageAuditTests(unittest.TestCase):
             ]
             write_snapshot(target, "a.json", "2026-11-01T00:00:01.000Z",
                            [instrument("BTCUSDT"), instrument("ETHUSDT")],
-                           "2026-11-01T00:00:00.000Z", observations)
+                           "2026-11-01T00:00:00.000Z", observations, category="spot")
             report = audit_directory(target)
         self.assertEqual(
             report["snapshots"][0]["page_observations"]["duplicate_symbol_observations"],

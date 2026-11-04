@@ -61,6 +61,16 @@ class MultiBarLimitWaitTests(unittest.TestCase):
         self.assertEqual(signal["signal_origin_ts"], 1_000)
         self.assertEqual(signal["signal_ts"], 2_000)
 
+    def test_each_delayed_wait_bar_refreshes_guard_but_preserves_origin(self):
+        signal = {"signal_ts": 1_000, "direction": "long"}
+        first_origin = prepare_signal_for_next_bar_fill(signal, 3_601_000, 3_600_000)
+        self.assertEqual(first_origin, 1_000)
+        self.assertEqual(signal["signal_ts"], 1_000)
+        second_origin = prepare_signal_for_next_bar_fill(signal, 7_201_000, 3_600_000)
+        self.assertEqual(second_origin, 1_000)
+        self.assertEqual(signal["signal_origin_ts"], 1_000)
+        self.assertEqual(signal["signal_ts"], 3_601_000)
+
 
 if __name__ == "__main__":
     unittest.main()

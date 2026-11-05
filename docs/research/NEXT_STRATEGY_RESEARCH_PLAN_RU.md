@@ -667,3 +667,8 @@ The existing shared-capital H1 runner hardcodes `H1-momentum-breakout`, Donchian
 ### 13.19. H-B synthetic test specification v0.1 — 2026-11-05
 
 Создан `docs/research/hypotheses/H_B_SYNTHETIC_TEST_SPEC_2026-11-05_RU.md`. Он определяет end-to-end synthetic path `signal → pending save/restore → actual fill/sizing → position restore → MTM → prioritized exit → TradeRecord → journal → H-B-only report`, negative/fail-closed cases, null TP semantics, forced-close provenance, legacy parity, test module layout, offline test order и G0–G6 release gates. Никакие synthetic tests ещё не реализованы или запущены; это spec-only документ. Запрещённые market/exchange/trading действия остаются закрытыми.
+
+
+### 13.20. H-B implementation seam map — 2026-11-05
+
+В readiness review, раздел 10.22, добавлена карта точек интеграции по актуальному исходнику: OpenPositionState, TradeRecord, PlanBStatePersistence.load_state, _unrealized_pnl_at_marks, _try_fill_pending, _apply_tp1, _manage_position, _close_position и export_journal_for_dashboard. Дополнительно выявлена безусловная ATR-зависимость в начале _manage_position(), хотя H-B exit contract не использует ATR после сигнала. Это нужно устранить/изолировать без изменения legacy ATR/trailing. Также подтверждено, что TP1 fee leg условный, но TradeRecord TP serialization безусловно вызывает round() на TP1/TP2; null-safe close обязателен. Это read-only audit и implementation map, не изменение production code и не запуск тестов.

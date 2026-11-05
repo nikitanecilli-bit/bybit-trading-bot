@@ -524,3 +524,8 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 ### 13.1. Integration boundary уточнён — 2026-11-05
 
 Static audit подтвердил, что sparse shared-capital replay принимает custom `signal_evaluator`; H-B может быть отдельным entry evaluator без monkey-patching базового Donchian сигнала. Однако общий `_try_fill_pending()` строит уровни через `QuantStrategyCore.build_levels()`, а после входа `_manage_position()` применяет breakout-oriented exits. Следовательно, callback решает только entry, но не mean-reversion lifecycle. До кода нужен strategy-specific exit hook или изолированный H-B wrapper с общим accounting core; глобальные exit defaults не менять. См. разделы 9–9.1 в H-B readiness review. PnL и code integration не выполнялись.
+
+
+### 13.2. Exit-path audit уточнён — 2026-11-05
+
+Дополнительный read-only просмотр `_manage_position()`, `OpenPositionState` и `_close_position()` уточнил предыдущую формулировку: отдельный H-B exit path архитектурно возможен внутри существующего manager по `pos.strategy`, поскольку стратегия уже сохраняется в позиции, а liquidation/kill-switch/stop и финальный accounting централизованы. H-B потребуется собственная ветка discretionary exits и persisted target metadata (с backward-compatible serialize/restore), а не отдельный PnL ledger или новый engine. Это предпочтительнее wrapper, если synthetic regressions подтвердят сохранение общего защитного и accounting lifecycle. Пока не реализовано.

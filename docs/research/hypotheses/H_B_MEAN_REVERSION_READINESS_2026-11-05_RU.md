@@ -12,12 +12,14 @@ H-B остаётся приоритетным кандидатом для сле
 
 ## 2. Сопоставление с текущим кодом
 
-Статический просмотр `Bybit_Trading_Engine_v14_research.py` (branch file SHA: `ef09d744be25eb477d886f9afd73b1394f8e0b1a`) обнаружил:
-- есть Donchian/volume feature calculation и ATR-параметры;
-- в этом модуле не обнаружены готовые RSI, ADX, VWAP, Bollinger Band или z-score feature pipelines;
-- отдельная H-B стратегия/сигнальный путь не обнаружены.
+Расширенный статический просмотр исследовательских модулей выявил важное уточнение:
+- `Bybit_Trading_Engine_v14_research.py` (SHA `ef09d744be25eb477d886f9afd73b1394f8e0b1a`) содержит Donchian/volume и ATR; готовые RSI, ADX, VWAP, Bollinger Band или z-score pipelines в нём не обнаружены.
+- `market_regime.py` (SHA `f4add7dd8a7730e65489a7a29c85281e83bdfe1f`) **уже содержит causal regime classifier**: efficiency ratio, EMA alignment/slope, ATR-normalized slope и ATR-percentile/median volatility ratio; выходы `range`, `trend_up`, `trend_down`, `high_vol_chop`, `transition`, `unknown`.
+- `tests/test_market_regime.py` (SHA `e4e1066ef56e2908b895631274513b554a15479f`) содержит synthetic tests для трендовых/колебательных режимов, warm-up, invalid OHLC, timestamp order и future-mutation invariance.
+- `market_regime.py` прямо обозначен как отдельный research-only classifier: он не подключён к trading signals, execution или sizing. Его default thresholds существуют, но ещё не обоснованы/заморожены для H-B.
+- `market_structure.py` содержит EMA/trend и breakout-quality helpers, но не mean-reversion signal.
 
-Это не доказывает, что похожая математика нигде в репозитории отсутствует; перед реализацией нужен адресный поиск по всем research-модулям и runner-ам. Но текущая H1 breakout-подсистема не предоставляет готовую проверенную H-B реализацию.
+Следовательно, утверждение «формального range classifier нет» было бы неверным: classifier есть. Реальный пробел — **нет отдельной H-B preregistration, которая выбирает и фиксирует конкретную конфигурацию этого classifier, правила входа/стабилизации/выхода и причинное соединение с shared-capital runner**. Отсутствие RSI/ADX/VWAP/Bollinger/z-score в просмотренных модулях остаётся верным, но они не обязательны, если H-B использует уже имеющийся classifier.
 
 ## 3. Неопределённости, которые нельзя смешивать в первом тесте
 

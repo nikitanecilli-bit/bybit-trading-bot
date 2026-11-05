@@ -519,3 +519,8 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 Подготовлен отдельный design candidate в `hypotheses/H_B_MEAN_REVERSION_READINESS_2026-11-05_RU.md`: H1 long-only; range gate по существующему `market_regime.py` на баре до shock; oversold event — падение минимум на 2.0 ATR за ровно 24 последовательных H1 бара с ATR, измеренным до shock; stabilization — следующий закрытый бар закрывается строго выше high shock-бара; вход — только на open следующего бара. BTC/RSI/VWAP/z-score/news/macro фильтры исключены.
 
 Это causal signal skeleton для будущих synthetic tests, не полная preregistration. Stop/target/time stop, sizing/shared-capital priority, PIT universe, controls/folds и audited costs остаются незаполненными. Не запускать PnL, sweeps, market event study, paper/live. Текущий статус: **DESIGN CANDIDATE v0.1 / NOT PREREGISTERED / DATA-BLOCKED**. Следующий разрешённый шаг — deterministic synthetic test contract и статический audit возможного adapter к shared-capital runner; интеграция в production engine не требуется и не допускается.
+
+
+### 13.1. Integration boundary уточнён — 2026-11-05
+
+Static audit подтвердил, что sparse shared-capital replay принимает custom `signal_evaluator`; H-B может быть отдельным entry evaluator без monkey-patching базового Donchian сигнала. Однако общий `_try_fill_pending()` строит уровни через `QuantStrategyCore.build_levels()`, а после входа `_manage_position()` применяет breakout-oriented exits. Следовательно, callback решает только entry, но не mean-reversion lifecycle. До кода нужен strategy-specific exit hook или изолированный H-B wrapper с общим accounting core; глобальные exit defaults не менять. См. разделы 9–9.1 в H-B readiness review. PnL и code integration не выполнялись.

@@ -504,3 +504,19 @@ Read-only проверка фактического пути portfolio mark-to-m
 **Portfolio accounting finding:** _close_position() удаляет закрываемую позицию из open_positions до пересчёта unrealized PnL оставшихся позиций, затем добавляет net realized PnL. При `_defer_close_risk_evaluation=true` пакетные close последовательно обновляют realized equity и оставшийся unrealized snapshot без промежуточной оценки drawdown; после batch вызывается общий _update_mark_to_market(). Это выглядит как намеренная защита от порядка обхода словаря, но требует synthetic multi-position assertions: сумма realized net + оставшийся unrealized не меняется от порядка закрытия при одинаковом timestamp; закрытая позиция не учитывается в unrealized повторно; kill-switch latch оценивается по агрегированному snapshot после синхронного batch, а не по искусственному промежуточному состоянию.
 
 **Статус:** новая критическая H-B integration blocker. Код не менялся; только статический аудит. См. research plan 13.15.
+
+
+### 10.18. Полная карта nullable TP consumers и restore blockers
+
+Продолжен read-only аудит всех найденных обращений к `pos.tp1_price`, `pos.tp2_price`, `tp1_contract_qty` и `tp1_hit` в основном engine-файле. Помимо MTM/close blockers из 10.17 обнаружено:
+
+1. **Intrabar MTM (около `_unrealized_pnl_at_marks`)** безусловно строит TP1 quantity/notional и обращается к `Decimal(str(pos.tp1_price))`, хотя TP1 fee/slippage затем условны по `tp1_hit`. При H-B `None` исключение происходит раньше условного fee расчёта. Требуется целиком перенести вычисление TP1 qty/notional внутрь `if pos.tp1_hit`; при false не трогать TP1 price или quantity.
+2. **Restore schema** (`PlanBStatePersistence.load_state`) объявляет `tp1_price` и `tp2_price` обязательными числовыми положительными полями; их безусловно проверяет, а для exchange-sized позиции использует TP2 в `lowest_planned_exit`. H-B null TP не сможет восстановиться. Требуется strategy-aware схема: legacy прежняя строгая геометрия; H-B обе TP цены null, TP1 false, TP1 timestamp null, realized TP1=0, remaining_fraction=1 и full remaining quantity. Exchange-sized H-B minNotional проверять по H-B stop/mean target, а не TP2.
+3. **`_apply_tp1()`** напрямую вычисляет расстояние до `tp1_price`, использует TP1/TP2 для minNotional и меняет остаточную долю. Это legacy-only helper; H-B manager обязан обходить его полностью.
+4. **`_manage_position()`** перед общей discretionary логикой вычисляет TP2 touch, затем TP1 touch, затем trailing. Наличие стратегии H-B само по себе эту ветку не исключает. Нужна явная strategy branch после общих liquidation/kill-switch/stop checks и до TP1/TP2 блока; H-B target/time-stop обрабатываются там, затем обязательный return/исключение из legacy ветки.
+5. **Save path** сериализует `asdict(pos)` и затем проверяет временный backup тем же strict reader. Поэтому расширение dataclass без синхронного strategy-aware reader всё равно блокирует сохранение H-B позиции. Нельзя ослаблять unknown-field rejection глобально.
+6. **Close path** по-прежнему безусловно округляет TP цены при создании TradeRecord (см. 10.12), а **journal export** сериализует `asdict(TradeRecord)`. Для H-B null TP должны пройти close и JSON export; downstream consumer audit остаётся отдельным пунктом.
+
+Проверяемая матрица после реализации: legacy long/short position save-load и MTM parity; H-B null TP save→restore→intrabar MTM→bar-close MTM→manager→stop/target/time close→journal; попытка вызвать `_apply_tp1` для H-B невозможна; malformed H-B TP state отвергается; exchange-sized H-B minNotional использует frozen stop/target; старые backup остаются совместимыми.
+
+**Вывод:** nullable TP — сквозное изменение модели позиции, а не локальная правка TradeRecord. Все потребители должны быть исправлены одним согласованным контрактом. Код не менялся, тесты не запускались; это статический аудит source на текущей ветке.

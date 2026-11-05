@@ -589,3 +589,27 @@ Read-only просмотрены `MaintenanceGateAuditor.evaluate_portfolio()`, 
 **Уточнение по _close_position():** TP1 fee leg уже защищён if pos.tp1_hit (3095–3100), но TradeRecord создаётся с безусловными round(pos.tp1_price, 12) и round(pos.tp2_price, 12) (3155–3156). Следовательно, None TP ломает сериализацию даже при корректном tp1_hit=False; это отдельный обязательный тест close path.
 
 **Граница изменений:** перечисленные участки связаны; частичное внедрение nullable TP без одновременного MTM, manager, restore и close изменений создаёт неработоспособное промежуточное состояние. Требуется согласованный набор изменений с legacy regression. В этой сессии production code не менялся; source map — read-only engineering audit.
+
+
+### 10.23. Existing offline regression harness inventory — 2026-11-05
+
+Проверены реальные test modules на текущей ветке (read-only, без запуска):
+
+| Модуль | Объём | Релевантное покрытие | Роль в H-B acceptance |
+|---|---:|---|---|
+| `tests/test_portfolio_accounting.py` | 1,905 строк; 56 функций `test_*` | MTM, TP1 lifecycle, close accounting, journal precision, portfolio risk budget, exchange sizing, liquidation/kill-switch и close ordering | Обязательная accounting/MTM regression suite; дополнить отдельным H-B модулем, не менять legacy expectations |
+| `tests/test_state_persistence.py` | 2,116 строк; 123 test methods | backup round-trip, legacy compatibility, fail-closed schema, unknown fields, atomic save/fsync/replace, pending validation, exchange metadata restore | Обязательная persistence regression suite; новые H-B fixtures должны расширять схему без ослабления старых assertions |
+
+**Harness conventions observed:** accounting module dynamically imports engine under a test-specific module name and defines lightweight `make_position()` / `make_engine()` fixtures; persistence module uses `unittest.TestCase`, imports engine normally, and has reusable `sample_position()`, `sample_risk_data()` and atomic-backup helpers. New H-B module should follow the local conventions appropriate to each tested subsystem and avoid duplicating production logic in mocks.
+
+**Important caveat:** the presence of these test modules and test functions does not prove they currently pass on this branch. The repository files were inspected through the GitHub connector; there is no authorized local checkout/test execution path in this session, and repository archive download/extraction remains outside the approved scope. No test result is claimed. A future CI run must be observed and its logs inspected; current latest docs commit has no associated workflow run/status evidence.
+
+**Suggested next code-stage ordering, once sanctioned code editing/test execution is available:**
+1. Extend dataclasses and strategy-aware persistence schema with direct round-trip/fail-closed tests.
+2. Add pending H-B provenance and absolute fill geometry; test actual fill sizing and unchanged legacy fill fixtures.
+3. Make MTM null-safe and remove unnecessary H-B ATR dependency; add intrabar/close MTM tests.
+4. Add H-B manager branch and priority tests, including fill-bar stop-only behavior and 24th-bar close.
+5. Add normal/forced close provenance, null TP journal serialization and legacy JSON parity tests.
+6. Add strategy-isolated synthetic report/manifest; only then run targeted suites, accounting/persistence regressions and full offline suite.
+
+**Статус:** test infrastructure is present and relevant; no evidence yet of a successful run, no H-B tests exist, and no production code changed.

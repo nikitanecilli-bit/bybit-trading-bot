@@ -608,3 +608,8 @@ Restore позиции безусловно требует положитель�
 ### 13.10. H-B close/journal path audit — 2026-11-05
 
 В `_close_position()` обнаружен обязательный null-safety fix: текущий `TradeRecord` construction делает `round(pos.tp1_price, 12)` и `round(pos.tp2_price, 12)` без strategy guard. При корректных для H-B null TP1/TP2 закрытие позиции упадёт. Нужны strategy-aware null mapping и synthetic close-path tests. TP1 financial leg условен по `tp1_hit`; при H-B invariant false общая accounting path может сохранить полный размер. `finalize_open_positions()` отдельно закрывает остатки по последнему синхронному close с taker costs и end_of_test reason; требуется тест однократного H-B journal close. Engine-side export использует `asdict(TradeRecord)`; dashboard consumer compatibility не подтверждена и требует отдельного аудита. Подробности — readiness review 10.12. Код и тесты не менялись.
+
+
+### 13.11. Dashboard consumer scope уточнён — 2026-11-05
+
+Tracked v15 HTML dashboard — автономный simulator со своими объектами trades/KPI; он не читает engine `export_journal_for_dashboard()` JSON и не является consumer TradeRecord. Подтверждён engine-side JSON producer через `asdict(TradeRecord)`, но downstream consumers в просмотренных tracked files не установлены. Статус совместимости остаётся unknown/not evidenced; нужен deployment inventory фактических импортёров. См. readiness review 10.13. Это уточнение не снимает обязательный null-safe TradeRecord construction fix.

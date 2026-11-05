@@ -598,3 +598,8 @@ Readiness review section 10.9 lists existing tests and additions. Докумен
 - расширить save/restore round-trip tests и проверить сохранность прежнего backup при invalid save.
 
 Readiness review section 10.10 фиксирует точный список. Это новый persistence compatibility blocker; никаких кодовых изменений или тестовых запусков нет.
+
+
+### 13.9. H-B конфликт TP1/TP2 в restore — 2026-11-05
+
+Restore позиции безусловно требует положительные TP1/TP2 и long-геометрию `entry < TP1 < TP2`; exchange-sized restore использует TP2 для minNotional проверки. Эти поля не должны получать фиктивную H-B семантику. Readiness review section 10.11 фиксирует рекомендуемое strategy-specific решение: H-B TP1/TP2 = null, запрет partial TP1 state, отдельная проверка minNotional по frozen stop/mean target, явные H-B provenance поля в TradeRecord и аудит dashboard consumers на null/новые поля. Это новый blocker; код и тесты не менялись.

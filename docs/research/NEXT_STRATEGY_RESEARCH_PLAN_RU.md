@@ -512,3 +512,10 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 - Добавлен методологический приоритет: event-study screening и явный N_trials accounting. Это подготовка процесса, не разрешение рыночных PnL runs.
 - Подробная классификация: `docs/research/hypotheses/NEW_INPUTS_REVIEW_2026-11-04_RU.md`.
 - `main` не изменялась; стратегия и торговый код не менялись; data/accounting gate остаётся CLOSED.
+
+
+## 13. H-B causal signal candidate v0.1 — 2026-11-05
+
+Подготовлен отдельный design candidate в `hypotheses/H_B_MEAN_REVERSION_READINESS_2026-11-05_RU.md`: H1 long-only; range gate по существующему `market_regime.py` на баре до shock; oversold event — падение минимум на 2.0 ATR за ровно 24 последовательных H1 бара с ATR, измеренным до shock; stabilization — следующий закрытый бар закрывается строго выше high shock-бара; вход — только на open следующего бара. BTC/RSI/VWAP/z-score/news/macro фильтры исключены.
+
+Это causal signal skeleton для будущих synthetic tests, не полная preregistration. Stop/target/time stop, sizing/shared-capital priority, PIT universe, controls/folds и audited costs остаются незаполненными. Не запускать PnL, sweeps, market event study, paper/live. Текущий статус: **DESIGN CANDIDATE v0.1 / NOT PREREGISTERED / DATA-BLOCKED**. Следующий разрешённый шаг — deterministic synthetic test contract и статический audit возможного adapter к shared-capital runner; интеграция в production engine не требуется и не допускается.

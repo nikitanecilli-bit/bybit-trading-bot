@@ -111,3 +111,23 @@ ATR — значение classifier ATR, рассчитанное только �
 10. Long-only и одна позиция на инструмент: открытая позиция блокирует новые H-B entries до закрытия.
 
 Эти тесты проверяют механику сигнала, не торговую доходность. Их нельзя заменять прогоном по историческим рыночным данным.
+
+
+## 9. Static integration audit: shared-capital replay seam
+
+Проверены `run_sparse_simulation_pass()`, `run_simulation_pass()`, `UnifiedQuantEngine.step_candle()` и текущий shared-capital H1 validation runner.
+
+**Положительный результат:** отдельная стратегия может быть подключена через уже существующий `signal_evaluator(symbol, history, cfg, context)` callback в `run_simulation_pass(..., allow_sparse_data=True)`. Для каждого timestamp engine сначала обрабатывает существующие позиции/заявки, затем строит completed-bar histories, вызывает evaluator и ставит возвращённый signal в pending. Следующая свеча обслуживает pending fill. Это лучше, чем monkey-patching `QuantStrategyCore.evaluate_signal` в H-B runner: можно оставить базовый Donchian engine без изменений и передавать H-B только через research callback.
+
+**Ограничения seam:**
+- `step_candle(..., evaluate_new_signal=False)` возвращает eligibility только для символов без открытой позиции/pending заявки; H-B evaluator не вызывается для уже занятого символа.
+- `signal_context_provider` вызывается после обработки всех активных символов на текущей close boundary. Общий cross-sectional context доступен, но H-B первой версии его не требует.
+- Sparse replay требует непрерывную timeframe сетку внутри каждого symbol series и общий terminal candle; пропуски H1 не должны автоматически интерполироваться.
+- Текущая H1 validation runner `run_h1_shared_capital_portfolio_validation.py` жёстко ориентирована на Bybit-native H1, funding/Mark и dated specs/risk-tier snapshots. Она не является подходящим запуском до прохождения соответствующих data/accounting gates.
+- Новый H-B runner должен иметь отдельный manifest/provenance и использовать sparse replay callback, а не расширять существующий Donchian parameter grid.
+
+**Существенная проверка до реализации:** выяснить контракт signal dictionary, который потребляет `_try_fill_pending` / `_prepare_pending_entry_risk_budgets`, и сделать synthetic adapter tests на sizing/stop geometry без вызова рыночных данных. Не переиспользовать Donchian сигнальные поля как будто они автоматически корректны для H-B.
+
+Файлы/ориентиры: `Bybit_Trading_Engine_v14_research.py` (`run_sparse_simulation_pass`, `run_simulation_pass`, `step_candle`); `tests/test_sparse_simulation_replay.py`; `scripts/run_h1_shared_capital_portfolio_validation.py`.
+
+**Вывод:** инфраструктурный seam для отдельного H-B evaluator уже существует; отдельный торговый движок не нужен. Но это пока статический вывод о способе интеграции, не доказательство готовности H-B. Market PnL и code integration не выполнялись.

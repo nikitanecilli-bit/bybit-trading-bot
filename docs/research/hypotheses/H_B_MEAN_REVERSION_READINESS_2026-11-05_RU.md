@@ -187,3 +187,70 @@ ATR — значение classifier ATR, рассчитанное только �
 10. Restart между сигналом и выходом не меняет target reference, time-stop counter или exit-policy version.
 
 **Ограничение текущего этапа:** это статический контрактный аудит. Торговый код не менялся, тесты не запускались, market PnL не рассчитывался, CI после документации не запускался. Реализация остаётся заблокированной до завершения H-B exit preregistration и появления санкционированного пути изменения code files.
+
+
+## 10. Exit contract candidate v0.1 — synthetic-only, not market preregistration
+
+Ниже зафиксирован **один механически однозначный кандидат** для закрытия design gap. Это не результат оптимизации и не разрешение на рыночный PnL. Значения выбраны из структуры уже зафиксированного H1 signal contract и пользовательского диапазона удержания 12–48 часов; они не объявляются оптимальными.
+
+### 10.1. Frozen candidate rules
+
+Все ссылки на свечи используют индексы signal contract раздела 7: shock bar — t, stabilization bar — t+1, entry — open[t+2].
+
+| Элемент | Кандидат v0.1 | Причина / fail-closed |
+|---|---|---|
+| Initial stop | low[t] — минимум shock-свечи, фиксируется при сигнале и не расширяется | Структурная граница распродажи; без подбора ATR-buffer. Если entry_price <= low[t], pending entry отменяется |
+| Mean target | Простое среднее close[t-24:t], то есть 24 закрытия до shock bar; значение фиксируется при сигнале | Явная pre-shock mean reference, не использует shock/stabilization/future bars. Если target <= entry_price, вход отклоняется |
+| Target execution | Полное закрытие по зафиксированной target price; gap не даёт улучшения выше target | Консервативно, без моделирования недоказанного price improvement |
+| Time stop | 24 H1 бара удержания, считая fill bar первым; если target/stop не сработали — выход по close 24-го бара | Один горизонт внутри исходного диапазона 12–48h; не sweep и не «лучший» горизонт |
+| Partial exits / trailing | Не использовать; только один полный discretionary target либо time exit | Убирает лишние степени свободы из первого теста |
+| Stop update | Не переносить в breakeven, не трейлить, не усреднять | Сохраняет один фиксированный риск-уровень |
+| Direction | Только long | Соответствует signal contract v0.1 |
+
+close[t-24:t] — полуоткрытый интервал: включает t-24 и исключает t; ровно 24 наблюдения. Если любое из них отсутствует, timestamps не образуют непрерывную H1 сетку или значение невалидно, mean target не вычисляется и сигнал отклоняется.
+
+### 10.2. Event ordering
+
+Приоритет для одной H1 свечи:
+
+1. liquidation по существующему Mark-price механизму;
+2. portfolio kill-switch;
+3. protective stop;
+4. mean target;
+5. time stop на close бара.
+
+Если stop и target затронуты одной свечой, закрытие по stop. Stop gap для long: min(stop_price, candle.open) вне fill bar, как в существующем общем stop path. Если entry candle открывается на/ниже initial stop — pending entry отменяется, позиция не создаётся. На fill bar discretionary target не проверяется по high: экстремум мог произойти до фактического входа. На 24-м баре, если stop/target не сработали, time stop использует его close в соответствии с текущей close-based time-stop convention движка.
+
+Target gap-through не получает улучшения: цена закрытия остаётся ровно зафиксированной target price. Если stop и target потенциально сработали на одном баре, stop всегда выигрывает независимо от open/high/low/close последовательности.
+
+### 10.3. Lifecycle and persistence
+
+При создании позиции H-B должны быть сохранены как минимум:
+- strategy = H-B-mean-reversion;
+- h_b_exit_policy_version = v0.1;
+- h_b_target_price — конечная положительная цена;
+- h_b_shock_ts_ms и h_b_entry_signal_ts_ms для provenance;
+- h_b_max_hold_bars = 24 либо эквивалентная неизменяемая версия политики.
+
+Initial stop уже находится в общем stop_price; время удержания — в общем bars_held. Не дублировать их без необходимости. Restore обязан проверить, что H-B target выше entry для long, stop ниже entry, policy version поддерживается, timestamps согласованы с timeframe, а поля конечны и положительны. Legacy positions без H-B metadata продолжают идти по прежней ветке. H-B позиция с отсутствующей/некорректной metadata должна fail closed, а не попадать в breakout exit logic.
+
+При рестарте target и policy version восстанавливаются из backup; не пересчитываются из новой истории. После закрытия target и версия должны попасть в audit trail TradeRecord или однозначно сохраняемую exit metadata.
+
+### 10.4. Synthetic acceptance cases specific to this exit contract
+
+1. Stop равен low[t]; target равен mean ровно 24 pre-shock closes, исключая close[t].
+2. Мутация shock/stabilization/future closes не меняет зафиксированный target.
+3. 23/25 pre-shock closes, missing H1, duplicate timestamp, NaN/inf, zero/negative target — reject.
+4. entry <= stop или target <= entry — pending entry отклоняется до открытия позиции.
+5. Fill-bar target wick не закрывает позицию; fill-bar protective stop остаётся активным.
+6. Stop/target на одной свече — stop-first; gap stop — худшая из stop/open.
+7. Target gap-through закрывается по target, не по более выгодному open.
+8. Time stop срабатывает ровно на close 24-го бара, считая fill bar первым; на 23-м ещё не срабатывает.
+9. Restore round-trip сохраняет target, policy version, shock/signal timestamps и bars held; restart не сдвигает time-stop deadline.
+10. H-B проходит через общий _close_position(); legacy breakout fixtures не меняются.
+
+### 10.5. Decision status
+
+Этот контракт закрывает **механический design gap** для synthetic tests, но не все preregistration gates. До market experiment всё ещё необходимы: утверждённая frozen RegimeConfig и полный experiment card; sizing и portfolio concurrency/priority; PIT universe и независимые chronological folds; null/control и N_trials accounting; количественные reject/inconclusive criteria; Bybit-native OHLC/Mark/Funding, dated specs/risk tiers и audited costs.
+
+**Статус:** EXIT CANDIDATE v0.1 / SYNTHETIC-ONLY / NOT MARKET-PREREGISTERED / DATA-BLOCKED. Никаких market PnL, parameter sweeps, data downloads, API, paper/live или code changes этим решением не разрешается.

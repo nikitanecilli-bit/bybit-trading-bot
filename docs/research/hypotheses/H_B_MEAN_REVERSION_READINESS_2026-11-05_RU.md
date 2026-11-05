@@ -539,3 +539,25 @@ Read-only проверены `TradeRecord`, `MaintenanceGateAuditor.evaluate_por
 **Journal consumer compatibility gate:** проверить минимум JSON snapshot tests для legacy и H-B, `json.dumps(... allow_nan=False)`, null preservation, required H-B provenance, unknown-field behavior внешних readers (если они будут предоставлены), summary parity между `MaintenanceGateAuditor` и TradeRecord sums. Не утверждать отсутствие неизвестных внешних потребителей: доступный репозиторий не содержит обнаруженного parser для engine journal.
 
 **Статус:** внутренний аудитор и видимые скрипты не имеют TP-specific dependency; экспорт сохраняет optional поля через `asdict`, но внешняя совместимость неизвестна. Статический аудит; код/тесты не менялись и не запускались.
+
+
+### 10.20. Strategy KPI, readiness badge and validation-report boundary audit
+
+Read-only просмотрены `MaintenanceGateAuditor.evaluate_portfolio()`, daily odometer formatter, Bybit H1 single-symbol holdout и shared-capital H1 validation runner.
+
+**Критический вывод:** общий `evaluate_portfolio()` математически принимает список любых `TradeRecord` и не фильтрует по `strategy`. Он вычисляет net PnL/return от `cfg.capital_usdt`, Win Rate, PF, средний NET R, drawdown по агрегированному exit timestamp, average risk и `all_ok` по шести общим целям. `format_daily_odometer_report()` переводит `all_ok` в «All Systems Normal / Зелёный коридор». Это не strategy-specific readiness и не preregistration gate. Если H-B сделки попадут в этот общий список, результат может смешать H-B с breakout/другими стратегиями и выдать misleading green status.
+
+**Требуемая изоляция H-B reporting:**
+1. Для любого H-B research report группировать строго по `strategy == "H-B-mean-reversion"`; показывать отдельно число сделок и долю пропущенных/отклонённых сигналов, net/gross PnL, все costs, net R, PF, win rate, drawdown, expectancy, duration/monthly-equivalent только при валидном интервале, exit reason, stop/target/time counts.
+2. Указывать статус явно: `SYNTHETIC_ONLY`, `NOT_MARKET_VALIDATED`, `NOT_PREREGISTERED`, `NOT_DEPLOYMENT_APPROVED`; синтетические результаты не могут попадать в market PnL KPI или общий «зелёный коридор».
+3. `all_ok` общего аудитора нельзя переименовывать в H-B readiness. Нужен отдельный readiness state machine, где прохождение mechanical tests не открывает data/PnL gate.
+4. Общая equity/portfolio risk оценка может агрегировать стратегии для портфельного риска, но strategy edge attribution и readiness обязаны оставаться раздельными. Любая смешанная метрика должна явно иметь scope `portfolio`, а не `H-B`.
+5. Отдельно фиксировать sample size, дату/границы периода, data provenance, code/config hashes, exit-policy version, instrument/universe, cost model, funding/mark assumptions, blind-vs-seen period status и known limitations.
+
+**H1 runner incompatibility:** `scripts/run_h1_shared_capital_portfolio_validation.py` сейчас hardcodes `strategy="H1-momentum-breakout"`, Donchian/volume/EMA variants, their parameter grid and a manifest that names breakout-specific rules. It is not an H-B runner and must not be reused by merely passing H-B signals. H-B needs a dedicated runner/manifest with frozen signal/exit policy and no breakout factorial grid. `run_bybit_h1_long_only_holdout.py` is a cross-venue breakout holdout, uses per-symbol starting capital and explicitly is not a combined portfolio curve; it is also not an H-B validation route.
+
+**Additional caveats:** generic evaluator's `ret_pct` divides cumulative closed-trade net PnL by initial `cfg.capital_usdt`; its closed-trade drawdown aggregates same-exit-timestamp PnL but does not itself establish a complete intrabar MTM portfolio DD. `all_ok` has six configurable thresholds and is a product KPI, not evidence of statistical robustness or independent OOS. The H1 portfolio runner adds an input/code manifest and caveats but those manifest semantics are tied to breakout validation. A dedicated H-B manifest must capture H-B-specific classifier config, exact 24-close mean window, shock/stabilization/fill timing, frozen shock-low stop, target, 24-bar time stop, event priority, and synthetic-vs-market data tier.
+
+**Synthetic-only report contract:** a synthetic mechanics report may state pass/fail of deterministic invariants and test coverage, but must not print market return, PF, monthly return, profitability, edge, or green readiness. If any such fields are included for debugging, label them `NOT_MARKET_METRICS` and exclude them from strategy decision summaries.
+
+**Статус:** найдена конкретная reporting/readiness опасность при смешении стратегий; H-B runner отсутствует. Статический аудит; код и тесты не менялись/не запускались.

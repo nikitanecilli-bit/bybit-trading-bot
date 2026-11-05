@@ -349,3 +349,25 @@ Initial stop уже находится в общем stop_price; время уд
 No market PnL, parameter sweep, external API, archive data, or paper/live execution is part of these checks.
 
 Status: **ADAPTER CONTRACT + TEST MAP COMPLETE / IMPLEMENTATION NOT PRESENT / NO TESTS RUN**.
+
+
+### 10.10. Дополнительный persistence blocker: pending allowlist и signal provenance
+
+Прямое чтение `PlanBStatePersistence.load_state()` выявило конкретное несоответствие ранее описанному payload:
+- текущий `required_pending`: `symbol, direction, strategy, signal_ts, entry_price, stop_dist, order_type`;
+- текущий `allowed_pending`: те же поля плюс `stop_price, tp1_price, tp2_price, atr, vol_ratio, session, breakout_level`;
+- **`signal_origin_ts` сейчас отсутствует в allowed_pending**, хотя `_try_fill_pending()` читает его и валидирует как исходный timestamp сигнала.
+
+Для H-B нужно расширить allowlist точечно, не меняя смысл legacy полей:
+- добавить `signal_origin_ts` как optional positive integer timestamp, не позже `signal_ts` и не позже backup `saved_at_utc`;
+- добавить H-B поля `h_b_shock_ts_ms`, `h_b_stop_price`, `h_b_target_price`, `h_b_exit_policy_version` только как strategy-specific optional fields;
+- H-B pending обязан иметь все четыре H-B поля, `signal_origin_ts` и `strategy == "H-B-mean-reversion"`; не-H-B pending с любым H-B ключом отвергается;
+- shock timestamp должен быть положительным integer и строго раньше stabilization `signal_ts`; shock-low/target — конечные положительные числа, `stop < target`; policy version строго известна (v0.1);
+- на fill дополнительно проверить `shock_ts < signal_ts < curr.ts` и точное соседство signal→entry bar по общему freshness guard;
+- legacy payload без этих ключей остаётся валидным; неизвестные поля по-прежнему reject.
+
+Это также означает, что regression test на H-B pending restart должен проверять не только успешное чтение, но и round-trip через `save_state()` (который валидирует candidate тем же строгим reader) и фактическое заполнение на следующем баре. Existing test `test_pending_original_signal_timestamp_cannot_follow_freshness_guard` проверяет timestamp consistency в fill path, но не покрывает сериализацию этого поля.
+
+**Обязательные новые persistence tests:** H-B complete payload round-trip; missing each H-B key; H-B key on legacy strategy; unknown key; bool/string/zero/future timestamps; NaN/Inf/zero/negative stop or target; wrong policy version; `signal_origin_ts > signal_ts`; valid legacy payload unchanged. Проверить, что failed save сохраняет прежний backup byte-for-byte.
+
+Status remains **SPEC ONLY**; no code/test execution.

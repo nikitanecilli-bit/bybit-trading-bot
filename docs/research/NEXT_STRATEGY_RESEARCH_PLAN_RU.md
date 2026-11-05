@@ -574,3 +574,16 @@ Read-only трассировка подтвердила:
 Принято решение: H-B обходит общий market-entry `max_chase_limit_pct` только для собственной стратегии, поскольку контракт требует попытку входа на следующем H1 open. Для legacy strategies guard не меняется. Это не ослабляет остальные ограничения: H-B fill обязан удовлетворять `0 < shock_low < fill < frozen_target`, sizing использует абсолютные fill/stop и фактическое `fill - shock_low`, dated instrument/risk-tier/lot checks и shared portfolio risk budget остаются обязательными; любое нарушение ведёт к reject.
 
 Дополнительно зафиксированы: запрет H-B target/time-stop на fill bar, активность protective stop на fill bar, post-rounding risk/geometry validation и тест сравнения H-B/legacy поведения при гэпе выше chase cap. Readiness review section 10.8 содержит точные invariants. Код не менялся, тесты/CI не запускались; остаёмся synthetic-only и data-blocked.
+
+
+### 13.7. H-B integration/test map completed — 2026-11-05
+
+По фактическому тестовому каркасу определены точные места будущих изменений:
+- `tests/test_gap_execution.py`: chase behavior (H-B bypass vs legacy unchanged), fill geometry, stop/target priority, fill-bar target suppression, gap execution and full-close journal.
+- `tests/test_state_persistence.py`: strict pending allowlist, H-B pending/open-position round-trip, malformed H-B fields, policy-version validation and legacy backup compatibility.
+- `_try_fill_pending()`: H-B absolute stop/target path, actual fill sizing, isolated chase bypass and post-exchange-rounding risk/geometry checks.
+- `_manage_position()`: shared liquidation/kill-switch/stop first, H-B target/time-stop next, then return without entering breakout TP1/TP2/trailing.
+- `_close_position()`: optional H-B trade provenance while preserving shared accounting.
+- Persistence pending orders have their own strict allowlist (separate from OpenPositionState dataclass fields); H-B keys must be added there without globally relaxing unknown-key rejection.
+
+Readiness review section 10.9 lists existing tests and additions. Документация обновлена; код не менялся, тесты и CI не запускались. Implementation remains blocked by sanctioned code-write access; no bypass attempts.

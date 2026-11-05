@@ -544,3 +544,12 @@ Static audit подтвердил, что sparse shared-capital replay прин�
 Выбор горизонта 24 часа — фиксированная середина пользовательского диапазона 12–48h, а не найденный лучший параметр. Shock-low и pre-shock mean выбраны как структурная invalidation boundary и причинная mean reference без дополнительного индикаторного поиска.
 
 Статус: **EXIT CANDIDATE v0.1 / SYNTHETIC-ONLY**. Это позволяет готовить deterministic mechanics tests, но не даёт права на code integration, market PnL или paper/live. Перед market experiment остаются полный experiment card, frozen RegimeConfig, sizing/portfolio priority, PIT universe, независимые folds, controls/N_trials, reject criteria и Bybit-native data/accounting gates.
+
+
+### 13.4. H-B fill geometry blocker найден — 2026-11-05
+
+Read-only inspection of `_try_fill_pending()` confirmed that the current callback seam is not enough to express the frozen absolute shock-low stop. The engine rebuilds stop/TP levels from fill-relative `stop_dist` after the actual next-open fill; the callback cannot know that open in advance. A close[t+1]-based approximation would silently move the stop after an entry gap and distort risk sizing.
+
+Before implementation, the narrow H-B adapter must carry absolute shock-low stop and frozen mean target through pending state, validate them against the actual fill, derive actual fill-to-stop distance at fill time, and pass that distance to the shared risk manager. H-B must bypass breakout TP1/TP2/trailing/time-stop logic while retaining common liquidation, kill-switch, protective stop, and `_close_position()` accounting. Legacy signal path must remain unchanged.
+
+Synthetic-only tests are specified in H-B readiness review section 10.6. No code write, tests, CI or market PnL were performed. The sanctioned code-write path remains unconfirmed/blocked; do not bypass GitHub security controls. This is an additional implementation gate, not permission to run a market experiment.

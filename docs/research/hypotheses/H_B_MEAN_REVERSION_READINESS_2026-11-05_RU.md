@@ -301,3 +301,21 @@ Initial stop уже находится в общем stop_price; время уд
 
 **Restore/audit:** pending payload H-B и открытая позиция должны проходить fail-closed validation; старые payload без H-B ключей сохраняют прежнее поведение. При закрытии `TradeRecord` должен сохранять policy version, shock timestamp, frozen target и фактический initial stop. В текущем `TradeRecord` есть `initial_stop_price`, `initial_stop_dist`, `final_stop_price`, `strategy` и общие execution/accounting поля, но нет H-B target/policy/shock provenance. При реализации добавить только optional H-B audit fields (`h_b_exit_policy_version`, `h_b_shock_ts_ms`, `h_b_target_price`) с defaults и backward-compatible trade-log serialization; не перегружать `tp2_price`. H-B metadata нельзя молча терять при serialization или переводить H-B позицию в legacy breakout exits.
 
+
+
+### 10.8. Решение по chase guard и точные sizing-инварианты
+
+**Решение для H-B v0.1: общий market-entry `max_chase_limit_pct` обходится только для H-B.** H-B сигнал означает безусловную попытку исполнения на следующем H1 open, а не лимитированную погоню за ценой. Включение общего chase cap создало бы дополнительный неописанный фильтр и изменило бы гипотезу. Это не разрешает ухудшать вход произвольным образом: вход всё равно отклоняется при нарушении `0 < shock_low < actual_fill < frozen_mean_target`, невалидных данных, недостаточном размере/лоте, нарушении risk budget, dated instrument specs или risk tiers. Для legacy strategies общий chase guard остаётся без изменений. Для H-B не вводить альтернативный cap, slippage threshold или поздний fill.
+
+**Sizing invariant уточнён по реализации `calculate_position_size()`:** функция уже принимает абсолютные `entry_price` и `stop_price` и рассчитывает stop distance как `abs(entry-stop)`, учитывая entry/stop fees, taker slippage, per-trade budget и portfolio allocation. Adapter должен передавать туда фактический fill и shock-low stop; в `OpenPositionState.initial_stop_dist` сохранять тот же `fill - shock_low`, а не исходный `sig["stop_dist"]`. После dated exchange rounding необходимо повторно проверить фактические notional/risk, stop/target geometry и ограничения портфельного бюджета; любое превышение или нарушение — reject, без переноса stop.
+
+**Fill-bar exit invariant:** `_manage_position(fill_bar=True)` сначала увеличивает `bars_held`, затем проверяет liquidation/kill-switch/stop. Для H-B mean target и time stop на fill bar намеренно не исполняются; target проверяется начиная со следующей полной H1 свечи. Stop на fill bar остаётся активным. Для H-B ветка должна быть отдельной и завершать общую discretionary breakout-ветку до TP1/TP2/trailing; иначе фиктивные legacy TP levels могут влиять на выход.
+
+**Дополнение к synthetic test matrix:**
+- H-B гэп выше общего `max_chase_limit_pct`, но `stop < fill < target` и risk checks проходят → исполнение на open; legacy сигнал при том же гэпе → прежняя отмена.
+- Проверить, что H-B `initial_stop_dist == fill - shock_low`, а sizing получает тот же абсолютный stop.
+- Dated lot/qty rounding, приводящий к превышению risk budget или нарушению геометрии → reject.
+- Fill-bar target touch не закрывает H-B; fill-bar stop touch закрывает.
+- H-B позиция не попадает в TP1/TP2/trailing/time-stop breakout path.
+
+Статус: chase policy решена на уровне контракта; реализация остаётся заблокированной до санкционированного code-write пути. Это synthetic-only design, не market preregistration.

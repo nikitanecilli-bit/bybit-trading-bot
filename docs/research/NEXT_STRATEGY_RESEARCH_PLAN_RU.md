@@ -587,3 +587,14 @@ Read-only трассировка подтвердила:
 - Persistence pending orders have their own strict allowlist (separate from OpenPositionState dataclass fields); H-B keys must be added there without globally relaxing unknown-key rejection.
 
 Readiness review section 10.9 lists existing tests and additions. Документация обновлена; код не менялся, тесты и CI не запускались. Implementation remains blocked by sanctioned code-write access; no bypass attempts.
+
+
+### 13.8. Найден pending provenance persistence gap — 2026-11-05
+
+Текущий strict `allowed_pending` в `PlanBStatePersistence.load_state()` не содержит `signal_origin_ts`, хотя fill path читает и проверяет это поле. H-B payload требует origin timestamp и отдельные shock/stop/target/policy fields. Перед adapter implementation необходимо:
+- добавить optional `signal_origin_ts` с positive integer/time-order validation;
+- добавить H-B fields в pending allowlist только для H-B strategy, требуя полный набор;
+- отклонять H-B metadata на legacy strategy и неизвестные поля;
+- расширить save/restore round-trip tests и проверить сохранность прежнего backup при invalid save.
+
+Readiness review section 10.10 фиксирует точный список. Это новый persistence compatibility blocker; никаких кодовых изменений или тестовых запусков нет.

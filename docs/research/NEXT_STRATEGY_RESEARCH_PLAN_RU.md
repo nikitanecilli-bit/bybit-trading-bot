@@ -553,3 +553,17 @@ Read-only inspection of `_try_fill_pending()` confirmed that the current callbac
 Before implementation, the narrow H-B adapter must carry absolute shock-low stop and frozen mean target through pending state, validate them against the actual fill, derive actual fill-to-stop distance at fill time, and pass that distance to the shared risk manager. H-B must bypass breakout TP1/TP2/trailing/time-stop logic while retaining common liquidation, kill-switch, protective stop, and `_close_position()` accounting. Legacy signal path must remain unchanged.
 
 Synthetic-only tests are specified in H-B readiness review section 10.6. No code write, tests, CI or market PnL were performed. The sanctioned code-write path remains unconfirmed/blocked; do not bypass GitHub security controls. This is an additional implementation gate, not permission to run a market experiment.
+
+
+### 13.5. H-B pending/fill adapter уточнён; chase policy остаётся открытой — 2026-11-05
+
+Read-only трассировка подтвердила:
+- `step_candle()` после успешного pending fill вызывает `_manage_position(fill_bar=True)` на той же H1 свече; `bars_held` увеличивается сразу, поэтому fill bar считается первым баром удержания.
+- H-B pending должен нести абсолютные `h_b_stop_price=low[t]` и `h_b_target_price=mean(close[t-24:t])`, policy version и shock timestamp. На фактическом t+2 open проверяются `stop < fill < target`; затем общий sizing получает `fill - stop` как фактический stop distance.
+- Shared portfolio risk budget, dated specs/risk tiers, lot/min-notional и общий close/accounting path остаются обязательными.
+- H-B нужен собственный frozen 24-bar time stop; нельзя полагаться на общий `cfg.max_hold_bars`.
+- Legacy signal dict и legacy positions должны остаться полностью на прежнем пути.
+
+**Нерешённая семантика входа:** generic market-entry `max_chase_limit_pct` может отменить вход, хотя H-B контракт говорит «следующий open». До кода нужно выбрать, обходится ли chase guard только для H-B или фиксируется как часть H-B hypothesis. Никакого неявного дополнительного фильтра.
+
+Документ readiness review section 10.7 содержит payload, fill validation, sizing и restore contract. Код не менялся; тесты/CI/PnL не запускались. Текущий статус: **SIGNAL + EXIT DESIGN / ADAPTER SPECIFIED / CHASE POLICY OPEN / SYNTHETIC-ONLY / DATA-BLOCKED**.

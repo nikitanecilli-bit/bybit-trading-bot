@@ -142,6 +142,48 @@ ATR — значение classifier ATR, рассчитанное только �
 
 Это подтверждает возможность подать H-B entry signal через callback, но **не решает H-B exits**: текущий engine после открытия вызывает общий `_manage_position()`, который реализует существующую stop/TP/trailing/time-stop механику breakout engine. Одного custom `signal_evaluator` недостаточно, чтобы получить mean-reversion exit contract. Нельзя маскировать это, записав в signal произвольные TP-поля: уровни строятся централизованно из `stop_dist` и глобального cfg.
 
-Поэтому перед кодовой интеграцией требуется отдельный design decision: добавить изолированный strategy-specific position management hook с default-off и regression tests, либо создать H-B research adapter/engine wrapper, который не меняет базовую стратегию. Выбор должен сохранять общую accounting/position lifecycle реализацию и не дублировать PnL ledger. Не менять глобальные exits для всех стратегий ради H-B.
+Поэтому перед кодовой интеграцией нужно использовать уже существующее поле OpenPositionState.strategy и добавить изолированную ветку H-B внутри общего _manage_position(), без изменения поведения остальных стратегий. Этот путь подтверждён последующим статическим аудитом ниже.
 
-**Статус интеграции уточнён:** entry callback seam существует; strategy-specific exit seam отсутствует/не подтверждён. Это конкретный кодовый blocker, не только незаполненные параметры гипотезы.
+
+### 9.2. Position state, restore compatibility and exit ordering
+
+Проверены OpenPositionState, PlanBStatePersistence.save_state()/load_state(), _manage_position() и _close_position() в Bybit_Trading_Engine_v14_research.py на ветке research/market-regime-v1-main.
+
+**Persistence contract:**
+- OpenPositionState.strategy уже сохраняется и восстанавливается; отдельный discriminator для выбора H-B exit policy не нужен.
+- Backup сериализует позиции через dataclasses.asdict(pos).
+- Restore сначала вычисляет допустимые поля из dataclasses.fields(OpenPositionState), отклоняет неизвестные ключи, проверяет обязательные/числовые поля и затем вызывает OpenPositionState(**pos_dict).
+- Следовательно, новые optional H-B metadata fields можно добавить в конец dataclass с безопасными defaults: старые backups без этих ключей продолжат восстанавливаться. Но это не автоматическая гарантия: если поле влияет на H-B управление, загрузчик должен отдельно валидировать его тип, конечность/диапазон и взаимную согласованность.
+- Текущий TradeRecord уже фиксирует strategy, исходный/финальный stop, TP1/TP2, TP1 state, final stop и breakout level. Если H-B использует отдельную target reference/exit metadata, нужно решить, какие сведения являются audit provenance и должны пережить закрытие сделки; не перегружать tp2_price без явного общего контракта.
+
+**Порядок управления позицией:**
+1. _manage_position() сначала вычисляет возможную ликвидацию по Mark Price.
+2. Далее идут liquidation, portfolio kill-switch и protective stop. При stop gap текущая модель использует худшую цену min(stop, open) для long.
+3. Только если защитные условия не сработали, выполняется discretionary exit logic.
+4. Любой выход проходит через _close_position(), который централизованно считает gross PnL, TP1 realized component, fees, slippage, funding, net PnL, TradeRecord и обновляет risk manager.
+
+**Рекомендуемая точка интеграции H-B:** после общих protective checks (liquidation / kill-switch / stop) и до breakout-specific TP1/TP2/trailing/time-stop block. Ветка должна включаться только при pos.strategy == "H-B-mean-reversion". Общие protective checks и _close_position() остаются едиными. Не выносить расчёт PnL в отдельный H-B код и не менять глобальную стратегию.
+
+**Неразрешённые execution semantics, которые нужно заморозить до реализации:**
+- Если stop и H-B mean target задеты одной H1 свечой, stop-first (консервативный исход), поскольку OHLC не раскрывает последовательность событий.
+- Stop gap: для long выход не лучше худшей из open и stop; это согласуется с существующей защитной логикой.
+- Target gap: не засчитывать цену лучше target без отдельной модели исполнения; консервативная механика — target price как fill ceiling для long limit-like exit, либо заранее определённое правило open/target, применяемое последовательно.
+- На fill bar discretionary target не исполнять по экстремумам, которые могли возникнуть до фактического входа; защитный stop остаётся активным согласно существующей модели.
+- Exit reason должен однозначно различать H-B mean target и H-B time stop, чтобы trade ledger позволял аудит.
+- Пережившие restart позиции должны восстанавливать ту же target reference и exit-policy version, что были зафиксированы при входе; нельзя пересчитывать target по текущему rolling window после рестарта.
+
+**Что ещё не выбрано:** сама target reference (например, заранее определённая середина диапазона или causal rolling mean), stop placement, time-stop horizon, а также конкретная формула для gap target. Здесь не назначаются числа или формулы задним числом. Это остаётся блокером preregistration.
+
+**Synthetic-only acceptance tests для будущей реализации:**
+1. Старый backup без новых H-B полей восстанавливает legacy position без изменения значений.
+2. H-B backup round-trip сохраняет target reference, exit-policy version и все lifecycle поля без потери точности.
+3. Неизвестная/некорректная H-B metadata отклоняется fail-closed.
+4. Одновременное касание stop и target закрывает по stop.
+5. Stop gap закрывает по худшей цене open/stop.
+6. Target gap следует одному заранее frozen правилу и не получает незаслуженного улучшения исполнения.
+7. На fill bar нет discretionary target fill по предшествовавшему входу экстремуму.
+8. H-B exit проходит через общий _close_position() и сохраняет fees/slippage/funding/gross/net ledger invariants.
+9. Legacy breakout strategy regression fixtures дают идентичный результат до/после добавления H-B branch.
+10. Restart между сигналом и выходом не меняет target reference, time-stop counter или exit-policy version.
+
+**Ограничение текущего этапа:** это статический контрактный аудит. Торговый код не менялся, тесты не запускались, market PnL не рассчитывался, CI после документации не запускался. Реализация остаётся заблокированной до завершения H-B exit preregistration и появления санкционированного пути изменения code files.

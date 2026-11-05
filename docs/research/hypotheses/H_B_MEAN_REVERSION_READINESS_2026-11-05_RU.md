@@ -410,3 +410,15 @@ Status remains **SPEC ONLY**; no code/test execution.
 **Требуемые дополнительные tests:** close H-B via stop, mean target, time stop, liquidation, kill-switch and end_of_test; each creates exactly one TradeRecord, no TP1 fee leg, full remaining qty; TP1/TP2 journal fields null; H-B metadata retained; legacy TradeRecord numeric TP fields unchanged; JSON export round-trip with optional fields.
 
 Status **SPEC ONLY**. No code changes, no tests run.
+
+
+### 10.13. Dashboard scope уточнён; end-to-end consumer не найден
+
+Прочитан tracked `dashboards/v15/Bybit Profit Dashboard v15 (Чистый HTML).html`:
+- это самостоятельный JS backtest/simulator: создаёт собственные объекты position/trades, считает KPI и портфель внутри браузера;
+- он не читает `export_journal_for_dashboard()` JSON и не обращается к engine TradeRecord schema;
+- поэтому этот HTML dashboard **не является downstream consumer** H-B journal и его нельзя использовать как доказательство совместимости null TP/new provenance fields.
+
+В текущем доступном дереве подтверждён producer `export_journal_for_dashboard()` с `asdict(TradeRecord)`; прямой независимый consumer engine journal в проверенных tracked files не установлен. Следовательно, формулировка корректного статуса: **consumer compatibility unknown / not evidenced**, а не «dashboard совместим». Перед интеграцией проверить все реально используемые внешние импортёры/дашборды по фактическому формату journal; если таких consumers нет, зафиксировать это как deployment inventory, не придумывать их.
+
+Этот аудит не меняет blocker из 10.12: strategy-aware null mapping в TradeRecord constructor обязателен. Код и тесты не менялись.

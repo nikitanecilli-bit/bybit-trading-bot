@@ -561,3 +561,8 @@ Read-only просмотрены `MaintenanceGateAuditor.evaluate_portfolio()`, 
 **Synthetic-only report contract:** a synthetic mechanics report may state pass/fail of deterministic invariants and test coverage, but must not print market return, PF, monthly return, profitability, edge, or green readiness. If any such fields are included for debugging, label them `NOT_MARKET_METRICS` and exclude them from strategy decision summaries.
 
 **Статус:** найдена конкретная reporting/readiness опасность при смешении стратегий; H-B runner отсутствует. Статический аудит; код и тесты не менялись/не запускались.
+
+
+### 10.21. Synthetic test specification v0.1
+
+Создан отдельный документ `docs/research/hypotheses/H_B_SYNTHETIC_TEST_SPEC_2026-11-05_RU.md` (16 разделов): точная временная семантика H-B; детерминированные fixtures; signal predicates; pending persistence fail-closed; actual-fill sizing; nullable TP position restore; MTM/manager/exit priority; close/accounting/provenance; portfolio/report isolation; legacy parity; структура будущего тестового модуля; последовательность offline test suites; release gates G0–G6. Документ фиксирует, что synthetic pass не открывает market validation или deployment. Это спецификация, не реализация: код не менялся, тесты не писались/не запускались.

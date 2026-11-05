@@ -422,3 +422,25 @@ Status **SPEC ONLY**. No code changes, no tests run.
 В текущем доступном дереве подтверждён producer `export_journal_for_dashboard()` с `asdict(TradeRecord)`; прямой независимый consumer engine journal в проверенных tracked files не установлен. Следовательно, формулировка корректного статуса: **consumer compatibility unknown / not evidenced**, а не «dashboard совместим». Перед интеграцией проверить все реально используемые внешние импортёры/дашборды по фактическому формату journal; если таких consumers нет, зафиксировать это как deployment inventory, не придумывать их.
 
 Этот аудит не меняет blocker из 10.12: strategy-aware null mapping в TradeRecord constructor обязателен. Код и тесты не менялись.
+
+
+### 10.14. Contract refinement: dataclass compatibility and H-B manager isolation
+
+Дополнительная проверка всех tracked constructor callsites в engine и трёх основных test modules:
+- Все найденные OpenPositionState(...) и TradeRecord(...) вызовы используют keyword arguments; positional callsites в проверенных файлах не обнаружены.
+- Тем не менее публичный порядок dataclass полей лучше не менять: новые H-B provenance поля добавлять только в конец с defaults. Для OpenPositionState.tp1_price/tp2_price предпочтительно изменить аннотации на Optional[float], но оставить их обязательными constructor arguments (без default), передавая None явно для H-B. Это сохраняет порядок/арность конструктора и не вызывает dataclass ordering conflict. Не делать их default=None без отдельного решения по API совместимости.
+- TradeRecord.tp1_price/tp2_price уже Optional в типах; проблема не в типах, а в unconditional round() в producer. H-B provenance fields добавлять в конец dataclass с defaults; producer должен передавать null TP values без round(None).
+
+**Новый обязательный manager guard:** _manage_position() сейчас безусловно вычисляет TP2 touch и далее TP1/trailing, обращаясь к pos.tp2_price/pos.tp1_price. Поэтому одних nullable полей недостаточно: H-B обязан иметь отдельную discretionary ветку до legacy TP2/TP1 блока. Рекомендуемый control flow:
+1. Общие проверки liquidation → portfolio kill-switch → protective stop остаются первыми и неизменными.
+2. Если позиция H-B и ни один общий forced/protective exit не сработал, проверить frozen mean target; затем 24-bar time stop по close. Целевой exit не активировать на fill bar; stop остаётся активным.
+3. После H-B ветки не проваливаться в breakout TP1/TP2/trailing. Сохранить общую нижнюю часть обработки close, _close_position, MTM, persist и post-execution kill-switch safeguards.
+4. Для legacy стратегий оставить текущий TP2 → TP1 → trailing → max_hold path без семантических изменений.
+
+Это отдельный runtime blocker: если branch расположить после legacy блока, null TP приведёт к TypeError ещё до формирования TradeRecord.
+
+**Forced flatten paths:** _force_flatten_open_positions_after_kill_switch() и finalize_open_positions() вызывают общий _close_position() напрямую, минуя _manage_position(). Это желаемо для forced liquidation/kill-switch и terminal cleanup: они должны сохранять общую accounting и H-B metadata, но не запускать H-B target/time logic повторно. Проверить idempotency/one-record semantics и journal provenance на каждом из путей.
+
+**TP1 restore invariant:** H-B backup требует одновременно tp1_hit=false, tp1_ts_ms=null, realized_tp1_gross_usdt=0, remaining_fraction=1, tp1_price=null, tp2_price=null; любые частичные/legacy TP состояния отклоняются.
+
+**Статус:** contract уточнён, code/test implementation отсутствует. Никакие constructor callsites не менялись.

@@ -444,3 +444,31 @@ Status **SPEC ONLY**. No code changes, no tests run.
 **TP1 restore invariant:** H-B backup требует одновременно tp1_hit=false, tp1_ts_ms=null, realized_tp1_gross_usdt=0, remaining_fraction=1, tp1_price=null, tp2_price=null; любые частичные/legacy TP состояния отклоняются.
 
 **Статус:** contract уточнён, code/test implementation отсутствует. Никакие constructor callsites не менялись.
+
+
+### 10.15. Единый end-to-end data contract и порядок реализации
+
+Этот раздел сводит решения 10.6–10.14 в один контракт между lifecycle слоями. Это спецификация для будущей реализации, не утверждение, что код уже поддерживает H-B.
+
+| Этап | Канонические данные / invariants | Проверка и отказ |
+|---|---|---|
+| Signal evaluator на close t+1 | strategy = `H-B-mean-reversion`; direction = long; `signal_ts=t+1`; `signal_origin_ts`; `h_b_shock_ts_ms=t`; абсолютный `h_b_stop_price=low[t]`; frozen `h_b_target_price=mean(close[t-24:t])`; policy `v0.1` | Только причинные H1 бары; ровно 24 непрерывных pre-shock close; gap/duplicate/invalid ATR или timestamp => fail closed |
+| Pending save/restore | Тот же полный H-B набор; legacy pending schema остаётся прежней; H-B metadata допустима только при точной H-B strategy | Save и load используют одинаковую строгую валидацию; missing/unknown/mixed-strategy fields, неверный тип/порядок timestamp, NaN/Inf или неизвестная policy => reject; прежний backup не повреждается |
+| Fill на open t+2 | Реальный fill = `curr.open`; frozen stop/target не пересчитываются; проверка `0 < stop < fill < target`; `shock_ts < signal_ts < curr.ts`; немедленно следующий H1 бар | Любая геометрическая, временная или freshness ошибка => cancel pending; H-B-only bypass chase cap не отменяет остальные проверки |
+| Shared sizing и exchange validation | Передать фактические `fill` и `stop`; distance = `fill - stop`; сохранить distance в `initial_stop_dist`; общий portfolio budget, dated specs, risk tiers, lot/minQty/minNotional | После округления повторно проверить geometry и риск; reject вместо перемещения stop/target или увеличения риска |
+| OpenPositionState | strategy H-B; `tp1_price=None`, `tp2_price=None`; frozen shock timestamp, initial stop, mean target и policy version; full position only | Restore H-B branch требует null TP, `tp1_hit=false`, `tp1_ts_ms=null`, realized TP1 = 0, remaining fraction = 1; stop и target совпадают с frozen metadata; legacy restore остаётся без изменений |
+| Position manager | Общие liquidation → kill-switch → protective stop; далее H-B target → 24-bar time stop; fill bar — bar 1, но target/time-stop на fill bar запрещены | Same-bar stop/target => stop first; target gap без improvement; stop gap по min(stop, open); H-B всегда return до legacy TP1/TP2/trailing/max-hold ветки |
+| Close/accounting | Общий `_close_position()`; полный объём; без TP1 financial leg; TradeRecord сохраняет H-B shock/stop/target/policy provenance | Null-safe TP serialization (никакого `round(None)`); один close — одна запись; legacy TP значения и accounting не меняются |
+| Journal/export | `asdict(TradeRecord)` включает optional H-B поля; legacy TP fields у H-B null | Проверить JSON round-trip и фактические downstream importers; consumer compatibility пока unknown/not evidenced |
+| Forced close/finalize | Kill-switch flatten и end_of_test идут напрямую через общий close, не через H-B target/time logic | Сохранить provenance и exactly-once semantics; не запускать H-B discretionary exit повторно |
+
+**Рекомендуемый порядок реализации после восстановления санкционированного code-write пути:**
+1. Зафиксировать типы и invariants dataclasses/TradeRecord и backward-compatible persistence reader/writer; добавить round-trip и malformed-state tests.
+2. Реализовать узкий fill adapter с абсолютными stop/target, actual-fill sizing и изолированным chase bypass; проверить legacy signal path.
+3. Реализовать H-B manager branch и forced-close-safe TradeRecord producer; добавить детерминированные механические tests на все приоритеты выхода.
+4. Проверить journal schema/export, импортёров и legacy regression suites.
+5. Запустить targeted tests, затем полные offline code tests и CI; дождаться завершения и разобрать каждый failure.
+
+**Нельзя объединять в один недифференцированный этап:** persistence schema, fill geometry и manager exit semantics должны иметь отдельные regression assertions. Иначе успешный signal/fill тест не доказывает restart или close correctness.
+
+**Границы:** synthetic fixtures/FakeTransport only; никаких live/paper execution, private/account/exchange API, market data collection, archive extraction, market PnL или parameter sweeps. До отдельной preregistration/data-accounting clearance статус остаётся **SPEC ONLY / SYNTHETIC-ONLY / DATA-BLOCKED**.

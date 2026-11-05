@@ -613,3 +613,10 @@ Restore позиции безусловно требует положитель�
 ### 13.11. Dashboard consumer scope уточнён — 2026-11-05
 
 Tracked v15 HTML dashboard — автономный simulator со своими объектами trades/KPI; он не читает engine `export_journal_for_dashboard()` JSON и не является consumer TradeRecord. Подтверждён engine-side JSON producer через `asdict(TradeRecord)`, но downstream consumers в просмотренных tracked files не установлены. Статус совместимости остаётся unknown/not evidenced; нужен deployment inventory фактических импортёров. См. readiness review 10.13. Это уточнение не снимает обязательный null-safe TradeRecord construction fix.
+
+
+### 13.12. H-B dataclass/manager contract refinement — 2026-11-05
+
+Все найденные OpenPositionState и TradeRecord constructor callsites в engine и проверенных regression modules используют keyword arguments. Сохранить dataclass API: новые H-B поля добавлять в конец с defaults; OpenPositionState TP1/TP2 сделать Optional по типу, но пока оставить обязательными аргументами без defaults, передавать явный null для H-B. TradeRecord TP поля уже Optional; исправить unconditional round(None) в close producer.
+
+Ключевой runtime blocker: _manage_position() обращается к TP2/TP1 безусловно. H-B discretionary ветка должна стоять до legacy TP1/TP2/trailing блока, после общих liquidation → kill-switch → protective stop checks, и не должна проваливаться в legacy ветку. Forced flatten и finalize вызывают _close_position напрямую; сохранить там общую accounting, однократное закрытие и H-B provenance без повторного запуска target/time logic. Restore требует строгих нулевых TP1 partial-state invariants. Подробности — readiness review 10.14. Code/tests не менялись.

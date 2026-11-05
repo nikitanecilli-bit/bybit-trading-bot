@@ -603,3 +603,8 @@ Readiness review section 10.10 фиксирует точный список. Э�
 ### 13.9. H-B конфликт TP1/TP2 в restore — 2026-11-05
 
 Restore позиции безусловно требует положительные TP1/TP2 и long-геометрию `entry < TP1 < TP2`; exchange-sized restore использует TP2 для minNotional проверки. Эти поля не должны получать фиктивную H-B семантику. Readiness review section 10.11 фиксирует рекомендуемое strategy-specific решение: H-B TP1/TP2 = null, запрет partial TP1 state, отдельная проверка minNotional по frozen stop/mean target, явные H-B provenance поля в TradeRecord и аудит dashboard consumers на null/новые поля. Это новый blocker; код и тесты не менялись.
+
+
+### 13.10. H-B close/journal path audit — 2026-11-05
+
+В `_close_position()` обнаружен обязательный null-safety fix: текущий `TradeRecord` construction делает `round(pos.tp1_price, 12)` и `round(pos.tp2_price, 12)` без strategy guard. При корректных для H-B null TP1/TP2 закрытие позиции упадёт. Нужны strategy-aware null mapping и synthetic close-path tests. TP1 financial leg условен по `tp1_hit`; при H-B invariant false общая accounting path может сохранить полный размер. `finalize_open_positions()` отдельно закрывает остатки по последнему синхронному close с taker costs и end_of_test reason; требуется тест однократного H-B journal close. Engine-side export использует `asdict(TradeRecord)`; dashboard consumer compatibility не подтверждена и требует отдельного аудита. Подробности — readiness review 10.12. Код и тесты не менялись.

@@ -523,7 +523,7 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 
 ### 13.1. Integration boundary уточнён — 2026-11-05
 
-Static audit подтвердил, что sparse shared-capital replay принимает custom `signal_evaluator`; H-B может быть отдельным entry evaluator без monkey-patching базового Donchian сигнала. Однако общий `_try_fill_pending()` строит уровни через `QuantStrategyCore.build_levels()`, а после входа `_manage_position()` применяет breakout-oriented exits. Следовательно, callback решает только entry, но не mean-reversion lifecycle. До кода нужен strategy-specific exit hook или изолированный H-B wrapper с общим accounting core; глобальные exit defaults не менять. См. разделы 9–9.1 в H-B readiness review. PnL и code integration не выполнялись.
+Static audit подтвердил, что sparse shared-capital replay принимает custom `signal_evaluator`; H-B может быть отдельным entry evaluator без monkey-patching базового Donchian сигнала. Однако общий `_try_fill_pending()` строит уровни через `QuantStrategyCore.build_levels()`, а после входа `_manage_position()` применяет breakout-oriented exits. Следовательно, callback решает только entry, но не mean-reversion lifecycle. Требуется strategy-tagged exit branch внутри общего manager с persisted target metadata и backward-compatible state restore; подробное уточнение после просмотра `OpenPositionState` и `_close_position()` см. в разделе 13.2 и H-B readiness review. Глобальные exit defaults не менять. PnL и code integration не выполнялись.
 
 
 ### 13.2. Exit-path audit уточнён — 2026-11-05

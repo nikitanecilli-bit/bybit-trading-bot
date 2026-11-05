@@ -489,3 +489,18 @@ Status **SPEC ONLY**. No code changes, no tests run.
 **Новые synthetic-only assertions:** liquidation touch + stop touch => liquidation; поднятый kill-switch блокирует mean target/time stop; flatten закрывает все H-B позиции ровно один раз с полной provenance; restore с kill_switch_triggered=true не возобновляет discretionary exits; exchange-sized full close использует полный remaining qty; replay finalization закрывает H-B один раз без TP1 fee leg; отчёты не называют isolated approximation полноценной portfolio/cross-margin моделью.
 
 **Ограничение readiness:** даже после синтетических тестов эта модель не доказывает реальную биржевую ликвидацию, cross-margin, общий risk-tier aggregation или account-level protection. Это отдельный data/model validation gate. Рыночные и account/API проверки остаются закрытыми.
+
+
+### 10.17. Новая блокировка: portfolio MTM безусловно использует TP1
+
+Read-only проверка фактического пути portfolio mark-to-market выявила блокер, который возникает **до** H-B manager и независимо от nullable исправления в _close_position():
+
+- _unrealized_pnl_at_marks() для каждой открытой позиции безусловно вычисляет tp1_qty, затем выполняет `tp1_notional = float(tp1_qty * Decimal(str(pos.tp1_price)))`. Это происходит даже когда `pos.tp1_hit` равно false. При H-B `tp1_price=None` вызов Decimal('None') завершится исключением во время обычного MTM.
+- Этот helper вызывается из _update_mark_to_market(), который исполняется на каждом bar-close до _manage_position(). Значит H-B позиция с корректными null TP1/TP2 не дойдёт даже до своего exit manager: replay остановится на portfolio accounting.
+- _close_position() имеет отдельные TP1-условные fee legs, поэтому TP1 fee leg не начисляется при `tp1_hit=false`; однако сериализация TradeRecord всё ещё безусловно делает round(pos.tp1_price/pos.tp2_price), что подтверждает ранее найденный close blocker.
+
+**Требуемый контракт MTM:** вычислять TP1 quantity/notional/cost только внутри ветки `tp1_hit=true`; при H-B full-only state это условие обязано оставаться false, а realized TP1 leg — нулём. Не подменять null фиктивной ценой. Добавить regression tests: H-B null TP поля проходят MTM при нескольких mark prices; TP1 costs остаются нулевыми; legacy partial TP1 MTM сохраняет прежнюю математику; H-B MTM + close + journal выполняются без TypeError.
+
+**Portfolio accounting finding:** _close_position() удаляет закрываемую позицию из open_positions до пересчёта unrealized PnL оставшихся позиций, затем добавляет net realized PnL. При `_defer_close_risk_evaluation=true` пакетные close последовательно обновляют realized equity и оставшийся unrealized snapshot без промежуточной оценки drawdown; после batch вызывается общий _update_mark_to_market(). Это выглядит как намеренная защита от порядка обхода словаря, но требует synthetic multi-position assertions: сумма realized net + оставшийся unrealized не меняется от порядка закрытия при одинаковом timestamp; закрытая позиция не учитывается в unrealized повторно; kill-switch latch оценивается по агрегированному snapshot после синхронного batch, а не по искусственному промежуточному состоянию.
+
+**Статус:** новая критическая H-B integration blocker. Код не менялся; только статический аудит. См. research plan 13.15.

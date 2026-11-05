@@ -620,3 +620,12 @@ Tracked v15 HTML dashboard — автономный simulator со своими 
 Все найденные OpenPositionState и TradeRecord constructor callsites в engine и проверенных regression modules используют keyword arguments. Сохранить dataclass API: новые H-B поля добавлять в конец с defaults; OpenPositionState TP1/TP2 сделать Optional по типу, но пока оставить обязательными аргументами без defaults, передавать явный null для H-B. TradeRecord TP поля уже Optional; исправить unconditional round(None) в close producer.
 
 Ключевой runtime blocker: _manage_position() обращается к TP2/TP1 безусловно. H-B discretionary ветка должна стоять до legacy TP1/TP2/trailing блока, после общих liquidation → kill-switch → protective stop checks, и не должна проваливаться в legacy ветку. Forced flatten и finalize вызывают _close_position напрямую; сохранить там общую accounting, однократное закрытие и H-B provenance без повторного запуска target/time logic. Restore требует строгих нулевых TP1 partial-state invariants. Подробности — readiness review 10.14. Code/tests не менялись.
+
+
+### 13.13. H-B end-to-end contract и implementation sequence — 2026-11-05
+
+Readiness review section 10.15 сводит в единую lifecycle-матрицу контракт H-B: causal signal → strict pending persistence → actual-open fill → shared sizing/exchange validation → strategy-specific OpenPositionState restore → isolated manager exits → null-safe TradeRecord close → journal export → forced flatten/finalize. Ключевые invariants: абсолютный frozen shock-low stop и pre-shock mean target не пересчитываются; sizing использует фактический fill-to-stop distance; H-B TP1/TP2 null и partial TP state запрещён; H-B manager не входит в breakout exits; forced close использует общий accounting и сохраняет provenance.
+
+Рекомендуемый порядок будущей реализации: (1) dataclass + pending/open-position save/restore и round-trip tests; (2) fill adapter + actual-fill sizing и legacy parity; (3) изолированная manager ветка + null-safe TradeRecord и все synthetic close paths; (4) journal schema/consumer inventory; (5) targeted tests → полные offline suites → CI с ожиданием результата. Это последовательность зависимостей, не разрешение на кодовые обходы или рыночные тесты. Code-write путь остаётся заблокированным/неподтверждённым; обходить security controls запрещено.
+
+Только deterministic synthetic fixtures/FakeTransport. Live/paper, private/account/exchange API, collectors, archives, market PnL и sweeps остаются закрыты. Статус **SPEC ONLY / SYNTHETIC-ONLY / DATA-BLOCKED**.

@@ -629,3 +629,10 @@ Readiness review section 10.15 сводит в единую lifecycle-матри
 Рекомендуемый порядок будущей реализации: (1) dataclass + pending/open-position save/restore и round-trip tests; (2) fill adapter + actual-fill sizing и legacy parity; (3) изолированная manager ветка + null-safe TradeRecord и все synthetic close paths; (4) journal schema/consumer inventory; (5) targeted tests → полные offline suites → CI с ожиданием результата. Это последовательность зависимостей, не разрешение на кодовые обходы или рыночные тесты. Code-write путь остаётся заблокированным/неподтверждённым; обходить security controls запрещено.
 
 Только deterministic synthetic fixtures/FakeTransport. Live/paper, private/account/exchange API, collectors, archives, market PnL и sweeps остаются закрыты. Статус **SPEC ONLY / SYNTHETIC-ONLY / DATA-BLOCKED**.
+
+
+### 13.14. H-B liquidation and portfolio-risk boundary — 2026-11-05
+
+Readiness review section 10.16 records a critical scope limitation: mark_price_liquidation.py implements a single-position isolated approximation, not account-level cross/portfolio margin or full exchange liquidation. It does not model account/order risk-tier aggregation, AMR, exact funding transfer timing or all exchange rounding. H-B may reuse the shared local liquidation/kill-switch/stop priority, but must not claim this proves portfolio-level or exchange-level liquidation correctness.
+
+Synthetic-only tests must cover liquidation > kill-switch > stop > H-B target/time, persisted kill-switch latch after restore, forced kill-switch flatten exactly once with H-B provenance, full exchange-sized remaining quantity, and replay finalization without TP1 fee leg. Forced administrative closes preserve metadata but are not H-B discretionary exits. This is a separate data/model validation gate; no account/private API or market validation is authorized.

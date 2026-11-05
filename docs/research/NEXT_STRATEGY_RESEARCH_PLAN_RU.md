@@ -567,3 +567,10 @@ Read-only трассировка подтвердила:
 **Нерешённая семантика входа:** generic market-entry `max_chase_limit_pct` может отменить вход, хотя H-B контракт говорит «следующий open». До кода нужно выбрать, обходится ли chase guard только для H-B или фиксируется как часть H-B hypothesis. Никакого неявного дополнительного фильтра.
 
 Документ readiness review section 10.7 содержит payload, fill validation, sizing и restore contract. Код не менялся; тесты/CI/PnL не запускались. Текущий статус: **SIGNAL + EXIT DESIGN / ADAPTER SPECIFIED / CHASE POLICY OPEN / SYNTHETIC-ONLY / DATA-BLOCKED**.
+
+
+### 13.6. H-B chase policy resolved — 2026-11-05
+
+Принято решение: H-B обходит общий market-entry `max_chase_limit_pct` только для собственной стратегии, поскольку контракт требует попытку входа на следующем H1 open. Для legacy strategies guard не меняется. Это не ослабляет остальные ограничения: H-B fill обязан удовлетворять `0 < shock_low < fill < frozen_target`, sizing использует абсолютные fill/stop и фактическое `fill - shock_low`, dated instrument/risk-tier/lot checks и shared portfolio risk budget остаются обязательными; любое нарушение ведёт к reject.
+
+Дополнительно зафиксированы: запрет H-B target/time-stop на fill bar, активность protective stop на fill bar, post-rounding risk/geometry validation и тест сравнения H-B/legacy поведения при гэпе выше chase cap. Readiness review section 10.8 содержит точные invariants. Код не менялся, тесты/CI не запускались; остаёмся synthetic-only и data-blocked.

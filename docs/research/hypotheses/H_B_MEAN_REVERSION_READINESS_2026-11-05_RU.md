@@ -520,3 +520,22 @@ Read-only проверка фактического пути portfolio mark-to-m
 Проверяемая матрица после реализации: legacy long/short position save-load и MTM parity; H-B null TP save→restore→intrabar MTM→bar-close MTM→manager→stop/target/time close→journal; попытка вызвать `_apply_tp1` для H-B невозможна; malformed H-B TP state отвергается; exchange-sized H-B minNotional использует frozen stop/target; старые backup остаются совместимыми.
 
 **Вывод:** nullable TP — сквозное изменение модели позиции, а не локальная правка TradeRecord. Все потребители должны быть исправлены одним согласованным контрактом. Код не менялся, тесты не запускались; это статический аудит source на текущей ветке.
+
+
+### 10.19. TradeRecord, auditor и downstream journal consumer audit
+
+Read-only проверены `TradeRecord`, `MaintenanceGateAuditor.evaluate_portfolio()`, `export_journal_for_dashboard()`, тесты accounting/persistence, аналитические скрипты и dashboard v15.
+
+**Подтверждено:**
+- `TradeRecord.tp1_price` и `tp2_price` уже объявлены `Optional[float]`; добавление H-B полей возможно append-only с defaults, не меняя существующие обязательные positional/keyword поля.
+- `MaintenanceGateAuditor.evaluate_portfolio()` не читает TP1/TP2, `tp1_hit` или remaining fraction. Его метрики строятся на `pnl_usdt`, `gross_pnl`, fees/slippage/funding, `risk_pct`, `r_multiple`, exit timestamp и группировке по активу/сессии. При корректном H-B `TradeRecord` агрегатный аудитор не требует TP-специфичной ветки.
+- `export_journal_for_dashboard()` пишет `trades=[asdict(t)]`, не фильтруя поля. Новые optional H-B provenance поля автоматически попадут в JSON; старые поля TP могут быть null. В payload нет явного schema_version — рекомендуется добавить версионирование отдельным согласованным изменением и зафиксировать consumer contract, не ломая прежние поля.
+- Внутренние attribution scripts используют `engine.closed_trades` напрямую и агрегируют net/gross/fees/slippage/R/MFE/MAE/exit_reason; TP-поля не читают. Это не доказательство совместимости внешних потребителей JSON.
+- `report_io.py` не содержит journal parser/consumer. Dashboard v15 — самостоятельный HTML simulator со своей моделью сделок и генерацией данных; в inspected source не найдено чтение JSON journal engine. Не считать его подтверждённым downstream consumer.
+- Accounting tests уже проверяют journal JSON и конкретные числовые TP значения для legacy; persistence tests строго проверяют старую TP геометрию и TP1 lifecycle. H-B потребует отдельной null-TP ветки, сохраняя legacy assertions без ослабления.
+
+**H-B TradeRecord контракт:** сохранить общие `pnl_usdt`, `gross_pnl`, fees, slippage, funding, `risk_usdt`, net/gross R и `exit_reason`; `tp1_price=null`, `tp2_price=null`, `tp1_hit=false`, `tp1_ts_ms=null`, `realized_tp1_gross_usdt=0`, `remaining_fraction_at_exit=1`. Добавить append-only optional поля с defaults: `h_b_shock_ts_ms`, `h_b_initial_stop_price`, `h_b_mean_target_price`, `h_b_exit_policy_version`. Поля обязаны заполняться для H-B при normal stop/target/time, liquidation, kill-switch flatten и replay finalization; не-H-B записи должны иметь null H-B provenance. `initial_stop_price` должен совпадать с абсолютным frozen shock-low stop; при точном actual fill-to-stop `initial_stop_dist` его derived значение это обеспечивает, но тест должен сравнить оба.
+
+**Journal consumer compatibility gate:** проверить минимум JSON snapshot tests для legacy и H-B, `json.dumps(... allow_nan=False)`, null preservation, required H-B provenance, unknown-field behavior внешних readers (если они будут предоставлены), summary parity между `MaintenanceGateAuditor` и TradeRecord sums. Не утверждать отсутствие неизвестных внешних потребителей: доступный репозиторий не содержит обнаруженного parser для engine journal.
+
+**Статус:** внутренний аудитор и видимые скрипты не имеют TP-specific dependency; экспорт сохраняет optional поля через `asdict`, но внешняя совместимость неизвестна. Статический аудит; код/тесты не менялись и не запускались.

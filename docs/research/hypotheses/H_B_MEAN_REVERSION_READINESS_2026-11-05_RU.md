@@ -131,3 +131,17 @@ ATR — значение classifier ATR, рассчитанное только �
 Файлы/ориентиры: `Bybit_Trading_Engine_v14_research.py` (`run_sparse_simulation_pass`, `run_simulation_pass`, `step_candle`); `tests/test_sparse_simulation_replay.py`; `scripts/run_h1_shared_capital_portfolio_validation.py`.
 
 **Вывод:** инфраструктурный seam для отдельного H-B evaluator уже существует; отдельный торговый движок не нужен. Но это пока статический вывод о способе интеграции, не доказательство готовности H-B. Market PnL и code integration не выполнялись.
+
+
+### 9.1. Signal dictionary and exit-policy boundary
+
+Проверен контракт `_try_fill_pending()`:
+- обязательные поля pending signal: `signal_ts`, `direction`, `entry_price`, `order_type`, `stop_dist`;
+- опционально сохраняется `signal_origin_ts`; для приоритизации batch sizing используются `priority_score` или `vol_ratio`;
+- исполнение проверяет, что candle timestamp равен `signal_ts + timeframe_ms`, затем строит уровни через общий `QuantStrategyCore.build_levels()` и sizing через общий risk manager.
+
+Это подтверждает возможность подать H-B entry signal через callback, но **не решает H-B exits**: текущий engine после открытия вызывает общий `_manage_position()`, который реализует существующую stop/TP/trailing/time-stop механику breakout engine. Одного custom `signal_evaluator` недостаточно, чтобы получить mean-reversion exit contract. Нельзя маскировать это, записав в signal произвольные TP-поля: уровни строятся централизованно из `stop_dist` и глобального cfg.
+
+Поэтому перед кодовой интеграцией требуется отдельный design decision: добавить изолированный strategy-specific position management hook с default-off и regression tests, либо создать H-B research adapter/engine wrapper, который не меняет базовую стратегию. Выбор должен сохранять общую accounting/position lifecycle реализацию и не дублировать PnL ledger. Не менять глобальные exits для всех стратегий ради H-B.
+
+**Статус интеграции уточнён:** entry callback seam существует; strategy-specific exit seam отсутствует/не подтверждён. Это конкретный кодовый blocker, не только незаполненные параметры гипотезы.

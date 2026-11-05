@@ -472,3 +472,20 @@ Status **SPEC ONLY**. No code changes, no tests run.
 **Нельзя объединять в один недифференцированный этап:** persistence schema, fill geometry и manager exit semantics должны иметь отдельные regression assertions. Иначе успешный signal/fill тест не доказывает restart или close correctness.
 
 **Границы:** synthetic fixtures/FakeTransport only; никаких live/paper execution, private/account/exchange API, market data collection, archive extraction, market PnL или parameter sweeps. До отдельной preregistration/data-accounting clearance статус остаётся **SPEC ONLY / SYNTHETIC-ONLY / DATA-BLOCKED**.
+
+
+### 10.16. Liquidation / portfolio-risk / replay boundary audit
+
+Дополнительная read-only проверка выявила важное ограничение модели риска:
+
+1. mark_price_liquidation.py прямо определяет расчёты как **single-position isolated approximation**. calculate_mark_price_maintenance_margin() выбирает maintenance tier по mark notional одной позиции; evaluate_isolated_margin_health() учитывает initial margin, extra margin, unrealized PnL и funding net cost. В docstring указано, что account/order aggregation, AMR, точные funding transfer timestamps и exchange rounding не моделируются.
+2. H-B может использовать общий локальный kill-switch и позиционный liquidation guard, но это не доказывает корректность cross/portfolio margin или exchange-level liquidation. Нельзя описывать это как полную модель портфельной ликвидации.
+3. В _manage_position() liquidation имеет приоритет над kill-switch и last-price stop; kill-switch — над discretionary exits; stop — перед target. H-B branch должна находиться после этих общих защитных проверок.
+4. В _close_position() exchange-sized quantity берётся из remaining_contract_qty; при H-B full-only invariants это должно совпадать с полной исходной позицией. Для liquidation отдельная ветка обходит обычные minQty/minNotional проверки, поскольку settlement не является обычным reduce order. Не менять это поведение без отдельной модели liquidation settlement.
+5. Forced kill-switch flatten использует сохранённый intrabar liquidation exit, если он есть, иначе intrabar risk mark/last mark, и вызывает общий _close_position(). H-B metadata обязана попасть в TradeRecord независимо от инициатора close.
+6. Persistence сохраняет risk.kill_switch_triggered и восстанавливает его в candidate risk manager до commit состояния. H-B restore не должен очищать или пересчитывать этот latch; после restore общий kill-switch сохраняет приоритет.
+7. Replay finalization вызывает общий close напрямую по последнему синхронному mark/candle. Это forced administrative close, а не H-B target/time exit; provenance/policy должны сохраниться, exit_reason остаётся end_of_test (или явно переданный reason).
+
+**Новые synthetic-only assertions:** liquidation touch + stop touch => liquidation; поднятый kill-switch блокирует mean target/time stop; flatten закрывает все H-B позиции ровно один раз с полной provenance; restore с kill_switch_triggered=true не возобновляет discretionary exits; exchange-sized full close использует полный remaining qty; replay finalization закрывает H-B один раз без TP1 fee leg; отчёты не называют isolated approximation полноценной portfolio/cross-margin моделью.
+
+**Ограничение readiness:** даже после синтетических тестов эта модель не доказывает реальную биржевую ликвидацию, cross-margin, общий risk-tier aggregation или account-level protection. Это отдельный data/model validation gate. Рыночные и account/API проверки остаются закрытыми.

@@ -254,3 +254,19 @@ Initial stop уже находится в общем stop_price; время уд
 Этот контракт закрывает **механический design gap** для synthetic tests, но не все preregistration gates. До market experiment всё ещё необходимы: утверждённая frozen RegimeConfig и полный experiment card; sizing и portfolio concurrency/priority; PIT universe и независимые chronological folds; null/control и N_trials accounting; количественные reject/inconclusive criteria; Bybit-native OHLC/Mark/Funding, dated specs/risk tiers и audited costs.
 
 **Статус:** EXIT CANDIDATE v0.1 / SYNTHETIC-ONLY / NOT MARKET-PREREGISTERED / DATA-BLOCKED. Никаких market PnL, parameter sweeps, data downloads, API, paper/live или code changes этим решением не разрешается.
+
+
+### 10.6. Entry seam compatibility check — absolute stop is not yet representable
+
+Повторно просмотрен реальный код `_try_fill_pending()` на текущей ветке. Это выявило дополнительное ограничение, которое важно не скрывать:
+
+- callback может передать `stop_dist`, но при fill движок заново строит `stop_price`, TP1 и TP2 через `QuantStrategyCore.build_levels(direction, fill, sig["stop_dist"], cfg)`;
+- затем sizing и `initial_stop_dist` используют эту fill-relative геометрию;
+- отдельные абсолютные поля `h_b_stop_price` / `h_b_target_price` в pending contract сейчас не потребляются;
+- для H-B stop должен быть ровно `low[t]`, а не расстоянием от неизвестного заранее следующего open. Вычислить точный `stop_dist` в callback нельзя без знания будущего fill open. Подстановка close[t+1] создаст расхождение при gap между сигналом и входом и изменит риск.
+
+**Следствие:** существующий `signal_evaluator` seam достаточен для генерации/передачи сигнала, но не достаточен для точной реализации exit candidate v0.1. До кода нужен узкий strategy-aware fill contract: на фактическом fill вычислить абсолютный H-B stop из сохранённого shock low, проверить stop < fill и target > fill, затем вычислить фактический stop distance и передать его общему risk sizing. Не-H-B ветка должна продолжить использовать прежний `build_levels()` без изменения. H-B target должен переноситься из pending в position state, а стандартные TP1/TP2 не должны случайно управлять H-B позицией.
+
+**Обязательные synthetic adapter tests:** gap между signal close и entry open; entry open на/ниже shock low; target на/ниже fill; расчёт size/risk по фактическому fill-to-stop distance; точное сохранение absolute stop/target в позиции; legacy signal dict без H-B полей даёт прежние уровни побитово/численно идентичные; H-B не попадает в breakout TP/trailing/time-stop ветку.
+
+Это design/integration blocker, не повод приближать stop к close[t+1] или молча менять stop. Торговый код не менялся.

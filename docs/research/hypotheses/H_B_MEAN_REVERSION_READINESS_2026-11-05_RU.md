@@ -395,3 +395,18 @@ Status remains **SPEC ONLY**; no code/test execution.
 **Synthetic tests:** legacy long/short TP geometry unchanged; H-B backup accepts null TP fields; H-B backup rejects non-null TP1/TP2 and any partial state; exchange-sized H-B checks minNotional against stop and target; TradeRecord JSON has null legacy TP fields and complete H-B provenance; legacy dashboard journal shape remains semantically unchanged.
 
 Это отдельный blocker перед кодовой реализацией. Предыдущие разделы 10.7–10.10 остаются действующими; статус **SPEC ONLY / NO CODE / NO TESTS**.
+
+
+### 10.12. TradeRecord close-path audit: null TP crash и end-of-replay flatten
+
+Проверен полный `_close_position()` и export path. Уточнение к разделу 10.11:
+- Если H-B хранит `tp1_price=None` и `tp2_price=None`, текущий конструктор `TradeRecord` вызывает `round(pos.tp1_price, 12)` и `round(pos.tp2_price, 12)` без strategy guard. Закрытие H-B упадёт с TypeError, даже если TP1 partial leg не исполнялся.
+- Передавать H-B null в TradeRecord корректно только после изменения обеих строк на strategy-aware optional mapping; legacy значения должны сериализоваться прежними числами.
+- TP1 fee/PnL leg уже условно исполняется только при `pos.tp1_hit`; H-B invariant `tp1_hit=False` корректно исключает её. Остаточная нога учитывается как полный размер при `remaining_fraction=1`.
+- Финальный close fee рассчитывается для фактического exit_price; exchange-sized `_close_position()` отдельно проверяет final qty alignment, minOrderQty и minNotional по фактической цене закрытия. Это не заменяет restore-time проверку допустимых H-B stop/target.
+- `export_journal_for_dashboard()` формирует `trades: [asdict(t)]`; новые optional TradeRecord fields автоматически войдут в JSON. В доступной ветке обнаружен engine-side producer, но независимые dashboard consumers этим поиском не подтверждены; до включения H-B нужен отдельный consumer/schema audit. Нельзя считать совместимость dashboard доказанной.
+- `finalize_open_positions()` намеренно закрывает все оставшиеся позиции по последнему синхронному close с общим `end_of_test` reason и taker costs. H-B не должен подменять этот terminal cleanup своей обычной mean/time-stop логикой; synthetic test должен подтвердить, что финализация закрывает H-B ровно один раз, сохраняет H-B provenance и не пытается читать null TP.
+
+**Требуемые дополнительные tests:** close H-B via stop, mean target, time stop, liquidation, kill-switch and end_of_test; each creates exactly one TradeRecord, no TP1 fee leg, full remaining qty; TP1/TP2 journal fields null; H-B metadata retained; legacy TradeRecord numeric TP fields unchanged; JSON export round-trip with optional fields.
+
+Status **SPEC ONLY**. No code changes, no tests run.

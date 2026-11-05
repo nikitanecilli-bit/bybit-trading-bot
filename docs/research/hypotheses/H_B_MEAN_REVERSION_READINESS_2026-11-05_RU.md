@@ -270,3 +270,34 @@ Initial stop уже находится в общем stop_price; время уд
 **Обязательные synthetic adapter tests:** gap между signal close и entry open; entry open на/ниже shock low; target на/ниже fill; расчёт size/risk по фактическому fill-to-stop distance; точное сохранение absolute stop/target в позиции; legacy signal dict без H-B полей даёт прежние уровни побитово/численно идентичные; H-B не попадает в breakout TP/trailing/time-stop ветку.
 
 Это design/integration blocker, не повод приближать stop к close[t+1] или молча менять stop. Торговый код не менялся.
+
+
+### 10.7. Pending/fill adapter contract and remaining policy mismatch
+
+Статическая трассировка `step_candle()` → `_try_fill_pending()` → `OpenPositionState` уточняет минимальный adapter contract.
+
+**Pending payload для H-B (все поля должны пережить backup):**
+- `strategy = "H-B-mean-reversion"`;
+- `direction = "long"`;
+- `signal_ts` = timestamp stabilization bar t+1; именно он задаёт обязательный следующий entry bar t+2;
+- `signal_origin_ts` = исходный timestamp shock bar t для общего provenance, если сохраняется текущая семантика поля;
+- `h_b_shock_ts_ms` = timestamp shock bar t;
+- `h_b_stop_price` = абсолютный `low[t]`;
+- `h_b_target_price` = frozen mean `mean(close[t-24:t])`;
+- `h_b_exit_policy_version = "v0.1"`;
+- `order_type = "market"`; fill price — фактический `curr.open` свечи t+2.
+
+**Fill-time validation и sizing:**
+1. До sizing проверить типы/конечность всех H-B чисел и целочисленность/порядок timestamps.
+2. Проверить, что текущая свеча — ровно H1 бар после signal_ts; старый pending уже отсекается общим freshness guard.
+3. Получить `fill = curr.open`; потребовать `0 < h_b_stop_price < fill < h_b_target_price`. Иначе pending отклоняется, позиция не открывается.
+4. Вычислить `actual_stop_dist = fill - h_b_stop_price`; именно это значение использовать в общем `calculate_position_size(fill, stop_price, ...)`, `risk_usdt` и `OpenPositionState.initial_stop_dist`.
+5. Создать позицию с `stop_price = h_b_stop_price`, H-B target/policy/shock timestamp metadata; обычные TP1/TP2 не должны участвовать в H-B exit branch. Для полей dataclass, которые технически обязательны для legacy accounting, допустимы только явно определённые neutral/sentinel values, не используемые H-B manager; нельзя подставлять фиктивные близкие TP.
+6. Dated instrument specs, risk tiers, lot/min-notional validation и shared portfolio risk budget остаются общими. Если фактический exchange sizing после округления нарушает stop/target геометрию или risk budget, entry отклоняется, а не «чинится» переносом stop.
+
+**Новый policy mismatch: generic chase guard.** Текущий market-entry path отменяет вход, если `abs(curr.open - sig["entry_price"]) / sig["entry_price"]` выше `max_chase_limit_pct`. H-B signal contract говорит входить на следующем open, но не определяет этот дополнительный фильтр. Его нельзя молча считать частью H-B: это меняет набор сделок. Перед реализацией требуется одно явное решение в experiment card: (a) H-B строго исполняет следующий open, обходя только общий chase guard для этой стратегии; или (b) фиксирует конкретный chase cap как часть гипотезы. До такого решения не кодировать adapter. При любом варианте проверки `stop < fill < target` и sizing по фактическому fill обязательны.
+
+**Bars-held convention проверена:** `step_candle()` вызывает `_manage_position(..., fill_bar=True)` сразу после fill на t+2; `_manage_position()` увеличивает `bars_held` до проверки выходов. Поэтому fill bar естественно считается баром №1. H-B ветка должна использовать собственный frozen `h_b_max_hold_bars=24`, а не общий `cfg.max_hold_bars`.
+
+**Restore/audit:** pending payload H-B и открытая позиция должны проходить fail-closed validation; старые payload без H-B ключей сохраняют прежнее поведение. При закрытии `TradeRecord` должен сохранять policy version, shock timestamp, frozen target и фактический initial stop. H-B metadata нельзя молча терять при serialization или переводить H-B позицию в legacy breakout exits.
+

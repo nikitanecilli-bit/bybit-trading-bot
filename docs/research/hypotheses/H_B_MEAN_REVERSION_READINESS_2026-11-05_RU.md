@@ -371,3 +371,27 @@ Status: **ADAPTER CONTRACT + TEST MAP COMPLETE / IMPLEMENTATION NOT PRESENT / NO
 **Обязательные новые persistence tests:** H-B complete payload round-trip; missing each H-B key; H-B key on legacy strategy; unknown key; bool/string/zero/future timestamps; NaN/Inf/zero/negative stop or target; wrong policy version; `signal_origin_ts > signal_ts`; valid legacy payload unchanged. Проверить, что failed save сохраняет прежний backup byte-for-byte.
 
 Status remains **SPEC ONLY**; no code/test execution.
+
+
+### 10.11. Критичный конфликт legacy TP1/TP2 restore validation с H-B
+
+Новый статический проход restore validation обнаружил, что H-B нельзя безопасно представить только добавлением metadata:
+- `tp1_price` и `tp2_price` входят в обязательные поля позиции и positive numeric allowlist;
+- restore безусловно требует `entry < TP1 < TP2` для long;
+- exchange-sized restore дополнительно проверяет minNotional через `min(stop_price, tp2_price)`;
+- `_close_position()` безусловно экспортирует `tp1_price/tp2_price` в TradeRecord, хотя TP1 cost leg учитывается только при `tp1_hit`.
+
+Для H-B эти поля не имеют экономического смысла. Заполнять их target-like sentinel values опасно: это сохраняет ложную семантику breakout TP и может ошибочно повлиять на restore/exchange validation или dashboard analytics.
+
+**Рекомендуемый adapter/data-model контракт (требует отдельного code review):**
+1. Сохранить legacy TP1/TP2 поля и их строгую геометрию для всех legacy strategies.
+2. Для H-B разрешить `tp1_price=None` и `tp2_price=None` в `OpenPositionState`; сделать типы optional с defaults только если это не меняет positional constructor compatibility (лучше appended H-B optional metadata плюс стратегия-специфичная нормализация при создании).
+3. В restore validation разделить strategy branches: legacy требует текущую TP геометрию; H-B требует обе TP цены null, `tp1_hit=false`, `tp1_ts_ms=null`, `realized_tp1_gross_usdt=0`, `remaining_fraction=1`. Не допускать H-B с любым TP1 partial state.
+4. В exchange-sized validation для H-B проверять minNotional для фактических допустимых full-close уровней: frozen stop и frozen mean target, а не legacy TP2; qty remains full initial quantity. При округлении не менять stop/target.
+5. В `_close_position()` экспортировать legacy TP fields как null для H-B; не выполнять TP1 fee leg; добавить отдельные H-B поля в TradeRecord: `h_b_shock_ts_ms`, `h_b_initial_stop_price`, `h_b_mean_target_price`, `h_b_exit_policy_version`. Существующий `initial_stop_price` может оставаться общим derived stop, но H-B explicit field сохраняет provenance.
+6. `export_journal_for_dashboard()` сериализует TradeRecord через `dataclasses.asdict()`; новые optional fields автоматически попадут в JSON. Нужен consumer audit dashboard/report readers на неизвестные поля и null TP values до включения H-B.
+7. В H-B restore проверять `initial_stop_dist ≈ entry_price - h_b_initial_stop_price` с согласованным денежным tolerance; stop_price должен совпадать с frozen H-B stop; target/policy/shock timestamp неизменны.
+
+**Synthetic tests:** legacy long/short TP geometry unchanged; H-B backup accepts null TP fields; H-B backup rejects non-null TP1/TP2 and any partial state; exchange-sized H-B checks minNotional against stop and target; TradeRecord JSON has null legacy TP fields and complete H-B provenance; legacy dashboard journal shape remains semantically unchanged.
+
+Это отдельный blocker перед кодовой реализацией. Предыдущие разделы 10.7–10.10 остаются действующими; статус **SPEC ONLY / NO CODE / NO TESTS**.

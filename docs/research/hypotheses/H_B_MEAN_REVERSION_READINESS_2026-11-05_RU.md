@@ -319,3 +319,33 @@ Initial stop уже находится в общем stop_price; время уд
 - H-B позиция не попадает в TP1/TP2/trailing/time-stop breakout path.
 
 Статус: chase policy решена на уровне контракта; реализация остаётся заблокированной до санкционированного code-write пути. Это synthetic-only design, не market preregistration.
+
+
+### 10.9. Точки внедрения и привязка synthetic tests к существующим тестам
+
+Повторная проверка тестового каркаса показала, что H-B не требует отдельного simulation harness: достаточно расширить существующие узкие regression suites, сохранив legacy assertions.
+
+**Engine integration points:**
+- `_try_fill_pending()`: распознать строгое имя стратегии H-B; для H-B валидировать обязательные absolute fields до расчёта размера; использовать фактический `curr.open`; обойти только общий chase guard; передать абсолютный stop в `calculate_position_size(fill, stop_price, ...)`; не вызывать `QuantStrategyCore.build_levels()` для H-B.
+- После `size_to_exchange_constraints()`: дополнительно проверить post-rounding stop/target geometry и риск. Ветка сейчас присваивает `size_usdt = exchange_order.notional_usdt` и `risk_usdt = exchange_order.risk_usdt`; H-B adapter обязан fail closed, если итоговый риск превысил выделенный budget либо округлённый qty не соответствует сохранённой геометрии. Не менять общий legacy path.
+- `OpenPositionState`: добавить optional H-B fields в конец dataclass с defaults. Restore использует строгий allowlist из `dataclasses.fields()`; поэтому старые backups останутся читаемыми, а новые поля автоматически станут известными, но H-B values всё равно требуют отдельной strategy-specific validation. H-B restore должен проверить policy version, timestamps, finite positive prices, long-only, `stop < entry < target`, `initial_stop_dist == entry - stop`, `bars_held` и отсутствие TP1 partial state.
+- `_manage_position()`: после общих liquidation/kill-switch/protective-stop проверок, но до TP2/TP1/trailing/time-stop breakout logic, добавить изолированную H-B ветку. Она проверяет frozen target начиная с non-fill bar; time stop на close 24-й свечи; при любом H-B исходе не проваливается в legacy discretionary exits.
+- `_close_position()`: передать H-B audit fields в optional поля `TradeRecord`; общая финансовая арифметика остаётся неизменной. H-B позиция закрывается целиком, без TP1, так что `remaining_fraction=1`, `tp1_hit=False`, `realized_tp1_gross_usdt=0`.
+
+**Existing regression suites to extend (tests are not yet written):**
+
+| File | Existing coverage | H-B additions |
+|---|---|---|
+| `tests/test_gap_execution.py` | market chase cancel/fill, fill-bar stop, stop-first, journal costs | H-B gap above chase cap still fills on next open; same legacy signal still cancels; reject stop/target geometry; stop-first vs target same candle; no target on fill bar; target gap exits fixed target; frozen stop gap exits min(stop, open) |
+| `tests/test_state_persistence.py` | pending strict allowlist, finite values, immediate-next-bar freshness, position round-trip, legacy backups | H-B pending and position round-trip; missing/unknown/wrong-version H-B fields reject; non-finite target/stop/timestamps reject; wrong strategy/direction/stop-distance/TP1 state reject; legacy pending and position fixtures unchanged |
+| `tests/test_gap_execution.py` + portfolio sizing tests | risk budget and position sizing | actual fill-to-shock-low distance passed to sizing; post-rounding risk over budget rejects; invalid exchange lot/min notional rejects without stop adjustment |
+
+**Persistence detail:** pending payload is not restored by dataclass; `PlanBStatePersistence.load_state()` validates it as a dictionary against a separate strict field allowlist. Adding H-B pending keys therefore requires updating both pending save validation and pending restore validation, plus tests that save rejects payloads the reader would reject. Do not loosen the unknown-field rejection globally. The current pending tests at `tests/test_state_persistence.py` cover unknown fields and missing required fields and should remain passing.
+
+**Test execution order when code writes are available:**
+1. targeted H-B tests in `test_gap_execution.py` and `test_state_persistence.py`;
+2. complete persistence + gap execution suites;
+3. complete repository CI.
+No market PnL, parameter sweep, external API, archive data, or paper/live execution is part of these checks.
+
+Status: **ADAPTER CONTRACT + TEST MAP COMPLETE / IMPLEMENTATION NOT PRESENT / NO TESTS RUN**.

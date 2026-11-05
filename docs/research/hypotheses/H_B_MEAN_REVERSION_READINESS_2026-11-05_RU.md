@@ -566,3 +566,26 @@ Read-only просмотрены `MaintenanceGateAuditor.evaluate_portfolio()`, 
 ### 10.21. Synthetic test specification v0.1
 
 Создан отдельный документ `docs/research/hypotheses/H_B_SYNTHETIC_TEST_SPEC_2026-11-05_RU.md` (16 разделов): точная временная семантика H-B; детерминированные fixtures; signal predicates; pending persistence fail-closed; actual-fill sizing; nullable TP position restore; MTM/manager/exit priority; close/accounting/provenance; portfolio/report isolation; legacy parity; структура будущего тестового модуля; последовательность offline test suites; release gates G0–G6. Документ фиксирует, что synthetic pass не открывает market validation или deployment. Это спецификация, не реализация: код не менялся, тесты не писались/не запускались.
+
+
+### 10.22. Implementation seam map and additional manager dependency — 2026-11-05
+
+Повторная адресная read-only проверка актуального Bybit_Trading_Engine_v14_research.py на HEAD ветки зафиксировала точные места будущей интеграции (номера строк относятся к проверенному blob; при реализации искать по именам методов, а не полагаться на номера):
+
+| Узел | Текущий участок | Требуемое изменение для H-B |
+|---|---:|---|
+| OpenPositionState | 401–447 | Добавить только appended optional H-B provenance; TP1/TP2 типизировать nullable без изменения legacy defaults/порядка полей |
+| TradeRecord | 787–839 | Добавить appended optional H-B поля; существующие TP поля уже Optional |
+| PlanBStatePersistence.load_state | 1412–1625+ | Strategy-aware required/numeric/geometry validation; H-B null TP; H-B metadata; exchange minNotional по stop/target; строгий unknown-key rejection |
+| _unrealized_pnl_at_marks | 2392–2435 | Сейчас TP1 qty/notional вычисляются безусловно на строках 2410–2412 до проверки tp1_hit на 2418. Перенести TP1-specific расчёты внутрь условной ветки; H-B не должен требовать TP1 |
+| _try_fill_pending | 2647–2785+ | Сейчас market chase guard 2712–2714, build_levels 2717 и sizing от fill-relative stop. Добавить strategy-specific absolute stop/target path, actual-fill geometry, H-B-only chase bypass и legacy parity |
+| _apply_tp1 | 2855+ | Не вызывать для H-B; не менять семантику legacy |
+| _manage_position | 2889–3043 | Отдельная H-B ветка после liquidation/kill-switch/stop и до TP1/TP2/trailing. Сохранить bars_held и запрет discretionary exit на fill bar |
+| _close_position | 3050–3191 | Null-safe TradeRecord TP serialization и H-B provenance для обычного и forced close; общая accounting логика сохраняется |
+| export_journal_for_dashboard | 3284–3297 | asdict() автоматически экспортирует новые поля; проверить null и строгую JSON сериализацию |
+
+**Дополнительная находка:** _manage_position() безусловно вызывает QuantStrategyCore.compute_atr(hist[:-1], cfg.atr_period) на строке 2896 до exit branching. H-B exit contract не использует ATR после сигнала. Поэтому реализация должна либо вычислять ATR только для стратегий, которым он нужен, либо доказать, что H-B manager не зависит от него; нельзя вводить скрытое требование достаточной ATR-истории для уже открытой H-B позиции. Тест: валидная H-B позиция после restore управляется без ATR-зависимого discretionary path, при этом legacy ATR/trailing остаётся прежним.
+
+**Уточнение по _close_position():** TP1 fee leg уже защищён if pos.tp1_hit (3095–3100), но TradeRecord создаётся с безусловными round(pos.tp1_price, 12) и round(pos.tp2_price, 12) (3155–3156). Следовательно, None TP ломает сериализацию даже при корректном tp1_hit=False; это отдельный обязательный тест close path.
+
+**Граница изменений:** перечисленные участки связаны; частичное внедрение nullable TP без одновременного MTM, manager, restore и close изменений создаёт неработоспособное промежуточное состояние. Требуется согласованный набор изменений с legacy regression. В этой сессии production code не менялся; source map — read-only engineering audit.

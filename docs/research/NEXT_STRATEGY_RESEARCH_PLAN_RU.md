@@ -518,7 +518,7 @@ Research CI [#41730514894](https://github.com/nikitanecilli-bit/bybit-trading-bo
 
 Подготовлен отдельный design candidate в `hypotheses/H_B_MEAN_REVERSION_READINESS_2026-11-05_RU.md`: H1 long-only; range gate по существующему `market_regime.py` на баре до shock; oversold event — падение минимум на 2.0 ATR за ровно 24 последовательных H1 бара с ATR, измеренным до shock; stabilization — следующий закрытый бар закрывается строго выше high shock-бара; вход — только на open следующего бара. BTC/RSI/VWAP/z-score/news/macro фильтры исключены.
 
-Это causal signal skeleton для будущих synthetic tests, не полная preregistration. Stop/target/time stop, sizing/shared-capital priority, PIT universe, controls/folds и audited costs остаются незаполненными. Не запускать PnL, sweeps, market event study, paper/live. Текущий статус: **DESIGN CANDIDATE v0.1 / NOT PREREGISTERED / DATA-BLOCKED**. Следующий разрешённый шаг — deterministic synthetic test contract и статический audit возможного adapter к shared-capital runner; интеграция в production engine не требуется и не допускается.
+Это causal signal skeleton для будущих synthetic tests, не полная preregistration. Отдельный exit candidate v0.1 теперь описан в H-B readiness review: shock-low stop, frozen mean из 24 pre-shock closes, 24 H1 bars time stop, stop-first и консервативное исполнение. Это design choice для механических тестов, не оптимизированный параметр и не market preregistration. Sizing/shared-capital priority, PIT universe, controls/folds и audited costs остаются незаполненными. Не запускать PnL, sweeps, market event study, paper/live. Текущий статус: **SIGNAL + EXIT DESIGN CANDIDATE / SYNTHETIC-ONLY / NOT MARKET-PREREGISTERED / DATA-BLOCKED**.
 
 
 ### 13.1. Integration boundary уточнён — 2026-11-05
@@ -529,3 +529,18 @@ Static audit подтвердил, что sparse shared-capital replay прин�
 ### 13.2. Exit-path audit уточнён — 2026-11-05
 
 Дополнительный read-only просмотр `_manage_position()`, `OpenPositionState` и `_close_position()` уточнил предыдущую формулировку: отдельный H-B exit path архитектурно возможен внутри существующего manager по `pos.strategy`, поскольку стратегия уже сохраняется в позиции, а liquidation/kill-switch/stop и финальный accounting централизованы. H-B потребуется собственная ветка discretionary exits и persisted target metadata (с backward-compatible serialize/restore), а не отдельный PnL ledger или новый engine. Это предпочтительнее wrapper, если synthetic regressions подтвердят сохранение общего защитного и accounting lifecycle. Пока не реализовано.
+
+
+### 13.3. Exit candidate v0.1 определён для synthetic validation — 2026-11-05
+
+В H-B readiness review добавлен один механически однозначный exit candidate, без parameter sweep:
+- initial stop = low shock-свечи t; entry отменяется, если open[t+2] уже на/ниже stop;
+- target = arithmetic mean 24 pre-shock closes, close[t-24:t], вычисляется до shock и фиксируется в позиции; если target не выше entry — сигнал отклоняется;
+- полный выход по target, без partial TP/trailing и без gap improvement;
+- time stop = close 24-го H1 бара, считая fill bar первым;
+- общая последовательность liquidation → kill-switch → stop → target → time stop; stop-first при same-bar конфликте;
+- target и policy version должны переживать restart, а exit проходит через общий accounting path.
+
+Выбор горизонта 24 часа — фиксированная середина пользовательского диапазона 12–48h, а не найденный лучший параметр. Shock-low и pre-shock mean выбраны как структурная invalidation boundary и причинная mean reference без дополнительного индикаторного поиска.
+
+Статус: **EXIT CANDIDATE v0.1 / SYNTHETIC-ONLY**. Это позволяет готовить deterministic mechanics tests, но не даёт права на code integration, market PnL или paper/live. Перед market experiment остаются полный experiment card, frozen RegimeConfig, sizing/portfolio priority, PIT universe, независимые folds, controls/N_trials, reject criteria и Bybit-native data/accounting gates.

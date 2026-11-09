@@ -1,8 +1,8 @@
 # ALT-SYSTEM-RESEARCH-001 — provenance matrix (P1, read-only)
 
-Дата: 2026-11-05  
+Дата: 2026-11-09  
 Ветка: `research/market-regime-v1-main`  
-Статус: PARTIAL — historical ledger cross-referenced; missing provenance explicitly retained as gaps.  
+Статус: PARTIAL — historical ledger cross-referenced; missing provenance explicitly retained as gaps; weekly read-only refresh added 2026-11-09.  
 Scope: existing repository documents and already-published GitHub Actions metadata only. No workflow reruns, artifact downloads, backtests, PnL recalculation, API calls or data acquisition.
 
 ## Правила интерпретации
@@ -217,3 +217,65 @@ Exact engine file blobs were fetched at each recorded experiment commit and the 
 - E11/E13 cost-only sensitivity values already documented elsewhere remain sensitivity estimates on fixed historical trades, not corrected engine portfolio runs. Since stop-risk cost estimates also changed, the trade sizes and later portfolio path could differ.
 - H-C's corrected accounting does not make its negative proxy result a Bybit-native or forward-OOS result.
 - No artifact contents were downloaded; no historical PnL, cost sensitivity or replay was recalculated in this pass.
+
+
+## 2026-11-09 — weekly P1/P2 refresh (read-only)
+
+### 1. Branch, PR and CI snapshot
+
+- Current research HEAD: `9e8ffb4c06acc4fcf7600b85206cdb30e95f95c2`, commit `docs(research): record offline regression harness inventory`, 2026-11-05 08:14:41 UTC ([commit](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/9e8ffb4c06acc4fcf7600b85206cdb30e95f95c2)).
+- Previous recorded snapshot was `17cfb27fb6999a0c22d809a6e882dad3e73eb146`. Current branch is its descendant by 55 commits, 0 behind. The aggregate diff since that snapshot touches only four documentation paths: `NEXT_STRATEGY_RESEARCH_PLAN_RU.md`, `H_B_MEAN_REVERSION_READINESS_2026-11-05_RU.md`, `H_B_SYNTHETIC_TEST_SPEC_2026-11-05_RU.md`, and `NEW_INPUTS_REVIEW_2026-11-04_RU.md`. No source code, dataset or workflow change is present in that interval.
+- Latest Research CI remains [#41928978081](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928978081): SUCCESS, 2026-11-04 22:52 UTC, tested code SHA `08afcdd6c16e6c32fa33198e2ff56c66023ce585`. Its job has 56 numbered work/test steps plus setup/checkout/cleanup, all successful. Scope includes deterministic tests, existing CryptoFetch archive integrity/overlap audit and H-A preparation-manifest generation; this is not a strategy PnL run.
+- Compare from tested SHA `08afcdd6c16e6c32fa33198e2ff56c66023ce585` to current HEAD: 68 commits ahead, 0 behind; all eight changed paths are documentation-only (accounting audit, continuation checkpoint, next strategy plan, H-B readiness/spec, new-input review and hypothesis-source index/input). Thus the current executable code is unchanged from the CI-tested code snapshot, but the documentation commits themselves were not CI-tested.
+- Current HEAD has no combined status checks and no PR-triggered workflow runs. A read of the first 100 branch workflow runs found no run newer than #419289.
+- Branch/main relationship: `main` remains `c06af3aa084d3513a3c2d7b183f02dba312be230`; compare is `diverged`, 2,661 ahead / 40 behind. Do not merge, rebase or fast-forward.
+- PR #4 remains open Draft, unmerged; its head is current research HEAD and its base is `main`. PR #13 remains open, non-Draft, unmerged; its base is the research branch. PR #9 remains open and unmerged against `main`. No PR was changed or merged.
+
+### 2. Actions artifacts — metadata only
+
+| Run | Artifact | ID | Size | Metadata checked 2026-11-09 |
+|---|---|---:|---:|---|
+| [#41928978081](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928978081) | `cryptofetch-archive-audit` | 13371450337 | 2,732 bytes | not expired; expires 2027-02-02 22:52:09 UTC |
+| [#41928978081](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928978081) | `h-a-archive-preparation` | 13370881028 | 1,649 bytes | not expired; expires 2027-02-02 22:52:09 UTC |
+| [#41670116033](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41670116033) | `h-a-preregistered-ohlcv-results` | 13247672222 | 372,438 bytes | not expired; expires 2027-02-01 16:02:51 UTC |
+| [#41722545731](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41722545731) | `h-c-reverse-time-cryptofetch-proxy` | 13272957989 | 211,799 bytes | not expired; expires 2026-12-03 21:31:48 UTC |
+
+Only artifact metadata was queried. No artifact or source archive was downloaded or extracted; metadata existence does not validate artifact contents or input-dataset hashes.
+
+### 3. New H-B design evidence — no experiment result
+
+- Added H-B readiness assessment and synthetic-test specification dated 2026-11-05. H-B is still `DESIGN GAP REVIEW / NOT PREREGISTERED / NO PNL RUN`; it is not ready for implementation or market validation.
+- Static review confirms that `market_regime.py` already contains a causal regime classifier, but it is research-only and not connected to trading signals, execution or sizing. Its thresholds are not yet frozen/justified for H-B.
+- A candidate mechanics contract is outlined (long-only H1, completed-bar range gate, one oversold event, one stabilization rule, next-open entry), but it is not a frozen preregistration. Timeframe semantics, regime configuration, stop/target/time-stop, same-bar priority, sizing, validation folds, controls and `N_trials` must be resolved together. Do not treat the candidate thresholds as validated.
+- The synthetic specification maps future persistence, fill/sizing, MTM, exit-manager, close-accounting, journal/reporting and legacy-parity tests. Existing accounting/persistence test modules were inventoried, not executed. No H-B production code or test module was added; no synthetic tests or CI pass are claimed.
+- The H1 validation manifest is breakout-specific and must not be repurposed as an H-B manifest. H1/H4 empirical horizon comparison remains NOT READY; the candidate H1 mechanics design does not establish that H1 is superior to H4.
+
+### 4. P1 — provenance state and historical accounting impact
+
+- E01–E07 now have recovered run/check-out commits, script blob identities and uploaded artifact ZIP digests. The ZIP digests are not hashes of the original CryptoFetch market-data archives; exact input archive byte hashes/manifests remain unknown. E08–E13 lineage is stronger, but original source-data completeness and some artifact contents remain unverified.
+- Accounting-version classification remains: E01–E11 and E13 used the old entry-notional basis for TP1/final exit fees and slippage; E12 is diagnostics-only. These PnL rows remain PROVISIONAL/IMPACTED. The correction can change cost reserves, risk sizing, slot competition and the later shared-capital trade sequence; it cannot be repaired by a scalar adjustment. No historical PnL was recalculated.
+- H-A final run #41670116033 and H-C reverse-time run #41722545731 used the corrected execution-price fee basis. H-A still lost `6,135.26 USDT` versus baseline `5,635.98 USDT`; H-C proxy net before funding was `-2,880.12 USDT` versus baseline `-2,720.47 USDT`. Their remaining proxy/universe/holdout/funding/Mark limitations are unchanged.
+- ENG-EXEC-041's positive-timestamp guard is a deterministic input-validation fix, not market evidence. No existing historical strategy result was replayed to quantify whether any invalid zero/negative timestamp row would be affected. Maker execution remains blocked: the stored AAVE sample lacks required BT/block-trade classification, and aggregate L2/CSV sequence and queue limitations remain.
+- Wallet/accounting audit still finds no confirmed TP1/funding sign or double-counting defect in the tested position-level ledger, but wallet-level available-balance funding routing, funding-receipt destination, TP1 proceeds transfer, manual/auto margin and account-mode-specific liquidation remain unmodelled. This is an account-model gap, not a safe local formula patch.
+
+### 5. P2 — Bybit data contract
+
+The last audited acceptance state remains unchanged; no new Bybit data was acquired:
+
+| Dataset gate | Status | Blocking fact |
+|---|---|---|
+| D1 Bybit-native H1 OHLCV | `missing` | No complete saved Bybit-native package for the research interval |
+| D2 Mark OHLCV | `missing / unverified` | Historical coverage/package and settlement alignment unconfirmed |
+| D3 Funding + settlements | `missing / unverified` | Complete PIT observations and authoritative settlement Mark not confirmed |
+| D4 PIT universe/lifecycle | `partial / unverified` | Listing/delisting/suspension history and delisted-symbol coverage incomplete |
+| D5 Effective-time instrument specs | `partial / unverified` | No complete dated spec history across the research interval |
+| D6 Effective-time risk tiers | `partial / unverified` | Historical tier coverage/effective times not proven |
+| D7 L2/trades | `partial` for one diagnostic AAVE day; `missing` for representative research | One day and four hypothetical orders are not a multi-symbol/multi-regime fill dataset |
+| D8 Fees | `unverified` | Dated account/symbol-specific fee assumptions not established |
+
+### 6. Readiness and next safe boundary
+
+- Strategy readiness, Bybit-native PnL validation and maker execution remain BLOCKED. No reviewed configuration demonstrates reproducible positive net results on independent, complete Bybit-native data with validated shared-capital accounting and realistic execution.
+- Shared-capital replay infrastructure and deterministic accounting regressions exist, but that does not close wallet-level funding routing or UTA liquidation semantics. A portfolio architecture comparison is therefore not ready for strategy selection or deployment.
+- Empirical H1/H4 horizon selection is blocked by missing accepted Bybit-native OHLCV/Mark/Funding and PIT universe/spec/risk-tier packages. Acquiring them would require collector/API/archive actions that remain prohibited. Stop at this boundary; do not substitute CryptoFetch/Binance-style proxy data or current snapshots for historical Bybit facts.
+- Next safe work is read-only: preserve this provenance state, resolve any remaining source-code/manifest identities from already-published repository and Actions metadata, and keep H-B as a design-only candidate until its contract and the existing data/accounting gates are independently satisfied. No new market run, sweep, collector, API call, artifact download or order is authorized by this refresh.

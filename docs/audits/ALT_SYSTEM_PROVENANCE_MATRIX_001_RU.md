@@ -349,3 +349,62 @@ GitHub-reported digests above identify the Actions artifact ZIPs; they were not 
 ### 6. Scope of this refresh
 
 Read-only GitHub repository, commit, PR, workflow, job, ledger and artifact-metadata inspection only. No source code, workflow, dataset or `main` changes; no workflow reruns, artifact/source downloads, archive extraction, collectors, exchange/private/account API, market PnL tests/recalculation, parameter sweeps, paper or live trading. This section records a metadata/documentation refresh, not CI verification or profitability evidence.
+
+
+## 7. Weekly metadata refresh — 2026-11-23
+
+### Branch, PR and CI snapshot
+
+- Research branch HEAD: `a09295d25b89b32ca349c7bcd81c43b73cc1bdde`; unchanged from the 2026-11-16 snapshot. No new branch commit was found in this interval.
+- `main`: `c06af3aa084d3513a3c2d7b183f02dba312be230`; unchanged. Compare remains `diverged`, 2,665 commits ahead / 40 behind, merge base `ae599a2f3279e15fe27360662f94f0e7ef8db5be`.
+- PR #4 remains open, Draft, unmerged; its head SHA equals the research HEAD. PR #13 remains open, non-Draft, unmerged; GitHub reports base branch `research/market-regime-v1-main` with base SHA `4c6d12d681fe97b03a43b48a4c0c462d2f0f7dd9`, which differs from the current branch HEAD. Record this as metadata divergence; do not retarget or merge. PR #9 also remains open and unmerged.
+- No commit statuses or check runs are published for current HEAD `a09295d...`.
+- Latest discovered Research CI remains [#41928978081](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928978081), SUCCESS on code SHA `08afcdd6c16e6c32fa33198e2ff56c66023ce585` (2026-11-04). Its `tests` job and all 56 numbered workflow steps completed successfully; cleanup steps also succeeded.
+- Compare `08afcdd6...` → current HEAD reports 72 commits and only nine changed paths, all documentation: accounting audit, provenance matrix, continuation checkpoint, next strategy plan, H-B readiness/specification, new-input review, hypothesis index and preserved hypothesis source. No code, workflow, test or dataset path changed after the last verified code SHA. The documentation changes themselves have no CI result.
+- The experiment ledger remains 1,310 lines; latest entry is ENG-EXEC-041 (2026-11-04). No later market-PnL experiment ID was found.
+
+### ENG-EXEC-042 — instrument snapshot fail-closed validation
+
+The branch contains an additional deterministic data-ingestion guardrail that was not separately represented in the previous matrix snapshot:
+
+| Commit | Change | CI evidence |
+|---|---|---|
+| [b1fafc3](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/b1fafc3b69fe71cb5d97408689b2ee7403f8191f) | Require explicit non-empty string `category`; remove implicit `linear` default | [#41892075429](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41892075429) SUCCESS |
+| [2c00abd](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/2c00abd10803030e6e4cc1536339afdbad544d05) | Reject missing, empty, numeric or boolean `symbol` values | [#41892392949](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41892392949) SUCCESS |
+| [8c04cde](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/8c04cde99b20fc6a42908c620e1786bb0231a6f7) | Apply strict symbol validation in instrument snapshots | [#41893297801](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41893297801) FAILURE: one collector test expected error text `missing symbol`, while implementation raised `instrument row is missing or has invalid symbol`; the instrument-spec tests passed 15/15 |
+| [f7ef140](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/f7ef1405013e0593f045b5c6f8de19fa9749c5d2) and [c9096a7](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/c9096a7ccb2fd9b3b3a48537a709907529ec3c62) | Update/add collector regression assertions for fail-closed symbol validation | Covered by subsequent successful CI |
+| [ff7e5bb](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/ff7e5bbda19907ef11b70695e0109cf90958a19e) | Reject non-string symbols in linear-universe snapshots | No separate check run surfaced for this exact SHA; later full Research CI succeeded |
+| [c069075](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/c06907551c4210ed09540f77115fd218778676a3) and [3025039](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/302503937f47277ab0ee7a83c2a0247bcf51a81c) | Read category from the validated snapshot envelope when row-level category is absent; reject contradictions; add as-of history regressions | [#41893435624](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41893435624) and [#41893443621](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41893443621) SUCCESS |
+| [08afcdd](https://github.com/nikitanecilli-bit/bybit-trading-bot/commit/08afcdd6c16e6c32fa33198e2ff56c66023ce585) | Explicit timestamp-skew fixture in Mark/liquidation integration test | [#41928978081](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41928978081) SUCCESS; latest discovered full Research CI |
+
+The ENG-EXEC-042 changes affect input parsing, snapshot provenance and fail-closed eligibility only. They do not change signal rules, sizing arithmetic, stops/targets, fee/slippage formulas or PnL accounting. Direct historical PnL impact is therefore not indicated by the changed code. An indirect effect is possible if malformed snapshots would previously have been admitted into an instrument universe; its actual magnitude is unknown and unmeasured. No Bybit-native historical PnL run exists to quantify it.
+
+### Supplemental Actions artifact metadata checked 2026-11-23
+
+Metadata was re-fetched for the following ENG-EXEC-042 validation runs. No artifact was downloaded or extracted.
+
+| Run | Artifact | ID | Size | GitHub digest | Retention at check |
+|---|---|---:|---:|---|---|
+| [#41892075429](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41892075429) | `cryptofetch-archive-audit` | 13355115589 | 2,732 B | `805a01c55bb7626b57f8649b3c574b5643da826da853cdead9b4bbc257164bd7` | not expired; 2027-02-02 18:56:36 UTC |
+| #41892075429 | `h-a-archive-preparation` | 13355035942 | 1,649 B | `13a8d2f147c748dcb16c355a70c37b76ae8a432f2fa5b584ca80db4dc9fe5218` | not expired; 2027-02-02 18:56:36 UTC |
+| [#41892392949](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41892392949) | `h-a-archive-preparation` | 13355180705 | 1,649 B | `2282ef1173bba062a14e5d483473b4bf2370979b2b3fd044f0aa63c8d0baf6b1` | not expired; 2027-02-02 18:58:36 UTC |
+| #41892392949 | `cryptofetch-archive-audit` | 13354127520 | 2,732 B | `1b26a22e1ff5fd9fedc384ff2e3fa8860a1f9801f84ba787e8305ae8c41e13af` | not expired; 2027-02-02 18:58:36 UTC |
+| [#41893297801](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41893297801) | `cryptofetch-archive-audit` | 13355251398 | 2,732 B | `b2bf08168a3bcf29cc6dc0454d53734b0efb85833dd91aed7b81c14eb53d082a` | not expired; 2027-02-02 19:04:02 UTC |
+| #41893297801 | `h-a-archive-preparation` | 13355151581 | 1,649 B | `7c8de50ef5bc1e42040b048a2776464f4fcd4c8421b37421dc14ddc4aadfdcba` | not expired; 2027-02-02 19:04:02 UTC |
+| [#41893435624](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41893435624) | `cryptofetch-archive-audit` | 13354117822 | 2,732 B | `3b258e0a0f7e839a75b8dc726d03ab59e968cf16bccf184ad9b903a4923359fd` | not expired; 2027-02-02 19:04:50 UTC |
+| #41893435624 | `h-a-archive-preparation` | 13353338959 | 1,649 B | `3eb645730acea8b2774ebe6958d7d6472fda08acb5e0c9dcbc7b0cb0b687f1c8` | not expired; 2027-02-02 19:04:50 UTC |
+| [#41893443621](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41893443621) | `h-a-archive-preparation` | 13354512428 | 1,649 B | `38554703bb8350dab1a3bb0b0ee3895067b352d4bd0f842d28966b9c3fbca416` | not expired; 2027-02-02 19:04:53 UTC |
+| #41893443621 | `cryptofetch-archive-audit` | 13353458760 | 2,732 B | `3b258e0a0f7e839a75b8dc726d03ab59e968cf16bccf184ad9b903a4923359fd` | not expired; 2027-02-02 19:04:53 UTC |
+
+These are GitHub-reported SHA-256 digests of Actions artifact ZIPs, not independently recomputed hashes and not hashes of original market-data archives. Artifact metadata confirms registration/retention only, not artifact contents or Bybit dataset completeness.
+
+### P1/P2 and research readiness — unchanged
+
+- E01–E11 and E13 retain `PROVISIONAL / IMPACTED` classification for the prior exit-fee/slippage basis; no scalar correction or historical PnL recalculation is justified. H-A/H-C remain negative proxy outcomes on corrected fee basis.
+- D1 Bybit-native H1 OHLCV: `missing`; D2 Mark: `missing / unverified`; D3 Funding/settlement: `missing / unverified`; D4 PIT universe incl. delisted/suspended: `partial / unverified`; D5/D6 effective-time specs/risk tiers: `partial / unverified`; D7 representative L2/trades: `missing` (one diagnostic AAVE day only); D8 dated account/symbol fee assumptions: `unverified`.
+- H-B remains design-only, not preregistered and data-blocked. H1/H4 empirical comparison and portfolio-architecture selection remain NOT READY.
+- The latest CI is deterministic code/data-integrity validation; its archive audit and H-A preparation steps are not market PnL runs.
+
+### Scope of this refresh
+
+Read-only inspection of existing GitHub files, commit metadata, PR metadata, CI jobs/logs and Actions artifact metadata; one documentation-only matrix update. No code, workflow, dataset or `main` changes; no workflow dispatch/rerun, artifact or archive download/extraction, collectors, exchange/private/account API, market PnL tests/recalculation, parameter sweeps, paper or live trading.

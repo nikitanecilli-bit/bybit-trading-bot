@@ -156,7 +156,7 @@
 ## 2026-11-24 — актуализация статуса и повторная сверка существующего data package
 
 - Текущий research/market-regime-v1-main HEAD при сверке: 99e0a681a6a341866773b7d99c066bf63165bd46. Последний принятый code/test CI — 45466778550 на 84d1da812d1958cbb32f3789895c7d4b56e45488; последующие commits в этой цепочке — документационные.
-- PR #15 (PROJECT COMPASS) и PR #16 (H-B signal contract) merged в рабочую ветку. PR #13 остаётся открытым и содержит более ранний context-recovery protocol; он не является текущим источником правил.
+- PR #15 (PROJECT COMPASS) и PR #16 (H-B signal contract) merged в рабочую ветку. PR #13 закрыт как superseded by PR #15: его более ранний context-recovery protocol заменён обязательной связкой AGENTS.md + PROJECT_COMPASS_RU.md + RESEARCH_BOARD_RU.md.
 - Git tree содержит ровно шесть файлов данных: CryptoFetch ZIP в data/archives/cryptofetch/. В текущем дереве нет подтверждённых Bybit-native OHLCV/mark/funding/spec/risk-tier snapshots.
 - Сверен существующий архивный audit artifact #13187466159 из workflow #41542079766: 67/67 CSV members структурно валидны; 64 проходят legacy 200-bar floor; 3 пусты (DAIUSDT, MATICUSDT, XMRUSDT); 0 malformed; 0 irregular/missing intervals; 6 pairwise duplicate comparisons без конфликтующих OHLCV candles; longest-file winner не теряет timestamps в проверенных парах. Audit hashes совпали с E11/E13 source archives по исторической записи.
 - Артефакт старый и проверяет целостность именно имеющихся Binance-style proxy archives; он не устраняет PIT universe, funding/mark, Bybit-native market, cost и execution gaps. Архивы не скачивались заново, новые данные не собирались, backtests/PnL не запускались.

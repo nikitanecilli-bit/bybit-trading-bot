@@ -952,3 +952,75 @@ A valid reconstruction would need, for every symbol and effective interval:
 **D6 remains structurally unaccepted for historical replay.** Even if a partial symbol-level tier history is later recovered, account-specific historical margin state must remain a separate requirement rather than being inferred from a static tier table.
 
 No private API, account data, market data, paid vendor access, or execution was used.
+
+
+## 30. Cross-check of the Tardis channel boundary and two dated risk-rule regime changes
+
+A current, line-level review of the Tardis Bybit coverage page confirms the exact channel inventory and corrects how the historical stream should be interpreted:
+
+- `instrument_info` is explicitly listed as available **until 2023-04-05**, described only as “Instrument ticker and contract state updates”.
+- The old `trade` and `orderBookL2_25` channels also end on 2023-04-05.
+- From 2023-04-05, Tardis lists V5 channels including `publicTrade`, `tickers`, and `orderbook.*`; it does **not** list a successor `instrument_info` channel.
+- Tardis says historical messages are stored in the same format as the exchange WebSocket messages, with an additional local timestamp. The current Bybit V5 `tickers.{symbol}` schema contains market/ticker fields (last/mark/index price, funding, best bid/ask, delivery fields), but does not document `tickSize`, `qtyStep`, min notional, max order quantities, or risk-tier schedule fields.
+
+References:
+- Tardis Bybit channel inventory and collection boundary: https://docs.tardis.dev/historical-data-details/bybit
+- Tardis message format: same as exchange WebSocket plus local timestamp, https://docs.tardis.dev/historical-data-details/bybit
+- Bybit V5 ticker schema: https://bybit-exchange.github.io/docs/v5/websocket/public/ticker
+
+This means the old stream remains a potentially useful **bounded contract-state/ticker evidence source**, but we must not promote it to a full D5 specification archive based only on its channel name. The schema-level evidence presently supports no claim that it contains the full REST instrument filters. A raw sample and legacy schema inspection would be required to determine whether any subset of specification fields is present.
+
+The Tardis general collection documentation also describes checks for newly available instruments every minute. This is a discovery cadence, not a guarantee that every lifecycle transition or every mutable instrument parameter was captured. It cannot be used to infer continuous historical spec snapshots.
+
+Reference: https://docs.tardis.dev/historical-data-details
+
+### D5 revised conclusion
+
+- Through 2023-04-05: Tardis `instrument_info` is a bounded historical candidate for contract state and possibly some instrument metadata, but field coverage and continuity remain unverified.
+- From 2023-04-05 onward: documented V5 ticker and public-trade channels do not expose the full REST instrument filters needed for D5.
+- No reviewed source establishes complete effective-dated history for tick size, quantity step, min notional, maximum order sizes, leverage bounds, and funding parameters across the full research interval.
+- **D5 remains not accepted.** Do not treat market ticker feeds or Tardis instrument discovery as a substitute for effective-dated specification snapshots.
+
+## 31. D6: two authoritative regime boundaries now identified
+
+The documentary record provides two concrete, dated changes to risk/margin mechanics. These improve the regime timeline, but do not provide historical per-symbol tier tables.
+
+### 31.1 Automatic risk-tier adjustment rollout — 2024-02-20
+
+The Bybit API announcement states that automatic adjustment of Perpetual and Futures risk-limit tiers, based on position and active-order value, was postponed from 2024-02-05 to **2024-02-20**. The rollout covered USDT, USDC, and Inverse Perpetual/Futures. Manual tier selection was removed/disabled for users and the old Set Risk Limit API became ineffective for modifying the tier.
+
+Reference: https://t.me/s/Bybit_API_Announcements?before=217
+
+The changelog later records `Set Risk Limit` as deprecated on 2024-03-12 because automatic risk limit had launched:
+https://bybit-exchange.github.io/docs/changelog/v5
+
+For historical replay, 2024-02-20 is a documented rollout boundary, but “gradually changed” means it should not be assumed that every product/account transitioned atomically at one instant without further evidence. The March 12 deprecation is a later API/documentation boundary, not necessarily the first effective date for every account.
+
+### 31.2 Mark-price-based margin/risk calculation — 2025-09-02
+
+Bybit's Help Center article, last updated 2026-06-18, explicitly states that from **2025-09-02** it implemented a major margin-calculation update:
+- Cross Margin IM/MM moved to Mark Price in the described contract modes.
+- Isolated Margin MM moved to Mark Price while IM continued to use Entry Price.
+- Risk-limit tiers began adjusting dynamically based on real-time Mark Price and combined position/order value.
+
+Reference: https://www.bybit.com/en/help-center/article/Understanding-the-Adjustment-and-Impact-of-the-New-Margin-Calculation
+
+This is a material risk-model regime boundary. A replay that uses only entry-price-based position valuation or assumes tiers change solely when orders/positions are opened/closed would be inconsistent with the documented post-2025-09-02 rules. The help article is current documentation with a stated implementation date; historical rollout exceptions and product/account eligibility still require confirmation if exact account-level liquidation replication is attempted.
+
+### D6 implications and minimum reconstruction
+
+The evidence now supports at least these distinct conceptual regimes:
+1. Pre-auto-tier regime: manual risk tier selection / older adjustment semantics.
+2. Automatic-tier regime beginning 2024-02-20: tier selected from positions and active orders.
+3. Mark-price margin regime beginning 2025-09-02: relevant IM/MM and tier valuation logic uses Mark Price according to margin mode and contract type.
+
+These are **rule-regime boundaries**, not tier-table values. For any historical replay that needs margin/liquidation fidelity, each regime still requires its applicable formulas, tier schedule, symbol-specific parameters, and account-state inputs. A dated rule announcement cannot supply missing historical tier rows.
+
+### D6 revised conclusion
+
+- We can now version the broad risk/margin rule regimes using official dated evidence for 2024-02-20 and 2025-09-02.
+- We still cannot reconstruct the complete effective-dated risk-tier schedules for each symbol.
+- We cannot reconstruct account-specific effective tier without positions, active orders, mark prices, leverage, margin mode, and applicable transition/eligibility state.
+- **D6 remains unaccepted for historical economic replay.** The new findings reduce ambiguity about rule changes but do not close the data gap.
+
+No Bybit endpoint was called. No Tardis replay/sample, private account data, market data, vendor subscription, archive download, collector, PnL run, or execution was used.

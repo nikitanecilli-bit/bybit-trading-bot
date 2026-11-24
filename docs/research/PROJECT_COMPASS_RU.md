@@ -198,7 +198,10 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - Bybit-native data/provenance gaps остаются критическими; не обходить действующие запреты на новые collectors/data/PnL.
 - Пользователь подтвердил максимальную автономность 2026-11-24, включая управление документами и исследовательской лабораторией. Это разрешает самостоятельные безопасные изменения в research-ветке, но не отменяет явные gates по сбору данных/подключению Bybit, paper/live и реальному капиталу.
 - PR #15 объединён в `research/market-regime-v1-main` (squash commit `f92a211...`); `main` не затрагивался. Обнаруженная ошибка прошлого статуса исправлена: до merge карта и правило фактически отсутствовали в рабочей ветке.
-- Следующий практический шаг: чистая статическая спецификация и минимальный deterministic synthetic test для H-B signal predicate (без lifecycle, market data, PnL или engine modifications). Проверить H1 cadence, 24-bar shock, causal range gate на t-1, stabilization t+1, entry timestamp t+2 и future-mutation invariance. После результата принять решение — нужна ли отдельная интеграция вообще.
+- H-B signal-only implementation находится в PR #16 (`research/hb-signal-contract`), не объединён: добавлены `h_b_signal.py` и `tests/test_h_b_signal.py` (10 тестов). Изменений торгового движка нет.
+- В отдельной Python-сессии вручную проверены 10 основных сценариев/инвариантов на точной копии функции: все прошли. Это не запуск pytest из репозитория и не CI.
+- Для PR #16 не обнаружены связанные workflow runs; автоматическое подтверждение тестового набора отсутствует. Не объединять PR до получения репозиторного тестового результата и проверки legacy suite.
+- Следующий практический шаг: получить фактический запуск `pytest tests/test_h_b_signal.py` и relevant legacy regression suite. Если GitHub Actions не запускается автоматически, найти разрешённый способ выполнения; не создавать инфраструктуру только ради красивого статуса. Затем исправить обнаруженные дефекты и принять решение по узкой интеграции.
 
 ---
 
@@ -215,3 +218,9 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - PR #15 объединён только в `research/market-regime-v1-main`; `main` не менялся. Обязательное чтение PROJECT COMPASS теперь присутствует в `AGENTS.md` и `docs/README_RU.md` рабочей ветки.
 - Повторная проверка H-B показала: signal contract уже описан, но production implementation и H-B synthetic tests отсутствуют. Большой lifecycle plan преждевременен для первого этапа.
 - Выбран более узкий следующий шаг: проверить чистую временную механику сигнала отдельно от исполнения/позиционного lifecycle. Никаких market-PnL тестов или сбора данных.
+
+### 2026-11-24 — H-B signal-only implementation candidate
+- Создан PR #16 (`research/hb-signal-contract`) с отдельной pure-функцией H-B signal predicate и 10 deterministic tests. Не тронут торговый движок и не реализованы pending/fill/position lifecycle.
+- Тестовая функция вручную исполнена в изолированной Python-сессии; 10 ключевых проверок прошли. Результат не является pytest/CI evidence.
+- GitHub connector не вернул workflow runs для PR head; автоматическое тестовое подтверждение пока отсутствует. PR оставлен открытым, не объединён.
+- H-B RegimeConfig не frozen; range labels и ATR в механическом тесте — контролируемые входы. Market PnL, новые данные и Bybit подключение не выполнялись.

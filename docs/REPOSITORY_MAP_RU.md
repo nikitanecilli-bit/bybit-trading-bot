@@ -7,17 +7,21 @@
 | `dashboards/v15/` | HTML/PDF экспорт дашборда v15 и инструкция |
 | `docs/audits/` | Технический аудит, сравнение веток, audit findings |
 | `docs/reports/` | Исторические backtest, holdout и regime отчёты |
-| `docs/research/` | Experiment ledger, coverage matrix, следующий план |
+| `docs/research/` | Research Board, Project Compass, Experiment Ledger, coverage matrix, hypotheses and plans |
 | `research/config/` | Конфигурационные данные исследовательского universe |
 | `scripts/` | Backtest runners, диагностика, сбор данных и утилиты |
-| `tests/` | 16 детерминированных регрессионных тестов |
+| `tests/` | Детерминированные regression tests и отдельные H-B synthetic mechanics suites |
+| `h_b_signal.py` | Изолированный H-B signal predicate; без engine integration |
+| `h_b_regime.py` | Frozen candidate RegimeConfig + causal H1 cadence gate |
+| `h_b_fill.py` | Offline t+2 open geometry check; не execution simulator |
 | корень | Исследовательский движок, downloader, README и инструкции |
 
 ## Важные границы
 
 - `Bybit_Trading_Engine_v14_research.py` остаётся в корне: скрипты импортируют его напрямую.
 - ZIP-архивы перемещены без изменения содержимого; runner читает только `data/archives/cryptofetch/`.
-- Все 16 тестов находятся в `tests/`; тесты, загружающие движок через `__file__`, используют путь на уровень выше.
+- Автоматические проверки находятся в `tests/`; H-B signal/regime/fill tests являются отдельными synthetic-only suites.
+- `h_b_signal.py`, `h_b_regime.py` и `h_b_fill.py` не подключены к торговому движку и не размещают ордера.
 - Market backtests не входят в технический CI и не запускаются по push.
 - Данные Binance OHLCV являются proxy; fills по касанию OHLC не моделируют очередь и partial fills.
 - Не сливать ветки автоматически: main и исследовательская линия имеют независимую историю и разные версии движка.

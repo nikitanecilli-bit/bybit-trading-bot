@@ -647,3 +647,31 @@ Repository evidence:
 A third-party Bybit data-source note independently describes current instrument specs as coming from the REST instruments-info/risk-limit endpoints and says delisted symbols are not served by those current lookups. This is corroborative only, not an official completeness guarantee: https://github-wiki-see.page/m/sbOogway/sbt2/wiki/Source-Bybit
 
 **Updated D5 status:** `missing` for full historical acceptance. The new summary endpoint is not a historical-data solution. No API call was made.
+
+
+## 22. `status=Closed` is a possible current lifecycle inventory, not proven historical completeness
+
+The official V5 changelog records that on 2024-06-27 the Get Instruments Info endpoint expanded its `status` filter to support `Closed`, `Delivering`, and `PreLaunch` for `linear` and `inverse` categories. The current reference/API Explorer lists `Closed` as an allowed status and returns `launchTime`, `deliveryTime`, and instrument fields in the response.
+
+Official references:
+- 2024-06-27 changelog: https://bybit-exchange.github.io/docs/changelog/v5
+- Current endpoint reference: https://bybit-exchange.github.io/docs/v5/market/instrument
+- API Explorer schema: https://bybit-exchange.github.io/docs/api-explorer/v5/market/instrument
+
+### What this could provide
+
+A read-only request using `category=linear&status=Closed` (and separately inverse) may expose the exchange's currently retained closed-contract records, potentially including their launch/delivery times and current returned metadata. This is a plausible source for a partial delisted-symbol inventory and worth testing if explicitly authorized.
+
+### What documentation does not establish
+
+- No documented retention period or earliest historical date for Closed records.
+- No guarantee that every delisted/closed symbol since exchange launch remains queryable.
+- No documented effective-dated history for tick size, qty step, min notional, max quantities, leverage limits or risk tiers.
+- No documented guarantee that emergency delistings, pre-market failures, migrations/renames or all historical status transitions are represented as a complete event log.
+- The feature was documented in June 2024; this does not establish that the endpoint exposed the same closed-state query before that date.
+
+**D4 assessment:** this is a potentially useful source for a present-day closed-symbol census, but it cannot yet satisfy point-in-time universe reconstruction. Treat its coverage as unknown until an authorized query can be tested against a separately compiled list of known delistings and dated notices. Announcements remain an incomplete event source because the DDM permits delisting without further notice in specified circumstances.
+
+**D5 assessment:** even if Closed records are returned, one current response cannot reconstruct the historical sequence of mutable specification values. D5 remains `missing`.
+
+No request was made to `/v5/market/instruments-info`; existing permission remains limited to the public announcements endpoint. No market data, collector, archive, runner, PnL or execution action was performed.

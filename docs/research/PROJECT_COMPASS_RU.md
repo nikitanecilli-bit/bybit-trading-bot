@@ -318,3 +318,8 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - L2/public-trade audits identify unresolved passive-fill realism limits: price-through and cancellation allocation are not modeled; cross-stream event ordering and historical trade sequence fields are unverified. The replay cannot be promoted as validated maker execution.
 - Conclusion: prior experiments provide useful negative/exploratory evidence, not a defensible positive edge claim. No backtest, sweep, event study, data collection or exchange connection was performed. Project remains BLOCKED pending a legitimately permitted independent validation route.
 - Current research branch HEAD at this reconciliation: 1e08da2cff4b07159b80664da79c70110b2f80ad; the preceding Compass snapshot had an outdated HEAD reference.
+
+
+### 2026-11-24 — E04/E07 exit-cost provenance follow-up
+
+- Read-only workflow-log and source audit confirms E04 (checkout `4b291265`) and E07 (checkout `a5a98516`) also used engine implementations charging exit fees/slippage from entry notional rather than exit execution notional. E01–E03 were already confirmed on the same pre-fix engine family. Therefore E01–E04 and E07 historical net-PnL totals are not reusable as accurate net results; E04/E07 also retain their independent selection/multiple-testing limitations. No PnL was recalculated; see Experiment Ledger for exact workflow and engine blob provenance.

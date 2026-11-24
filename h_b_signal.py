@@ -144,3 +144,49 @@ def evaluate_h_b_signal_with_classifier(
         return None
     signal["regime_config"] = asdict(config)
     return signal
+
+
+
+def prepare_h_b_entry(
+    signal: Mapping[str, object] | None,
+    entry_candle: Mapping[str, object] | None,
+    position_open: bool = False,
+) -> dict[str, Any] | None:
+    """Validate the scheduled next-open entry without simulating an engine fill.
+
+    The supplied candle must be exactly t+2. Missing bars, timestamp gaps,
+    occupied positions, and invalid entry/stop/target geometry fail closed.
+    The returned entry_price is the observed candle open, not a promise of an
+    executable fill after spread, slippage, queueing, or fees.
+    """
+    if not isinstance(position_open, bool):
+        raise ValueError("position_open must be boolean")
+    if position_open or signal is None or entry_candle is None:
+        return None
+
+    expected_ts = signal.get("entry_ts_ms")
+    if isinstance(expected_ts, bool) or not isinstance(expected_ts, int) or expected_ts <= 0:
+        raise ValueError("signal entry_ts_ms must be a positive integer")
+    raw_ts = entry_candle.get("ts")
+    if isinstance(raw_ts, bool) or not isinstance(raw_ts, int) or raw_ts != expected_ts:
+        return None
+
+    entry_price = _positive_finite(entry_candle.get("open"), "entry open")
+    stop_price = _positive_finite(signal.get("stop_price"), "signal stop_price")
+    target_price = _positive_finite(signal.get("target_price"), "signal target_price")
+    if entry_price <= stop_price or target_price <= entry_price:
+        return None
+
+    prepared = {
+        "strategy": signal.get("strategy"),
+        "direction": signal.get("direction"),
+        "policy_version": signal.get("policy_version"),
+        "signal_ts_ms": signal.get("signal_ts_ms"),
+        "entry_ts_ms": expected_ts,
+        "entry_price": entry_price,
+        "stop_price": stop_price,
+        "target_price": target_price,
+    }
+    if "regime_config" in signal:
+        prepared["regime_config"] = signal["regime_config"]
+    return prepared

@@ -299,3 +299,28 @@ Read-only inspection of the current research-branch scripts/workflow found:
 - `scripts/archive_bybit_market_history.py` is a venue API collector that requires a Bybit lifecycle snapshot and dated instrument snapshots, then writes archive manifests and per-source files. Its existence does not authorize running it.
 
 **Compatibility conclusion:** neither external discovery lead can be plugged into the current H1 runner as-is. A future use would require a separately reviewed adapter, preservation of original provider files and hashes, field/time-unit mapping, provenance manifest, and all existing D1–D6 gates. In particular, a third-party OHLCV file labelled “Bybit” cannot bypass the runner's native-source and PIT snapshot requirements by being renamed into the expected directory. No adapter, test, collector or PnL run was created or executed in this checkpoint.
+
+
+
+
+## 13. Static boundary audit for D4–D6: what dated snapshots can and cannot prove
+
+Inspected `snapshot_bybit_linear_universe.py`, `snapshot_bybit_instruments.py`, `snapshot_bybit_risk_limits.py`, `instrument_spec_history.py`, and `bybit_risk_tiers.py`. This was source inspection only; collectors and tests were not run.
+
+**D4 — point-in-time universe/lifecycle**
+- The universe collector is more complete than a plain current-tickers list: it paginates the default Trading/PendingOpen set and explicitly queries PreLaunch, Settling, Delivering and Closed statuses. It records the full returned instrument rows, `launchTime`, `deliveryTime`, status counts, fetch time and per-page timing/provenance.
+- The lifecycle predicate uses contract type, quote/settlement coin, launch time and delivery time. For terminal/in-progress terminal statuses without a positive delivery boundary, it fails closed rather than inventing an end date.
+- However, each output is still a **point-in-time observation**, not a historical lifecycle event log. It does not establish every past suspension/resumption interval or prove that Bybit retains every delisted contract indefinitely. A current `Closed` row plus launch/delivery timestamps is not a complete reconstruction of all prior tradability states.
+- No dated universe snapshot is currently committed in the repository. D4 remains `partial/unverified`, not accepted.
+
+**D5 — effective-time instrument specifications**
+- Instrument snapshots preserve raw Bybit instrument fields, category, fetch time, collection bounds and page observations. `InstrumentSpecHistory.get_spec()` selects only the newest complete snapshot with `fetched_at <= as_of_ts`; it fails if no earlier snapshot exists and can reject a stale snapshot when a maximum age is configured.
+- This is a sound forward-observation model once snapshots have begun and are stored immutably. It does **not** infer the effective time of a change between snapshots and cannot recover a specification that changed before the first retained snapshot. A snapshot captured today cannot be applied backward to an earlier fold.
+- No dated instrument snapshot series is currently committed. D5 remains `missing` for the historical interval under consideration.
+
+**D6 — effective-time risk tiers**
+- Risk-tier snapshots paginate the returned symbol/tier rows, validate tier structure and monotonic relationships, and record fetch time/page provenance. `RiskTierHistory.get_tier(s)()` selects the newest snapshot no later than the requested timestamp and can fail closed on missing or stale coverage.
+- The same temporal limitation applies: the endpoint snapshot records the observed tier table at capture time, not an authoritative historical effective-time change log. It cannot reconstruct pre-capture tier changes.
+- No dated risk-tier snapshot series is currently committed. D6 remains `missing` for the historical interval under consideration.
+
+**Operational implication:** the existing collectors can begin building a forward-dated evidence trail only after an explicit future authorization and successful capture. Their presence in GitHub does not create historical PIT data retroactively. Since the current workflows are manual-only and the user hold prohibits runner setup/dispatch, no new snapshots can be assumed or scheduled in this project state.

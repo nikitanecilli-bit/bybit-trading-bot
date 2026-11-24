@@ -319,7 +319,7 @@ Inspected `snapshot_bybit_linear_universe.py`, `snapshot_bybit_instruments.py`, 
 - No dated instrument snapshot series is currently committed. D5 remains `missing` for the historical interval under consideration.
 
 **D6 — effective-time risk tiers**
-- Risk-tier snapshots paginate the returned symbol/tier rows, validate tier structure and monotonic relationships, and record fetch time/page provenance. `RiskTierHistory.get_tiers()` и `RiskTierHistory.get_tier()` selects the newest snapshot no later than the requested timestamp and can fail closed on missing or stale coverage.
+- Risk-tier snapshots paginate the returned symbol/tier rows, validate tier structure and monotonic relationships, and record fetch time/page provenance. `RiskTierHistory.get_tiers()` и `RiskTierHistory.get_tier()` выбирают последний snapshot не позднее запрошенного timestamp и fail-closed завершаются при отсутствии или устаревании покрытия.
 - The same temporal limitation applies: the endpoint snapshot records the observed tier table at capture time, not an authoritative historical effective-time change log. It cannot reconstruct pre-capture tier changes.
 - No dated risk-tier snapshot series is currently committed. D6 remains `missing` for the historical interval under consideration.
 

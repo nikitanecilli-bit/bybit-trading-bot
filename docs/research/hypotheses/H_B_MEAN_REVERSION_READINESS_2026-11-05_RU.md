@@ -613,3 +613,16 @@ Read-only просмотрены `MaintenanceGateAuditor.evaluate_portfolio()`, 
 6. Add strategy-isolated synthetic report/manifest; only then run targeted suites, accounting/persistence regressions and full offline suite.
 
 **Статус:** test infrastructure is present and relevant; no evidence yet of a successful run, no H-B tests exist, and no production code changed.
+
+
+### 10.24. Isolated causal signal predicate — 2026-11-24
+
+В отдельной ветке `research/hb-signal-contract` добавлены:
+- `h_b_signal.py` — чистая функция `evaluate_h_b_signal()`, которая проверяет только H-B v0.1 signal contract до close t+1 и возвращает ожидаемое время входа на open t+2;
+- `tests/test_h_b_signal.py` — 10 deterministic synthetic pytest cases: happy path, range gate на t-1, inclusive shock threshold с ATR[t-1], strict stabilization, future mutation, exact H1 cadence, duplicate timestamp, invalid ATR/OHLC и insufficient history.
+
+**Границы реализации:** торговый движок не изменён; нет pending/fill adapter, sizing, position state, persistence, manager, exits, TradeRecord или отчётов. Range labels и ATR подаются как входы; RegimeConfig не выбрана и не заморожена. Это намеренно узкий тест временной механики, а не полноценная H-B стратегия.
+
+**Проверка:** прямое выполнение скопированной из GitHub реализации прошло 4 базовые assertions. Это не равно запуску pytest из репозитория. PR #16 открыт; GitHub workflow runs для head commit пока не обнаружены. Полный pytest/CI результат не подтверждён.
+
+**Решение:** не начинать полный lifecycle adapter. Сначала добиться исполнения 10 тестов в репозитории и проверить независимую legacy regression. После этого оценить, имеет ли смысл следующий изолированный слой. Market PnL, data collection, exchange APIs, parameter sweep и paper/live остаются запрещёнными текущими gates.

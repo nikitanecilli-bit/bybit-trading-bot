@@ -184,3 +184,14 @@
 
 
 **Ключевая поправка к объёму доказательств:** E04/E06/E08/E09 — один и тот же набор 1,012 уникальных кандидатов по пяти выбранным монетам, повторённый в разных конфигурациях; E11/E13 — один и тот же набор 9,236 кандидатов по 47 монетам; E10 почти полностью совпадает с ним (9,236 общих ключей + 79 из-за временного покрытия). E12 агрегирует timestamp'ы E11, а не независимую выборку. Число строк CSV и число experiment ID нельзя трактовать как число независимых подтверждений.
+
+
+
+
+## 2026-11-24 — read-only inventory внешних источников данных
+
+- Recursive Git tree текущего research branch содержит шесть market-data ZIP, все CryptoFetch proxy; Bybit-native OHLCV/Mark/Funding/trades/L2 и датированные instrument/risk/universe snapshots в репозитории не обнаружены.
+- Старый AAVEUSDT L2 run #41814167058 повторно проверен по job metadata/logs: raw L2/trades archives были временно обработаны в workflow, но в artifact сохранены только три компактных JSON-отчёта (3,725 bytes). Raw source archives не лежат в Git tree. Trade CSV не содержит block-trade flag; четыре hypothetical orders не являются fill-rate evidence.
+- Найдены только внешние discovery leads: Hugging Face `rogerdehe/klines-bybit` (заявленный OHLCV/Mark/Funding, но under construction) и CryptoHFTData (L2/trades/Mark/Funding, но документированные gaps/corrections и отсутствие OHLCV family). Ни один источник не принят и не скачивался.
+- Подробная классификация и ссылки: [ALT-SYSTEM-DATA-ACCEPTANCE-001, раздел 11](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#11-read-only-inventory-and-external-source-screening-2026-11-24).
+- Решение: **DATA GATE BLOCKED**; D1–D6 не закрыты. Запреты на Bybit, runner, collectors, новые архивы, PnL runs, paper/live остаются без изменений.

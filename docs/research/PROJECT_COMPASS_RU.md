@@ -276,3 +276,11 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - Research CI [45464653488](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45464653488) — SUCCESS on SHA `6540e375d6d2ad7dfd321202973e60e2e0815dae`. Market-regime tests passed; H-B signal tests: 13/13; H-B regime adapter tests: 6/6; full technical workflow successful.
 - Status: **SIGNAL + REGIME MECHANICS PASS** only. The RegimeConfig is an uncalibrated candidate; no actual t+2 fill, fill geometry, engine lifecycle, market PnL or edge is validated.
 - Next safe step: isolated pure next-open fill-geometry check (bar availability, timestamp, actual open between frozen stop/target), without engine integration or PnL.
+
+
+## 2026-11-24 — H-B next-open entry contract
+
+- Added `prepare_h_b_entry()` as a pure synthetic contract: validates H-B long identity and policy version, exact next-H1 timestamp, presence of t+2 candle, no existing position, finite positive entry open, and strict entry/stop/target geometry. Missing/gapped t+2, occupied symbol, or invalid geometry fail closed.
+- The returned price is the observed candle open reference, not an executable fill. No spread, queue, partial fill, slippage, fee or adverse-selection model is present. No engine or pending-order integration was changed.
+- Research CI run `45465175545` on `83ebd2f644b9a1f26b2928135b3c5b0b82ac37fc` completed SUCCESS. H-B signal/entry test file contains 21 tests and passed; frozen regime adapter test file contains 6 tests and passed. The full configured deterministic workflow passed.
+- Current H-B result is a synthetic signal + classifier + entry contract pass only. No market PnL, execution proof or edge. A synthetic exit/persistence contract may be the next bounded step; do not connect the engine or run PnL before that is independently specified and needed.

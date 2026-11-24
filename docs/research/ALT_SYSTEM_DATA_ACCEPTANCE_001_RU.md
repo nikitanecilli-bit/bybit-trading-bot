@@ -1630,3 +1630,29 @@ The unique symbol coverage remains:
 - Across the raw cross-project observations, unique replicated symbols remain BTC, ETH, SOL and XRP: **4/47 = 8.5%**. The new contribution is an additional independently captured date and repository for BTC/ETH, not additional symbol breadth.
 
 **Decision:** D6 evidence is stronger for four named symbols and spans more dates, but remains PARTIAL CANDIDATE EVIDENCE — NOT ACCEPTED. D5 remains unchanged. D4 remains partial/unverified. Do not import, forward-fill, or use these external fixtures for market-PnL replay without a separate provenance decision and authorization.
+
+
+## 45. Additional D5 leads reviewed — linear candidate downgraded; spot-only capture excluded
+
+### Hassnain2003/trading-engine — normalized two-symbol candidate, not independent raw capture
+
+Repository file: https://github.com/Hassnain2003/trading-engine/blob/main/research/market_meta.json
+
+The file labels itself as Bybit V5 public REST, Linear settled instruments, captured live via CCXT on 2026-10-19. It contains BTCUSDT and ETHUSDT only, with normalized values for tick size, quantity step, min/max quantities, minimum notional, price bounds, maximum leverage and funding interval. Nominal universe coverage is 2/47 (4.26%).
+
+However:
+- It is a normalized CCXT representation, not the raw Bybit response envelope; request parameters, response server timestamp, exact raw bytes and capture manifest are absent.
+- The public repository has a fresh initial-public-copy commit dated 2026-11-12 with no parent history. The file's claimed 2026-10-19 capture date is therefore not independently anchored by repository history.
+- Its BTC/ETH values match the corresponding normalized subset of the already inspected 2026-10-21 sleeve-fund raw response. This is consistent with a stable specification, but does not prove independent capture or establish a separate date observation.
+
+Assessment: retain as a **low-confidence candidate / value cross-check only**, not as an independent D5 snapshot and not as accepted coverage. Do not add its 2 symbols to the independent snapshot coverage numerator.
+
+### pranay123-stack/crypto-hft-market-making-cpp20 — genuine dated metadata, wrong product category
+
+The repository documents real public-endpoint captures from 2026-10-18, including raw Bybit `instruments-info` response files for BTCUSDT and ETHUSDT. The saved request parameters explicitly use `category=spot`; hashes and capture procedure are documented in `tests/data/README.md`.
+
+This is stronger provenance than a generated fixture, but it is **Spot**, while the E11/E13 research universe consists of Linear perpetuals. It therefore contributes no D5 coverage for the 47-symbol Linear universe. It may be retained as a separate Spot metadata example only.
+
+### Decision
+
+These leads do not improve accepted D5 Linear coverage. D5 remains PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED; D6 remains PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED; D4 remains partial/unverified. No files were imported into the research repository, no market data was downloaded, and no Bybit API, collector, PnL run or backtest was executed.

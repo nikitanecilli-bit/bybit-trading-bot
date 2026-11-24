@@ -776,3 +776,51 @@ However:
 Tardis's raw historical replay/API route is not equivalent to its public monthly sample CSVs. The downloadable CSV schema does not include `instrument_info`; access path, exact symbol coverage, retention, and price must be confirmed before any purchase. No subscription should be purchased at this stage.
 
 This audit was documentation-only. No Tardis API request, download, account connection, subscription, collector, or market-data archive was used.
+
+
+## 26. CoinAPI historical-symbol metadata: a stronger D4 candidate, but not an exchange-rules archive
+
+CoinAPI documents a dedicated endpoint `GET /v1/symbols/{exchange_id}/history` that returns symbols no longer actively traded/listed on an exchange, with pagination. Its FAQ explicitly says it retains historical/inactive symbols when the symbol was supported at introduction, and points to this endpoint for delisted-symbol discovery.
+
+CoinAPI also documents Bybit integration for perpetual/futures data and gives `BYBIT` as an exchange identifier in its perpetual-symbol examples. This makes CoinAPI a concrete vendor candidate for D4 rather than a generic possibility.
+
+References:
+- Historical symbols endpoint: https://www.coinapi.io/products/market-data-api/docs/rest-api/metadata/symbols/exchange_id/history/get
+- CoinAPI data coverage FAQ: https://www.coinapi.io/products/market-data-api/faq
+- Bybit integration page: https://www.coinapi.io/products/market-data-api/exchanges/bybit
+- Symbol metadata overview: https://www.coinapi.io/datasets/asset-and-symbol-metadata
+
+### Potential D4 value
+
+The endpoint's stated purpose directly matches the missing historical inactive/delisted symbol inventory. Its symbol records can include:
+- exchange-native symbol mapping;
+- instrument type and base/quote assets;
+- market-data coverage start/end dates, including trade/quote/order-book intervals where available;
+- normalized precision fields.
+
+This could provide a second independently maintained symbol universe against which Bybit's own trade archive and announcements can be reconciled. It is particularly useful for discovering symbols that no longer appear in Bybit's current REST instrument list.
+
+### Limits and acceptance risks
+
+1. CoinAPI's retention statement is conditional: a symbol must have been supported by CoinAPI when introduced. It is not a guarantee that every Bybit listing is present.
+2. The documentation confirms Bybit integration, but we have not yet verified the exact exchange identifier(s), derivative-category split, or returned history coverage for the target period by a live metadata response.
+3. `data_trade_start/end`, `data_quote_start/end`, and `data_orderbook_start/end` describe CoinAPI's own data coverage, not the exact Bybit listing/delisting timestamps.
+4. CoinAPI explicitly warns that `price_precision` and `size_precision` are not necessarily the exchange's actual trading increments; these values can be derived after the fact and may lag changes. They are not substitutes for historical `tickSize`, `qtyStep`, min notional, order limits, or risk tiers.
+5. No historical effective-dated risk-limit schedule or account-state reconstruction is documented by this symbol metadata endpoint.
+
+### Updated gap assessment
+
+- **D4:** CoinAPI historical symbols is a promising candidate to test for universe completeness, in addition to the Bybit public trade archive and dated notices. It does not yet close D4 because actual Bybit response coverage, known-delisting recall, and symbol-history semantics have not been verified.
+- **D5:** remains missing. CoinAPI precision fields are not guaranteed exchange trading rules and are not documented as a complete effective-dated spec history.
+- **D6:** remains missing. No risk-limit tier history or account-state-dependent rules archive is established.
+
+### Next bounded evaluation (no purchase or data download)
+
+If a free trial or sample metadata response is available, the acceptance test should be metadata-only:
+1. Confirm Bybit's exact exchange identifier(s) for linear and inverse derivatives.
+2. Request active and historical symbol lists with pagination.
+3. Check whether known cases already identified in this audit (LUNAUSDT, USTUSDT, ANCUSDT, and other dated delistings) are present with plausible data coverage intervals.
+4. Compare the returned symbol set with the public Bybit trade-archive directory and official notices; quantify matches, omissions, duplicate/renamed instruments, and unexplained records.
+5. Reject any claim of completeness unless the vendor states coverage scope and the known-case reconciliation passes.
+
+No CoinAPI API request, API-key creation, paid trial, market-data download, or subscription was made. This is a vendor-evaluation lead only.

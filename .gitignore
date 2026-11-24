@@ -35,6 +35,8 @@ bybit_trade_journal*.json
 
 # Generated data and research outputs (keep reports and source code)
 data/cache/
+# Locally captured OKX public market-data pilot (do not commit raw archives)
+data/archives/okx/
 backtest_results/
 results/generated/
 reports/generated/

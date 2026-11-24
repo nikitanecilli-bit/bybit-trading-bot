@@ -421,3 +421,8 @@ Candidate deduplication across E04/E06/E08–E13 found only two main historical 
 ### 2026-11-25 — ограниченный BTCUSDT GET pilot
 
 Пользователь разрешил пять точечных публичных V5 GET для BTCUSDT (H1, Mark, Funding, текущие specs/risk tiers). Рабочая среда не смогла получить ответы: web retrieval сообщил URL inaccessible/403, container HTTPS не прошёл DNS resolution. Ни один валидный Bybit JSON не получен; это ограничение сетевого маршрута среды, а не доказательство отказа Bybit. Gates D1–D6 не изменились. Повторять только при появлении разрешённого прямого маршрута или при предоставлении пользователем исходных ответов; прокси/зеркала не использовать.
+
+
+### 2026-11-25 — независимый holdout повторно проверен
+
+В repo нет accepted independent dataset для H1 D48+EMA: шесть CryptoFetch proxy ZIP заканчиваются не позднее 2026-10-27 и уже использованы. Старый Bybit holdout script — другая гипотеза (D20, 11 ранее выбранных Binance symbols, independent per-symbol capital, approximate funding, Last-price exits) и сам указывает на календарное пересечение с Binance study; нужных Bybit файлов нет. Archive workflow требует self-hosted по умолчанию и предупреждает о hosted US egress block; self-hosted/collector запрещены. Значит текущее ограничение точнее формулируется как **BLOCKED BY DATA + INDEPENDENCE**. Не строить runner и не перемаркировать старые folds. Полный аудит — acceptance ledger Section 49.

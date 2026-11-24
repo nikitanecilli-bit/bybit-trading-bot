@@ -249,3 +249,12 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - Повторный run [45463406898](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463406898) — SUCCESS; лог подтверждает `Ran 10 tests`, `OK`; все остальные шаги Research CI также прошли.
 - Статус: **SIGNAL MECHANICS PASS**, не strategy/edge pass. Не frozen RegimeConfig, не проверены фактический t+2 fill, geometry, engine lifecycle или profitability.
 - Следующий безопасный этап: read-only audit существующего causal regime classifier/RegimeConfig и timestamp convention; без market PnL, tuning, Bybit, новых архивов и engine integration.
+
+
+## 2026-11-24 — H-B predicate and classifier review
+
+- Research CI run `45463406898` on commit `582ccedf943ed7d4a5a60db0436bbb63d4f5741c` completed SUCCESS. The exact H-B step ran `python tests/test_h_b_signal.py`: 10 tests, OK. This is a signal-predicate synthetic pass only.
+- Independent static review: predicate reads regime[t-1], ATR[t-1], close[t], high/low[t], close[t+1], and schedules entry at t+2. It does not read future candles beyond t+1. It freezes stop=low[t] and target=mean of 24 pre-shock closes. No engine fill/position/exit behavior is covered.
+- Predicate currently accepts precomputed regime and ATR arrays; it does not bind them to a specific `RegimeConfig` or prove that `market_regime.classify_candles()` generated them. This remains the principal H-B mechanics/design gap before any engine adapter.
+- `RegimeConfig.validate()` had a validation gap: non-finite slope thresholds and some wrong threshold types could pass. Added finite numeric validation and tests in commits `65da09dce517a93d089bc88fc716707891eecd59` and `e9782d15ff4f5ab226d4c89d842a544ed4cddf6a`. CI run `45463921785` is pending at time of this note.
+- The next allowed step is a pure, explicit-config adapter from causal classifier to predicate, plus synthetic tests that prove config binding, regime/ATR index alignment and prefix/future invariance. Do not select RegimeConfig values by inspecting CryptoFetch PnL. If a configuration cannot be justified independently, retain H-B as design-blocked.

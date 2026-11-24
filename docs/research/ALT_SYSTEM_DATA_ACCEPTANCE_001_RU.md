@@ -1692,3 +1692,34 @@ Bybit announcement, published 2026-11-19: [Update to Funding Rate Calculation Fo
 - D3 остаётся NOT ACCEPTED: по-прежнему нет реального Bybit archive с доказанной полнотой и точной settlement-mark семантикой.
 
 Никаких API endpoints кроме отдельно разрешённого announcements endpoint не вызывалось; market data не загружались, расчёты PnL не выполнялись.
+
+
+## 47. Veldra Bybit history adapter — useful acquisition-code lead, not accepted data
+
+### Что найдено
+
+Public repository: https://github.com/Baselm1/Veldra-Historical-Crypto-Market-Data-Downloader (MIT, version 0.1.0; source reviewed read-only on 2026-11-24).
+
+Its Bybit adapter documents and implements:
+- native Linear klines via V5 REST;
+- Mark Price, Index Price and Premium Index klines via V5 REST;
+- funding settlement history via V5 REST;
+- public Bybit daily trade and order-book archives;
+- backward pagination for klines (limit 1000) and funding (limit 200), half-open time ranges, schema/OHLC validation, normalized Parquet cache and SHA-256 of local materialization.
+
+The docs explicitly state that Bybit's daily public archives do not publish checksum sidecars. Its REST cache hashes the normalized Parquet materialization, not the original raw HTTP response bytes. Unit tests exercise pagination, schemas and range handling, but tests do not prove live source completeness or PIT history.
+
+### Ограничения относительно наших gates
+
+- The adapter exposes **current market discovery/current instrument metadata**, not an effective-time archive of all past instrument spec changes or risk tiers.
+- It does not reconstruct delisted/paused contract history or prove a complete PIT universe.
+- Funding pagination is implemented, but the reviewed code does not independently prove that the endpoint returns every historical settlement across every interval/formula regime; completeness still requires boundary, cadence, known-case and duplicate checks.
+- No historical D5/D6 archive is supplied. D4/D5/D6 therefore remain NOT ACCEPTED.
+- The package requires Python >=3.14, while this repository's Research CI currently uses Python 3.11. Direct adoption would require a separately justified runtime change or a compatibility port; neither is warranted before data-path acceptance.
+- A second public downloader, `gptcompany/bybit_historical_data_download`, documents Klines and Funding REST retrieval and trade/orderbook bulk archives, but its own availability report says the bulk historical download service covers trade/orderbook only. It is downloader code, not a stored accepted dataset; no evidence there closes D4–D6.
+
+### Решение
+
+Veldra is a **candidate implementation reference for D1/D2/D3 retrieval**, not a data source with accepted completeness and not a reason to change runtime dependencies now. If collection is separately authorized later, compare its request manifests, raw-response retention, cursor termination and gap checks against our existing `bybit_downloader.py` before deciding whether to reuse, port or reject it.
+
+No Bybit endpoint was called, no archive or dataset was downloaded, no dependency was installed, no runner/collector was started, and no PnL calculation was run. Existing user restrictions remain unchanged.

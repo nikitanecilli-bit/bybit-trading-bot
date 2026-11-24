@@ -148,7 +148,7 @@
 
 ## 2026-11-24 — scope freeze after H-B mechanics
 
-- Final bounded Research CI after removing the premature exit layer: run `45466416019`, commit `a78fa8ac4b41c7d2741d6d5a1a0014d02fb5df9e`, SUCCESS. H-B signal tests (13), frozen regime adapter tests (6), next-open fill geometry tests (8) all passed; all other configured deterministic checks passed.
+- Final bounded Research CI after removing the premature exit layer: run `45466778550`, commit `84d1da812d1958cbb32f3789895c7d4b56e45488`, SUCCESS (after removing the temporary exit module, tests and all workflow references). H-B signal tests (13), frozen regime adapter tests (6), next-open fill geometry tests (8) all passed; all other configured deterministic checks passed.
 - A temporary standalone H-B exit evaluator was explored but deliberately removed before acceptance. It crossed the current scope boundary: H-B synthetic signal/regime/fill mechanics are enough to establish the next decision; more lifecycle code would not answer the missing economic question. No active `h_b_exit.py` or exit test remains.
 - **Freeze decision:** do not add more H-B mechanics, engine integration, persistence, sizing, exit manager or new strategies. The synthetic package is complete for its narrow purpose. Current data and authorization gates do not allow market validation; adding code would create activity, not evidence.
 - Resume only when an independent market-validation route is legitimately available under the existing user permissions and data/provenance gates. Until then, permitted work is read-only audits, provenance/coverage review, and documentation/decision hygiene only.

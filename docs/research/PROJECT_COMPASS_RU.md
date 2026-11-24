@@ -327,3 +327,8 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 ### 2026-11-24 — E08–E13 exit-cost provenance reconciliation
 - Exact Actions checkout/source review confirms E08, E09, E10, E11 and E13 used engine versions whose `_close_position()` charged TP1/final exit fees and slippage from entry notional rather than exit execution notional. E12 is descriptive context analysis with no PnL and is not affected by this accounting defect.
 - Confirmed affected net-PnL experiments now include E01–E04, E07–E11 and E13. E05/E06 remain unclassified pending exact commit-level review. Preserve non-PnL descriptive observations, but do not use affected net aggregates for ranking or economic claims. No recalculation or new market run was performed.
+
+
+### 2026-11-24 — E05/E06 classification correction
+- E05 is a failed Bybit public-data download attempt (HTTP 403 across tested endpoints), not a PnL experiment; it is a data-access blocker, not affected by exit-cost accounting.
+- E06 is not merely descriptive: its signal/trade diagnostic workflow ran `UnifiedQuantEngine.run_simulation_pass()` on Binance proxy data. Exact checkout `9601f4d855f69d58e7353655a0c62060f519de13` uses the pre-fix engine blob `e4501bd...`; therefore E06's reported net-PnL is affected. E12 remains descriptive-only. Confirmed affected PnL scope is E01–E04, E06–E11 and E13.

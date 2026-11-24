@@ -1729,3 +1729,35 @@ Veldra is a **candidate implementation reference for D1/D2/D3 retrieval**, not a
 Veldra may be useful as a secondary code reference, but it does not remove a known missing capability. Its Python >=3.14 requirement is incompatible with our Python 3.11 Research CI. **Do not adopt or port it.** The actual bottleneck is accepted historical source evidence and authorized collection, not another downloader implementation. If collection is separately authorized later, retain our existing code as the baseline and compare only any specifically demonstrated missing behavior.
 
 No Bybit endpoint was called, no archive or dataset was downloaded, no dependency was installed, no runner/collector was started, and no PnL calculation was run. Existing user restrictions remain unchanged.
+
+
+## 48. Ограниченный BTCUSDT public-GET pilot — доступность среды не подтверждена (2026-11-25)
+
+### Разрешение и границы
+
+Пользователь отдельно разрешил ограниченный read-only пилот публичных GET для одного Linear-инструмента: H1 OHLCV, Mark Price, Funding History, текущие Instrument Specs и Risk Tiers. Выбран BTCUSDT, поскольку в существующем evidence inventory это наиболее полно покрытый контракт по датированным instrument/risk captures. Разрешение не включает API keys, private/account endpoints, архивную выгрузку, collector, торговлю или PnL.
+
+### Попытка доступа
+
+Выполнены только адресные попытки открыть публичные V5 endpoints с узкими параметрами для BTCUSDT:
+- GET /v5/market/kline — H1, 2026-10-21 00:00–02:00 UTC, limit 3;
+- GET /v5/market/mark-price-kline — тот же короткий интервал, limit 3;
+- GET /v5/market/funding/history — тот же короткий интервал, limit 10;
+- GET /v5/market/instruments-info — один символ;
+- GET /v5/market/risk-limit — один символ.
+
+Web retrieval layer вернул для kline/mark/funding/risk-limit сообщения "URL is not accessible via this tool"; для instruments-info — "403 Forbidden". Дополнительная попытка прямого HTTPS через доступную container-среду не прошла DNS resolution ("Could not resolve host: api.bybit.com"). Не получен ни один валидный Bybit JSON response; поэтому нельзя утверждать, что запросы достигли Bybit edge или что Bybit отказал в доступе.
+
+### Результат
+
+- API reachability: NOT VERIFIED (environment/network limitation).
+- D1/D2/D3: новых наблюдений и файлов нет; gates не изменились.
+- D5/D6: текущие snapshots не получены; historical effective-time coverage не проверена.
+- D4 lifecycle и independent holdout period не проверялись этим пилотом.
+- Нет данных, чтобы сравнить текущие instrument/risk values с прежними snapshots.
+
+Никаких архивов/больших ответов не скачано, collector не запускался, файлы данных не создавались, зависимости и runtime не менялись, PnL не считался. Пилот остановлен на сетевом барьере; обход через сторонние прокси/зеркала не предпринимать.
+
+### Следующее допустимое действие
+
+Повторять те же пять точечных GET только если появится разрешённый прямой сетевой маршрут в рабочую среду или пользователь предоставит выгрузку точных публичных ответов с URL, UTC timestamp, HTTP status/headers и исходным телом. Это не расширяет разрешение на иные endpoint-ы или архивный сбор.

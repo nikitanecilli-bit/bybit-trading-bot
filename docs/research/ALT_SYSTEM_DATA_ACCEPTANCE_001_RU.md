@@ -265,7 +265,8 @@ The provider describes an independent hourly Parquet archive beginning 2025-06-2
 
 Preliminary fit: possible D7 and partial D2/D3 research input, not a complete strategy-validation package. D1 and D4–D6 are not supplied by the listed families. Provider documentation and sample rows are not a substitute for independent raw-file verification.
 
-**Candidate C — official Bybit public archives and APIs**
+**Candidate C — official Bybit public archives and APIs**  
+Bybit's public documentation says historical trades can be downloaded from its archive site and documents public market endpoints for klines, mark-price klines, funding history, instruments, and risk limits. The existing AAVE diagnostic used public Bybit trade and quote-saver L2 archives. This is a potential venue-origin source, but it does not remove the historical PIT problem: current instrument/risk endpoints do not reconstruct old effective-time specifications or complete delisted/suspension history. Any future collection remains blocked by the active project hold and is not authorized by this inventory.
 
 **Candidate D — Tardis.dev Bybit Derivatives archive**  
 Bybit-specific coverage: https://docs.tardis.dev/historical-data-details/bybit.md  
@@ -281,8 +282,7 @@ Preliminary fit:
 - **D7:** strongest current public-documentation lead for execution research: raw Bybit L2 snapshots/deltas and trades, but it is L2 market-by-price rather than L3 order-by-order queue data. Depth/channel versions change over time, so replay rules must be channel-specific.
 
 No Tardis data, samples, or API responses were downloaded or inspected in this screening. The provider is a **candidate for a future provenance/coverage spot-check**, not an accepted source and not a substitute for D4-D6. Its subscription cost and exact symbol/date coverage for the proposed experiment remain unverified.
-  
-Bybit's public documentation says historical trades can be downloaded from its archive site and documents public market endpoints for klines, mark-price klines, funding history, instruments, and risk limits. The existing AAVE diagnostic used public Bybit trade and quote-saver L2 archives. This is a potential venue-origin source, but it does not remove the historical PIT problem: current instrument/risk endpoints do not reconstruct old effective-time specifications or complete delisted/suspension history. Any future collection remains blocked by the active project hold and is not authorized by this inventory.
+
 
 ### 11.4. Acceptance decision
 

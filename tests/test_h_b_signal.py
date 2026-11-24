@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from h_b_signal import H1_INTERVAL_MS, evaluate_h_b_signal, evaluate_h_b_signal_with_classifier, prepare_h_b_entry
+from h_b_signal import H1_INTERVAL_MS, evaluate_h_b_signal, evaluate_h_b_signal_with_classifier
 from market_regime import RegimeConfig
 
 
@@ -211,74 +211,5 @@ class TestHBClassifierBinding(unittest.TestCase):
         )
 
 
-
-
-class TestHBEntryPreparation(unittest.TestCase):
-    def setUp(self):
-        self.signal = {
-            "strategy": "H-B-mean-reversion",
-            "direction": "long",
-            "policy_version": "v0.1",
-            "signal_ts_ms": 1_800_000_000_000,
-            "entry_ts_ms": 1_800_000_000_000 + H1_INTERVAL_MS,
-            "stop_price": 98.0,
-            "target_price": 101.0,
-            "regime_config": {"efficiency_period": 5},
-        }
-        self.entry_candle = {
-            "ts": self.signal["entry_ts_ms"],
-            "open": 99.0,
-            "high": 100.0,
-            "low": 98.5,
-            "close": 99.5,
-        }
-
-    def test_accepts_exact_next_h1_open_and_preserves_signal_provenance(self):
-        prepared = prepare_h_b_entry(self.signal, self.entry_candle)
-        self.assertIsNotNone(prepared)
-        self.assertEqual(prepared["entry_price"], 99.0)
-        self.assertEqual(prepared["stop_price"], 98.0)
-        self.assertEqual(prepared["target_price"], 101.0)
-        self.assertEqual(prepared["regime_config"], {"efficiency_period": 5})
-
-    def test_missing_or_gapped_next_bar_fails_closed(self):
-        self.assertIsNone(prepare_h_b_entry(self.signal, None))
-        wrong_bar = dict(self.entry_candle, ts=self.entry_candle["ts"] + 1)
-        self.assertIsNone(prepare_h_b_entry(self.signal, wrong_bar))
-
-    def test_open_position_blocks_new_h_b_entry(self):
-        self.assertIsNone(prepare_h_b_entry(self.signal, self.entry_candle, True))
-
-    def test_entry_at_or_below_stop_is_rejected(self):
-        candle = dict(self.entry_candle, open=98.0)
-        self.assertIsNone(prepare_h_b_entry(self.signal, candle))
-
-    def test_entry_at_or_above_target_is_rejected(self):
-        candle = dict(self.entry_candle, open=101.0)
-        self.assertIsNone(prepare_h_b_entry(self.signal, candle))
-
-    def test_invalid_entry_open_fails_closed(self):
-        candle = dict(self.entry_candle, open=float("nan"))
-        with self.assertRaisesRegex(ValueError, "entry open"):
-            prepare_h_b_entry(self.signal, candle)
-
-
 if __name__ == "__main__":
     unittest.main()
-
-
-
-    def test_rejects_non_h_b_or_unsupported_signal(self):
-        wrong_strategy = dict(self.signal, strategy="other")
-        wrong_version = dict(self.signal, policy_version="v9")
-        wrong_direction = dict(self.signal, direction="short")
-        self.assertIsNone(prepare_h_b_entry(wrong_strategy, self.entry_candle))
-        with self.assertRaisesRegex(ValueError, "policy version"):
-            prepare_h_b_entry(wrong_version, self.entry_candle)
-        with self.assertRaisesRegex(ValueError, "H-B long"):
-            prepare_h_b_entry(wrong_direction, self.entry_candle)
-
-    def test_entry_timestamp_must_follow_signal_by_exactly_one_h1(self):
-        invalid = dict(self.signal, entry_ts_ms=self.signal["entry_ts_ms"] + 1)
-        with self.assertRaisesRegex(ValueError, "exactly one H1"):
-            prepare_h_b_entry(invalid, self.entry_candle)

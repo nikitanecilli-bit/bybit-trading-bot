@@ -1,0 +1,28 @@
+name: OKX public data loader checks
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/okx-public-data-loader]
+    paths:
+      - 'scripts/okx_public_data_archive.py'
+      - 'tests/test_okx_public_data_archive.py'
+      - '.github/workflows/okx-public-data-loader-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile loader and tests
+        run: python -m py_compile scripts/okx_public_data_archive.py tests/test_okx_public_data_archive.py
+      - name: Run offline loader tests
+        run: python tests/test_okx_public_data_archive.py

@@ -34,7 +34,7 @@ The output directory must be empty or absent. The script refuses to overwrite pr
 
 - `candles_h1.csv`: last-trade OHLCV candles, with the exchange `confirm` flag.
 - `mark_price_h1.csv`: mark-price OHLC candles. These are reference/valuation prices, not executable fills.
-- `funding_history.csv`: funding timestamps, rates, and formula metadata exactly as returned.
+- `funding_history.csv`: funding timestamps, rates, and formula metadata exactly as returned. **OKX documents this endpoint as covering up to three months**, so a 365-day OHLCV request will not imply 365 days of funding history. The manifest records the oldest raw funding event and whether pagination reached the requested start.
 - `instrument_current.json`: current contract metadata only; it is not a historical specification archive.
 - `raw/`: exact response bodies for every API page.
 - `manifest.json`: requested range, exact request URLs, capture times, row counts, SHA-256 hashes, hourly-grid checks, and limitations.
@@ -44,6 +44,7 @@ Exit code `0` means both H1 series have complete hourly timestamp coverage and n
 ## What this does not prove
 
 - A complete H1 grid does not prove that every historical contract rule, fee tier, risk tier, or funding formula regime has been reconstructed.
+- Funding history endpoint retention is documented as up to three months. Older funding data may therefore be unavailable from this endpoint even when H1 candles/mark history extend further.
 - Funding rows are not assumed to occur every eight hours. The received events are preserved; expected settlement completeness requires a separate schedule/effective-time audit.
 - The instrument endpoint is current-state metadata. Historical tick size, lot size, contract value, lifecycle, and risk tiers remain separate acceptance gates.
 - A successful download is data-source evidence, not a trading edge or permission to run a backtest. Do not start market-PnL work until the existing research authorization and data/provenance gates are explicitly reviewed.

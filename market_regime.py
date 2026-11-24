@@ -50,17 +50,6 @@ class RegimeConfig:
             raise ValueError("all regime thresholds must be finite numbers")
         if self.ema_fast_period >= self.ema_slow_period:
             raise ValueError("ema_fast_period must be less than ema_slow_period")
-        numeric_thresholds = (
-            ("trend_er_min", self.trend_er_min),
-            ("range_er_max", self.range_er_max),
-            ("trend_slope_atr_min", self.trend_slope_atr_min),
-            ("range_slope_atr_max", self.range_slope_atr_max),
-            ("high_vol_ratio", self.high_vol_ratio),
-            ("high_vol_er_max", self.high_vol_er_max),
-        )
-        for name, value in numeric_thresholds:
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-                raise ValueError(f"{name} must be a finite number")
         if not 0 <= self.range_er_max < self.trend_er_min <= 1:
             raise ValueError("require 0 <= range_er_max < trend_er_min <= 1")
         if self.trend_slope_atr_min <= 0 or self.range_slope_atr_max < 0:

@@ -283,6 +283,10 @@ Preliminary fit:
 
 No Tardis data, samples, or API responses were downloaded or inspected in this screening. The provider is a **candidate for a future provenance/coverage spot-check**, not an accepted source and not a substitute for D4-D6. Its subscription cost and exact symbol/date coverage for the proposed experiment remain unverified.
 
+**Commercial-access check (public pricing page reviewed 2026-11-24):** the listed Bybit Derivatives data-plan tiers show Academic at USD 350/month (quarterly or yearly billing only), Solo at USD 700/month, Professional at USD 1,000/month, and Business at USD 3,000/month. Academic eligibility requires confirmation; the Professional tier adds raw replay/API, Tardis Machine and instrument metadata access, while Academic/Solo are CSV-only. Under the published billing rules, Academic/Solo/Professional yearly subscriptions expose four years of historical data; Business yearly exposes all available history. Therefore the advertised Bybit start date of 2020-05-28 for linear contracts does **not** imply that a normal four-year plan purchased in late 2026 includes the full history back to 2020. Exact quote, tax, data-plan scope and contractual access window would need confirmation directly from the provider before any purchase decision.
+
+**Cost-benefit decision:** do not purchase or trial a paid Tardis plan at this stage. Even the lowest listed derivatives tier is a recurring material cost, and Tardis does not close D4-D6. Its strongest contribution would be D7 execution research and potentially raw trades for D1 bar construction; neither is the currently decisive missing gate for a first defensible strategy test. Reconsider only after a frozen experiment specification proves that tick/L2 data is essential, the required symbol/date sample is known, and a separately authorized data budget exists.
+
 
 ### 11.4. Acceptance decision
 

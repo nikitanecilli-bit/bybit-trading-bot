@@ -582,3 +582,21 @@ This is a material unresolved lead for D4/D5, not evidence that historical speci
 **Correction to Section 16:** do not treat the current reference's lack of time parameters as proof that Bybit never offered historical instrument queries. Equally, do not treat the 2023 changelog line as proof of a usable, complete historical metadata archive. D5 remains `missing / unresolved historical-query lead` until official semantics, current support, historical depth, and field coverage are independently established. D4 remains partial/unverified.
 
 A bounded next documentary task is to recover the 2023-04-04 API schema/PR history and determine the exact meaning and removal date of `startTime`/`endTime`. If that cannot be established from public documentation history, the next step requires explicit permission for a read-only public GET against the instruments-info endpoint; it must not be silently tested under the announcements-only authorization.
+
+
+## 19. Git-history cross-check of the 2023 instrument-time-parameter lead
+
+The public `bybit-exchange/docs` repository was checked read-only to avoid interpreting a changelog line in isolation.
+
+- The historical `docs/v5/market/instrument.mdx` file at commit `8cce6d002d126ad9a48c0584a317c37ce17ba6ce` (2023-03-09) documents category, symbol, baseCoin, limit and cursor; it does not document `startTime` or `endTime`.
+- The current file at the repository's `master` ref also omits `startTime` and `endTime`.
+- A broad GitHub search for the terms `startTime` and `endTime` surfaced PR #245 (December 2023), but its actual commit patch changes documentation for closed PnL, executions, transaction logs, and order history; it does **not** touch Get Instruments Info. This is a verified false positive and must not be cited as evidence for instrument-history support.
+- The official V5 changelog still contains the 2023-04-04 line attributing `startTime`/`endTime` to Get Instruments Info for UTA mode, but the corresponding API-doc change/PR and precise semantics have not yet been located.
+
+References:
+- Historical instrument schema commit: https://github.com/bybit-exchange/docs/commit/8cce6d002d126ad9a48c0584a317c37ce17ba6ce
+- Current instrument schema: https://github.com/bybit-exchange/docs/blob/master/docs/v5/market/instrument.mdx
+- False-positive PR #245: https://github.com/bybit-exchange/docs/pull/245
+- Changelog: https://bybit-exchange.github.io/docs/changelog/v5
+
+**Conclusion:** the 2023 changelog line is an unresolved documentation anomaly, not a verified historical metadata endpoint. The historical instrument-info query hypothesis remains unproven. Do not use it to accept D4 or D5, and do not claim the endpoint never had such parameters. Resolving this requires locating the exact historical API implementation/announcement or receiving explicit authorization for a narrowly scoped public GET test of the instruments-info endpoint.

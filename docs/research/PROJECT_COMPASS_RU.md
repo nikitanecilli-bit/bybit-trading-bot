@@ -267,3 +267,12 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - Research CI run `45464213667` on `7d27224942a7082889d8e98f3155668d18a9c5bb` completed SUCCESS. H-B test step: 13/13 OK; causal regime classifier tests and other configured deterministic checks passed.
 - This establishes mechanical wiring from an explicit causal classifier to the H-B predicate. It does not establish that the classifier thresholds are economically justified, nor does it validate pending/fill, sizing, exits, persistence, market PnL or edge.
 - Next possible isolated task: synthetic pending-entry contract for open[t+2], missing/gap cancellation, and entry/stop/target geometry without engine integration or PnL. Do not use CryptoFetch PnL to select RegimeConfig.
+
+
+### 2026-11-24 — H-B regime adapter and causal cadence gate
+- Static audit: `market_regime.classify_candles()` is causal but only requires strictly increasing timestamps; it does not enforce a timeframe cadence. H-B therefore must validate its entire classifier prefix, not only the local shock window.
+- Added `h_b_regime.py` with an explicit frozen candidate config inherited from pre-existing RegimeConfig defaults (not market-calibrated), exact uninterrupted H1 validation through t+1, and causal regime/ATR feed into the H-B signal predicate. The wrapper slices input at t+1; later bars cannot affect the candidate.
+- `RegimeConfig.validate()` now rejects non-finite, boolean and non-numeric threshold values; regression tests cover these cases.
+- Research CI [45464653488](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45464653488) — SUCCESS on SHA `6540e375d6d2ad7dfd321202973e60e2e0815dae`. Market-regime tests passed; H-B signal tests: 13/13; H-B regime adapter tests: 6/6; full technical workflow successful.
+- Status: **SIGNAL + REGIME MECHANICS PASS** only. The RegimeConfig is an uncalibrated candidate; no actual t+2 fill, fill geometry, engine lifecycle, market PnL or edge is validated.
+- Next safe step: isolated pure next-open fill-geometry check (bar availability, timestamp, actual open between frozen stop/target), without engine integration or PnL.

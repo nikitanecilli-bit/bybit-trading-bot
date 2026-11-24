@@ -196,4 +196,4 @@ jobs:
       - name: Test sparse shared-capital replay timeline
         run: python tests/test_sparse_simulation_replay.py
       - name: Test H-B signal predicate (synthetic only)
-        run: python -m pytest -q tests/test_h_b_signal.py
+        run: python tests/test_h_b_signal.py

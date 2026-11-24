@@ -80,6 +80,7 @@ class TestHBNexOpenFillGeometry(unittest.TestCase):
     def test_signal_timestamp_must_match_stabilization_bar(self):
         candles, signal = make_candidate()
         signal["signal_ts_ms"] += H1_INTERVAL_MS
+        signal["entry_ts_ms"] += H1_INTERVAL_MS
         with self.assertRaisesRegex(ValueError, "stabilization candle"):
             validate_h_b_replay_fill(candles, signal)
 

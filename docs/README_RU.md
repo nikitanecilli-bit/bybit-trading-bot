@@ -2,6 +2,8 @@
 
 ## Читать в первую очередь
 
+0. [PROJECT COMPASS — долговременный контекст проекта](research/PROJECT_COMPASS_RU.md) — цель, история, решения, результаты, ограничения и точка продолжения; обязателен перед каждой новой задачей.
+
 1. [Инструкции агенту](../AGENTS.md) — обязательные правила.
 2. [Exchange reconciliation readiness](audits/EXCHANGE_RECONCILIATION_READINESS_RU.md) — read-only V5 snapshot contract и причина текущего BLOCKED.
 3. [Рабочие правила проекта](../PROJECT_WORKING_RULES_RU.md) — автономность, безопасность и методика.

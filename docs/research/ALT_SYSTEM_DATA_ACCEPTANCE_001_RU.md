@@ -1761,3 +1761,61 @@ Web retrieval layer вернул для kline/mark/funding/risk-limit сообщ
 ### Следующее допустимое действие
 
 Повторять те же пять точечных GET только если появится разрешённый прямой сетевой маршрут в рабочую среду или пользователь предоставит выгрузку точных публичных ответов с URL, UTC timestamp, HTTP status/headers и исходным телом. Это не расширяет разрешение на иные endpoint-ы или архивный сбор.
+
+
+## 49. Повторная проверка наличия независимого holdout и готовых Bybit-путей — 2026-11-25
+
+### Вывод
+
+**В текущем репозитории нет доступного независимого набора, на котором можно проверить замороженный H1 Donchian(48)+EMA50/200.** Это подтверждается аудитом дерева данных, preregistration, существующего cross-venue holdout script и workflow.
+
+### 1. Существующие OHLCV периоды не являются holdout
+
+- В data/archives/cryptofetch/ находятся шесть Binance-style proxy ZIP; их наблюдения заканчиваются не позднее 2026-10-27.
+- Эти архивы использовались в E01–E13 и при разработке/отборе последующих H1 гипотез. Они не могут быть переименованы в независимый Confirm/holdout.
+- LOW_FREQUENCY_DONCHIAN48_EMA_H1_PREREGISTRATION_RU.md датирован 2026-11-04, но его Explore/Confirm folds относятся к уже изученным proxy материалам. Сам документ прямо запрещает считать CryptoFetch untouched holdout.
+- В дереве текущей ветки нет data/bybit_recent, Bybit trade OHLCV, Mark candles или Funding CSV. Наличие загрузчика и workflow не означает наличие набора данных.
+
+### 2. Старый cross-venue holdout script не закрывает задачу
+
+scripts/run_bybit_h1_long_only_holdout.py выглядит как возможный путь, но это другой эксперимент:
+- frozen list из 11 символов отобран на более раннем Binance train;
+- движок использует Donchian(20), а не preregistered Donchian(48)+EMA50/200;
+- каждый символ запускается отдельно с 10,000 USDT, поэтому суммарный PnL не является shared-capital portfolio curve;
+- Funding cost считается верхней оценкой: положительные ставки начисляются на полный исходный notional, отрицательные receipts и уменьшение notional после TP1 игнорируются;
+- Mark используется для basis diagnostics, но stop/exit остаётся на Last-price OHLC;
+- сам скрипт явно предупреждает, что Bybit даты пересекаются с прежним Binance study period: это cross-venue robustness, а не последующий untouched temporal holdout.
+- Скрипт требует data/bybit_recent и dated instrument/risk directories; нужных Bybit market files в текущем repo tree нет.
+
+Следовательно, этот script нельзя просто запустить и назвать результат проверкой H1 D48+EMA или независимой временной репликацией. Его переписывание сейчас также не решит отсутствие данных.
+
+### 3. Путь сбора в существующем workflow ограничен
+
+.github/workflows/bybit-market-history-archive.yml:
+- по умолчанию выбирает self-hosted runner;
+- отдельно предупреждает, что hosted US runners блокируются Bybit;
+- предлагает ubuntu-latest лишь как альтернативу, но workflow заранее ожидает блокировку по egress geography;
+- перед сбором требует dated instrument snapshots.
+
+Self-hosted runner и новые collectors остаются запрещены действующими пользовательскими ограничениями. Поэтому этот workflow не является сейчас разрешённым рабочим путём. Не менять runner, не пытаться обойти географические ограничения и не запускать workflow.
+
+### 4. Классификация
+
+| Условие | Статус |
+|---|---|
+| Замороженная H1 D48+EMA гипотеза | Есть, design frozen |
+| Независимый Explore/Confirm набор | Нет |
+| Независимый последующий temporal holdout | Нет |
+| Bybit-native trade OHLCV D1 | Нет в repo |
+| Bybit Mark D2 | Нет в repo |
+| Полная Funding D3 | Нет в repo |
+| Point-in-time lifecycle D4 | Не принят |
+| Effective-time specs D5 | Частичные внешние snapshots, не приняты |
+| Effective-time risk tiers D6 | Частичные внешние snapshots, не приняты |
+| Разрешённый канал получения новых данных | Сейчас отсутствует |
+
+### Решение
+
+Не выбирать другие старые folds, не делать временной split внутри уже использованных архивов и не подменять независимость сменой venue при совпадающем календарном периоде. Не переписывать holdout script и не трогать workflow.
+
+**Исследовательский статус остаётся BLOCKED BY DATA + INDEPENDENCE.** Следующее событие, которое действительно меняет статус: появление разрешённого, воспроизводимого Bybit-native набора с provenance и достаточным новым временным окном либо предоставление такого набора пользователем. После этого отдельно проверяются lifecycle, funding completeness, specs/risk effective-time и пригодность периода до любого PnL.

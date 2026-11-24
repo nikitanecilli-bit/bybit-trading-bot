@@ -289,3 +289,5 @@
 - Но текущий runner принудительно использует maker limit OHLC penetration (20 bps offset / 5 bps penetration / 3-bar TTL); это не доказанный maker fill. Base engine умеет market entry на next H1 open с taker accounting, но runner этот путь переопределяет.
 - Наиболее дешёвый потенциальный путь — отдельная preregistered taker-only single-symbol execution profile поверх существующего H1 engine. Это новая версия execution contract, не прежний maker candidate. D1/D3/D4/D5/D8 остаются обязательны; при 5x isolated также D2/D6.
 - **Решение: пока не писать runner и не запускать PnL.** Сначала доказать наличие независимого периода и accepted Bybit-native inputs для одного инструмента. Подробный read-only review — раздел 2A [Minimum Viable Edge Validation](MINIMUM_VIABLE_EDGE_VALIDATION_RU.md).
+
+- Новый read-only source lead: Veldra умеет получать Bybit Linear klines, mark klines, funding и public trade/orderbook archives, но не даёт исторические D4/D5/D6; требует Python >=3.14 против Python 3.11 в нашем Research CI. Это reference implementation, не принятые данные и не причина менять runtime. См. acceptance ledger Section 47.

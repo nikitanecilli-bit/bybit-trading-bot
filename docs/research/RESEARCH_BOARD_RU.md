@@ -32,7 +32,7 @@
 | Базовая H1 breakout / E01–E13 | **DEFERRED / NO EDGE** | Ряд shared-capital proxy результатов отрицателен; выборка не PIT Bybit; старые результаты имеют ограничения исполнения и provenance | Не тюнить прежние folds. Возвращаться только при новом независимом основании и закрытых data/method gates |
 | H-A relative-strength breakout | **REJECTED — tested configuration** | В preregistered proxy comparison хуже baseline и отрицательна по folds | Не подбирать параметры и символы на тех же folds |
 | H-C post-break invalidation | **REJECTED AS PROFITABILITY CANDIDATE / MECHANICS ONLY** | Проверенная proxy-конфигурация не показала превосходства; реализация находится за default-OFF флагом; synthetic tests не доказывают edge | Не продолжать tuning на использованном окне |
-| H-B mean reversion | **SIGNAL + CLASSIFIER MECHANICS PASS / ENGINE LIFECYCLE BLOCKED** | Pure predicate (10 tests) и explicit-config classifier adapter (+3 tests) прошли Research CI #45464213667; нет engine integration, pending/fill/exit lifecycle и market PnL | Независимо проверить entry open[t+2], gap/cancel, stop/target geometry и exit/persistence contract синтетически; не запускать PnL |
+| H-B mean reversion | **SIGNAL + CLASSIFIER + ENTRY MECHANICS PASS / LIFECYCLE BLOCKED** | Frozen default RegimeConfig candidate, causal adapter, predicate и next-open entry contract прошли Research CI #45465175545; 21 H-B signal/entry tests и 6 regime-adapter tests; нет engine integration, exit/persistence lifecycle и market PnL | Решить, нужен ли synthetic-only exit/persistence contract; не подключать engine и не запускать PnL |
 | Новые стратегии/фильтры | **DEFERRED** | Ни один новый кандидат не обоснован достаточно, чтобы оправдать расширение | Не добавлять до закрытия текущего H-B mechanical question |
 
 Статусы REJECTED относятся к конкретным проверенным конфигурациям/окнам, а не к утверждению, что любой вариант семейства стратегий математически невозможен.
@@ -117,3 +117,12 @@
 - Research CI [45464653488](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45464653488) — SUCCESS на актуальном SHA `6540e375d6d2ad7dfd321202973e60e2e0815dae`. Логи: market-regime suite passed; H-B signal `Ran 13 tests / OK`; H-B regime adapter `Ran 6 tests / OK`; все остальные шаги завершились успешно.
 - Вывод: **SIGNAL + REGIME MECHANICS PASS** на synthetic inputs. Frozen config — только исследовательский кандидат; он не оптимизирован и не подтверждён на рынке. Реальный t+2 fill, fill geometry, costs, engine lifecycle и edge не проверены.
 - Следующий узкий шаг: отдельный pure next-open fill-geometry check; без engine integration, market PnL, data collection или Bybit.
+
+
+## 2026-11-24 — H-B next-open entry contract verified
+
+- Добавлен `prepare_h_b_entry()`: проверяет H-B long identity и policy version, точную связь `entry_ts_ms = signal_ts_ms + 1 H1`, наличие свечи t+2 с точным timestamp, свободный symbol и геометрию `entry > stop`, `target > entry`. Missing/gapped bar, occupied position и невалидная геометрия дают no-entry; невалидные числовые данные fail closed.
+- Это reference open, не обещание реального fill: spread, queue, partial fills, slippage, fees и adverse selection не моделируются. Engine/pending/position state не менялись.
+- Ужесточена проверка идентичности входного сигнала: принимается только H-B long и поддерживаемая policy version; сигнал с неверной временной связью отвергается.
+- Research CI run `45465175545` на commit `83ebd2f644b9a1f26b2928135b3c5b0b82ac37fc` завершился SUCCESS. `tests/test_h_b_signal.py`: 21 test; `tests/test_h_b_regime.py`: 6 tests; оба workflow steps success, causal regime validation и остальные deterministic checks также прошли.
+- Текущий H-B статус: synthetic signal/classifier/entry contract PASS. Это не market PnL, не edge, не execution validation. Следующий слой — только если полезен: synthetic exit/persistence invariants с заранее определённым контрактом. Не подключать engine и не запускать PnL.

@@ -345,3 +345,6 @@ Current boundary: preserve raw signal/context observations as exploratory histor
 
 
 E08–E13 artifact cross-check: raw candidate feature rows are constructed before engine replay and can be retained as exploratory descriptions; future-return columns are labels only, while engine status/fill/trade outputs remain tainted. Candidate rows repeat across configs and must be canonicalized/deduplicated. This does not change the NO EDGE / DEFERRED status.
+
+
+The artifact-level salvage classification now covers E01–E13: E01–E03/E07 are summary-only; E04/E06/E08–E11/E13 contain candidate signal CSVs with pre-engine raw features (exploratory only, canonicalized/deduplicated); E12 is descriptive-only hourly context; E05 is a failed data-access attempt. All engine-derived fills, trade selection/status and PnL remain excluded from economic evidence. No new market calculation was performed and the strategy status remains DEFERRED / NO EDGE.

@@ -260,7 +260,7 @@ def main(argv: list[str] | None = None) -> int:
         "host": BASE_URL, "credentials_used": False,
         "notes": [
             "Current instrument metadata is a snapshot, not historical effective-time specifications.",
-            "Funding rows are preserved as returned; this tool does not infer missing settlement events from a fixed interval.",
+            "Funding rows are preserved as returned; this tool does not infer missing settlement events from a fixed interval. OKX documents this history endpoint as covering up to three months.",
             "Mark price candles are valuation/reference data, not executable trade prices.",
             "No strategy, PnL, backtest, order, or account endpoint is called.",
         ],
@@ -284,6 +284,21 @@ def main(argv: list[str] | None = None) -> int:
             }
             if dataset in ("candles", "mark_price"):
                 dataset_report["hourly_grid"] = hourly_grid_report(rows, start_ms, end_ms)
+            if dataset == "funding":
+                raw_times = [page["min_timestamp_ms"] for page in pages if page["min_timestamp_ms"] is not None]
+                oldest_raw = min(raw_times) if raw_times else None
+                newest_times = [page["max_timestamp_ms"] for page in pages if page["max_timestamp_ms"] is not None]
+                newest_raw = max(newest_times) if newest_times else None
+                dataset_report["oldest_raw_event_ms"] = oldest_raw
+                dataset_report["oldest_raw_event_utc"] = iso_utc(oldest_raw) if oldest_raw is not None else None
+                dataset_report["newest_raw_event_ms"] = newest_raw
+                dataset_report["newest_raw_event_utc"] = iso_utc(newest_raw) if newest_raw is not None else None
+                dataset_report["requested_start_reached"] = oldest_raw is not None and oldest_raw <= start_ms
+                dataset_report["coverage_note"] = (
+                    "Requested start boundary was reached by pagination."
+                    if dataset_report["requested_start_reached"]
+                    else "API response did not reach requested start; history may be truncated by endpoint retention."
+                )
             manifest["datasets"][dataset] = dataset_report
 
         instrument_url = build_url(ENDPOINTS["instrument"], {"instType": "SWAP", "instId": args.instrument})

@@ -6,7 +6,8 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from h_b_signal import H1_INTERVAL_MS, evaluate_h_b_signal
+from h_b_signal import H1_INTERVAL_MS, evaluate_h_b_signal, evaluate_h_b_signal_with_classifier
+from market_regime import RegimeConfig
 
 
 def make_fixture():
@@ -120,6 +121,97 @@ class TestHBSignal(unittest.TestCase):
     def test_insufficient_history_returns_no_signal(self):
         candles, regimes, atr = make_fixture()
         self.assertIsNone(evaluate_h_b_signal(candles, regimes, atr, 23))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+
+def make_classifier_fixture():
+    ts0 = 1_800_000_000_000
+    candles = []
+    for i in range(30):
+        close = 100.0 + (0.05 if i % 2 else -0.05)
+        candles.append({
+            "ts": ts0 + i * H1_INTERVAL_MS,
+            "open": close,
+            "high": close + 0.2,
+            "low": close - 0.2,
+            "close": close,
+        })
+    candles.append({
+        "ts": ts0 + 30 * H1_INTERVAL_MS,
+        "open": 99.0,
+        "high": 99.2,
+        "low": 98.0,
+        "close": 98.5,
+    })
+    candles.append({
+        "ts": ts0 + 31 * H1_INTERVAL_MS,
+        "open": 98.6,
+        "high": 99.5,
+        "low": 98.4,
+        "close": 99.3,
+    })
+    return candles, 30
+
+
+class TestHBClassifierBinding(unittest.TestCase):
+    def setUp(self):
+        self.config = RegimeConfig(
+            efficiency_period=5,
+            atr_period=3,
+            ema_fast_period=3,
+            ema_slow_period=6,
+            slope_lookback=2,
+            volatility_lookback=8,
+            trend_er_min=0.35,
+            range_er_max=0.25,
+            trend_slope_atr_min=1.0,
+            range_slope_atr_max=1.0,
+            high_vol_ratio=10.0,
+            high_vol_er_max=0.3,
+        )
+
+    def test_explicit_config_is_required(self):
+        candles, index = make_classifier_fixture()
+        with self.assertRaisesRegex(ValueError, "explicit RegimeConfig"):
+            evaluate_h_b_signal_with_classifier(candles, None, index)
+
+    def test_classifier_binding_emits_config_provenance(self):
+        candles, index = make_classifier_fixture()
+        signal = evaluate_h_b_signal_with_classifier(candles, self.config, index)
+        self.assertIsNotNone(signal)
+        self.assertEqual(signal["regime_config"], {
+            "efficiency_period": 5,
+            "atr_period": 3,
+            "ema_fast_period": 3,
+            "ema_slow_period": 6,
+            "slope_lookback": 2,
+            "volatility_lookback": 8,
+            "trend_er_min": 0.35,
+            "range_er_max": 0.25,
+            "trend_slope_atr_min": 1.0,
+            "range_slope_atr_max": 1.0,
+            "high_vol_ratio": 10.0,
+            "high_vol_er_max": 0.3,
+        })
+
+    def test_future_rows_after_confirmation_do_not_enter_classifier_prefix(self):
+        candles, index = make_classifier_fixture()
+        baseline = evaluate_h_b_signal_with_classifier(candles, self.config, index)
+        extended = copy.deepcopy(candles)
+        extended.extend([
+            {"ts": candles[-1]["ts"] + H1_INTERVAL_MS, "open": 1.0, "high": 1.0,
+             "low": 1.0, "close": 1.0},
+            {"ts": candles[-1]["ts"] + 2 * H1_INTERVAL_MS, "open": 5000.0, "high": 9000.0,
+             "low": 100.0, "close": 8000.0},
+        ])
+        self.assertEqual(
+            evaluate_h_b_signal_with_classifier(extended, self.config, index),
+            baseline,
+        )
 
 
 if __name__ == "__main__":

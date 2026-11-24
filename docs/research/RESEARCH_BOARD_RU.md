@@ -296,3 +296,11 @@
 ### 2026-11-25 — BTCUSDT public GET pilot blocked by environment
 
 - Пользователь разрешил ограниченный read-only pilot пяти публичных Bybit V5 GET endpoints для BTCUSDT. Все адресные попытки завершились недоступностью URL в web retrieval; instruments-info вернул 403 на стороне retrieval layer. Прямой HTTPS из container среды не прошёл DNS resolution. Нет валидных ответов Bybit, поэтому API reachability и все data gates остаются NOT VERIFIED/NOT ACCEPTED. Никакого обхода через прокси, архивной загрузки или PnL не выполнялось. Подробности: acceptance ledger Section 48.
+
+
+### 2026-11-25 — independent holdout availability re-audited
+
+- В репозитории нет независимого набора для замороженной H1 Donchian(48)+EMA50/200: CryptoFetch proxy заканчивается 2026-10-27 и уже использован в E01–E13/последующей разработке.
+- Старый run_bybit_h1_long_only_holdout.py не подходит: Donchian(20), 11 символов отобраны на Binance train, отдельный капитал на символ, funding upper-bound, Last-price exits и явное пересечение календарного периода с прежним Binance study. Bybit data files, которых он требует, в repo отсутствуют.
+- Существующий Bybit archive workflow требует self-hosted по умолчанию и предупреждает о блокировке hosted US egress. Self-hosted/collector запрещены; workflow не запускать и не менять.
+- Статус: **BLOCKED BY DATA + INDEPENDENCE**. Ни старые folds, ни другой venue на том же календарном периоде не создают независимый holdout. Подробности: acceptance ledger Section 49 и Minimum Viable Validation Section 6A.

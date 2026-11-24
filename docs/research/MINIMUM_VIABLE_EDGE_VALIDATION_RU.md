@@ -124,6 +124,16 @@ Funding нужно учитывать не только как ряд ставо
 - Отрицательный результат закрывает проверенную конфигурацию, если качество данных и исполнения достаточно для такого вывода.
 - Если funding completeness, lifecycle или execution ambiguity не разрешены, результат INCONCLUSIVE/BLOCKED, а не условный PASS.
 
+## 6A. Проверка независимого периода и существующего Bybit holdout path (2026-11-25)
+
+Read-only audit Section 49 of the acceptance ledger confirms that the repository has no accepted independent dataset for H1 Donchian(48)+EMA50/200. CryptoFetch proxy bars end by 2026-10-27 and were already used in E01–E13 and subsequent H1 hypothesis work. The preregistration dated 2026-11-04 does not make those bars unseen.
+
+The existing scripts/run_bybit_h1_long_only_holdout.py is not a substitute: it runs Donchian(20), uses 11 symbols selected on earlier Binance training data, launches independent 10,000-USDT per-symbol simulations rather than shared capital, applies an upper-bound funding approximation, and explicitly states that its Bybit calendar period overlaps the earlier Binance study. It also requires Bybit market files absent from the repository.
+
+The existing archive workflow defaults to self-hosted and warns hosted US runners are blocked. Self-hosted runners and new collectors remain prohibited. Do not modify the workflow or relabel old folds as holdout.
+
+Decision: **BLOCKED BY DATA + INDEPENDENCE**. No runner rewrite or PnL run is justified until a permitted independent Bybit-native dataset exists and passes the relevant gates.
+
 ## 7. Что делать сейчас
 
 Пока действуют ограничения пользователя:

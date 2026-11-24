@@ -1475,3 +1475,59 @@ This is a useful three-part consistency chain for **BNBUSDT Linear**: dated pre-
 | D6 — exchange risk tiers | 9-symbol tier fixture at 2026-09-29; raw 4-symbol tables at 2026-10-21; a manually pasted BTC table dated 2026-10-15; exact 35-tier cross-source matches for BTC/ETH/SOL/XRP | Only four symbols have raw cross-project replication; the Oct 15 BTC corroboration is manually pasted; short time span; no full historical tier-change ledger; no account-specific applied-tier/position/order state | **PARTIAL CANDIDATE EVIDENCE — NOT ACCEPTED** |
 
 These snapshots are not yet imported into the project repository and are not authorized for historical market-PnL replay. They should be treated as source leads for a future provenance acceptance package, not as permission to start collectors or market tests. No Bybit endpoint was called by this research session, no new market archive was downloaded, and no backtest/PnL calculation was run.
+
+
+## 41. Coverage of dated metadata snapshots against the exact E11/E13 47-symbol proxy universe
+
+### Recovering the denominator from the original workflow logs
+
+The exact universe was recovered from historical GitHub Actions logs, not inferred from the shortlist in `scripts/h1_symbol_universes.json`:
+
+- E11 run: https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41361376448
+- E11 repeat run: https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41361285396
+- E13 run: https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41362217727
+
+Both E11 runs and the E13 run report `Valid H1 symbols=50; fold-eligible symbols=47; common aligned bars=4321`, then print the complete sorted 47-symbol universe. All three lists are identical. This is the exact E11/E13 replay universe, not the 5-symbol primary or 5-symbol reserve shortlist.
+
+The 47 symbols are:
+
+`AAVEUSDT, ADAUSDT, ALGOUSDT, APTUSDT, ARBUSDT, ASTERUSDT, ATOMUSDT, AVAXUSDT, BCHUSDT, BNBUSDT, BTCUSDT, CAKEUSDT, DASHUSDT, DOGEUSDT, DOTUSDT, ENAUSDT, ETCUSDT, ETHUSDT, GMXUSDT, HBARUSDT, ICPUSDT, JSTUSDT, LINKUSDT, LTCUSDT, MINAUSDT, MORPHOUSDT, NEARUSDT, ONDOUSDT, PAXGUSDT, PEPEUSDT, POLUSDT, PUMPUSDT, QNTUSDT, RAYUSDT, RENDERUSDT, SHIBUSDT, SKYUSDT, SOLUSDT, SUIUSDT, TAOUSDT, TRXUSDT, UNIUSDT, WLDUSDT, WLFIUSDT, XLMUSDT, XRPUSDT, ZECUSDT`.
+
+The log prints `UNIVERSE <symbol>` and bar/fold counts for each row. No archive or workflow artifact ZIP was downloaded; this comparison used only existing text logs and source metadata.
+
+### Exact overlap with the dated metadata snapshots
+
+The 2026-09-29 `crypto-dashboard` fixture contains nine Linear symbols. All nine are present in the E11/E13 universe:
+
+`ADAUSDT, AVAXUSDT, BNBUSDT, BTCUSDT, DOGEUSDT, ETHUSDT, LINKUSDT, SOLUSDT, XRPUSDT`.
+
+- D5 candidate instrument-spec coverage: **9 / 47 = 19.1%** of the E11/E13 proxy universe at the 2026-09-29 capture window.
+- D6 candidate risk-tier coverage: **9 / 47 = 19.1%** at the same capture window.
+- The additional 9 Spot rows in that fixture do not increase coverage of this Linear perpetual universe; they are a different product category.
+
+The 2026-10-21 `sleeve-fund` raw captures cover:
+- D5 instrument info: BTCUSDT only, **1 / 47 = 2.1%**.
+- D6 risk tiers: BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT, **4 / 47 = 8.5%**.
+
+The four raw Oct 21 risk-tier symbols are all inside the Sep 29 nine-symbol fixture, and all 35 tiers for each symbol compare exactly between the two projects. Thus the raw cross-project D6 replication covers four of the 47 proxy symbols, not nine. The Oct 15 manually pasted BTC table adds no new symbol or independent raw-capture coverage.
+
+The 38 symbols outside the Sep 29 nine-symbol fixture are:
+
+`AAVEUSDT, ALGOUSDT, APTUSDT, ARBUSDT, ASTERUSDT, ATOMUSDT, BCHUSDT, CAKEUSDT, DASHUSDT, DOTUSDT, ENAUSDT, ETCUSDT, GMXUSDT, HBARUSDT, ICPUSDT, JSTUSDT, LTCUSDT, MINAUSDT, MORPHOUSDT, NEARUSDT, ONDOUSDT, PAXGUSDT, PEPEUSDT, POLUSDT, PUMPUSDT, QNTUSDT, RAYUSDT, RENDERUSDT, SHIBUSDT, SKYUSDT, SUIUSDT, TAOUSDT, TRXUSDT, UNIUSDT, WLDUSDT, WLFIUSDT, XLMUSDT, ZECUSDT`.
+
+### Interpretation — useful coverage, not a point-in-time universe
+
+This comparison makes the gap measurable: the dated candidate fixture covers 19.1% of the exact 47-symbol research sample, and the second project's raw captures cover only one instrument-spec row and four risk-tier rows.
+
+However, **the 47-symbol denominator is itself not a Bybit point-in-time universe**. E11/E13 formed it from the Binance-style proxy archive by retaining symbols with enough common history across all three folds. The sample spans 2026-04-29 to 2026-10-26, but it is fixed, availability-filtered and survivor-biased. A matching ticker in a third-party Bybit fixture does not prove that the same Bybit contract was listed and tradable throughout the entire proxy interval.
+
+Therefore:
+- the percentages quantify overlap with the research sample only;
+- they do not estimate coverage of all Bybit Linear contracts;
+- they do not close D4 lifecycle/PIT-universe requirements;
+- they do not close D5 historical effective-time parameter coverage;
+- they do not close D6 historical tier schedule or account-applied-tier history.
+
+### Updated decision
+
+D5 and D6 remain **PARTIAL CANDIDATE EVIDENCE — NOT ACCEPTED**. The next highest-value source search is for additional dated raw Bybit Linear instrument/risk-limit captures covering the 38 currently uncovered symbols and earlier dates, with per-response server timestamps and original request/response envelopes. Do not import third-party files or start any PnL/backtest until provenance acceptance and existing authorization gates are separately satisfied.

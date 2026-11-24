@@ -734,3 +734,45 @@ For future, separately authorized validation, the evidence should be combined wi
 No absence-based inference should be made from missing archive files or missing announcements. A valid point-in-time universe requires a reconciliation process that preserves `observed active`, `observed inactive/closed`, and `unknown` as separate states, with source and confidence attached to each symbol/time interval.
 
 **Acceptance remains D4 partial/unverified.** The public archive materially improves the evidence path, but its completeness and row-level quality have not been validated. No market archive file was downloaded.
+
+
+## 25. Tardis Bybit `instrument_info` capture: a bounded historical lifecycle lead, not a specification archive
+
+The current Tardis Bybit Derivatives coverage page provides a more precise finding than the earlier general vendor assessment:
+
+- Tardis states Bybit inverse-contract historical data is available from 2019-11-07 and linear-contract data from 2020-05-28.
+- The legacy Bybit WebSocket channel `instrument_info` is listed as available **until 2023-04-05**, described as “instrument ticker and contract state updates”.
+- From 2023-04-05 onward, Tardis lists newer channels such as `publicTrade`, `tickers`, and order-book feeds, but does not list a replacement channel explicitly described as a contract-state/instrument-spec update stream.
+- Tardis downloadable CSV data types list trades, order books, quotes, derivative tickers and other datasets, but do not list `instrument_info` as a normalized downloadable CSV dataset. The raw channel is documented as accessible through the historical replay/API path.
+
+References:
+- Bybit coverage and channel dates: https://docs.tardis.dev/historical-data-details/bybit
+- Tardis downloadable CSV data types: https://docs.tardis.dev/downloadable-csv-files/data-types
+- Tardis API access: https://docs.tardis.dev/api/http-api-reference
+- Tardis instruments metadata limitations: https://docs.tardis.dev/api/instruments-metadata-api
+
+### Potential value for D4
+
+The old `instrument_info` stream may provide timestamped state updates for the 2020-11/2020-05 through 2023-04 period, depending on contract category and actual per-symbol capture coverage. This is a concrete lead for reconstructing part of the historical lifecycle and could be stronger than announcement-only evidence.
+
+However:
+- the documentation's channel description does not itself prove that every status transition or every symbol was captured without gaps;
+- the page does not provide a point-in-time completeness guarantee for the instrument-state channel;
+- the raw channel schema and event semantics must be validated against Bybit's legacy WebSocket protocol and known lifecycle cases;
+- no equivalent explicit state-update channel is documented after 2023-04-05 in this coverage page.
+
+**D4 assessment:** Tardis `instrument_info` is a potentially valuable, bounded historical source through 2023-04-05. It could strengthen D4 for covered symbols and intervals if completeness is tested. It cannot by itself establish a complete lifecycle ledger through the present.
+
+### Why it does not close D5 or D6
+
+- The channel is described as instrument ticker and contract state updates, not as a full historical copy of `instruments-info` or `risk-limit` REST responses. Do not assume it contains tick size, quantity step, minimum notional, order limits, leverage filters, or risk tiers.
+- Tardis's separate Instruments Metadata API states that only `contractMultiplier` changes are guaranteed accurate and complete; `priceIncrement` and `amountIncrement` are best-effort. Its `availableTo` can lag actual delisting. This remains insufficient for strict D5 acceptance.
+- No documented historical risk-limit tier archive or account-state history is provided by the examined Tardis Bybit coverage.
+
+**D5 remains missing. D6 remains missing.**
+
+### Cost and permission decision
+
+Tardis's raw historical replay/API route is not equivalent to its public monthly sample CSVs. The downloadable CSV schema does not include `instrument_info`; access path, exact symbol coverage, retention, and price must be confirmed before any purchase. No subscription should be purchased at this stage.
+
+This audit was documentation-only. No Tardis API request, download, account connection, subscription, collector, or market-data archive was used.

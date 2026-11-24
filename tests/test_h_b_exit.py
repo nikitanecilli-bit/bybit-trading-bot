@@ -1,5 +1,9 @@
 """Deterministic synthetic tests for the H-B exit contract."""
+from pathlib import Path
+import sys
 import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from h_b_exit import H_B_TIME_STOP_BARS, evaluate_h_b_exit
 from h_b_signal import H1_INTERVAL_MS

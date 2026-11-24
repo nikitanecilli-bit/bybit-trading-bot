@@ -291,3 +291,8 @@
 - **Решение: пока не писать runner и не запускать PnL.** Сначала доказать наличие независимого периода и accepted Bybit-native inputs для одного инструмента. Подробный read-only review — раздел 2A [Minimum Viable Edge Validation](MINIMUM_VIABLE_EDGE_VALIDATION_RU.md).
 
 - Veldra read-only review завершён: adapter покрывает D1/D2/D3 retrieval, но не даёт D4/D5/D6 и не улучшает покрытие относительно уже имеющихся `bybit_downloader.py`, `archive_bybit_market_history.py` и funding manifests; к тому же требует Python >=3.14 против Python 3.11 в нашем CI. Решение: не внедрять и не портировать. Узкое место — реальные принятые исторические данные/разрешение на их сбор, а не downloader tooling. См. acceptance ledger Section 47.
+
+
+### 2026-11-25 — BTCUSDT public GET pilot blocked by environment
+
+- Пользователь разрешил ограниченный read-only pilot пяти публичных Bybit V5 GET endpoints для BTCUSDT. Все адресные попытки завершились недоступностью URL в web retrieval; instruments-info вернул 403 на стороне retrieval layer. Прямой HTTPS из container среды не прошёл DNS resolution. Нет валидных ответов Bybit, поэтому API reachability и все data gates остаются NOT VERIFIED/NOT ACCEPTED. Никакого обхода через прокси, архивной загрузки или PnL не выполнялось. Подробности: acceptance ledger Section 48.

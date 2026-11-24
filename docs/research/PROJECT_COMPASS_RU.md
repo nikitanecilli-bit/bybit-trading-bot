@@ -306,3 +306,6 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - H-B has completed its narrow synthetic mechanics purpose. The synthetic accepted fill example has gross reward/risk 0.4; this is not an estimate of live expectancy, but reinforces that geometric validity is not economic evidence.
 - Freeze further H-B code, engine integration, persistence, sizing, exits and new strategy families. Current data and authorization gates do not permit independent market validation. Additional implementation would add activity without resolving edge.
 - Until a legitimate validation route is available under the user's explicit permissions and data/provenance requirements, restrict work to read-only audits, existing-data provenance/coverage review and documentation/decision hygiene.
+
+
+- Added `H-B-SYNTHETIC-001` to `EXPERIMENT_LEDGER_RU.md`, recording the exact causal signal contract, frozen default regime candidate, 13/6/8 synthetic test suites, final Research CI, the 0.4 synthetic gross R/R fixture, and all non-claims/limitations. This is a mechanics record, not a market experiment.

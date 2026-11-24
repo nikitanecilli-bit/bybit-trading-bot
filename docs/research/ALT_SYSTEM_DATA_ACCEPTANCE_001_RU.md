@@ -473,3 +473,66 @@ References:
 - The public API GET is still not verified by a live response; no total count, oldest returned record, or complete pagination depth is known.
 - No new market-data archive, collector, runner, market-PnL test, paper trade, or live trade was run.
 - **DATA GATE REMAINS BLOCKED.** The next legitimate improvement is source-level acceptance design for actual lifecycle and account-state records, not more isolated announcement examples.
+
+
+## 16. V5 API changelog audit: dated schema evolution and current-endpoint limitations (2026-11-24)
+
+This section is based on the official V5 API documentation and changelog. It is documentary evidence, not a live API response or historical data download.
+
+### 16.1. Instrument specifications are not static
+
+The official `Get Instruments Info` documentation states that:
+- `maxLimitOrderQty`, `maxMarketOrderQty`, and `postOnlyMaxLimitOrderSize` are adjusted twice monthly, on the 3rd and 17th at 08:00 UTC+8; users must not assume they remain constant.
+- `linear` and `inverse` default status responses return `Trading` and `PendingOpen`; other lifecycle states require explicit status queries.
+- `launchTime` and `deliveryTime` are returned, with `deliveryTime` also used as perpetual delisting time.
+- Current responses include tick size, quantity step, minimum notional, max order quantities, leverage limits, funding interval and funding-rate bounds.
+
+Official reference: https://bybit-exchange.github.io/docs/v5/market/instrument
+
+The official V5 changelog documents that fields were added at different dates, rather than being available throughout the entire API history:
+- 2023-04-06: `status` filter added to Get Instruments Info.
+- 2024-01-18: `riskParameters`, `limitParameter`, and `marketParameter` added.
+- 2024-02-06: `upperFundingRate` and `lowerFundingRate` added.
+- 2024-02-21: `maxMktOrderQty` added and `postOnlyMaxOrderQty` superseded by `maxOrderQty`.
+- 2024-04-11: `minNotionalValue` added.
+- 2024-06-27: status filtering expanded to `Closed`, `Delivering`, and `PreLaunch` for linear/inverse.
+- 2026-09-01: `PendingOpen` status added for futures.
+- 2026-09-29: `tags` field added for linear/inverse.
+
+Official reference: https://bybit-exchange.github.io/docs/changelog/v5
+
+**D5 consequence:** the present response schema cannot be projected backwards as though every field existed in 2020–2023. A historical specification model needs field-level availability dates, effective dates of values, and explicit unknowns before a field was introduced. The twice-monthly quantity-limit changes are a direct reason that one current snapshot cannot represent historical order constraints.
+
+### 16.2. Risk-limit API history has structural breaks
+
+The official V5 changelog records:
+- 2024-03-12: `Set Risk Limit` deprecated because automatic risk limit had launched.
+- 2024-04-30: `Get Risk Limit` began returning 30 linear symbols per request and added `nextPageCursor`.
+- 2024-08-26: page size changed from 30 to 15.
+- 2025-08-28: Get Risk Limit added support for pre-market contract risk-limit tables.
+
+Official reference: https://bybit-exchange.github.io/docs/changelog/v5
+
+These changes create at least three historical API regimes: before automatic risk-limit operation, the initial automatic-risk period, and later cursor-paginated response behavior. A collector that assumes today's pagination or today's automatic tier semantics for older dates would be incorrect.
+
+### 16.3. Current risk rules include account-state and transition behavior
+
+The current official Help Center article states that:
+- risk tier is adjusted automatically from open position value and active-order value;
+- for USDT/USDC contracts, position/order value uses contract size multiplied by mark price;
+- Reduce Only and Close on Trigger orders are excluded from effective position value;
+- One-Way and Hedge modes are handled by side;
+- mark-price changes can change the tier in real time;
+- platform-wide risk-parameter changes can be applied immediately when account risk is low, or can trigger a 10-day buffer with restrictions when risk is high.
+
+Official reference: https://www.bybit.com/en/help-center/article/Risk-Limit-Perpetual-and-Expiry-Contracts
+
+**D6 consequence:** reconstructing effective risk constraints requires more than a historical per-symbol tier table. It needs the rules version and effective time, dated tier schedule, mark price, open position and active-order state, order flags, position mode, and any account-specific transition/buffer state. The current Help Center page does not prove that every current rule applied unchanged in earlier years.
+
+### 16.4. Updated acceptance decision
+
+- D4: unchanged — announcement-only reconstruction cannot guarantee complete lifecycle coverage; automatic delisting may occur without prior notice.
+- D5: strengthened negative evidence — the official API itself confirms recurring quantity-limit changes and multiple schema additions over time. Dated field-level snapshots remain necessary. Status: `missing` for full historical acceptance.
+- D6: strengthened negative evidence — official changelog establishes the transition to automatic risk limits and later API pagination changes; current rules show account-state-dependent tier application. Status: `missing` for full historical acceptance.
+- No live API response, current API count, archive, market data, collector, runner, PnL run, paper order, or live order was produced by this audit.
+- **DATA GATE REMAINS BLOCKED.**

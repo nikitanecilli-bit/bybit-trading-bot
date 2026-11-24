@@ -246,3 +246,11 @@
 - Public `sbOogway/sbt2` adapter writes daily dated instrument snapshots when run, but its `/data/` outputs are git-ignored and no raw Bybit archive is present in the public tree. Snapshot stores only lowest risk tier; full D6 table is not preserved there.
 - D5 potential lead only if local snapshots can be obtained with provenance; D6 insufficient as implemented. D4 partial; D5/D6 remain not accepted. No API, collectors, market data or PnL runs.
 - Evidence: acceptance ledger Section 43.
+
+
+### 2026-11-24 — CandleViewer Oct 25 raw risk-tier capture
+
+- Third independent repository found: CandleViewer preserves full public Bybit REST envelopes for BTCUSDT and ETHUSDT Linear risk tiers on 2026-10-25, 35 tiers each.
+- All 35 rows/fields for BTC and ETH match the Oct 21 sleeve-fund raw responses exactly and the Sep 29 crypto-dashboard fixture. This improves date/source replication for BTC/ETH but adds no new symbol breadth.
+- D6 unique raw-replicated symbols remain BTC/ETH/SOL/XRP = 4/47 (8.5%); D6 remains PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED.
+- CandleViewer instrument-before/after examples are generated documented-shape fixtures, not D5 live captures. D5 unchanged. Details in acceptance ledger Section 44.

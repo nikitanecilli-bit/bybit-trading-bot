@@ -213,3 +213,11 @@
 - `risk-limit`: current symbol tier table only. Actual account tier is dynamic from positions, active orders and mark price; account-level liquidation replay also needs account-state history.
 - Official archived-trade download link does not establish historical specification/risk archives.
 - **Decision:** D5/D6 remain NOT ACCEPTED; D4 remains partial/unverified. No new archives, collectors, API calls, market PnL or backtests. See [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 38](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#38-official-market-api-and-risk-limit-documentation-historical-data-boundary).
+
+
+### 2026-11-24 — Official Bybit documentation Git history
+
+- `bybit-exchange/docs` provides versioned instrument/risk-limit API documentation from 2022-12-05 onward. Instrument schema history is extensive; risk-limit history contains 34 commits.
+- Recoverable: documented field/filter/response changes, pagination changes, and some published rule-change references.
+- Not recoverable from this repository: complete effective-dated per-symbol numeric instrument specs or full historical risk-tier tables. Timestamped examples are partial illustrative payloads, not accepted snapshots.
+- **Decision unchanged:** D5/D6 NOT ACCEPTED. Documentation history improves schema chronology only. Full evidence: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 39](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#39-bybit-official-documentation-git-history-schema-chronology-recovered-historical-values-not-recovered).

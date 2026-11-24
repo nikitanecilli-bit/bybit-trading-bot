@@ -234,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end", help="UTC ISO timestamp, exclusive, exact hour; defaults to latest closed H1 boundary")
     parser.add_argument("--days", type=int, default=365, help="lookback days when --start is omitted (default: 365)")
     parser.add_argument("--output", type=Path, default=Path("data/archives/okx/BTC-USDT-SWAP"))
-    parser.add_argument("--pause", type=float, default=0.15, help="seconds between pages (default: 0.15)")
+    parser.add_argument("--pause", type=float, default=0.25, help="seconds between pages (default: 0.25)")
     parser.add_argument("--max-pages", type=int, default=2000, help="safety limit per endpoint")
     args = parser.parse_args(argv)
 

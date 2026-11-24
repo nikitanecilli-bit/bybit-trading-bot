@@ -1720,6 +1720,12 @@ The docs explicitly state that Bybit's daily public archives do not publish chec
 
 ### Решение
 
-Veldra is a **candidate implementation reference for D1/D2/D3 retrieval**, not a data source with accepted completeness and not a reason to change runtime dependencies now. If collection is separately authorized later, compare its request manifests, raw-response retention, cursor termination and gap checks against our existing `bybit_downloader.py` before deciding whether to reuse, port or reject it.
+Veldra is a **candidate implementation reference for D1/D2/D3 retrieval**, not a data source with accepted completeness. A read-only comparison with our existing repository shows no material gate-coverage advantage:
+- our `bybit_downloader.py` already pages native klines, mark/index/premium klines and funding, and snapshots current instrument metadata;
+- `scripts/archive_bybit_market_history.py` already has bounded funding pagination, mark/kline acquisition and page-level audit metadata;
+- `funding_archive_manifest.py` stores query provenance, file hashes and an explicit unresolved settlement-schedule field;
+- our separate instrument/risk modules already parse dated specs and complete risk-tier ladders, while Veldra only discovers current markets.
+
+Veldra may be useful as a secondary code reference, but it does not remove a known missing capability. Its Python >=3.14 requirement is incompatible with our Python 3.11 Research CI. **Do not adopt or port it.** The actual bottleneck is accepted historical source evidence and authorized collection, not another downloader implementation. If collection is separately authorized later, retain our existing code as the baseline and compare only any specifically demonstrated missing behavior.
 
 No Bybit endpoint was called, no archive or dataset was downloaded, no dependency was installed, no runner/collector was started, and no PnL calculation was run. Existing user restrictions remain unchanged.

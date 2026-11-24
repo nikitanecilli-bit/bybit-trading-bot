@@ -105,12 +105,15 @@ H-C — идея раннего выхода, если цена после пр�
 Источник: `docs/research/H_C_POST_BREAK_INVALIDATION_PREREGISTRATION_RU.md`.
 
 ### H-B — mean reversion
-H-B обсуждалась как отдельная гипотеза: сильное движение/падение, затем подтверждение стабилизации/бокового режима и возврат к среднему. Подготовлены readiness/synthetic design specifications в исследовательском контексте, но на текущем этапе **нет подтверждённого рыночного результата и нет основания для полной интеграции в торговый движок**.
+H-B прошла только узкую синтетическую проверку механики, не рыночную проверку:
+- h_b_signal.py — pure causal long-only H1 predicate; shock на t, стабилизация на t+1, planned entry на t+2.
+- h_b_regime.py — adapter к frozen candidate H-B-RANGE-DEFAULTS-v1; конфигурация унаследована от существующих defaults, не оптимизирована по market PnL.
+- h_b_fill.py — offline reference check actual open[t+2] строго между stop и target; это не реальный fill model.
+- Финальный bounded Research CI #45466778550 на code commit 84d1da812d1958cbb32f3789895c7d4b56e45488: 13 signal tests, 6 regime adapter tests, 8 next-open geometry tests; полный configured deterministic workflow SUCCESS.
+- Synthetic accepted fixture имеет gross reward/risk 0.4. Это искусственная тестовая геометрия, не expectancy и не оценка реальной торговли.
+- Нет market PnL, edge, spread/queue/slippage/funding model, engine integration, sizing, persistence или exit lifecycle.
 
-Ближайший безопасный шаг, согласованный в диалоге 2026-11-24: проверить только чистую механику сигнала на синтетических данных — временную причинность/no-look-ahead, вход, stop и mean target; оценить минимальный изолированный seam. Не переписывать весь lifecycle/engine до доказательства, что гипотеза хотя бы механически определена и реализуема без утечки будущего.
-
-Перед продолжением перепроверить наличие и актуальность файлов H-B в выбранной ветке. Историческое упоминание спецификации не является доказательством, что она присутствует в текущем HEAD.
-
+**Решение: H-B SYNTHETIC MECHANICS COMPLETE / FROZEN.** Не добавлять lifecycle, manager, sizing, exits, новые H-B filters или новые strategy families. Продолжение возможно только при появлении легитимного независимого пути market validation, который укладывается в разрешения пользователя и data/provenance gates. До этого — read-only аудит уже имеющихся данных и документационная гигиена.
 ## 5. Данные и ограничения, которые блокируют рыночные выводы
 
 В provenance-аудитах были выявлены пробелы:
@@ -186,25 +189,17 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 
 ## 10. Текущая точка на 2026-11-24
 
-- Большая исследовательская/техническая инфраструктура существует, но её объём не должен диктовать следующий шаг.
-- Рыночное преимущество не доказано.
-- H-A tested configuration rejected.
-- H-C implemented behind default-OFF flag; no PnL proof.
-- H-B signal candidate v0.1 описан: H1 long-only; range label на t-1; shock на close t; stabilization на close t+1; entry на open t+2; stop `low[t]`; target — среднее 24 pre-shock closes; time stop — close 24-го бара удержания. Это спецификация, не реализация.
-- В H-B документах есть подробный lifecycle/adapter plan (pending, actual-fill sizing, nullable TP, restore, manager, accounting, journal). Он значительно шире минимальной проверки сигнала. Не начинать эту полную интеграцию до доказательства необходимости.
-- `market_regime.py` уже содержит causal classifier; `tests/test_market_regime.py` проверяет future-mutation invariance. Однако classifier не обеспечивает H1 cadence validation, а H-B требует ровно 3,600,000 ms между последовательными свечами.
-- H-B `RegimeConfig` ещё не frozen для гипотезы. Не использовать незаметно default config и не выбирать пороги по результатам. Для первого изолированного теста режим `range` подавать как заранее заданный synthetic input; отдельно проверять temporal predicates. Выбор/freeze classifier config — отдельное решение до рыночного исследования.
-- H-B readiness spec и synthetic spec содержат несколько уровней детализации и открытых вопросов (например numeric tolerance, downstream JSON consumers, liquidation model limits). Не считать все lifecycle требования обязательными для первой проверки чистого сигнала.
-- Bybit-native data/provenance gaps остаются критическими; не обходить действующие запреты на новые collectors/data/PnL.
-- Пользователь подтвердил максимальную автономность 2026-11-24, включая управление документами и исследовательской лабораторией. Это разрешает самостоятельные безопасные изменения в research-ветке, но не отменяет явные gates по сбору данных/подключению Bybit, paper/live и реальному капиталу.
-- PR #15 объединён в `research/market-regime-v1-main` (squash commit `f92a211...`); `main` не затрагивался. Обнаруженная ошибка прошлого статуса исправлена: до merge карта и правило фактически отсутствовали в рабочей ветке.
-- H-B signal-only implementation находится в PR #16 (`research/hb-signal-contract`), не объединён: добавлены `h_b_signal.py` и `tests/test_h_b_signal.py` (10 тестов). Изменений торгового движка нет.
-- В отдельной Python-сессии вручную проверены 10 основных сценариев/инвариантов на точной копии функции: все прошли. Это не запуск pytest из репозитория и не CI.
-- Для PR #16 не обнаружены связанные workflow runs; автоматическое подтверждение тестового набора отсутствует. Не объединять PR до получения репозиторного тестового результата и проверки legacy suite.
-- Следующий практический шаг: получить фактический запуск `pytest tests/test_h_b_signal.py` и relevant legacy regression suite. Если GitHub Actions не запускается автоматически, найти разрешённый способ выполнения; не создавать инфраструктуру только ради красивого статуса. Затем исправить обнаруженные дефекты и принять решение по узкой интеграции.
-
----
-
+- **Цель:** доказать или опровергнуть устойчивый net edge после реалистичных издержек и независимой проверки. Доказанного edge нет.
+- **H-A:** проверенная конфигурация отклонена; не тюнить на использованных folds.
+- **H-C:** mechanics behind default-OFF flag; проверенная proxy-конфигурация не показала прибыльного преимущества; не продолжать tuning на использованном окне.
+- **Базовая H1/E01–E13:** deferred/no edge. Исторические proxy результаты не являются актуальным доказательством; есть survivorship/PIT и execution gaps.
+- **H-B:** synthetic signal + frozen regime adapter + next-open geometry complete/frozen. Final bounded Research CI #45466778550 passed 13 + 6 + 8 tests. Synthetic gross R/R fixture 0.4. Это не market PnL и не edge. Никакого engine lifecycle/exit/persistence/sizing integration.
+- **Данные:** в текущем Git tree — шесть CryptoFetch ZIP (67 CSV members), Binance-style OHLCV proxy. В read-only archive artifact #13187466159: 67/67 структурно валидны, 64 eligible, 3 пусты, нет malformed/gaps/conflicting overlap и нет потери timestamps в longest-file pair comparisons. Это подтверждает целостность этих архивов, но не Bybit provenance или полноту рынка.
+- **Критические пробелы:** нет подтверждённого Bybit-native trade OHLCV, mark-price history, funding completeness, dated instrument/risk-tier snapshots и полноценного PIT tradable universe. Старые audit documents подробно описывают эти блокеры.
+- **Разрешения:** никаких Bybit/API keys/private endpoints, runner setup, новых биржевых архивов/collectors, market-PnL backtests/sweeps/event studies, paper/live или реальных ордеров до выполнения последовательных historical и paper/forward gates. Live требует отдельного разрешения.
+- **Рабочая ветка:** research/market-regime-v1-main; HEAD при последней сверке 99e0a681a6a341866773b7d99c066bf63165bd46. Последний принятый code/test CI #45466778550 относится к 84d1da812d1958cbb32f3789895c7d4b56e45488; последующие commits в цепочке документируют freeze.
+- **PR:** #15 (Compass) и #16 (H-B signal contract) merged в research branch; PR #13 остаётся открытым как более ранний context-recovery protocol. main не изменялась.
+- **Следующий безопасный режим:** read-only audit уже имеющихся datasets/provenance и документационная гигиена. Если никакой допустимый путь к независимой market validation не существует, оставить проект BLOCKED, а не строить новые слои.
 ## Журнал изменений карты
 
 ### 2026-11-24 — первый глобальный контекстный аудит
@@ -309,3 +304,8 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 
 
 - Added `H-B-SYNTHETIC-001` to `EXPERIMENT_LEDGER_RU.md`, recording the exact causal signal contract, frozen default regime candidate, 13/6/8 synthetic test suites, final Research CI, the 0.4 synthetic gross R/R fixture, and all non-claims/limitations. This is a mechanics record, not a market experiment.
+
+### 2026-11-24 — актуализация H-B freeze и data inventory
+- Сверены текущий branch HEAD, последние commits, Research CI и архивный audit artifact. Принятый H-B результат — только synthetic mechanics pass (13 signal + 6 regime + 8 fill geometry tests), не market edge. Временный exit layer не входит в accepted design и удалён.
+- Текущий Git tree содержит шесть CryptoFetch ZIP; исторический archive audit artifact #13187466159 сообщает 67 valid CSV members, 64 non-empty/legacy-eligible, 3 empty, zero irregular intervals, zero conflicting overlaps and zero longest-file timestamp loss in duplicate comparisons.
+- Отредактирован верхний статус карты, чтобы он не противоречил более позднему scope-freeze log. Никаких данных не скачивали, Bybit/API/runner не подключали, market-PnL не запускали.

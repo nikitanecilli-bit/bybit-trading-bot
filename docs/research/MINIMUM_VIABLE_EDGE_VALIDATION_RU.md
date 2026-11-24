@@ -28,6 +28,44 @@
 
 **Вывод:** сейчас нет кандидата, одновременно готового к честному новому PnL validation и имеющего независимый допустимый период/реалистичную модель исполнения. Это отдельный блокер наряду с данными. Не маскировать его сбором ещё большего архива или инфраструктурой.
 
+
+
+## 2A. Решение по готовности кандидатов — read-only review 2026-11-24
+
+### Ранжирование по близости к честной проверке
+
+| Кандидат | Что уже есть | Что блокирует | Решение |
+|---|---|---|---|
+| **H1 Donchian(48)+EMA50/200** | Frozen signal specification; полный общий engine lifecycle (entry, sizing, stop/TP/trailing/time stop, funding, fees, risk state); отдельная preregistration | Текущий runner принудительно превращает сигнал в maker limit: offset 20 bps, penetration 5 bps, TTL 3 H1 bars. OHLC penetration не подтверждает maker fill, queue, spread или partial fills. Runner также привязан к Top-5 manifest/folds и 5x isolated risk-tier path. Все старые proxy folds просмотрены | **Ближайший к спасению кандидат, но не готов к validation.** Не использовать текущую maker-fill версию как доказательство исполнимости |
+| **H-B mean reversion** | Causal signal, stabilization and next-open geometry tests | Нет полного lifecycle, stop/target/exit policy, sizing, portfolio interaction, funding/cost integration | FROZEN. Достраивание lifecycle сейчас дороже, чем адаптация существующего H1 engine |
+| **H-A / H-C** | Исследованные конфигурации и/или synthetic mechanics | Нет положительного независимого edge; старые folds уже использованы | Не возвращать в tuning |
+
+### Технически самый дешёвый следующий вариант для H1
+
+Read-only code inspection выявил важную возможность: базовый engine `_try_fill_pending()` уже поддерживает **market entry на open следующей H1 свечи**, когда сигнал имеет `order_type != "limit"`. Для market entry он проверяет max-chase, использует следующий open и рассчитывает taker fee/slippage в sizing/accounting. Но текущий research runner оборачивает этот метод, принудительно задаёт `order_type="limit"` и применяет OHLC limit-wait модель. Runner config также задаёт `maker_entry_and_tp1=True`, а `maker_tp1_and_target=False`.
+
+Поэтому минимальная инженерная ветка — сохранить H1 Donchian(48)+EMA signal и существующий lifecycle, но создать **отдельную preregistered taker-only execution profile**:
+1. вход market на open следующей H1 свечи, с существующим max-chase guard;
+2. taker fees/slippage на entry и всех exit legs; maker assumptions выключены явно;
+3. прежние stop/TP/trailing/time-stop правила сохраняются только после проверки, что их trigger/fill semantics не зависят от maker assumptions;
+4. один заранее выбранный инструмент, без Top-5 ranking и cross-sectional claims;
+5. прежние folds не использовать как independent validation; thresholds/parameters фиксировать до нового test period.
+
+Это **не та же самая preregistered maker strategy** и не подтверждение её результата. Изменение execution contract требует новой версии preregistration и deterministic tests. Никакой market-PnL расчёт не запускать до снятия запретов и приёмки данных.
+
+### Что такой путь снимает и что не снимает
+
+- Убирает необходимость доказывать maker queue priority, если все ноги действительно taker (D7 можно не включать в первый тест).
+- Не убирает D1 Bybit-native trade OHLCV, D3 funding completeness, D4 lifecycle выбранного символа, D5 effective-time specs и D8 fee assumptions.
+- При сохранении 5x isolated leverage **D2 Mark и D6 risk tiers остаются обязательными** для liquidation/risk replay. Нельзя считать D6 необязательным лишь потому, что выбран один символ.
+- Top-5 manifest можно исключить только из нового single-symbol design; это не превращает прежние cross-sectional folds в holdout.
+- Пока нет принятого независимого периода и требуемых Bybit-native inputs, кандидат остаётся BLOCKED.
+
+### Решение
+
+**Не строить новый runner сейчас.** Сначала требуется read-only доказательство, что один символ и независимый период могут быть обеспечены источниками с достаточной provenance. Если такой путь подтверждается, следующая инженерная задача — отдельный taker-only single-symbol adapter поверх существующего engine, а не новая стратегия и не переписывание всего движка. Если источника нет, остановиться на BLOCKED.
+
+
 ## 3. Минимальный scope данных
 
 После выбора кандидата следует проверить возможность узкого single-instrument исследования на одном заранее выбранном Bybit Linear perpetual, одном H1 timeframe и одном общем временном окне. Конкретный символ и период фиксируются до просмотра результатов. Никакого cross-sectional ranking, top-N selection или многосимвольного portfolio claim на первом проходе.

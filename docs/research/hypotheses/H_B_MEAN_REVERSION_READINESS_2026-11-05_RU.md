@@ -656,3 +656,8 @@ Read-only просмотрены `MaintenanceGateAuditor.evaluate_portfolio()`, 
 - Research CI [45465377742](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45465377742) completed SUCCESS on `b72c15575170fc8f49691706d88a3599ed94b954`; H-B signal 19/19, regime adapter 6/6 and fill geometry 8/8.
 - **Decision:** current narrow H-B synthetic mechanics are complete. This is not an execution model: no bid/ask, spread, queue, partial fills, slippage, fees, funding or adverse selection. No sizing, persistence, position manager, engine integration or market PnL.
 - Do not implement the full H-B lifecycle yet. Without a permitted independent market-validation path, that would add complexity without answering whether the hypothesis has economic value.
+
+
+### 10.28. Economic acceptability remains unresolved — 2026-11-24
+
+The synthetic valid-fill fixture has gross reward/risk 0.4 (2 units potential reward vs 5 units risk). This is deliberately not a profitability result; it demonstrates that `stop < fill < target` is only a geometric condition. The fill helper has no minimum R:R gate and excludes fees, spread, slippage, funding, queue/fill probability and adverse selection. Do not introduce an arbitrary threshold or optimize one on already-used folds. A cost-aware preregistered economic criterion is still missing, and current data/authorization gates do not permit the market validation needed to derive it. Therefore do not proceed to engine lifecycle integration.

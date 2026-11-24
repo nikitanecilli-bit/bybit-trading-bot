@@ -1307,3 +1307,19 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - Code/test commit: `ed2d35551496eb56e1298420507fbaed735e6b29`.
 - CI: [Research engine checks #41891208250](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41891208250), SUCCESS; aggregate-L2 primitive tests 85/85; L2 runner/inspector step 26/26; all workflow steps successful.
 - Decision: ACCEPT as a deterministic input-validation guardrail; not market/PnL evidence. No archive download, collector, API/account access, runner registration, paper/live orders or main changes. Maker execution gate remains blocked.
+
+
+## H-B-SYNTHETIC-001 — causal signal, frozen regime candidate and next-open geometry (2026-11-24)
+
+**Тип:** deterministic synthetic mechanics validation. **Не market experiment, не PnL и не evidence of edge.**
+
+- **Контракт сигнала:** long-only H1. На t-1 используется label `range`; shock на t: `close[t] <= close[t-24] - 2 × ATR[t-1]`; стабилизация на t+1: `close[t+1] > high[t]`; entry timestamp планируется на open t+2. Stop фиксируется на `low[t]`; target — среднее 24 pre-shock closes.
+- **Regime candidate:** `h_b_regime.py` фиксирует существующие default значения `RegimeConfig` как `H-B-RANGE-DEFAULTS-v1`. Это frozen synthetic candidate для воспроизводимости, не оптимизированная и не экономически обоснованная конфигурация.
+- **Реализация:** `h_b_signal.py` — pure predicate; `h_b_regime.py` — causal classifier adapter, который использует только prefix до t+1; `h_b_fill.py` — проверка фактического t+2 OHLC open относительно stop/target.
+- **Синтетические проверки:** 13 signal predicate tests, 6 frozen regime adapter tests, 8 next-open geometry tests. Включают timestamp grid, causal prefix/future mutation, regime[t-1], ATR[t-1], warm-up, missing t+1/t+2, invalid OHLC и fill geometry.
+- **CI:** Research CI [#45466778550](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45466778550) — SUCCESS на `84d1da812d1958cbb32f3789895c7d4b56e45488`; все три H-B test steps и весь configured deterministic workflow прошли. Отдельные CI failures в процессе разработки были устранены; в итоговый статус входит только финальный passing run.
+- **Synthetic economics sanity check:** accepted fixture в `tests/test_h_b_fill.py` показывает gross reward/risk = 0.4 (potential reward 2 units при risk 5 units). Это искусственная геометрия тестовой свечи, не оценка ожидаемой доходности, не частота сигналов и не прогноз реального исполнения.
+- **Ограничения:** нет spread/bid-ask, fees, funding, slippage, queue, partial fills, adverse selection, sizing, shared-capital competition, position lifecycle, persistence или engine integration. Next-open price — reference open, не executable fill.
+- **Данные:** использованы только синтетические fixtures; CryptoFetch/Binance proxy archives не запускались в market-PnL, event study или parameter tuning. Никакие новые архивы не собирались.
+- **Решение:** ACCEPT только как узкая механическая проверка signal → regime → next-open geometry. **NO EDGE / NOT PREREGISTERED FOR MARKET PNL / NOT EXECUTION-VALIDATED.** Не расширять H-B engine lifecycle и не добавлять новые слои до появления разрешённого независимого пути market validation с закрытыми data/provenance/cost gates.
+- **Связанные документы:** `RESEARCH_BOARD_RU.md`, `PROJECT_COMPASS_RU.md`, `hypotheses/H_B_MEAN_REVERSION_READINESS_2026-11-05_RU.md`.

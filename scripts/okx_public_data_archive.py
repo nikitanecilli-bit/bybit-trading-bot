@@ -230,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--instrument", default=INSTRUMENT, help="OKX instrument ID (default: BTC-USDT-SWAP)")
     parser.add_argument("--start", help="UTC ISO timestamp, inclusive, exact hour; e.g. 2026-10-01T00:00:00Z")
     parser.add_argument("--end", help="UTC ISO timestamp, exclusive, exact hour; defaults to latest closed H1 boundary")
-    parser.add_argument("--days", type=int, default=30, help="lookback days when --start is omitted (default: 30)")
+    parser.add_argument("--days", type=int, default=365, help="lookback days when --start is omitted (default: 365)")
     parser.add_argument("--output", type=Path, default=Path("data/archives/okx/BTC-USDT-SWAP"))
     parser.add_argument("--pause", type=float, default=0.15, help="seconds between pages (default: 0.15)")
     parser.add_argument("--max-pages", type=int, default=2000, help="safety limit per endpoint")

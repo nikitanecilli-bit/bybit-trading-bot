@@ -301,7 +301,7 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 
 ## 2026-11-24 — H-B scope freeze
 
-- Final bounded Research CI run `45466416019` on `a78fa8ac4b41c7d2741d6d5a1a0014d02fb5df9e` completed SUCCESS. H-B signal predicate tests: 13; frozen regime adapter: 6; next-open fill geometry: 8. All corresponding workflow steps and the full configured deterministic workflow passed.
+- Final bounded Research CI run `45466778550` on `84d1da812d1958cbb32f3789895c7d4b56e45488` completed SUCCESS after deleting the temporary exit module/tests and removing all CI references. H-B signal predicate tests: 13; frozen regime adapter: 6; next-open fill geometry: 8. All corresponding workflow steps and the full configured deterministic workflow passed.
 - A temporary standalone H-B exit evaluator was explored and removed before acceptance because it crossed the agreed scope boundary. No active `h_b_exit.py` or exit-test layer remains. Do not infer it is part of the accepted design from intermediate commits.
 - H-B has completed its narrow synthetic mechanics purpose. The synthetic accepted fill example has gross reward/risk 0.4; this is not an estimate of live expectancy, but reinforces that geometric validity is not economic evidence.
 - Freeze further H-B code, engine integration, persistence, sizing, exits and new strategy families. Current data and authorization gates do not permit independent market validation. Additional implementation would add activity without resolving edge.

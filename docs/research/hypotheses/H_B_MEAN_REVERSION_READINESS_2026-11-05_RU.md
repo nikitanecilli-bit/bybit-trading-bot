@@ -636,3 +636,14 @@ Read-only просмотрены `MaintenanceGateAuditor.evaluate_portfolio()`, 
 - **Decision: SIGNAL MECHANICS PASS.** This proves only that the isolated function conforms to the tested synthetic cases. It does not validate the chosen RegimeConfig, actual t+2 bar availability/fill, stop/target geometry at fill, engine lifecycle, costs, market PnL or edge.
 - No engine integration, market-PnL backtest, parameter sweep, exchange API, new archive, paper/live trading or real order was performed.
 - Next safe step: read-only review of causal regime classifier configuration and timestamp semantics. Do not extend lifecycle until this review establishes that the H-B range gate can be frozen without tuning on previously used market folds.
+
+
+### 10.26. Frozen causal regime adapter — 2026-11-24
+
+- Static audit established that `market_regime.classify_candles()` is causal but intentionally timeframe-agnostic: it enforces strictly increasing timestamps, not exact H1 cadence. Its rolling features and recursive EMA can therefore process a history with gaps unless the caller validates cadence.
+- Added `h_b_regime.py` to bind the H-B signal predicate to an explicit `RegimeConfig` candidate inherited from existing defaults: efficiency=20, ATR=14, EMA 10/30, slope lookback=5, volatility lookback=100, trend ER 0.35, range ER 0.25, trend slope 0.25 ATR, range slope 0.15 ATR, high-vol ratio 1.5, high-vol ER 0.30. These values are frozen for mechanics testing only; not calibrated or validated against market data.
+- Adapter requires a continuous exact H1 grid across all input history through t+1, uses classifier output at t-1, and ignores all candles after t+1. Warm-up is 100 bars. It records the full config in signal metadata.
+- `RegimeConfig.validate()` was hardened to reject non-finite, bool and non-numeric threshold values; synthetic tests cover those invalid inputs.
+- Research CI [45464653488](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45464653488) — SUCCESS on SHA `6540e375d6d2ad7dfd321202973e60e2e0815dae`. Market-regime tests passed; H-B signal tests 13/13; H-B regime adapter tests 6/6.
+- **Decision: SIGNAL + REGIME MECHANICS PASS.** This is synthetic evidence only. It does not validate the default config as a useful market regime, next-open fill geometry, sizing, costs, engine lifecycle, market PnL or edge.
+- Next safe step: separate pure fill-geometry test for the actual open at t+2. Do not integrate into the trading engine yet.

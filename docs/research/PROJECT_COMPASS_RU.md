@@ -342,3 +342,6 @@ A read-only review of E06/E11/E12 artifacts verified that the old PnL defect doe
 - This is not evidence of edge: the three folds are contiguous, cross-sectionally correlated, based on a fixed Binance-style proxy universe and already inspected. The compression q25 rule was formed on the same sample and is not independently validated. No new market test or PnL calculation was performed.
 
 Current boundary: preserve raw signal/context observations as exploratory historical data; do not use them to tune/promote filters or claim profitability.
+
+
+E08–E13 artifact cross-check: raw candidate feature rows are constructed before engine replay and can be retained as exploratory descriptions; future-return columns are labels only, while engine status/fill/trade outputs remain tainted. Candidate rows repeat across configs and must be canonicalized/deduplicated. This does not change the NO EDGE / DEFERRED status.

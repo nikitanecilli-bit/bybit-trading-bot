@@ -284,3 +284,10 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - The returned price is the observed candle open reference, not an executable fill. No spread, queue, partial fill, slippage, fee or adverse-selection model is present. No engine or pending-order integration was changed.
 - Research CI run `45465175545` on `83ebd2f644b9a1f26b2928135b3c5b0b82ac37fc` completed SUCCESS. H-B signal/entry test file contains 21 tests and passed; frozen regime adapter test file contains 6 tests and passed. The full configured deterministic workflow passed.
 - Current H-B result is a synthetic signal + classifier + entry contract pass only. No market PnL, execution proof or edge. A synthetic exit/persistence contract may be the next bounded step; do not connect the engine or run PnL before that is independently specified and needed.
+
+
+### 2026-11-24 — H-B next-open geometry pass and lifecycle stop gate
+- Added `h_b_fill.py`, a pure offline reference check for actual t+2 H1 open: validates exact shock/signal/entry timestamps and OHLC, then accepts only `stop < open[t+2] < target`. It reports per-unit risk/reward geometry only; no fees, spread, queue, slippage, funding, partial fills or adverse selection.
+- Added 8 deterministic tests. Research CI [45465377742](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45465377742) — SUCCESS on SHA `b72c15575170fc8f49691706d88a3599ed94b954`; logs confirm H-B signal 19/19, regime adapter 6/6, next-open geometry 8/8; full technical workflow passed.
+- Status: **SIGNAL + REGIME + NEXT-OPEN GEOMETRY PASS** on synthetic inputs only. No market PnL, no Bybit, no new archives, no paper/live, no engine integration.
+- Decision: stop H-B expansion before pending/fill lifecycle, sizing, persistence and manager integration. Building those layers without a permitted independent market-validation path would repeat premature infrastructure growth. Resume only when the data/provenance gate can be satisfied within the user's existing permissions.

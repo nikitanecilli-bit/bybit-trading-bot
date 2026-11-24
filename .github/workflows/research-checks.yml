@@ -199,5 +199,7 @@ jobs:
         run: python tests/test_h_b_signal.py
       - name: Test H-B causal regime adapter (synthetic only)
         run: python tests/test_h_b_regime.py
+      - name: Test H-B exit contract (synthetic only)
+        run: python tests/test_h_b_exit.py
       - name: Test H-B next-open fill geometry (synthetic only)
         run: python tests/test_h_b_fill.py

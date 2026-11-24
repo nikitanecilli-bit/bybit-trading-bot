@@ -416,3 +416,8 @@ Candidate deduplication across E04/E06/E08–E13 found only two main historical 
 - A separate Oct 6 report prints tier-1 summaries for BTC/ETH/SOL/BNB/XRP matching Sep 29 values, but its referenced raw results.json is not committed; secondary corroboration only.
 - Unique D6 raw-replicated symbols remain BTC/ETH/SOL/XRP = 4/47 (8.5%); new contribution is additional dates/repository for BTC/ETH, not broader universe coverage. D6 remains PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED.
 - Full audit: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 44](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#44-third-independent-raw-risk-tier-capture-candleviewer-2026-10-25).
+
+
+### 2026-11-25 — ограниченный BTCUSDT GET pilot
+
+Пользователь разрешил пять точечных публичных V5 GET для BTCUSDT (H1, Mark, Funding, текущие specs/risk tiers). Рабочая среда не смогла получить ответы: web retrieval сообщил URL inaccessible/403, container HTTPS не прошёл DNS resolution. Ни один валидный Bybit JSON не получен; это ограничение сетевого маршрута среды, а не доказательство отказа Bybit. Gates D1–D6 не изменились. Повторять только при появлении разрешённого прямого маршрута или при предоставлении пользователем исходных ответов; прокси/зеркала не использовать.

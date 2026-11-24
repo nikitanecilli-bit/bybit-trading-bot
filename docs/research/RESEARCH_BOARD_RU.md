@@ -136,3 +136,11 @@
 - Research CI [45465377742](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45465377742) — SUCCESS on commit `b72c15575170fc8f49691706d88a3599ed94b954`. Logs: H-B signal 19/19, regime adapter 6/6, next-open geometry 8/8; full technical workflow successful.
 - This remains an OHLC next-open reference model, not an executable fill model: no spread, queue, slippage, fees, funding, partial fills or adverse selection. No sizing, persistence, position lifecycle or engine integration.
 - **Decision:** H-B has passed the current narrow synthetic mechanics gates. Stop expanding it. The next meaningful proof is independent market validation with appropriate data/costs, but current provenance and user authorization gates do not permit that work. Do not build additional lifecycle infrastructure merely to keep coding.
+
+
+## 2026-11-24 — экономическое ограничение H-B next-open geometry
+
+- Синтетический accepted case в `tests/test_h_b_fill.py` имеет gross reward/risk = **0.4** (reward 2 на risk 5). Это намеренно показывает, что положительная геометрия `stop < fill < target` ещё не означает экономически приемлемую сделку.
+- `h_b_fill.py` не задаёт минимальный R:R и не учитывает комиссии, spread, slippage, funding, fill probability или win rate. Не добавлять произвольный порог только ради «улучшения» тестового результата.
+- До любого market validation потребуется заранее зафиксировать cost assumptions и критерии экономической приемлемости; их нельзя подбирать на уже использованных folds. Сейчас такой путь закрыт действующими data/provenance и research gates.
+- Следовательно, **не переходить к engine lifecycle**. Текущий результат — механическая корректность трёх изолированных слоёв, не торговая готовность.

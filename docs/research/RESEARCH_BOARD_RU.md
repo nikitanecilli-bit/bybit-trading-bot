@@ -200,3 +200,8 @@
 
 
 **Дополнительная проверка совместимости (2026-11-24):** текущий H1 shared-capital runner требует frozen selection manifest, датированные instrument/risk snapshots, funding audit manifest + settlement schedule, Mark и Bybit-native H1 trade-kline; proxy candles явно блокируются. Ветка не содержит адаптеров для Hugging Face Parquet или CryptoHFTData. Внешние discovery leads нельзя подключить переименованием файлов; потребуется отдельный reviewed adapter и прохождение прежних data gates. Код не менялся, тесты и рыночные прогоны не запускались.
+
+
+
+
+**D4–D6 snapshot boundary audit (2026-11-24):** universe collector queries several lifecycle statuses including Closed and records launch/delivery timestamps, but produces point-in-time observations rather than a complete suspension/resumption history. Instrument-spec and risk-tier as-of loaders select only the newest dated snapshot at or before a timestamp and fail when none exists; they cannot reconstruct pre-first-snapshot effective-time changes. No dated snapshot series is committed. D4 remains partial/unverified; D5/D6 remain missing for the historical interval. Подробнее: [ALT-SYSTEM-DATA-ACCEPTANCE-001, раздел 13](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#13-static-boundary-audit-for-d4d6-what-dated-snapshots-can-and-cannot-prove).

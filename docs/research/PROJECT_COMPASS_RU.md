@@ -386,5 +386,5 @@ Candidate deduplication across E04/E06/E08–E13 found only two main historical 
 - 2026-10-21 raw captures cover BTC instrument specs (**1/47 = 2.1%**) and BTC/ETH/SOL/XRP risk tiers (**4/47 = 8.5%**). The extra nine Spot rows are not Linear coverage.
 - The 38 uncovered proxy symbols are listed in Section 41 of the acceptance ledger.
 - This quantifies coverage of the existing research sample only. It does not establish Bybit PIT listings, full-market coverage or effective-dated history. D4 remains partial/unverified; D5/D6 remain PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED.
-- No workflow artifact ZIP or market archive was downloaded; no market/PnL experiment or collector was run.
+- Follow-up read-only verification downloaded only the existing E11/E13 result-artifact ZIPs (not market archives): both 50-row universe manifests and all six archive SHA-256 entries match exactly; 47 symbols included, same three exclusions. No market/PnL experiment, collector or Bybit API request was run.
 - Full audit: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 41](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#41-coverage-of-dated-metadata-snapshots-against-the-exact-e11e13-47-symbol-proxy-universe).

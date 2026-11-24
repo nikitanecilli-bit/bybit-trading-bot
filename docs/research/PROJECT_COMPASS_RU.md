@@ -198,7 +198,7 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - **Критические пробелы:** нет подтверждённого Bybit-native trade OHLCV, mark-price history, funding completeness, dated instrument/risk-tier snapshots и полноценного PIT tradable universe. Старые audit documents подробно описывают эти блокеры.
 - **Разрешения:** никаких Bybit/API keys/private endpoints, runner setup, новых биржевых архивов/collectors, market-PnL backtests/sweeps/event studies, paper/live или реальных ордеров до выполнения последовательных historical и paper/forward gates. Live требует отдельного разрешения.
 - **Рабочая ветка:** research/market-regime-v1-main; HEAD при последней сверке 99e0a681a6a341866773b7d99c066bf63165bd46. Последний принятый code/test CI #45466778550 относится к 84d1da812d1958cbb32f3789895c7d4b56e45488; последующие commits в цепочке документируют freeze.
-- **PR:** #15 (Compass) и #16 (H-B signal contract) merged в research branch; PR #13 остаётся открытым как более ранний context-recovery protocol. main не изменялась.
+- **PR:** #15 (Compass) и #16 (H-B signal contract) merged в research branch; PR #13 закрыт как superseded by PR #15; старый context-recovery protocol не является параллельным источником инструкций. main не изменялась.
 - **Следующий безопасный режим:** read-only audit уже имеющихся datasets/provenance и документационная гигиена. Если никакой допустимый путь к независимой market validation не существует, оставить проект BLOCKED, а не строить новые слои.
 ## Журнал изменений карты
 

@@ -213,3 +213,74 @@ Read-only checkpoint фиксирует уже существующий artifact
 Дополнительный предел: статический аудит ENG-EXEC-038 установил, что исторический daily trades CSV adapter не передаёт cross-stream `seq`, поэтому сделки и L2 нельзя надёжно упорядочить внутри одинаковой миллисекунды. Текущий replay консервативно не кредитует same-ms fills. ENG-EXEC-040 подтвердил, что L2 deltas после постановки заявки не списывают очередь вторым каналом: queue consumption идёт только по допустимым public trades. Это избегает прямого двойного списания, но не восстанавливает индивидуальное распределение aggregate-L2 очереди.
 
 **Итог D7:** статус `partial` только для существующего однодневного диагностического sample; для репрезентативного multi-symbol / multi-regime execution research — `missing`. Не скачивать artifact повторно и не запускать replay в рамках текущих ограничений.
+
+
+
+
+## 11. Read-only inventory and external source screening (2026-11-24)
+
+### 11.1. Repository inventory at branch HEAD
+
+Checked the recursive Git tree at commit `a181606b8ec3e2ec9d416fe56cbe07ef92564eb9` (307 tree entries; not a working-tree checkout). Among data-like file extensions (`.zip`, `.csv`, `.parquet`, `.feather`, `.jsonl`, `.db`, `.sqlite`, `.gz`, `.tar`, `.arrow`), the only market-data archives are the six ZIP files under `data/archives/cryptofetch/`. The only other matching JSON file is `scripts/h1_symbol_universes.json`, which is a configuration universe, not a market history dataset.
+
+No committed Bybit OHLCV, mark, funding, trades, L2, dated instrument/risk snapshots, or universe-history archive was found in the current branch tree. No `data/archives/bybit/`, `data/instrument_specs/`, or `data/universe_history/` dataset paths are present. This is a repository-tree statement, not a claim that no files could exist outside this repository.
+
+### 11.2. Correction to the retained AAVE L2 diagnostic evidence
+
+Rechecked the existing GitHub Actions run [#41814167058](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41814167058) through run metadata, job metadata, and its existing job log only. No artifact was downloaded and no market archive was fetched in this audit.
+
+The workflow did download and scan the AAVEUSDT 2025-09-02 L2 archive (88,252,368 bytes; SHA-256 `e3646429c600f4917c021e240497e8f3d46fd44ba57168100633181916c761f6`; 816,684 events) and public trades archive (13,095,906 bytes; SHA-256 `cf11d05f6053acfeb22b1112df666ff328034963f04c6e6159f35cae63de1bc1`; 346,131 rows). However, the workflow upload step retained only three compact JSON inspection reports: `bybit_orderbook_sample_inspection.json`, `bybit_trade_sample_inspection.json`, and `bybit_l2_queue_replay_report.json`. The resulting artifact was only 3,725 bytes (artifact ID `13314017303`, SHA-256 `c6d37b83a909eae2e53e0436d74083dc1cc3d57348e95c0acaf09db7d1146f9c`). The 88 MB L2 and 13 MB trade source archives were not retained in that artifact and are not present in the repository tree.
+
+Additional source-log checks confirm:
+- L2 stream: 816,684 events over 24 hours; 2 snapshots and 816,682 deltas; no nonmonotonic timestamps, adjacent duplicate timestamps, cross-sequence reversals, update-ID resets, or missing matching-engine timestamps in the scanned file.
+- Trades: 346,131 unique IDs; 66 trades precede the first book matching-engine timestamp; the CSV has an RPI column (all zero in this sample) but **no block-trade field**. The strict replay must reject it; absence of the field is not equivalent to `false`.
+- The queue probe contained four deterministic hypothetical orders only and explicitly warned that it was not strategy PnL, a fill-rate estimate, L3 replay, or exchange-confirmed execution.
+
+Therefore D7 remains `partial` for a single historical diagnostic whose source bytes are no longer retained in the repository/artifact; it is `missing` for representative, reproducible multi-symbol execution research. The previous section 9.1 describes the diagnostic values, not a currently available raw dataset.
+
+### 11.3. External candidates found by public documentation screening
+
+These are discovery leads only. No files were downloaded, no account was created, no API was called, and no provider data was accepted.
+
+**Candidate A — Hugging Face, `rogerdehe/klines-bybit`**  
+Public dataset card: https://huggingface.co/datasets/rogerdehe/klines-bybit
+
+The card self-reports approximately 617 USDT perpetual pairs including delisted symbols, 1h candles among the available timeframes, history from each listing (mostly 2020–2021 onward), and mark/funding series for most pairs. It also explicitly says the dataset is under construction, pair/timeframe coverage is still growing, per-file coverage documentation is pending, and the data is provided as-is without a completeness/accuracy warranty.
+
+Preliminary fit: possible candidate for D1 and partial D2/D3; the claim that delisted symbols are included does not by itself establish PIT lifecycle completeness for D4. No effective-time instrument specs or risk-tier history are established by the card, so D5/D6 remain missing/unverified. No acceptance without exact file inventory, manifests, provenance, per-symbol gaps, and independent spot checks.
+
+**Candidate B — CryptoHFTData Bybit archive**  
+Bybit overview: https://www.cryptohftdata.com/exchanges/bybit  
+Order book: https://www.cryptohftdata.com/datasets/bybit-orderbook-data  
+Trades: https://www.cryptohftdata.com/datasets/bybit-trades-data  
+Funding/mark: https://www.cryptohftdata.com/datasets/bybit-funding-rate-data  
+Known gaps: https://www.cryptohftdata.com/docs/data-gaps-and-corrections
+
+The provider describes an independent hourly Parquet archive beginning 2025-06-28, with Bybit futures L2, tick trades, mark/funding, open interest and other feeds. Its own documentation discloses material limitations:
+- Bybit trade files have reconnect gaps from seconds to about three minutes, commonly around 02:00–02:50 UTC; a public-archive backfill is listed as planned.
+- Two large missing Bybit hourly ranges are listed: 2025-11-26 10 through 2025-12-26 19 UTC, and 2026-04-13 15 through 2026-04-14 21 UTC.
+- Bybit mark-price files before the 2026-09 data-integrity release contain change-only deltas; unchanged fields are null and require correct per-symbol forward filling.
+- The provider lists Bybit REST order-book snapshot handling as under review; L2 is aggregate price-level depth, not L3 individual orders or queue priority.
+- The listed Bybit families do not include a native OHLCV candle dataset. Trades could be aggregated into bars only with explicit gap and bar-construction controls; this does not solve missing data.
+
+Preliminary fit: possible D7 and partial D2/D3 research input, not a complete strategy-validation package. D1 and D4–D6 are not supplied by the listed families. Provider documentation and sample rows are not a substitute for independent raw-file verification.
+
+**Candidate C — official Bybit public archives and APIs**  
+Bybit's public documentation says historical trades can be downloaded from its archive site and documents public market endpoints for klines, mark-price klines, funding history, instruments, and risk limits. The existing AAVE diagnostic used public Bybit trade and quote-saver L2 archives. This is a potential venue-origin source, but it does not remove the historical PIT problem: current instrument/risk endpoints do not reconstruct old effective-time specifications or complete delisted/suspension history. Any future collection remains blocked by the active project hold and is not authorized by this inventory.
+
+### 11.4. Acceptance decision
+
+| Requirement | Current decision after this checkpoint |
+|---|---|
+| D1 Bybit-native OHLCV | `missing` in repository; Hugging Face lead is `unverified` |
+| D2 Bybit Mark | `missing/unverified` in repository; external leads are `unverified` |
+| D3 Funding + settlements | `missing/unverified` in repository; external leads are `unverified`; settlement completeness not established |
+| D4 PIT universe/lifecycle | `missing/unverified`; delisted-symbol inclusion claims do not prove full PIT transitions |
+| D5 Effective-time instrument specs | `missing` |
+| D6 Effective-time risk tiers | `missing` |
+| D7 Representative trades/L2 | `missing`; only one old, non-retained AAVE diagnostic is evidenced |
+| D8 Fee assumptions | `unverified` for dated account/symbol-specific rates; conservative scenario assumptions remain a separate model choice |
+
+**Decision: DATA GATE REMAINS BLOCKED.** No source found in this screening qualifies as a complete, independently verified D1–D6 package for the target market and interval. Combining several unverified providers does not create a verified dataset. These leads do not authorize downloads, account creation, API calls, collectors, runner setup, market-PnL tests, or paper/live execution.
+
+The next allowed action remains read-only documentation/code review. A later data-acceptance exercise requires a separate explicit decision that changes the current data-collection hold; until then, preserve the blocked state and do not manufacture progress through more strategy experiments.

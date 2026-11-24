@@ -626,3 +626,24 @@ The later Git-history results are consistent with this correction:
 5. **DATA GATE REMAINS BLOCKED.**
 
 This correction supersedes the factual claim and proposed follow-up in Sections 18 and 19. Those sections are retained only as an audit trail of the mistaken hypothesis and its falsification.
+
+
+## 21. New Get Instrument Summary endpoint does not provide historical specifications
+
+The official V5 changelog and repository history establish that `GET /v5/market/instrument-summary` was added on 2026-10-14:
+- Changelog entry: new endpoint for summary information and trading increments for linear and option instruments.
+- The documented request supports category, symbol, symbolType, marketRegion, baseCoin, limit and cursor.
+- The documented response includes identity/display fields, `qtyStep`, `tickSize`, and `deliveryTime`; it does not expose effective-from/effective-to timestamps or historical query parameters.
+- The endpoint covers linear and option only, not the full spot/inverse scope of Get Instruments Info.
+- It is a separate current summary endpoint, not a documented historical archive.
+
+Repository evidence:
+- Introduction commit: `13dce66147ff4bd200fdc6d20176186724a0f7a1` (2026-10-14), which adds the changelog entry and endpoint page.
+- Official endpoint reference: https://bybit-exchange.github.io/docs/v5/market/instrument-summary
+- Official changelog: https://bybit-exchange.github.io/docs/changelog/v5
+
+**D5 consequence:** this endpoint may be useful for current symbol discovery and current tick/quantity-step checks, but it does not reconstruct historical tickSize/qtyStep or the broader historical fields required by the validation engine. Its introduction in October 2026 also makes it irrelevant as a direct historical source for earlier years unless Bybit separately documents retention/history semantics. No such semantics are documented in the examined endpoint contract.
+
+A third-party Bybit data-source note independently describes current instrument specs as coming from the REST instruments-info/risk-limit endpoints and says delisted symbols are not served by those current lookups. This is corroborative only, not an official completeness guarantee: https://github-wiki-see.page/m/sbOogway/sbt2/wiki/Source-Bybit
+
+**Updated D5 status:** `missing` for full historical acceptance. The new summary endpoint is not a historical-data solution. No API call was made.

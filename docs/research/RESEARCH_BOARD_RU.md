@@ -43,7 +43,7 @@
 | H-A relative-strength breakout | **REJECTED — tested configuration** | В preregistered proxy comparison хуже baseline и отрицательна по folds | Не подбирать параметры и символы на тех же folds |
 | H-C post-break invalidation | **REJECTED AS PROFITABILITY CANDIDATE / MECHANICS ONLY** | Проверенная proxy-конфигурация не показала превосходства; реализация находится за default-OFF флагом; synthetic tests не доказывают edge | Не продолжать tuning на использованном окне |
 | H-B mean reversion | **SYNTHETIC MECHANICS COMPLETE / FROZEN — NO EDGE EVIDENCE** | Signal 13 tests, frozen regime adapter 6, next-open geometry 8; final bounded Research CI #45466778550 SUCCESS; synthetic fixture gross R/R 0.4 | Не расширять H-B. Возвращаться только при появлении разрешённого независимого пути market validation; пока — read-only data/provenance audit |
-| Новые стратегии/фильтры | **DEFERRED** | Ни один новый кандидат не обоснован достаточно, чтобы оправдать расширение | Не добавлять до закрытия текущего H-B mechanical question |
+| Новые стратегии/фильтры | **DEFERRED** | Доказанного edge нет; H-B mechanics завершена и заморожена без market evidence | Не расширять стратегический поиск, пока это не снимает текущее data/evidence bottleneck и нет допустимого независимого пути проверки |
 
 Статусы REJECTED относятся к конкретным проверенным конфигурациям/окнам, а не к утверждению, что любой вариант семейства стратегий математически невозможен.
 
@@ -264,3 +264,10 @@
 - All 35 rows/fields for BTC and ETH match the Oct 21 sleeve-fund raw responses exactly and the Sep 29 crypto-dashboard fixture. This improves date/source replication for BTC/ETH but adds no new symbol breadth.
 - D6 unique raw-replicated symbols remain BTC/ETH/SOL/XRP = 4/47 (8.5%); D6 remains PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED.
 - CandleViewer instrument-before/after examples are generated documented-shape fixtures, not D5 live captures. D5 unchanged. Details in acceptance ledger Section 44.
+
+
+### 2026-11-24 — TOC company philosophy adopted
+
+- Пользователь утвердил цель компании: устойчивый чистый денежный результат на финансовых рынках при контролируемом риске. Принят цикл Theory of Constraints; канонический документ: [COMPANY_OPERATING_PHILOSOPHY_RU.md](../COMPANY_OPERATING_PHILOSOPHY_RU.md).
+- Текущее ограничение остаётся: нет принятой доказательной базы для подтверждения/опровержения реализуемого edge на условиях Bybit. Любая задача должна снимать это ограничение или быть обязательным контролем качества/риска.
+- Уточнены статусы D5 leads: Hassnain metadata не считается независимым raw snapshot; найденный 2026-10-18 capture относится к Spot и не расширяет Linear universe. D5/D6 остаются не приняты. Подробности — acceptance ledger Section 45.

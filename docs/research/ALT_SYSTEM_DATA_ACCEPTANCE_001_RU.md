@@ -347,3 +347,58 @@ Inspected `snapshot_bybit_linear_universe.py`, `snapshot_bybit_instruments.py`, 
 - No dated risk-tier snapshot series is currently committed. D6 remains `missing` for the historical interval under consideration.
 
 **Operational implication:** the existing collectors can begin building a forward-dated evidence trail only after an explicit future authorization and successful capture. Their presence in GitHub does not create historical PIT data retroactively. Since the current workflows are manual-only and the user hold prohibits runner setup/dispatch, no new snapshots can be assumed or scheduled in this project state.
+
+
+## 14. Read-only screening of official announcement history (2026-11-24)
+
+This section records public documentation and web-visible announcement evidence only. **The public announcement API GET was not successfully executed from the research environment; no API response was collected, no announcement archive was downloaded, and no market data or collector was run.** Search-index and Telegram preview results are discovery evidence, not a complete census.
+
+### 14.1. Official V5 announcement API contract
+
+The official documentation for `GET /v5/announcements/index` specifies:
+- required `locale`; optional `type`, `tag`, `page`, and `limit`;
+- response-level `total` and `list[]`;
+- announcement title, description, type key/title, tags, URL, `dateTimestamp`, and `publishTime`;
+- no documented date-range filter, so historical coverage would have to be established by pagination and independent boundary checks.
+
+The documentation's static response example contains `total: 735` and an ARB listing dated 2023-03-17. **This is a documentation example, not a current API count and not proof that a live request currently returns all 735 records.** The example timestamp and the documented API launch date must not be conflated with the earliest date actually available from a live query.
+
+A schema inconsistency also needs to be handled defensively: the response-parameter table names `startDataTimestamp`, while the sample response uses `startDateTimestamp`. The field is described as activity-event-specific. Any future parser must preserve raw payloads and tolerate neither name as an assumed universal field without an observed response.
+
+Official reference: https://bybit-exchange.github.io/docs/v5/announcement
+
+### 14.2. Official Telegram channel as a historical discovery index
+
+The public preview of `@Bybit_API_Announcements` is navigable with Telegram's `before` / `after` pagination parameters. The reviewed public pages expose dated messages reaching back to 2019-12-18. This is useful as a second discovery path, but the channel is an API-announcement channel, not a guaranteed complete mirror of every Bybit product/market announcement. It must not be treated as a complete lifecycle database.
+
+Examples found in the channel and linked official announcements:
+- March 2023: changes to maximum open interest for perpetual contracts; risk-limit/applicable-leverage changes for STXUSDT, ARBUSDT and MASKUSDT.
+- April 2023: risk-limit adjustment for RNDRUSDT and FITFIUSDT; tick-size change for REEFUSDT; maximum-order-size adjustment for RNDRUSDT.
+- September 2023: ZBCUSDT Perpetual delisting effective 2023-09-14 07:00 UTC; several spot-pair delistings were scheduled for 2023-09-15.
+- January 2024: Bybit announced that `GET /v5/market/instruments-info` for Options would filter out historical `OFFLINE` symbols. This is direct evidence that a current instrument-info response is not a complete historical symbol inventory.
+- February 2024: Bybit announced a transition of derivatives risk-limit tiers from manual selection to automatic adjustment based on position value and active orders, with the rollout date later postponed from February 5 to February 20. This is material to D6: a static symbol-level tier table alone may not reproduce the account's effective risk tier.
+
+References:
+- Telegram public archive: https://t.me/s/Bybit_API_Announcements
+- Historical page around 2019–2020: https://t.me/s/Bybit_API_Announcements?before=25
+- Historical page around 2023: https://t.me/s/Bybit_API_Announcements?after=113
+- Delisting example: https://t.me/s/Bybit_API_Announcements?before=165
+- Risk-tier automation announcement: https://t.me/s/Bybit_API_Announcements?before=207
+
+### 14.3. What this does and does not establish for D4–D6
+
+| Gate | New evidence | Acceptance effect |
+|---|---|---|
+| D4 — PIT universe/lifecycle | Official delisting notices and dated API-channel references exist; the current instrument-info endpoint was explicitly changed to omit historical OFFLINE Options symbols | Improves discovery of individual listing/delisting events, but does not establish complete listing, suspension, resumption, or delisting coverage for every linear contract. Remains `partial/unverified`. |
+| D5 — effective-time specs | Dated tick-size, maximum-order-size, and listing announcements exist | Can recover selected parameter changes when the announcement includes the old/new values and effective time. Does not provide a complete continuous history of all tick/qty/minimum-notional/contract fields. Remains `missing` for full-interval acceptance. |
+| D6 — risk tiers | Dated risk-limit/leverage announcements exist, including 2023 adjustments and the 2024 move to automatic tier adjustment | Useful event evidence, but does not establish a complete historical tier table or account-specific effective tier for every position/order state. Remains `missing` for full-interval acceptance. |
+
+The public announcement API and Telegram archive are therefore **promising supplemental evidence sources**, not a substitute for the dated PIT snapshots and complete effective-time records required by D4–D6. A future acceptance exercise would need to enumerate every relevant page/message, retain original bodies and URLs, normalize publication and effective timestamps separately, reconcile corrections/postponements, and compare the recovered event history with independent Bybit snapshots or exports.
+
+### 14.4. Current decision
+
+- Announcement discovery has materially improved: there is a documented public API contract, a paginated official API-announcement channel with historical messages, and public examples of relevant delisting/specification/risk events.
+- The live API's current `total`, earliest returned record, page-depth behavior, locale coverage, deletion/retention policy, and completeness remain **unverified** because no successful GET response was obtained.
+- Search-engine results and Telegram preview pages are not a complete machine-readable event archive; they may omit posts, expose only excerpts, or change as the platform updates.
+- D4 remains `partial/unverified`; D5 and D6 remain `missing` for the required full historical interval.
+- **DATA GATE REMAINS BLOCKED.** This screening does not authorize API collectors, market-data downloads, runner setup, market-PnL tests, or paper/live execution.

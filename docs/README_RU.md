@@ -60,6 +60,8 @@
 - [E13 — causal compression gate](reports/E13_CAUSAL_COMPRESSION_GATE_RU.md): один фиксированный фильтр на shared capital.
 - [H-A — relative-strength breakout](research/H_A_RELATIVE_STRENGTH_BREAKOUT_PREREGISTRATION_RU.md): rejected hypothesis; includes final stop-loss, signal-candle and post-break attribution.
 - [H-C — post-break invalidation](research/H_C_POST_BREAK_INVALIDATION_PREREGISTRATION_RU.md): implemented behind a default-OFF research flag; synthetic tests pass, no PnL run.
+- [H-B — mean reversion readiness](research/hypotheses/H_B_MEAN_REVERSION_READINESS_2026-11-05_RU.md): signal + causal regime + next-open geometry pass synthetic CI; no market PnL, no engine integration.
+- [H-B — synthetic test contract](research/hypotheses/H_B_SYNTHETIC_TEST_SPEC_2026-11-05_RU.md): scope and evidence boundaries for isolated signal/regime/fill mechanics.
 
 - [Point-in-time universe и архив данных](audits/POINT_IN_TIME_UNIVERSE_AND_ARCHIVE_AUDIT_2026-11-03.md) — покрытие CryptoFetch, ограничения survivorship/selection bias и отсутствие фактических Bybit snapshots.
 

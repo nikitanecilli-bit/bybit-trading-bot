@@ -287,6 +287,9 @@ No Tardis data, samples, or API responses were downloaded or inspected in this s
 
 **Cost-benefit decision:** do not purchase or trial a paid Tardis plan at this stage. Even the lowest listed derivatives tier is a recurring material cost, and Tardis does not close D4-D6. Its strongest contribution would be D7 execution research and potentially raw trades for D1 bar construction; neither is the currently decisive missing gate for a first defensible strategy test. Reconsider only after a frozen experiment specification proves that tick/L2 data is essential, the required symbol/date sample is known, and a separately authorized data budget exists.
 
+**Additional D4-D6 boundary check from Tardis metadata documentation:** Tardis describes its instrument metadata `changes` history as guaranteed accurate/complete only for `contractMultiplier`; `priceIncrement` and `amountIncrement` changes are best-effort and may be incomplete. Its `availableTo` is the date Tardis stopped collecting and may lag the actual exchange delisting. The API's `active` field is current tradability, not a historical PIT status timeline. This means the metadata API cannot be treated as a complete D4 lifecycle or D5 effective-time specification archive. The instrument metadata API is also restricted to active Pro/Business subscriptions. Bybit's current instrument-info endpoint returns online trading pairs, and its documentation notes that certain quantity-limit fields are adjusted twice monthly; current snapshots therefore support forward-dated evidence capture, not retroactive reconstruction of historical effective values.
+
+
 
 ### 11.4. Acceptance decision
 

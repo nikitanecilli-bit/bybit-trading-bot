@@ -351,3 +351,11 @@ The artifact-level salvage classification now covers E01–E13: E01–E03/E07 ar
 
 
 Candidate deduplication across E04/E06/E08–E13 found only two main historical signal samples: the same 1,012 five-symbol candidates repeated across E04/E06/E08/E09 configurations, and the same 9,236 47-symbol common-timestamp candidates repeated in E11/E13 (E10 overlaps all 9,236 plus 79 extra timestamps due per-symbol coverage). E12 summarizes E11 timestamps, not a separate sample. Experiment IDs/configuration rows are not independent replications.
+
+
+### 2026-11-24 — official D5/D6 endpoint boundary re-confirmed
+
+- Current V5 `instruments-info` documents online instrument specifications and lifecycle timestamps, but no historical version/time query; max order quantity fields are explicitly adjusted twice monthly. `instrument-summary` is also current-only in its documented contract.
+- Current `risk-limit` returns the current symbol tier table, not historical tier versions. Bybit's own risk-limit help article says the account's applied tier changes dynamically with positions, active orders and mark price; account-level replay therefore needs both dated exchange tier schedules and account-state history.
+- Official historical-data downloads are referenced by the public-trades documentation, but no historical spec/risk archive is established by that reference.
+- D5 and D6 remain NOT ACCEPTED. No archives/API collectors/PnL runs were started. Detailed evidence: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 38](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#38-official-market-api-and-risk-limit-documentation-historical-data-boundary).

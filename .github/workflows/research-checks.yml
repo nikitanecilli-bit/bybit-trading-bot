@@ -7,6 +7,10 @@ on:
     branches: [research/market-regime-v1-main]
     paths:
       - 'Bybit_Trading_Engine_v14_research.py'
+      - 'market_regime.py'
+      - 'h_b_signal.py'
+      - 'h_b_regime.py'
+      - 'h_b_fill.py'
       - 'relative_strength_breakout.py'
       - 'bybit_instrument_specs.py'
       - 'instrument_spec_history.py'

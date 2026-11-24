@@ -123,9 +123,6 @@ class TestHBSignal(unittest.TestCase):
         self.assertIsNone(evaluate_h_b_signal(candles, regimes, atr, 23))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 
 def make_classifier_fixture():
@@ -212,6 +209,10 @@ class TestHBClassifierBinding(unittest.TestCase):
             evaluate_h_b_signal_with_classifier(extended, self.config, index),
             baseline,
         )
+
+
+if __name__ == "__main__":
+    unittest.main()
 
 
 if __name__ == "__main__":

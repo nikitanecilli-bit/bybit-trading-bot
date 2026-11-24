@@ -706,3 +706,31 @@ The public Bybit trade archive is now a **verified supplementary source for hist
 ### Permission boundary
 
 This audit inspected only public directory-index pages and their visible filenames. It did not download any `.csv.gz` market archive, fetch trade rows, create a local archive, or run a collector. No new permission is implied. The existing no-market-archive/no-collector restriction remains in force.
+
+
+## 24. Official API documentation explicitly points to the public trade archive
+
+The official V5 `Get Recent Public Trades` documentation states that archived historical trades can be downloaded from the website. The endpoint itself returns only recent public trades (with a bounded `limit`), while the website archive is the separate historical source.
+
+Official reference: https://bybit-exchange.github.io/docs/v5/market/recent-trade
+
+This establishes that `public.bybit.com` is not merely an undocumented third-party mirror: Bybit's own API documentation points users to its website for archived historical trades. The direct `/trading/` directory and symbol subdirectories inspected in Section 23 are hosted on that public archive domain.
+
+This strengthens provenance for historical **trade-presence evidence**, but does not add an instrument metadata or lifecycle completeness guarantee. The API documentation does not state:
+- that every historically listed instrument is retained indefinitely;
+- that every day/file is complete or non-empty;
+- that archive directory names constitute the authoritative point-in-time universe;
+- that the final file date equals the exact trading suspension/delisting timestamp.
+
+### Revised D4 source hierarchy
+
+For future, separately authorized validation, the evidence should be combined with distinct roles rather than treated as interchangeable:
+
+1. **Official dated delisting/listing notices and exchange rule notices** — event timing and stated operational treatment, but incomplete by themselves because emergency delisting can occur without further notice.
+2. **Bybit public trade archive directory and row-level trade timestamps** — positive evidence that a symbol had executions on observed dates; potential lower/upper bounds around activity, after file integrity and row-level validation.
+3. **Dated snapshots of instrument status and specs** — direct point-in-time state evidence, but only from the date snapshots begin; not yet available for the full target interval.
+4. **Independent historical market listings / vendor metadata** — corroboration and discrepancy detection only, never silently promoted to exchange-authoritative truth.
+
+No absence-based inference should be made from missing archive files or missing announcements. A valid point-in-time universe requires a reconciliation process that preserves `observed active`, `observed inactive/closed`, and `unknown` as separate states, with source and confidence attached to each symbol/time interval.
+
+**Acceptance remains D4 partial/unverified.** The public archive materially improves the evidence path, but its completeness and row-level quality have not been validated. No market archive file was downloaded.

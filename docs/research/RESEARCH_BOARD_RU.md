@@ -195,3 +195,8 @@
 - Найдены только внешние discovery leads: Hugging Face `rogerdehe/klines-bybit` (заявленный OHLCV/Mark/Funding, но under construction) и CryptoHFTData (L2/trades/Mark/Funding, но документированные gaps/corrections и отсутствие OHLCV family). Ни один источник не принят и не скачивался.
 - Подробная классификация и ссылки: [ALT-SYSTEM-DATA-ACCEPTANCE-001, раздел 11](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#11-read-only-inventory-and-external-source-screening-2026-11-24).
 - Решение: **DATA GATE BLOCKED**; D1–D6 не закрыты. Запреты на Bybit, runner, collectors, новые архивы, PnL runs, paper/live остаются без изменений.
+
+
+
+
+**Дополнительная проверка совместимости (2026-11-24):** текущий H1 shared-capital runner требует frozen selection manifest, датированные instrument/risk snapshots, funding audit manifest + settlement schedule, Mark и Bybit-native H1 trade-kline; proxy candles явно блокируются. Ветка не содержит адаптеров для Hugging Face Parquet или CryptoHFTData. Внешние discovery leads нельзя подключить переименованием файлов; потребуется отдельный reviewed adapter и прохождение прежних data gates. Код не менялся, тесты и рыночные прогоны не запускались.

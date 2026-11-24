@@ -265,3 +265,20 @@ class TestHBEntryPreparation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+    def test_rejects_non_h_b_or_unsupported_signal(self):
+        wrong_strategy = dict(self.signal, strategy="other")
+        wrong_version = dict(self.signal, policy_version="v9")
+        wrong_direction = dict(self.signal, direction="short")
+        self.assertIsNone(prepare_h_b_entry(wrong_strategy, self.entry_candle))
+        with self.assertRaisesRegex(ValueError, "policy version"):
+            prepare_h_b_entry(wrong_version, self.entry_candle)
+        with self.assertRaisesRegex(ValueError, "H-B long"):
+            prepare_h_b_entry(wrong_direction, self.entry_candle)
+
+    def test_entry_timestamp_must_follow_signal_by_exactly_one_h1(self):
+        invalid = dict(self.signal, entry_ts_ms=self.signal["entry_ts_ms"] + 1)
+        with self.assertRaisesRegex(ValueError, "exactly one H1"):
+            prepare_h_b_entry(invalid, self.entry_candle)

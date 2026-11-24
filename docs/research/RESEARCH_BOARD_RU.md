@@ -32,7 +32,7 @@
 | Базовая H1 breakout / E01–E13 | **DEFERRED / NO EDGE** | Ряд shared-capital proxy результатов отрицателен; выборка не PIT Bybit; старые результаты имеют ограничения исполнения и provenance | Не тюнить прежние folds. Возвращаться только при новом независимом основании и закрытых data/method gates |
 | H-A relative-strength breakout | **REJECTED — tested configuration** | В preregistered proxy comparison хуже baseline и отрицательна по folds | Не подбирать параметры и символы на тех же folds |
 | H-C post-break invalidation | **REJECTED AS PROFITABILITY CANDIDATE / MECHANICS ONLY** | Проверенная proxy-конфигурация не показала превосходства; реализация находится за default-OFF флагом; synthetic tests не доказывают edge | Не продолжать tuning на использованном окне |
-| H-B mean reversion | **SIGNAL + CLASSIFIER + ENTRY MECHANICS PASS / LIFECYCLE BLOCKED** | Frozen default RegimeConfig candidate, causal adapter, predicate и next-open entry contract прошли Research CI #45465175545; 21 H-B signal/entry tests и 6 regime-adapter tests; нет engine integration, exit/persistence lifecycle и market PnL | Решить, нужен ли synthetic-only exit/persistence contract; не подключать engine и не запускать PnL |
+| H-B mean reversion | **SYNTHETIC MECHANICS COMPLETE / FROZEN — NO EDGE EVIDENCE** | Signal 13 tests, frozen regime adapter 6, next-open geometry 8; final bounded Research CI #45466778550 SUCCESS; synthetic fixture gross R/R 0.4 | Не расширять H-B. Возвращаться только при появлении разрешённого независимого пути market validation; пока — read-only data/provenance audit |
 | Новые стратегии/фильтры | **DEFERRED** | Ни один новый кандидат не обоснован достаточно, чтобы оправдать расширение | Не добавлять до закрытия текущего H-B mechanical question |
 
 Статусы REJECTED относятся к конкретным проверенным конфигурациям/окнам, а не к утверждению, что любой вариант семейства стратегий математически невозможен.
@@ -47,14 +47,11 @@
 
 ## 5. Ближайшая последовательность
 
-1. Довести PR #16 до актуальной базы рабочей ветки без потери изменений.
-2. Включить H-B signal-only module/tests в технический Research CI так, чтобы CI выполнял только compile и deterministic tests — без market-PnL workflows. **Выполнено.**
-3. Получить фактический запуск точных H-B tests и релевантных legacy regression tests; прочитать логи и убедиться, что выполнялись именно нужные тесты. **Выполнено:** Research CI #45463406898 подтвердил 10/10 signal tests; #45464653488 подтвердил 13 market-regime tests, 13 H-B signal tests и 6 H-B regime-adapter tests.
-4. Провести независимый code review временной семантики и входных контрактов. Исправлять только подтверждённые дефекты. **Выполнено для signal/regime layer.**
-5. Зафиксировать результат как **SIGNAL + REGIME MECHANICS PASS**, не как strategy/edge pass. Engine integration не выполнять.
-6. Pure next-open fill geometry выполнен: наличие t+2 бара, exact timestamp, actual open строго между frozen stop и target. Не продолжать к sizing/persistence/manager без отдельного решения о необходимости и без допустимого пути к market validation.
-7. Сейчас H-B остановлена на границе механической готовности. Не строить полный engine lifecycle ради гипотезы без возможности проверить её на независимых рыночных данных.
-
+1. **H-B заморожена.** Её узкая синтетическая цель выполнена; никакой engine lifecycle, sizing, persistence, exit manager или новые семейства стратегий не добавлять.
+2. **Проверять только уже существующие данные и provenance.** В текущем Git tree — шесть CryptoFetch ZIP и никаких подтверждённых Bybit-native market archives. Read-only archive audit (run #41542079766, artifact #13187466159) проверил 67 CSV members: 67 структурно валидны, 64 имеют данные и проходят legacy 200-bar floor, три пусты; пропусков/нерегулярных интервалов и конфликтующих overlapping candles не обнаружено. Все шесть SHA-256 зафиксированы в артефакте.
+3. **Сохранять ограничения как блокирующие.** Данные — Binance-style OHLCV proxy; отсутствуют подтверждённые Bybit trade OHLCV, mark-price, funding, dated specs/risk tiers и полноценный point-in-time tradable universe. Не запускать новые market-PnL backtests, sweeps или event studies на этом пакете.
+4. **Поддерживать чистоту источников истины.** Синхронизировать верхние статусы Board/Compass с последними решениями; старые записи оставлять как историю, не удалять отрицательные результаты.
+5. **Не создавать искусственный следующий этап.** Если read-only аудит не открывает разрешённого независимого пути проверки, фиксировать BLOCKED и не заменять отсутствие доказательств дополнительной инфраструктурой.
 ## 6. Критерии остановки и доказательности
 
 - Если signal contract требует будущих данных, неоднозначного timestamp или скрытого подбора параметров — остановить/переформулировать гипотезу.
@@ -155,3 +152,12 @@
 
 
 - Детальная запись H-B-SYNTHETIC-001 добавлена в `EXPERIMENT_LEDGER_RU.md`: точный сигнал, frozen regime candidate, состав тестов, итоговый CI, synthetic gross R/R 0.4 и ограничения. Это техническая mechanics record, не market experiment.
+
+## 2026-11-24 — актуализация статуса и повторная сверка существующего data package
+
+- Текущий research/market-regime-v1-main HEAD при сверке: 99e0a681a6a341866773b7d99c066bf63165bd46. Последний принятый code/test CI — 45466778550 на 84d1da812d1958cbb32f3789895c7d4b56e45488; последующие commits в этой цепочке — документационные.
+- PR #15 (PROJECT COMPASS) и PR #16 (H-B signal contract) merged в рабочую ветку. PR #13 остаётся открытым и содержит более ранний context-recovery protocol; он не является текущим источником правил.
+- Git tree содержит ровно шесть файлов данных: CryptoFetch ZIP в data/archives/cryptofetch/. В текущем дереве нет подтверждённых Bybit-native OHLCV/mark/funding/spec/risk-tier snapshots.
+- Сверен существующий архивный audit artifact #13187466159 из workflow #41542079766: 67/67 CSV members структурно валидны; 64 проходят legacy 200-bar floor; 3 пусты (DAIUSDT, MATICUSDT, XMRUSDT); 0 malformed; 0 irregular/missing intervals; 6 pairwise duplicate comparisons без конфликтующих OHLCV candles; longest-file winner не теряет timestamps в проверенных парах. Audit hashes совпали с E11/E13 source archives по исторической записи.
+- Артефакт старый и проверяет целостность именно имеющихся Binance-style proxy archives; он не устраняет PIT universe, funding/mark, Bybit-native market, cost и execution gaps. Архивы не скачивались заново, новые данные не собирались, backtests/PnL не запускались.
+- Решение не меняется: H-B synthetic mechanics complete/frozen; no demonstrated edge. Дальше разрешены только read-only provenance/coverage audits и документационная гигиена.

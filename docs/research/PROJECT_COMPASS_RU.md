@@ -224,3 +224,14 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - Тестовая функция вручную исполнена в изолированной Python-сессии; 10 ключевых проверок прошли. Результат не является pytest/CI evidence.
 - GitHub connector не вернул workflow runs для PR head; автоматическое тестовое подтверждение пока отсутствует. PR оставлен открытым, не объединён.
 - H-B RegimeConfig не frozen; range labels и ATR в механическом тесте — контролируемые входы. Market PnL, новые данные и Bybit подключение не выполнялись.
+
+
+## 2026-11-24 — управленческая доска и проверка H-B signal-only PR
+
+- Создана короткая управленческая панель `docs/research/RESEARCH_BOARD_RU.md`: текущие статусы H-A/H-B/H-C, реальные ограничения данных, запреты и ближайшие решения. Это не новый журнал экспериментов; подробные результаты остаются в Experiment Ledger и первичных отчётах.
+- Актуальная инвентаризация Git tree рабочей ветки: шесть ZIP CryptoFetch в `data/archives/cryptofetch/`; Bybit-native trade OHLCV, mark, funding и dated instrument/risk-tier snapshots в дереве данных отсутствуют. Архивный аудит ранее зафиксировал 67 CSV entries, 64 валидных для legacy loader и три пустых; это Binance-style proxy, не Bybit data.
+- PR #16 (`research/hb-signal-contract`) открыт, не объединён. Head `7d10b7bddc093584b676736dd66691143f27a8c9`; на момент проверки рабочая ветка была `b6f7d45412a0ea8b348bc6262b2850f85b68de9e`. PR отстаёт от базы на один commit и имеет статус compare `diverged` (4 ahead / 1 behind); workflow runs и commit statuses для PR head отсутствуют.
+- Содержимое PR #16 — чистый `h_b_signal.py` и 10 deterministic tests; engine, pending/fill, sizing, persistence, exits и market PnL не менялись. По статическому чтению контракт использует range/ATR на t-1, shock на t, stabilization на t+1 и планирует вход на open t+2. RegimeConfig не frozen, фактический open t+2 и fill geometry ещё не проверяются; это осознанно оставленные следующие слои, а не доказанные свойства стратегии.
+- Текущий `.github/workflows/research-checks.yml` запускается push только на рабочую ветку и включает `tests/**` в path filter, но явный compile/test command для новых H-B файлов отсутствует. Поэтому PR #16 пока не имеет repository pytest/CI evidence. Прямой ручной запуск скопированной функции не заменяет pytest.
+- Следующий безопасный шаг: review/rebase PR #16 на актуальную рабочую базу; добавить H-B compile + deterministic test command в технический Research CI; выполнить CI и прочитать логи, убедившись, что market-PnL workflows не запускались. Не объединять и не расширять H-B lifecycle до получения реального тестового evidence.
+- Никаких Bybit API, runner, новых архивов, market-PnL backtests, paper/live trading или реальных ордеров не выполнялось. Действующие запреты сохранены.

@@ -1656,3 +1656,39 @@ This is stronger provenance than a generated fixture, but it is **Spot**, while 
 ### Decision
 
 These leads do not improve accepted D5 Linear coverage. D5 remains PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED; D6 remains PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED; D4 remains partial/unverified. No files were imported into the research repository, no market data was downloaded, and no Bybit API, collector, PnL run or backtest was executed.
+
+
+## 46. Funding formula regime change announced for 2026-11-24 onward
+
+### Первичный источник
+
+Bybit announcement, published 2026-11-19: [Update to Funding Rate Calculation Formula for Perpetual Contracts](https://announcements.bybit.com/en/article/update-to-funding-rate-calculation-formula-for-perpetual-contracts--art9f3b40f8766e/).
+
+В объявлении указано:
+- поэтапный rollout начинается 2026-11-24 и должен завершиться 2026-12-01;
+- новая формула масштабирует базовый расчёт с 8 часов к фактическому funding interval контракта через множитель N/8;
+- применённая settlement rate может измениться для контрактов с интервалом короче 8 часов;
+- default funding interval и funding rate limits самим обновлением не меняются;
+- таблица в announcement названа non-exhaustive, а точное расписание rollout вынесено в связанную Google Sheet.
+
+Доступный текст связанной таблицы раскрывает лишь часть строк; отсутствие символа в видимом фрагменте не является доказательством отсутствия в полном расписании. Поэтому effective batch/date для конкретного инструмента нельзя выводить из общего announcement date или краткого списка примеров.
+
+### Значение для D3
+
+Нужно различать три сущности:
+1. **Settlement observations:** фактически опубликованные funding rates и settlement timestamps. Они являются входом realised funding cashflow.
+2. **Funding interval schedule:** effective interval каждого инструмента во времени.
+3. **Funding formula regime:** effective version/formula regime и дата rollout для конкретного инструмента.
+
+Для расчёта realised historical funding cashflow используется фактически опубликованная settlement rate; новая формула сама по себе не требует пересчитывать уже состоявшиеся settlement rates. Но для воспроизведения/объяснения режима, моделирования ожидаемого funding и forward assumptions формула и effective window должны быть зафиксированы отдельно.
+
+Текущий API Funding History документирует rate и timestamp, но отсылает к текущему instruments-info за funding interval; историческая формула и её effective-time history в этих endpoint schemas не описаны. Источники: [Funding Rate History](https://bybit-exchange.github.io/docs/v5/market/history-fund-rate), [Instruments Info](https://bybit-exchange.github.io/docs/v5/market/instrument).
+
+### Решение
+
+- Добавить в будущий funding manifest поля `funding_formula_regime`, `effective_from`, `effective_to`, `announcement_ref`, `rollout_batch`, `evidence_confidence`.
+- Не назначать дату rollout конкретному символу без строки из полного списка или другого первичного подтверждения.
+- Не считать это доказательством пропуска funding settlements и не менять исторический PnL.
+- D3 остаётся NOT ACCEPTED: по-прежнему нет реального Bybit archive с доказанной полнотой и точной settlement-mark семантикой.
+
+Никаких API endpoints кроме отдельно разрешённого announcements endpoint не вызывалось; market data не загружались, расчёты PnL не выполнялись.

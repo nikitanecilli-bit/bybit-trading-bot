@@ -536,3 +536,23 @@ Official reference: https://www.bybit.com/en/help-center/article/Risk-Limit-Perp
 - D6: strengthened negative evidence — official changelog establishes the transition to automatic risk limits and later API pagination changes; current rules show account-state-dependent tier application. Status: `missing` for full historical acceptance.
 - No live API response, current API count, archive, market data, collector, runner, PnL run, paper order, or live order was produced by this audit.
 - **DATA GATE REMAINS BLOCKED.**
+
+
+## 17. Risk-limit endpoint cannot serve as a historical tier database
+
+A focused check of the current official `GET /v5/market/risk-limit` reference shows that the response exposes the current tier rows (`riskLimitValue`, `maintenanceMargin`, `initialMargin`, `maxLeverage`, `mmDeduction`, etc.) and a pagination cursor, but no effective-from/effective-to timestamps or historical query parameters.
+
+The official changelog documents these API changes:
+- 2023-10-25: `Get Position Info` added `isReduceOnly`, `mmrSysUpdatedTime`, and `leverageSysUpdatedTime`; a `Confirm New Risk Limit` endpoint was added.
+- 2024-03-12: `Set Risk Limit` was deprecated because automatic risk limit had launched.
+- 2024-05-09: `Get Risk Limit` added cursor pagination and returned 30 linear symbols per page.
+- 2024-12-12: linear page size changed from 30 to 15.
+- 2025-08-28: support for pre-market risk-limit tables was added.
+
+Official references:
+- https://bybit-exchange.github.io/docs/v5/market/risk-limit
+- https://bybit-exchange.github.io/docs/changelog/v5
+
+**D6 consequence:** the public risk-limit endpoint is a current-state lookup, not a time-series endpoint. Its cursor only traverses the current response set; it does not page through historical effective dates. The timestamps added to Position Info are account/position fields, not a public historical risk-tier archive, and they appeared only in October 2023. They cannot fill earlier history or replace periodic snapshots. Historical tier reconstruction therefore requires independently retained dated responses or a verifiable exchange event archive plus the exact rules in force at each time.
+
+Acceptance remains `missing` for D6. No private account API was accessed or requested, and no live response from the risk-limit endpoint was collected in this audit.

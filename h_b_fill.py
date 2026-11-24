@@ -100,8 +100,11 @@ def validate_h_b_replay_fill(
     gross_reward_per_unit = target - fill_price
     return {
         "strategy": H_B_STRATEGY,
+        "direction": "long",
         "policy_version": H_B_POLICY_VERSION,
         "fill_model": "next_h1_open_reference_only",
+        "entry_ts_ms": int(parsed[2]["ts"]),
+        "entry_price": fill_price,
         "fill_ts_ms": int(parsed[2]["ts"]),
         "fill_price": fill_price,
         "stop_price": stop,

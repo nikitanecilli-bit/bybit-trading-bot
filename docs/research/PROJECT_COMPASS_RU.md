@@ -241,3 +241,11 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - Первый CI run [45463120336](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463120336) прошёл compile и все предшествующие regression steps, но завершился на H-B test command: GitHub runner не имеет установленного `pytest` (`No module named pytest`). Само тело 10 H-B assertions не запускалось; не трактовать как логическую ошибку сигнала.
 - H-B tests переведены на стандартный Python `unittest`, workflow-команда заменена на `python tests/test_h_b_signal.py`; внешняя зависимость не добавлялась.
 - Повторный CI [45463406898] для commit `582ccedf943ed7d4a5a60db0436bbb63d4f5741c` запущен и на момент записи ещё выполняется. До результата не объявлять H-B mechanics pass.
+
+
+### 2026-11-24 — H-B signal mechanics confirmed by repository CI
+- PR #16 объединён в `research/market-regime-v1-main`; H-B pure predicate и 10 tests находятся в рабочей ветке. Research CI wiring выполняет compile и synthetic tests без рыночного PnL.
+- Первый run [45463120336](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463120336) не запустил assertions из-за отсутствующего pytest. Тесты переведены на stdlib unittest.
+- Повторный run [45463406898](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463406898) — SUCCESS; лог подтверждает `Ran 10 tests`, `OK`; все остальные шаги Research CI также прошли.
+- Статус: **SIGNAL MECHANICS PASS**, не strategy/edge pass. Не frozen RegimeConfig, не проверены фактический t+2 fill, geometry, engine lifecycle или profitability.
+- Следующий безопасный этап: read-only audit существующего causal regime classifier/RegimeConfig и timestamp convention; без market PnL, tuning, Bybit, новых архивов и engine integration.

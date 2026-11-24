@@ -377,3 +377,14 @@ Candidate deduplication across E04/E06/E08–E13 found only two main historical 
 - BNB Linear tick 0.1 in the Sep 29 fixture is consistent with Bybit's Oct 12 official 0.1→0.01 announcement and the later Oct 12 drift correction in the third-party project.
 - **Status correction:** external partial candidate snapshots now exist. D5/D6 are no longer "no candidate snapshots found", but remain PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED due to short date coverage, partial universe, capture/provenance limits and absent account-state history. No data was imported and no market-PnL run was authorized.
 - Full evidence and exact file/commit links: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 40](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#40-third-party-dated-bybit-metadata-snapshots-partial-raw-captures-and-cross-source-replication).
+
+
+### 2026-11-24 — exact E11/E13 universe coverage measured
+
+- Read-only inspection of historical E11/E13 workflow logs recovered the exact same 47-symbol universe in both experiments (47 fold-eligible out of 50 valid H1 symbols; 4,321 common H1 bars). This is the fixed Binance-style proxy universe, not a Bybit PIT universe.
+- The 2026-09-29 Bybit Linear metadata fixture overlaps **9/47 = 19.1%**: ADA, AVAX, BNB, BTC, DOGE, ETH, LINK, SOL, XRP.
+- 2026-10-21 raw captures cover BTC instrument specs (**1/47 = 2.1%**) and BTC/ETH/SOL/XRP risk tiers (**4/47 = 8.5%**). The extra nine Spot rows are not Linear coverage.
+- The 38 uncovered proxy symbols are listed in Section 41 of the acceptance ledger.
+- This quantifies coverage of the existing research sample only. It does not establish Bybit PIT listings, full-market coverage or effective-dated history. D4 remains partial/unverified; D5/D6 remain PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED.
+- No workflow artifact ZIP or market archive was downloaded; no market/PnL experiment or collector was run.
+- Full audit: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 41](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#41-coverage-of-dated-metadata-snapshots-against-the-exact-e11e13-47-symbol-proxy-universe).

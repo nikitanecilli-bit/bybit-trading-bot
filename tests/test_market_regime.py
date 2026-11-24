@@ -121,3 +121,36 @@ if __name__ == "__main__":
         if name.startswith("test_") and callable(value):
             value()
     print("All market-regime tests passed.")
+
+
+
+def test_regime_config_rejects_non_finite_thresholds():
+    import math
+    import pytest
+
+    invalid_configs = [
+        RegimeConfig(trend_slope_atr_min=math.nan),
+        RegimeConfig(range_slope_atr_max=math.inf),
+        RegimeConfig(high_vol_ratio=-math.inf),
+        RegimeConfig(high_vol_er_max=math.nan),
+    ]
+    for cfg in invalid_configs:
+        try:
+            cfg.validate()
+        except ValueError as exc:
+            assert "finite" in str(exc)
+        else:
+            raise AssertionError("non-finite regime threshold must be rejected")
+
+
+def test_regime_config_rejects_boolean_and_non_numeric_thresholds():
+    for cfg in (
+        RegimeConfig(trend_slope_atr_min=True),
+        RegimeConfig(high_vol_ratio="1.5"),
+    ):
+        try:
+            cfg.validate()
+        except ValueError as exc:
+            assert "finite" in str(exc)
+        else:
+            raise AssertionError("invalid regime threshold type must be rejected")

@@ -47,7 +47,7 @@
 
 
 
-**Сохранённые описательные данные (не edge):** read-only проверка артефактов E06/E11/E12 подтвердила, что можно сохранить raw signal-time OHLCV features и completed-bar market context отдельно от PnL. E12: 4,249 hourly rows, 47-symbol fixed universe; на unique selected-signal hours broad 72h breadth/return и ATR/dispersion ниже в fold 2, чем в folds 1/3. E06/E11 raw signal rows допустимы только для exploratory description после дедупликации; future-return columns — labels, engine fill/status/trade/PnL — исключить. Это три уже просмотренных proxy folds, не независимое подтверждение и не основание для нового фильтра.
+**Сохранённые описательные данные (не edge):** read-only проверка артефактов E06/E11/E12 подтвердила, что можно сохранить raw signal-time OHLCV features и completed-bar market context отдельно от PnL. E12: 4,249 hourly rows, 47-symbol fixed universe; на unique selected-signal hours broad 72h breadth/return и ATR/dispersion ниже в fold 2, чем в folds 1/3. E06/E08–E11/E13 raw signal rows допустимы только для exploratory description после выбора canonical config и дедупликации; future-return columns — labels, engine fill/status/trade/PnL — исключить. Артефакты E08–E13 содержат raw candidate rows, рассчитанные до engine replay; их можно сохранить только как exploratory features, отдельно от будущих labels и engine-derived статусов. Повторяющиеся конфигурационные строки требуют canonical config и дедупликации. Это три уже просмотренных proxy folds, не независимое подтверждение и не основание для нового фильтра.
 
 ## 5. Ближайшая последовательность
 

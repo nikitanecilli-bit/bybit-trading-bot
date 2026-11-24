@@ -317,7 +317,7 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - H-A and H-C tested configurations are negative after modeled costs and use reused CryptoFetch/Binance-style proxy windows without complete funding/Bybit PIT provenance. E14 is post-hoc attribution, not counterfactual PnL. Legacy holdout reports overlap previously inspected periods and/or have very small trade counts.
 - L2/public-trade audits identify unresolved passive-fill realism limits: price-through and cancellation allocation are not modeled; cross-stream event ordering and historical trade sequence fields are unverified. The replay cannot be promoted as validated maker execution.
 - Conclusion: prior experiments provide useful negative/exploratory evidence, not a defensible positive edge claim. No backtest, sweep, event study, data collection or exchange connection was performed. Project remains BLOCKED pending a legitimately permitted independent validation route.
-- Current research branch HEAD after this documentation reconciliation: b5068be44b43b087de737562f46e0152cce9bdb9; documentation-only commits, no strategy code or market results changed.
+- The documentation-only reconciliation sequence includes the E01–E04/E07 exit-cost provenance updates in Experiment Ledger and Research Board; no strategy code or market results changed. Check the live branch ref at the next task start rather than treating a SHA embedded in this log as current.
 
 
 ### 2026-11-24 — E04/E07 exit-cost provenance follow-up

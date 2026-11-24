@@ -230,3 +230,12 @@
 - These are external, third-party snapshots, not a full time series or full-market PIT archive. Capture provenance and universe coverage still need formal acceptance; the Oct 15 BTC file has manual-paste provenance; account-specific applied tiers are absent.
 - **Updated decision:** D5 and D6 = PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED. D4 remains partial/unverified. Do not import these snapshots or start PnL/backtests without completing provenance review and the existing authorization gates.
 - Details: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 40](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#40-third-party-dated-bybit-metadata-snapshots-partial-raw-captures-and-cross-source-replication).
+
+
+### 2026-11-24 — exact 47-symbol coverage measured
+
+- Historical E11 and E13 Actions logs independently print the same 47 fold-eligible symbols (50 valid H1 symbols, 4,321 common bars). This is the Binance-style proxy archive universe, not a Bybit point-in-time universe.
+- Sep 29 Linear fixture overlaps 9/47 (19.1%) for both instrument specs and risk tiers: ADA, AVAX, BNB, BTC, DOGE, ETH, LINK, SOL, XRP. Its nine Spot rows do not count toward Linear coverage.
+- Oct 21 raw capture coverage: instrument specs 1/47 (2.1%), risk tiers 4/47 (8.5%).
+- The 38 uncovered symbols and full interpretation are in acceptance ledger Section 41.
+- D5/D6 remain PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED; D4 remains partial/unverified. No PnL replay, collector, market archive download or workflow artifact download was performed.

@@ -1266,3 +1266,52 @@ The most defensible interpretation is a **changelog hyperlink/label copy-paste e
 ### Consequence
 
 Do not reopen the historical `instruments-info` API path based on the 2023-04-04 changelog line. D5 remains without a documented historical query mechanism in the current official endpoint. The historical event-ledger and baseline-snapshot requirements remain unchanged.
+
+
+## 38. Official market API and risk-limit documentation: historical-data boundary
+
+Read-only review of the current official V5 documentation establishes the following:
+
+### Instrument specifications (D5)
+
+- `GET /v5/market/instruments-info` is described as querying specifications for **online trading pairs**. Its documented request parameters are category, symbol, symbolType, status, baseCoin, limit and cursor; there are no documented historical time parameters.
+- The response includes launchTime and deliveryTime, but these describe instrument lifecycle bounds, not historical versions of tickSize, qtyStep, minNotionalValue, leverageFilter, funding bounds or order-size limits.
+- The documentation explicitly warns that max order quantity fields are adjusted twice monthly (3rd and 17th, 08:00 UTC+8), so a present-day value cannot safely be projected backward.
+- `GET /v5/market/instrument-summary`, introduced 2026-10-14, is a current summary endpoint and does not document historical versions either.
+
+Official references:
+- https://bybit-exchange.github.io/docs/v5/market/instrument
+- https://bybit-exchange.github.io/docs/v5/market/instrument-summary
+- Changelog: https://bybit-exchange.github.io/docs/changelog/v5
+
+### Risk-limit tables versus actual account tier (D6)
+
+- `GET /v5/market/risk-limit` returns the current per-symbol risk-tier table (riskLimitValue, IMR, MMR, maxLeverage, mmDeduction) with cursor pagination. Its documented request has no effective-time or historical query parameter.
+- Bybit's risk-limit help article states that automatic tier selection depends on the account's open positions and active orders. Effective position value is calculated using mark price; reduce-only and close-on-trigger orders are excluded. As mark price and open orders/positions change, the account's tier can change in real time.
+- The same help article distinguishes Isolated/Cross modes from Portfolio Margin. Portfolio Margin calculates risk at the overall account portfolio level rather than using the symbol risk-limit table in the same way.
+
+Official references:
+- https://bybit-exchange.github.io/docs/v5/market/risk-limit
+- https://www.bybit.com/en/help-center/article/Risk-Limit-Perpetual-and-Expiry-Contracts
+
+Therefore two different historical objects must not be conflated:
+1. **Exchange tier schedule:** the dated tier rows and parameter changes for a symbol.
+2. **Account's applied tier/state:** the tier actually applicable at a moment, derived from that account's positions, active orders, mark prices, leverage and margin mode.
+
+A historical tier schedule alone is insufficient to reproduce an account's liquidation/margin path. D6 needs both dated exchange tier schedules and account-state inputs if account-level liquidation is in scope.
+
+### Official historical market-data downloads are not a spec archive
+
+The V5 Get Recent Public Trades documentation links to Bybit's Historical Data download page. This confirms an official route for archived historical trade data, but the cited documentation does not describe a historical instrument-specification or risk-tier archive. It must not be treated as evidence that D5/D6 are solved:
+- https://bybit-exchange.github.io/docs/v5/market/recent-trade
+- https://www.bybit.com/en/derivative-activity/history-data
+
+A third-party Bybit adapter's source notes also describe instrument-info and risk-limit as today's specification only and state that delisted symbols are not served by those current endpoints. This is corroborative implementation evidence, not an official completeness guarantee:
+- https://github-wiki-see.page/m/sbOogway/sbt2/wiki/Source-Bybit
+
+### Gate decision
+
+- D5 remains **NOT ACCEPTED**: current specs plus lifecycle timestamps and event notices do not form a complete effective-dated history.
+- D6 remains **NOT ACCEPTED**: current tier tables and selected announcements do not form a complete tier history; account-specific applied tiers require account-state reconstruction.
+- Official trade archives may help a later, separately authorized market-data stage, but do not close D4/D5/D6.
+- No archive was downloaded, no collector or API endpoint was run, no market calculation/backtest was run, and no permission boundary was changed.

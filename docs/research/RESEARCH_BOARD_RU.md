@@ -205,3 +205,11 @@
 
 
 **D4–D6 snapshot boundary audit (2026-11-24):** universe collector queries several lifecycle statuses including Closed and records launch/delivery timestamps, but produces point-in-time observations rather than a complete suspension/resumption history. Instrument-spec and risk-tier as-of loaders select only the newest dated snapshot at or before a timestamp and fail when none exists; they cannot reconstruct pre-first-snapshot effective-time changes. No dated snapshot series is committed. D4 remains partial/unverified; D5/D6 remain missing for the historical interval. Подробнее: [ALT-SYSTEM-DATA-ACCEPTANCE-001, раздел 13](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#13-static-boundary-audit-for-d4d6-what-dated-snapshots-can-and-cannot-prove).
+
+
+### 2026-11-24 — D5/D6 official API boundary re-check
+
+- `instruments-info` / `instrument-summary`: current online specifications only; no documented historical versions. Periodic max-order-size changes make backward carry unsafe.
+- `risk-limit`: current symbol tier table only. Actual account tier is dynamic from positions, active orders and mark price; account-level liquidation replay also needs account-state history.
+- Official archived-trade download link does not establish historical specification/risk archives.
+- **Decision:** D5/D6 remain NOT ACCEPTED; D4 remains partial/unverified. No new archives, collectors, API calls, market PnL or backtests. See [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 38](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#38-official-market-api-and-risk-limit-documentation-historical-data-boundary).

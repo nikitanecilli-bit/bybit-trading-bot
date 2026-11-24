@@ -52,7 +52,8 @@
 3. Получить фактический запуск точных H-B tests и релевантных legacy regression tests; прочитать логи и убедиться, что выполнялись именно нужные тесты. **Выполнено:** Research CI #45463406898 подтвердил 10/10 signal tests; #45464653488 подтвердил 13 market-regime tests, 13 H-B signal tests и 6 H-B regime-adapter tests.
 4. Провести независимый code review временной семантики и входных контрактов. Исправлять только подтверждённые дефекты. **Выполнено для signal/regime layer.**
 5. Зафиксировать результат как **SIGNAL + REGIME MECHANICS PASS**, не как strategy/edge pass. Engine integration не выполнять.
-6. Следующий узкий шаг — pure next-open fill geometry: наличие t+2 бара, exact timestamp, actual open между frozen stop и target. Без sizing, fees/PnL и engine lifecycle.
+6. Pure next-open fill geometry выполнен: наличие t+2 бара, exact timestamp, actual open строго между frozen stop и target. Не продолжать к sizing/persistence/manager без отдельного решения о необходимости и без допустимого пути к market validation.
+7. Сейчас H-B остановлена на границе механической готовности. Не строить полный engine lifecycle ради гипотезы без возможности проверить её на независимых рыночных данных.
 
 ## 6. Критерии остановки и доказательности
 
@@ -126,3 +127,12 @@
 - Ужесточена проверка идентичности входного сигнала: принимается только H-B long и поддерживаемая policy version; сигнал с неверной временной связью отвергается.
 - Research CI run `45465175545` на commit `83ebd2f644b9a1f26b2928135b3c5b0b82ac37fc` завершился SUCCESS. `tests/test_h_b_signal.py`: 21 test; `tests/test_h_b_regime.py`: 6 tests; оба workflow steps success, causal regime validation и остальные deterministic checks также прошли.
 - Текущий H-B статус: synthetic signal/classifier/entry contract PASS. Это не market PnL, не edge, не execution validation. Следующий слой — только если полезен: synthetic exit/persistence invariants с заранее определённым контрактом. Не подключать engine и не запускать PnL.
+
+
+## 2026-11-24 — H-B next-open geometry completed; stop before engine lifecycle
+
+- Добавлен `h_b_fill.py`: pure offline check of actual t+2 H1 open against frozen absolute stop/target. It verifies exact timestamps and OHLC integrity; valid fill requires `stop < open[t+2] < target`. It reports per-unit geometry only.
+- Added 8 deterministic synthetic tests: valid open, missing next bar, gaps at/beyond stop and target, timestamp mismatch, signal/candle mismatch, malformed OHLC and future-row isolation.
+- Research CI [45465377742](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45465377742) — SUCCESS on commit `b72c15575170fc8f49691706d88a3599ed94b954`. Logs: H-B signal 19/19, regime adapter 6/6, next-open geometry 8/8; full technical workflow successful.
+- This remains an OHLC next-open reference model, not an executable fill model: no spread, queue, slippage, fees, funding, partial fills or adverse selection. No sizing, persistence, position lifecycle or engine integration.
+- **Decision:** H-B has passed the current narrow synthetic mechanics gates. Stop expanding it. The next meaningful proof is independent market validation with appropriate data/costs, but current provenance and user authorization gates do not permit that work. Do not build additional lifecycle infrastructure merely to keep coding.

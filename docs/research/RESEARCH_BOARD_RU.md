@@ -66,7 +66,7 @@
 
 ## 7. Источники истины
 
-- Цели, разрешения и ограничения: `PROJECT_COMPASS_RU.md` и `../PROJECT_WORKING_RULES_RU.md`.
+- Цели, разрешения и ограничения: `PROJECT_COMPASS_RU.md` и `../../PROJECT_WORKING_RULES_RU.md`.
 - Исторические эксперименты: `EXPERIMENT_LEDGER_RU.md`.
 - Доказательства и ограничения данных: `../audits/POINT_IN_TIME_UNIVERSE_AND_ARCHIVE_AUDIT_2026-11-03.md`, funding completeness audit и первичные experiment reports.
 - Текущая реализация и тесты: только актуальные файлы/commits рабочей ветки; старые сообщения чата не заменяют GitHub-проверку.

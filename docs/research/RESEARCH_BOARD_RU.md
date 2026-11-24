@@ -282,3 +282,10 @@
 - Bybit объявил поэтапное изменение формулы funding с 2026-11-24 по 2026-12-01. В D3 нужно хранить formula regime отдельно от settlement rate и funding interval; конкретные effective dates символов пока не подтверждены. Подробности: acceptance ledger Section 46.
 
 - Статический review текущего H1 runner подтвердил, что он не поддерживает single-symbol pilot простой конфигурацией: требует exact Top-5 selection manifest, lifecycle universe snapshot, все source directories и выполняет заранее заданный multi-arm/fold/cost loop. Новый runner не создавать, пока не выбран допустимый независимый эксперимент и не доказана необходимость такой переделки.
+
+### Candidate readiness decision — 2026-11-24
+
+- Ближайший существующий кандидат — H1 Donchian(48)+EMA50/200: сигнал и lifecycle есть, H-B существенно менее готова.
+- Но текущий runner принудительно использует maker limit OHLC penetration (20 bps offset / 5 bps penetration / 3-bar TTL); это не доказанный maker fill. Base engine умеет market entry на next H1 open с taker accounting, но runner этот путь переопределяет.
+- Наиболее дешёвый потенциальный путь — отдельная preregistered taker-only single-symbol execution profile поверх существующего H1 engine. Это новая версия execution contract, не прежний maker candidate. D1/D3/D4/D5/D8 остаются обязательны; при 5x isolated также D2/D6.
+- **Решение: пока не писать runner и не запускать PnL.** Сначала доказать наличие независимого периода и accepted Bybit-native inputs для одного инструмента. Подробный read-only review — раздел 2A [Minimum Viable Edge Validation](MINIMUM_VIABLE_EDGE_VALIDATION_RU.md).

@@ -32,7 +32,7 @@
 | Базовая H1 breakout / E01–E13 | **DEFERRED / NO EDGE** | Ряд shared-capital proxy результатов отрицателен; выборка не PIT Bybit; старые результаты имеют ограничения исполнения и provenance | Не тюнить прежние folds. Возвращаться только при новом независимом основании и закрытых data/method gates |
 | H-A relative-strength breakout | **REJECTED — tested configuration** | В preregistered proxy comparison хуже baseline и отрицательна по folds | Не подбирать параметры и символы на тех же folds |
 | H-C post-break invalidation | **REJECTED AS PROFITABILITY CANDIDATE / MECHANICS ONLY** | Проверенная proxy-конфигурация не показала превосходства; реализация находится за default-OFF флагом; synthetic tests не доказывают edge | Не продолжать tuning на использованном окне |
-| H-B mean reversion | **ACTIVE — SIGNAL MECHANICS ONLY** | Есть узкий pure predicate и 10 synthetic tests в PR #16; нет H-B market PnL, frozen RegimeConfig и engine integration | Сначала получить проверяемый pytest/CI результат и legacy regression; затем решить, имеет ли смысл следующий изолированный шаг |
+| H-B mean reversion | **SIGNAL MECHANICS PASS / DESIGN BLOCKED** | Pure predicate и 10 deterministic tests прошли Research CI #45463406898; нет H-B market PnL, frozen RegimeConfig и engine integration | Провести статический аудит causal RegimeConfig и timestamp semantics; затем решить, нужен ли следующий изолированный шаг |
 | Новые стратегии/фильтры | **DEFERRED** | Ни один новый кандидат не обоснован достаточно, чтобы оправдать расширение | Не добавлять до закрытия текущего H-B mechanical question |
 
 Статусы REJECTED относятся к конкретным проверенным конфигурациям/окнам, а не к утверждению, что любой вариант семейства стратегий математически невозможен.
@@ -48,11 +48,11 @@
 ## 5. Ближайшая последовательность
 
 1. Довести PR #16 до актуальной базы рабочей ветки без потери изменений.
-2. Включить H-B signal-only module/tests в технический Research CI так, чтобы CI выполнял только compile и deterministic tests — без market-PnL workflows.
-3. Получить фактический запуск точных H-B tests и релевантных legacy regression tests; прочитать логи и убедиться, что выполнялись именно нужные тесты. Первый запуск #45463120336 остановился на отсутствии pytest (тестовые assertions не запускались); тестовый файл переведён на стандартный unittest, повторный run #45463406898 выполняется.
+2. Включить H-B signal-only module/tests в технический Research CI так, чтобы CI выполнял только compile и deterministic tests — без market-PnL workflows. **Выполнено.**
+3. Получить фактический запуск точных H-B tests и релевантных legacy regression tests; прочитать логи и убедиться, что выполнялись именно нужные тесты. **Выполнено:** первый запуск #45463120336 остановился на отсутствии pytest (assertions не запускались); после перехода на unittest повторный run #45463406898 завершился SUCCESS, H-B 10/10.
 4. Провести независимый code review временной семантики и входных контрактов. Исправлять только подтверждённые дефекты.
-5. Если механика проходит — зафиксировать результат как **SIGNAL MECHANICS PASS**, не как strategy/edge pass. Не расширять сразу на pending/fill/position lifecycle.
-6. Отдельно решить, можно ли однозначно зафиксировать causal RegimeConfig без подбора по использованным рыночным folds. Если нет — H-B остаётся design-blocked.
+5. Зафиксировать результат как **SIGNAL MECHANICS PASS**, не как strategy/edge pass. Не расширять сразу на pending/fill/position lifecycle.
+6. Отдельно проверить causal RegimeConfig, timestamp semantics и следующий-bar/fill boundary без рыночного PnL. Если режим нельзя обосновать без tuning на использованных folds — H-B остаётся design-blocked.
 
 ## 6. Критерии остановки и доказательности
 
@@ -79,3 +79,12 @@
 - Первый Research CI после добавления H-B tests: run [45463120336](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463120336) — FAILURE только на команде `python -m pytest`: runner не содержит pytest (`No module named pytest`). H-B assertions не исполнялись; это не провал логики сигнала.
 - Не добавлять внешнюю зависимость только ради одного набора синтетических тестов. Тесты переведены на стандартный `unittest`; workflow теперь запускает `python tests/test_h_b_signal.py`.
 - Повторный Research CI run [45463406898](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463406898) для SHA `582ccedf943ed7d4a5a60db0436bbb63d4f5741c` находится в работе. До его завершения статус H-B mechanics остаётся UNVERIFIED.
+
+
+## 2026-11-24 — H-B signal mechanics CI passed
+
+- PR #16 объединён в рабочую ветку. Исследовательский commit с H-B pure predicate, tests и CI wiring: `5bd43a32bd3955684924b0bddc93356afa2de10c`; последующая замена pytest на стандартный unittest и финальный workflow: `582ccedf943ed7d4a5a60db0436bbb63d4f5741c`.
+- Research CI [45463406898](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463406898) — SUCCESS. В логах: `Ran 10 tests`, `OK`; compile и все предыдущие regression steps также прошли.
+- Первый запуск [45463120336](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463120336) провалился из-за отсутствующего pytest; после перевода тестов на stdlib unittest проблема закрыта. Это была инфраструктурная ошибка запуска, не ошибка assertions.
+- Решение: **H-B SIGNAL MECHANICS PASS** только для изолированного контракта. Не означает market validation, profitability, edge, engine integration или readiness.
+- Следующий шаг: статически проверить существующий causal regime classifier/RegimeConfig, timestamp convention и границы следующего бара. Не выполнять market-PnL, parameter tuning, data collection или lifecycle integration.

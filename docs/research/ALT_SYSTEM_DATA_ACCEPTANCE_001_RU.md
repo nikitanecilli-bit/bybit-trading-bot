@@ -1024,3 +1024,104 @@ These are **rule-regime boundaries**, not tier-table values. For any historical 
 - **D6 remains unaccepted for historical economic replay.** The new findings reduce ambiguity about rule changes but do not close the data gap.
 
 No Bybit endpoint was called. No Tardis replay/sample, private account data, market data, vendor subscription, archive download, collector, PnL run, or execution was used.
+
+
+## 32. Official announcement archive is a partial event ledger for D5, not a complete specification history
+
+A review of Bybit's current announcement catalogue and dated notices establishes that several mutable instrument constraints are published as explicit change events with old/new values and effective timestamps.
+
+### 32.1 Tick-size events
+
+Official USDT perpetual notices publish symbol-level current and new tick sizes and a UTC effective time. Examples found:
+- 2026-06-05: selected contracts, effective 07:30 UTC.
+- 2026-07-18: selected contracts, effective 05:00 UTC.
+- 2026-08-11: selected contracts, effective 08:30 UTC.
+- 2026-10-12: selected contracts, effective 07:30 UTC.
+- 2026-11-20: selected contracts, effective 07:30 UTC.
+
+Examples:
+- https://announcements.bybit.com/en/article/change-tick-size-for-usdt-perpetual-contract-jun-5-2026-blt539f4749d220f97b/
+- https://announcements.bybit.com/en/article/change-tick-size-for-usdt-perpetual-contract-jul-18-2026--art2c7f982380fe/
+- https://announcements.bybit.com/en/article/change-tick-size-for-usdt-perpetual-contract-aug-11-2026--art4f47b6648755/
+- https://announcements.bybit.com/en/article/change-tick-size-for-usdt-perpetual-contract-oct-12-2026--art5c4a8b8eef37/
+- https://announcements.bybit.com/en/article/change-tick-size-for-usdt-perpetual-contract-nov-20-2026--art2a243e629ca8/
+
+The Nov 20 notice also states that orders placed before the effective time remain in the book with the original tick size. Thus, for an order-book/execution replay, a single symbol-level tick value switched at the event time may still be insufficient to model grandfathered resting orders: order-level tick validity may depend on order placement time.
+
+### 32.2 Maximum order-size events
+
+Bybit's current Get Instruments Info documentation explicitly warns that `maxLimitOrderQty`, `maxMarketOrderQty`, and `postOnlyMaxLimitOrderSize` are adjusted twice monthly, on the 3rd and 17th at 08:00 UTC+8. It explicitly tells integrators not to assume these values remain constant.
+
+Official endpoint documentation: https://bybit-exchange.github.io/docs/v5/market/instrument
+
+The announcement catalogue contains many dated “Changes of Max. Order Size for USDT Perpetual Contracts” entries, including multiple updates in October–December 2025 and a Nov 20, 2026 notice. The Nov 20, 2026 notice gives before/after market and limit order sizes for SOXXUSDT and SNDKUSDT and an effective time of 12:30 UTC:
+https://announcements.bybit.com/en/article/changes-of-max-order-size-for-usdt-perpetual-contracts-nov-20-2026--arte1da2b0316fa/
+
+This is direct evidence that max order quantities are mutable and that dated event notices can recover selected changes. It does not establish that every scheduled adjustment is individually announced, indexed without omissions, or preserved for the full historical interval.
+
+### 32.3 D5 event-sourced recovery is possible only as a partial overlay
+
+The official notices can populate a sparse, auditable event table for the exact fields they state:
+- `tickSize`;
+- maximum limit order size;
+- maximum market order size;
+- effective UTC timestamp;
+- source URL and publication timestamp;
+- any grandfathering/transition note.
+
+Do not infer unchanged values between notices unless a complete baseline snapshot at the beginning of the interval and complete change-event coverage are both established. Missing notices must produce `unknown`, not carry-forward certainty.
+
+The notices reviewed do not provide a complete historical record for `qtyStep`, `minOrderQty`, `minNotionalValue`, `priceFilter.minPrice/maxPrice`, leverage filters, funding bounds, and every other instrument field. D5 therefore remains **not accepted**, but its recovery path is now more concrete: dated official notices can supply partial field-specific changes, while snapshots are still required for complete state.
+
+## 33. Official risk-limit notices expose a partial schedule-change ledger and account-specific transition windows
+
+The official announcement catalogue contains repeated “Risk limit adjustment for selected Perpetual Contracts” notices, not just the isolated examples previously examined. Searchable catalogue entries include repeated updates through 2025 and 2026. The notices have materially different levels of detail.
+
+### 33.1 Notices with explicit old/new leverage
+
+The Sep 11, 2026 notice lists affected symbols and current/after maximum leverage values, with effective time 08:00 UTC:
+https://announcements.bybit.com/en/article/risk-limit-adjustment-for-selected-perpetual-contracts-sep-11-2026--art85d833a97af0/
+
+This is usable as a symbol-level event for the published maximum-leverage field. It is not a complete tier schedule: it does not provide every riskLimitValue, IMR, MMR, mmDeduction row for each affected contract.
+
+### 33.2 Notices with delayed account application
+
+Other notices describe an initial effective time and a later end of a buffer period. Examples:
+- STORJUSDT: adjustment around 2026-09-04 03:30 UTC, buffer ends 2026-09-21 03:30 UTC.
+  https://announcements.bybit.com/en/article/risk-limit-adjustment-for-selected-perpetual-contracts-storjusdt-sep-4-2026--arteb41cc67ea8b/
+- AVAXUSDT, XLMUSDT and other contracts: initial adjustment around 2026-09-04 07:30 UTC, buffer ends 2026-09-21 07:30 UTC.
+  https://announcements.bybit.com/en/article/risk-limit-adjustment-for-selected-perpetual-contracts-avaxusdt-xlmusdt-sep-4-2026--art453915b9e8fd/
+- LYNUSDT, AGIUSDT, TMXUSDT, 1000RATSUSDT: initial adjustment around 2026-10-15 07:30 UTC, buffer ends 2026-11-01 07:30 UTC.
+  https://announcements.bybit.com/en/article/risk-limit-adjustment-for-selected-perpetual-contracts-lynusdt-agiusdt-oct-15-2026--art83f2aa1db186/
+
+The notices state that accounts unable to satisfy the new margin requirements may be restricted to reduce-only actions during the buffer period, and that existing positions may be subject to the new parameters after the buffer ends. They also reserve the right to end the buffer early for risk-control or emergency reasons.
+
+Therefore a single global effective timestamp is not sufficient to reproduce every account's applied risk parameters. At minimum, preserve:
+- announcement publication time;
+- nominal scheduled adjustment time;
+- buffer-period end;
+- symbol scope;
+- old/new values when explicitly disclosed;
+- account-specific application state as unknown unless independently observed.
+
+### 33.3 Current help-center mechanics confirm why a notice is not a complete account replay
+
+The current Risk Limit help article (last updated 2026-09-04) states that effective position value uses Mark Price for USDT/USDC and inverse contracts, includes open positions and active orders, treats one-way and hedge position modes separately, excludes Reduce Only and Close on Trigger orders, and adjusts tiers in real time as Mark Price changes. It also documents a trial calculation and a 10-day buffer when an immediate application would create excessive account risk.
+
+Reference: https://www.bybit.com/en/help-center/article/Risk-Limit-Perpetual-and-Expiry-Contracts
+
+This establishes that historical D6 requires both:
+1. the symbol's dated risk schedule/rules; and
+2. the account's positions, orders, mark-price path, mode, leverage and transition state.
+
+A public announcement may identify affected symbols and some parameter changes, but it does not expose the complete per-account rollout state.
+
+### 33.4 D6 conclusion
+
+- Official notices can recover selected symbol-level changes and some explicit maximum-leverage deltas.
+- Some notices provide a buffer window, not a universal instantaneous effective time.
+- The current REST risk-limit endpoint still has no documented historical time selector.
+- No complete historical table of all tier rows and effective intervals has been established.
+- **D6 remains unaccepted for historical account-level margin/liquidation replay.** Announcement-ledger work can reduce uncertainty for selected symbols and dates, but cannot substitute for the full tier history and account-state observations.
+
+No API request, market-data download, private account access, paid subscription, collector, PnL replay, or execution was used.

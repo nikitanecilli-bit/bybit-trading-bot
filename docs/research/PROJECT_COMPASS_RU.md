@@ -348,3 +348,6 @@ E08–E13 artifact cross-check: raw candidate feature rows are constructed befor
 
 
 The artifact-level salvage classification now covers E01–E13: E01–E03/E07 are summary-only; E04/E06/E08–E11/E13 contain candidate signal CSVs with pre-engine raw features (exploratory only, canonicalized/deduplicated); E12 is descriptive-only hourly context; E05 is a failed data-access attempt. All engine-derived fills, trade selection/status and PnL remain excluded from economic evidence. No new market calculation was performed and the strategy status remains DEFERRED / NO EDGE.
+
+
+Candidate deduplication across E04/E06/E08–E13 found only two main historical signal samples: the same 1,012 five-symbol candidates repeated across E04/E06/E08/E09 configurations, and the same 9,236 47-symbol common-timestamp candidates repeated in E11/E13 (E10 overlaps all 9,236 plus 79 extra timestamps due per-symbol coverage). E12 summarizes E11 timestamps, not a separate sample. Experiment IDs/configuration rows are not independent replications.

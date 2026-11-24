@@ -239,3 +239,10 @@
 - Oct 21 raw capture coverage: instrument specs 1/47 (2.1%), risk tiers 4/47 (8.5%).
 - The 38 uncovered symbols and full interpretation are in acceptance ledger Section 41.
 - D5/D6 remain PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED; D4 remains partial/unverified. Subsequent read-only download of existing E11/E13 result artifacts confirmed identical 50-row manifests, 47 included symbols, same three exclusions and identical six source-archive hashes. No market archive, collector, Bybit API request or PnL replay was performed.
+
+
+### 2026-11-24 — sbt2 source lead (not yet an archive)
+
+- Public `sbOogway/sbt2` adapter writes daily dated instrument snapshots when run, but its `/data/` outputs are git-ignored and no raw Bybit archive is present in the public tree. Snapshot stores only lowest risk tier; full D6 table is not preserved there.
+- D5 potential lead only if local snapshots can be obtained with provenance; D6 insufficient as implemented. D4 partial; D5/D6 remain not accepted. No API, collectors, market data or PnL runs.
+- Evidence: acceptance ledger Section 43.

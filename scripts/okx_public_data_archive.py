@@ -101,6 +101,8 @@ def parse_candle(row: Any, source: str) -> dict[str, Any]:
         "timestamp_ms": ts, "timestamp_utc": iso_utc(ts),
         "open": values[0], "high": values[1], "low": values[2], "close": values[3],
     }
+    if len(row) > 5:
+        result["confirm"] = str(row[8]) if len(row) > 8 else str(row[5])
     if source == "candles":
         result.update({
             "volume": str(row[5]) if len(row) > 5 else "",
@@ -213,11 +215,13 @@ def hourly_grid_report(rows: list[dict[str, Any]], start_ms: int, end_ms: int) -
     actual = {int(row["timestamp_ms"]) for row in rows}
     missing = [ts for ts in expected if ts not in actual]
     extra = sorted(actual.difference(expected))
+    unconfirmed = [row["timestamp_ms"] for row in rows if "confirm" in row and row["confirm"] != "1"]
     return {
         "expected_rows": len(expected), "actual_rows": len(rows),
         "missing_count": len(missing), "missing_first_20_utc": [iso_utc(x) for x in missing[:20]],
         "extra_count": len(extra), "duplicates": len(actual) != len(rows),
-        "complete": not missing and not extra and len(actual) == len(rows),
+        "unconfirmed_count": len(unconfirmed), "unconfirmed_first_20_utc": [iso_utc(x) for x in unconfirmed[:20]],
+        "complete": not missing and not extra and not unconfirmed and len(actual) == len(rows),
     }
 
 
@@ -236,7 +240,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("this first pilot is deliberately restricted to BTC-USDT-SWAP")
     if args.days < 1 or args.pause < 0 or args.max_pages < 1:
         parser.error("--days and --max-pages must be positive; --pause cannot be negative")
-    end_ms = parse_time(args.end) if args.end else (utc_now_ms() // HOUR_MS - 1) * HOUR_MS
+    end_ms = parse_time(args.end) if args.end else (utc_now_ms() // HOUR_MS) * HOUR_MS
     start_ms = parse_time(args.start) if args.start else end_ms - args.days * 24 * HOUR_MS
     if start_ms >= end_ms:
         parser.error("--start must be earlier than --end")

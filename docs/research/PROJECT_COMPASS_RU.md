@@ -367,3 +367,13 @@ Candidate deduplication across E04/E06/E08–E13 found only two main historical 
 - Recovered schema milestones include status-filter expansion (2023-04), funding-bound fields (2024-02), order-size field changes (2024-02 and 2025-10/11), risk-limit pagination (2024-05 and page-size reduction 2024-12), PreLaunch risk-limit support (2025-08), periodic order-size adjustments (documented 2026-02), and further instrument schema/price-limit changes in 2026.
 - This is useful evidence of **schema chronology**, not a complete historical archive of per-symbol numeric values. Documentation code examples contain timestamped but limited/possibly illustrative payloads; the risk-limit example is still a single BTCUSD tier with ellipsis.
 - D5/D6 remain NOT ACCEPTED. Details and primary commit links: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 39](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#39-bybit-official-documentation-git-history-schema-chronology-recovered-historical-values-not-recovered).
+
+
+### 2026-11-24 — third-party dated Bybit metadata snapshots identified
+
+- Found a 2026-09-29 mainnet fixture in `mannar-hielal/crypto-dashboard`: 9 Spot + 9 Linear instrument rows and risk tiers for 9 symbols. Its recorder source documents public GETs, but stores only result objects and one capture-start timestamp, not per-response server times.
+- Found raw API-envelope snapshots in `aoventuresdomain-cloud/sleeve-fund`: BTC risk tiers on 2026-10-15; on 2026-10-21, BTC instrument info plus risk tiers for BTC/ETH/SOL/XRP. The workflow preserves response envelopes and timestamps.
+- Exact cross-source comparison: all 35 risk tiers for BTC/ETH/SOL/XRP match between the 2026-09-29 and 2026-10-21 projects; BTC also matches 2026-10-15 vs 2026-10-21. BTC Linear instrument row matches 2026-09-29 vs 2026-10-21.
+- BNB Linear tick 0.1 in the Sep 29 fixture is consistent with Bybit's Oct 12 official 0.1→0.01 announcement and the later Oct 12 drift correction in the third-party project.
+- **Status correction:** external partial candidate snapshots now exist. D5/D6 are no longer "no candidate snapshots found", but remain PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED due to short date coverage, partial universe, capture/provenance limits and absent account-state history. No data was imported and no market-PnL run was authorized.
+- Full evidence and exact file/commit links: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 40](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#40-third-party-dated-bybit-metadata-snapshots-partial-raw-captures-and-cross-source-replication).

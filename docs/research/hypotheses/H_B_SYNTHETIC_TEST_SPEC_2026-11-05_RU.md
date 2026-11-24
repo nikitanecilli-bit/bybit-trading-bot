@@ -275,3 +275,8 @@ Research CI [45464653488](https://github.com/nikitanecilli-bit/bybit-trading-bot
 The isolated replay boundary `h_b_fill.py` validates the actual t+2 H1 candle and accepts only an open strictly between the frozen absolute stop and target. It verifies the signal's shock timestamp, stabilization timestamp, scheduled entry timestamp and OHLC integrity. Eight deterministic tests passed in Research CI [45465377742](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45465377742). The H-B signal suite passed 19 tests and the regime adapter suite passed 6 tests in the same run.
 
 This remains a reference-price geometry check, not an execution model. It excludes spread, queue position, fill probability, slippage, fees, funding, partial fills and adverse selection. No sizing, persistence, position manager, engine integration or market PnL was performed. Current synthetic mechanics gates are complete; do not extend lifecycle without an allowed independent market-validation path.
+
+
+### 19. Economic limitation of the synthetic fill example
+
+The accepted synthetic fill fixture produces gross reward/risk 0.4. The test demonstrates only that the observed next-open lies between stop and target; it does not imply the trade is economically acceptable. No minimum reward/risk threshold is defined, and the helper omits costs and fill uncertainty. A future market preregistration must specify cost assumptions and a break-even acceptance criterion before any data run. Do not tune such a criterion on previously used folds.

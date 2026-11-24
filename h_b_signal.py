@@ -163,10 +163,21 @@ def prepare_h_b_entry(
         raise ValueError("position_open must be boolean")
     if position_open or signal is None or entry_candle is None:
         return None
+    if not isinstance(signal, Mapping) or not isinstance(entry_candle, Mapping):
+        raise ValueError("signal and entry_candle must be mappings")
+    if signal.get("strategy") != H_B_STRATEGY or signal.get("direction") != "long":
+        raise ValueError("entry signal must be an H-B long signal")
+    if signal.get("policy_version") != H_B_POLICY_VERSION:
+        raise ValueError("unsupported H-B signal policy version")
 
+    signal_ts = signal.get("signal_ts_ms")
     expected_ts = signal.get("entry_ts_ms")
+    if isinstance(signal_ts, bool) or not isinstance(signal_ts, int) or signal_ts <= 0:
+        raise ValueError("signal signal_ts_ms must be a positive integer")
     if isinstance(expected_ts, bool) or not isinstance(expected_ts, int) or expected_ts <= 0:
         raise ValueError("signal entry_ts_ms must be a positive integer")
+    if expected_ts != signal_ts + H1_INTERVAL_MS:
+        raise ValueError("entry timestamp must be exactly one H1 bar after signal")
     raw_ts = entry_candle.get("ts")
     if isinstance(raw_ts, bool) or not isinstance(raw_ts, int) or raw_ts != expected_ts:
         return None

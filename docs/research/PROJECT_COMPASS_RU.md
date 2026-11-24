@@ -394,3 +394,13 @@ Candidate deduplication across E04/E06/E08–E13 found only two main historical 
 
 - `sbOogway/sbt2` can write one dated current-spec snapshot per symbol/day, but its public repo excludes local `/data/` and contains no published raw Bybit daily archive. Its snapshot captures only the lowest risk tier as margin fields, not the full D6 tier table.
 - D5 is a potential lead only if the maintainer's local dated files become independently available; D6 is insufficient as implemented. No API call, archive download, collector or PnL run. Details: [acceptance ledger Section 43](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#43-sboogwaysbt2--daily-instrument-snapshots-are-a-source-lead-not-a-public-archive).
+
+
+### 2026-11-24 — third raw risk-tier source found
+
+- CandleViewer preserves full public REST envelopes for BTCUSDT and ETHUSDT Linear risk limits on 2026-10-25 18:45 UTC, 35 tiers each, no auth. Its README documents the capture process and its manifest gives the per-file capture date.
+- All 35 tier rows/fields for BTC and ETH match exactly with sleeve-fund's 2026-10-21 raw captures; they also match the 2026-09-29 crypto-dashboard fixture. This gives three-repository agreement for BTC/ETH across three observation dates.
+- CandleViewer's instrument-before/after examples are documented-shape fixtures, not live instrument-info captures. No new D5 evidence.
+- A separate Oct 6 report prints tier-1 summaries for BTC/ETH/SOL/BNB/XRP matching Sep 29 values, but its referenced raw results.json is not committed; secondary corroboration only.
+- Unique D6 raw-replicated symbols remain BTC/ETH/SOL/XRP = 4/47 (8.5%); new contribution is additional dates/repository for BTC/ETH, not broader universe coverage. D6 remains PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED.
+- Full audit: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 44](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#44-third-independent-raw-risk-tier-capture-candleviewer-2026-10-25).

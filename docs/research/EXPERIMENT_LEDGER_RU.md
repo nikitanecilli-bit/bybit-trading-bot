@@ -1324,3 +1324,10 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - **Данные:** использованы только синтетические fixtures; CryptoFetch/Binance proxy archives не запускались в market-PnL, event study или parameter tuning. Никакие новые архивы не собирались.
 - **Решение:** ACCEPT только как узкая механическая проверка signal → regime → next-open geometry. **NO EDGE / NOT PREREGISTERED FOR MARKET PNL / NOT EXECUTION-VALIDATED.** Не расширять H-B engine lifecycle и не добавлять новые слои до появления разрешённого независимого пути market validation с закрытыми data/provenance/cost gates.
 - **Связанные документы:** `RESEARCH_BOARD_RU.md`, `PROJECT_COMPASS_RU.md`, `hypotheses/H_B_MEAN_REVERSION_READINESS_2026-11-05_RU.md`.
+
+
+### 2026-11-24 — follow-up: E04/E07 exit-cost provenance
+
+- Workflow logs establish E04 checkout `4b291265976d66f77b692d057a921d170be865da` and E07 checkout `a5a9851622544b4d16a0aec7f9ccab7d612cc608`. Both scripts import the shared `Bybit_Trading_Engine_v14_research.py`; both engine versions retain the same exit-cost calculation from entry notional (`pos.size_usdt`) rather than exit execution notional. E04 engine blob is `e4501bd...`; E07 engine blob is `c47caac...`.
+- Thus E04's selected-symbol positive totals and E07's selected shared-capital positive configuration are also affected by the same fee/slippage accounting defect, in addition to their already documented selection/multiple-testing risks. E07 is a shared-capital simulation, but shared capital does not repair incorrect per-leg exit costs or the 108-configuration selection problem.
+- No aggregate correction can be inferred without trade-level fills and recalculation; no backtest was rerun. These results remain provisional and must not be ranked as valid net-PnL evidence.

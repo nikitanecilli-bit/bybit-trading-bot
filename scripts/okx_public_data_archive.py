@@ -101,8 +101,10 @@ def parse_candle(row: Any, source: str) -> dict[str, Any]:
         "timestamp_ms": ts, "timestamp_utc": iso_utc(ts),
         "open": values[0], "high": values[1], "low": values[2], "close": values[3],
     }
-    if len(row) > 5:
-        result["confirm"] = str(row[8]) if len(row) > 8 else str(row[5])
+    if source == "candles" and len(row) > 8:
+        result["confirm"] = str(row[8])
+    elif source == "mark_price" and len(row) > 5:
+        result["confirm"] = str(row[5])
     if source == "candles":
         result.update({
             "volume": str(row[5]) if len(row) > 5 else "",
@@ -301,10 +303,13 @@ def main(argv: list[str] | None = None) -> int:
             "lot_size": instruments[0].get("lotSz"),
             "minimum_size": instruments[0].get("minSz"),
         }
-        manifest["status"] = "COMPLETE" if all(
+        h1_grid_complete = all(
             manifest["datasets"][name]["hourly_grid"]["complete"]
             for name in ("candles", "mark_price")
-        ) else "INCOMPLETE_HOURLY_COVERAGE"
+        )
+        manifest["h1_hourly_grid_complete"] = h1_grid_complete
+        manifest["funding_completeness"] = "NOT_ESTABLISHED: expected settlement schedule/effective-time intervals not reconstructed"
+        manifest["status"] = "H1_GRID_COMPLETE_FUNDING_UNVERIFIED" if h1_grid_complete else "INCOMPLETE_HOURLY_COVERAGE"
         manifest["funding_rows"] = manifest["datasets"]["funding"]["rows"]
         manifest_path = root / "manifest.json"
         manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -317,7 +322,7 @@ def main(argv: list[str] | None = None) -> int:
             "mark_grid": manifest["datasets"]["mark_price"]["hourly_grid"],
             "manifest": str(manifest_path),
         }, ensure_ascii=False, indent=2))
-        return 0 if manifest["status"] == "COMPLETE" else 2
+        return 0 if h1_grid_complete else 2
     except Exception as exc:
         manifest["status"] = "FAILED"
         manifest["error"] = f"{type(exc).__name__}: {exc}"

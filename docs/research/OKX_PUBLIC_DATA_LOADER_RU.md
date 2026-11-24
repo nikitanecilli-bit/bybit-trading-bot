@@ -11,10 +11,10 @@ The downloader is deliberately restricted to one instrument and the official `ht
 From the repository root, with Python 3.11+ and no third-party packages:
 
 ```bash
-python scripts/okx_public_data_archive.py --days 30
+python scripts/okx_public_data_archive.py --days 365
 ```
 
-This downloads the latest 30 complete UTC days (H1 boundaries) into:
+This downloads the latest 365 complete UTC days (H1 boundaries) into:
 
 ```text
 data/archives/okx/BTC-USDT-SWAP/

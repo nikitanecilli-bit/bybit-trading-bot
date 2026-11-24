@@ -626,3 +626,13 @@ Read-only просмотрены `MaintenanceGateAuditor.evaluate_portfolio()`, 
 **Проверка:** прямое выполнение скопированной из GitHub реализации прошло 4 базовые assertions. Это не равно запуску pytest из репозитория. PR #16 открыт; GitHub workflow runs для head commit пока не обнаружены. Полный pytest/CI результат не подтверждён.
 
 **Решение:** не начинать полный lifecycle adapter. Сначала добиться исполнения 10 тестов в репозитории и проверить независимую legacy regression. После этого оценить, имеет ли смысл следующий изолированный слой. Market PnL, data collection, exchange APIs, parameter sweep и paper/live остаются запрещёнными текущими gates.
+
+
+### 10.25. H-B signal-only repository CI result — 2026-11-24
+
+- PR #16 merged into `research/market-regime-v1-main`. The pure predicate is in `h_b_signal.py`; 10 deterministic tests are in `tests/test_h_b_signal.py` and use Python standard-library `unittest`.
+- Research CI [45463406898](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463406898) completed SUCCESS on commit `582ccedf943ed7d4a5a60db0436bbb63d4f5741c`. The exact H-B log says `Ran 10 tests` and `OK`. Compile and the other technical regression steps also passed.
+- The preceding run [45463120336](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463120336) failed only because pytest was not installed; no H-B assertions executed in that attempt. The tests were converted to stdlib unittest rather than adding an external dependency.
+- **Decision: SIGNAL MECHANICS PASS.** This proves only that the isolated function conforms to the tested synthetic cases. It does not validate the chosen RegimeConfig, actual t+2 bar availability/fill, stop/target geometry at fill, engine lifecycle, costs, market PnL or edge.
+- No engine integration, market-PnL backtest, parameter sweep, exchange API, new archive, paper/live trading or real order was performed.
+- Next safe step: read-only review of causal regime classifier configuration and timestamp semantics. Do not extend lifecycle until this review establishes that the H-B range gate can be frozen without tuning on previously used market folds.

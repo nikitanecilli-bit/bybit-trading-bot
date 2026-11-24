@@ -291,3 +291,9 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - Added 8 deterministic tests. Research CI [45465377742](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45465377742) — SUCCESS on SHA `b72c15575170fc8f49691706d88a3599ed94b954`; logs confirm H-B signal 19/19, regime adapter 6/6, next-open geometry 8/8; full technical workflow passed.
 - Status: **SIGNAL + REGIME + NEXT-OPEN GEOMETRY PASS** on synthetic inputs only. No market PnL, no Bybit, no new archives, no paper/live, no engine integration.
 - Decision: stop H-B expansion before pending/fill lifecycle, sizing, persistence and manager integration. Building those layers without a permitted independent market-validation path would repeat premature infrastructure growth. Resume only when the data/provenance gate can be satisfied within the user's existing permissions.
+
+
+### 2026-11-24 — H-B economic boundary after synthetic fill geometry
+- The synthetic accepted next-open example has gross reward/risk 0.4 (reward 2 per unit vs risk 5). The fill helper intentionally checks only strict positive geometry, not economic acceptability.
+- No minimum R:R threshold is frozen; none should be invented or tuned on already-used folds. A valid economic gate requires explicit fees, spread, slippage, funding, fill probability and win-rate assumptions.
+- Therefore H-B remains mechanics-only and must not proceed to engine lifecycle. Current data/provenance and authorization gates block the independent market validation needed to decide economic value.

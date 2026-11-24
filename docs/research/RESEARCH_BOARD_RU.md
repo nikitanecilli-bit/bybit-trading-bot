@@ -49,7 +49,7 @@
 
 1. Довести PR #16 до актуальной базы рабочей ветки без потери изменений.
 2. Включить H-B signal-only module/tests в технический Research CI так, чтобы CI выполнял только compile и deterministic tests — без market-PnL workflows.
-3. Получить фактический запуск точных H-B tests и релевантных legacy regression tests; прочитать логи и убедиться, что выполнялись именно нужные тесты.
+3. Получить фактический запуск точных H-B tests и релевантных legacy regression tests; прочитать логи и убедиться, что выполнялись именно нужные тесты. Первый запуск #45463120336 остановился на отсутствии pytest (тестовые assertions не запускались); тестовый файл переведён на стандартный unittest, повторный run #45463406898 выполняется.
 4. Провести независимый code review временной семантики и входных контрактов. Исправлять только подтверждённые дефекты.
 5. Если механика проходит — зафиксировать результат как **SIGNAL MECHANICS PASS**, не как strategy/edge pass. Не расширять сразу на pending/fill/position lifecycle.
 6. Отдельно решить, можно ли однозначно зафиксировать causal RegimeConfig без подбора по использованным рыночным folds. Если нет — H-B остаётся design-blocked.
@@ -72,3 +72,10 @@
 - Текущая реализация и тесты: только актуальные файлы/commits рабочей ветки; старые сообщения чата не заменяют GitHub-проверку.
 
 Обновлять эту доску после каждого решения ACCEPT/REJECT/BLOCKED или существенного изменения разрешений/данных. Не превращать её в подробный журнал событий.
+
+
+## 2026-11-24 — CI dependency correction
+
+- Первый Research CI после добавления H-B tests: run [45463120336](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463120336) — FAILURE только на команде `python -m pytest`: runner не содержит pytest (`No module named pytest`). H-B assertions не исполнялись; это не провал логики сигнала.
+- Не добавлять внешнюю зависимость только ради одного набора синтетических тестов. Тесты переведены на стандартный `unittest`; workflow теперь запускает `python tests/test_h_b_signal.py`.
+- Повторный Research CI run [45463406898](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463406898) для SHA `582ccedf943ed7d4a5a60db0436bbb63d4f5741c` находится в работе. До его завершения статус H-B mechanics остаётся UNVERIFIED.

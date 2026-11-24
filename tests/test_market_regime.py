@@ -126,7 +126,7 @@ def test_regime_config_rejects_non_finite_numeric_thresholds():
             try:
                 RegimeConfig(**{field: value}).validate()
             except ValueError as exc:
-                assert field in str(exc)
+                assert "finite numbers" in str(exc)
             else:
                 raise AssertionError(f"{field} must reject non-finite value {value}")
 

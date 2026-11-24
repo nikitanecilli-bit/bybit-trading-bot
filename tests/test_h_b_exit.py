@@ -110,6 +110,12 @@ class TestHBExit(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "bars_held"):
                 evaluate_h_b_exit(self.position, self.candle(2), bars_held)
 
+    def test_boolean_or_non_integer_candle_timestamp_is_rejected(self):
+        candle = self.candle(2)
+        candle["ts"] = True
+        with self.assertRaisesRegex(ValueError, "candle ts"):
+            evaluate_h_b_exit(self.position, candle, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

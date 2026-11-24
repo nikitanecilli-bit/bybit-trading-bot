@@ -647,3 +647,12 @@ Read-only просмотрены `MaintenanceGateAuditor.evaluate_portfolio()`, 
 - Research CI [45464653488](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45464653488) — SUCCESS on SHA `6540e375d6d2ad7dfd321202973e60e2e0815dae`. Market-regime tests passed; H-B signal tests 13/13; H-B regime adapter tests 6/6.
 - **Decision: SIGNAL + REGIME MECHANICS PASS.** This is synthetic evidence only. It does not validate the default config as a useful market regime, next-open fill geometry, sizing, costs, engine lifecycle, market PnL or edge.
 - Next safe step: separate pure fill-geometry test for the actual open at t+2. Do not integrate into the trading engine yet.
+
+
+### 10.27. H-B next-open geometry — 2026-11-24
+
+- Added `h_b_fill.py` as a pure offline replay boundary. It validates that the observed t+2 H1 candle exists at the scheduled timestamp, verifies OHLC integrity and accepts only an open strictly between frozen stop and target. The returned reward/risk ratio is gross per-unit geometry only.
+- Eight standard-library synthetic tests cover valid fill, missing t+2, gaps at/beyond stop/target, timestamp mismatch, signal/candle mismatch, invalid OHLC and isolation from bars after t+2.
+- Research CI [45465377742](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45465377742) completed SUCCESS on `b72c15575170fc8f49691706d88a3599ed94b954`; H-B signal 19/19, regime adapter 6/6 and fill geometry 8/8.
+- **Decision:** current narrow H-B synthetic mechanics are complete. This is not an execution model: no bid/ask, spread, queue, partial fills, slippage, fees, funding or adverse selection. No sizing, persistence, position manager, engine integration or market PnL.
+- Do not implement the full H-B lifecycle yet. Without a permitted independent market-validation path, that would add complexity without answering whether the hypothesis has economic value.

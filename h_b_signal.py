@@ -7,8 +7,11 @@ exchange behavior remain out of scope.
 from __future__ import annotations
 
 import math
+from dataclasses import asdict
 from collections.abc import Mapping, Sequence
 from typing import Any
+
+from market_regime import RegimeConfig, classify_candles
 
 H1_INTERVAL_MS = 3_600_000
 H_B_POLICY_VERSION = "v0.1"
@@ -109,3 +112,35 @@ def evaluate_h_b_signal(
         "stop_price": stop_price,
         "target_price": target_price,
     }
+
+
+
+def evaluate_h_b_signal_with_classifier(
+    candles: Sequence[Mapping[str, object]],
+    config: RegimeConfig,
+    shock_index: int,
+) -> dict[str, Any] | None:
+    """Run the H-B predicate using an explicitly supplied causal regime config.
+
+    Only the prefix through the stabilization close (t+1) is passed to the
+    classifier. This prevents later rows from becoming an accidental input to
+    the adapter and makes the exact classifier configuration part of signal
+    provenance. No default RegimeConfig is silently selected.
+    """
+    if not isinstance(config, RegimeConfig):
+        raise ValueError("H-B requires an explicit RegimeConfig")
+    config.validate()
+    if isinstance(shock_index, bool) or not isinstance(shock_index, int):
+        raise ValueError("shock_index must be an integer")
+    if shock_index < 24 or shock_index + 1 >= len(candles):
+        return None
+
+    prefix = list(candles[: shock_index + 2])
+    classified = classify_candles(prefix, config)
+    regimes = [str(row["regime"]) for row in classified]
+    atr_values = [row["atr"] if row["atr"] != "" else None for row in classified]
+    signal = evaluate_h_b_signal(prefix, regimes, atr_values, shock_index)
+    if signal is None:
+        return None
+    signal["regime_config"] = asdict(config)
+    return signal

@@ -284,3 +284,18 @@ Bybit's public documentation says historical trades can be downloaded from its a
 **Decision: DATA GATE REMAINS BLOCKED.** No source found in this screening qualifies as a complete, independently verified D1–D6 package for the target market and interval. Combining several unverified providers does not create a verified dataset. These leads do not authorize downloads, account creation, API calls, collectors, runner setup, market-PnL tests, or paper/live execution.
 
 The next allowed action remains read-only documentation/code review. A later data-acceptance exercise requires a separate explicit decision that changes the current data-collection hold; until then, preserve the blocked state and do not manufacture progress through more strategy experiments.
+
+
+
+
+## 12. Static compatibility audit of the existing H1 validation path (2026-11-24)
+
+Read-only inspection of the current research-branch scripts/workflow found:
+
+- `scripts/run_h1_shared_capital_portfolio_validation.py` requires a frozen top-five selection manifest with immutable input/code provenance. It explicitly requires `BYBIT_INSTRUMENT_SPECS_DIR`, `BYBIT_RISK_TIERS_DIR`, `BYBIT_FUNDING_DIR`, `BYBIT_MARK_PRICE_DIR`, and `BYBIT_KLINE_DIR`. The runner's kline resolver states that the signal/execution price source must be official Bybit linear H1 trade-kline CSVs and refuses Binance/CryptoFetch proxy candles.
+- Funding acceptance is not just a CSV shape check: each symbol requires its funding audit manifest and validated settlement schedule; mark candles must cover required timestamps; trade-kline, mark and funding coverage must align on the scored folds.
+- The current workflow `.github/workflows/h1-shared-capital-portfolio-validation.yml` exposes separate repository paths for Bybit kline, funding and mark-price CSVs and points instrument/risk directories to dated snapshot paths. It derives the exact five-symbol allowlist from the frozen selection manifest.
+- `scripts/cryptofetch_sparse_loader.py` is explicitly a local CryptoFetch archive reader; no adapter for the Hugging Face Parquet schema or CryptoHFTData hourly Parquet schema was found in the inspected source set.
+- `scripts/archive_bybit_market_history.py` is a venue API collector that requires a Bybit lifecycle snapshot and dated instrument snapshots, then writes archive manifests and per-source files. Its existence does not authorize running it.
+
+**Compatibility conclusion:** neither external discovery lead can be plugged into the current H1 runner as-is. A future use would require a separately reviewed adapter, preservation of original provider files and hashes, field/time-unit mapping, provenance manifest, and all existing D1–D6 gates. In particular, a third-party OHLCV file labelled “Bybit” cannot bypass the runner's native-source and PIT snapshot requirements by being renamed into the expected directory. No adapter, test, collector or PnL run was created or executed in this checkpoint.

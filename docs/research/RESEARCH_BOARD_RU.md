@@ -226,7 +226,7 @@
 ### 2026-11-24 — external metadata snapshots found (status correction)
 
 - **D5:** partial candidate snapshots: 9-symbol Spot+Linear fixture (2026-09-29) plus a raw BTCUSDT Linear instrument response (2026-10-21), exact BTC overlap; official BNBUSDT tick change cross-check.
-- **D6:** partial candidate snapshots: 9-symbol risk-tier fixture (2026-09-29), raw BTC/ETH/SOL/XRP tier tables (2026-10-21), and BTC tiers again (2026-10-15). All 35 tiers match exactly across projects/dates for BTC/ETH/SOL/XRP.
-- These are external, third-party snapshots, not a full time series or full-market PIT archive. Capture provenance and universe coverage still need formal acceptance; account-specific applied tiers are absent.
+- **D6:** partial candidate snapshots: 9-symbol risk-tier fixture (2026-09-29), raw BTC/ETH/SOL/XRP tier tables (2026-10-21), and a manually pasted/hand-checked BTC tier table dated 2026-10-15. All 35 tiers match exactly across the two projects for BTC/ETH/SOL/XRP; the Oct 15 BTC file is corroboration, not a direct recorder capture.
+- These are external, third-party snapshots, not a full time series or full-market PIT archive. Capture provenance and universe coverage still need formal acceptance; the Oct 15 BTC file has manual-paste provenance; account-specific applied tiers are absent.
 - **Updated decision:** D5 and D6 = PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED. D4 remains partial/unverified. Do not import these snapshots or start PnL/backtests without completing provenance review and the existing authorization gates.
 - Details: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 40](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#40-third-party-dated-bybit-metadata-snapshots-partial-raw-captures-and-cross-source-replication).

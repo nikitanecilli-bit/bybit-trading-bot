@@ -323,3 +323,7 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 ### 2026-11-24 — E04/E07 exit-cost provenance follow-up
 
 - Read-only workflow-log and source audit confirms E04 (checkout `4b291265`) and E07 (checkout `a5a98516`) also used engine implementations charging exit fees/slippage from entry notional rather than exit execution notional. E01–E03 were already confirmed on the same pre-fix engine family. Therefore E01–E04 and E07 historical net-PnL totals are not reusable as accurate net results; E04/E07 also retain their independent selection/multiple-testing limitations. No PnL was recalculated; see Experiment Ledger for exact workflow and engine blob provenance.
+
+### 2026-11-24 — E08–E13 exit-cost provenance reconciliation
+- Exact Actions checkout/source review confirms E08, E09, E10, E11 and E13 used engine versions whose `_close_position()` charged TP1/final exit fees and slippage from entry notional rather than exit execution notional. E12 is descriptive context analysis with no PnL and is not affected by this accounting defect.
+- Confirmed affected net-PnL experiments now include E01–E04, E07–E11 and E13. E05/E06 remain unclassified pending exact commit-level review. Preserve non-PnL descriptive observations, but do not use affected net aggregates for ranking or economic claims. No recalculation or new market run was performed.

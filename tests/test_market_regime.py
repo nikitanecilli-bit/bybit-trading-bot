@@ -116,6 +116,21 @@ def test_duplicate_timestamp_rejected():
         raise AssertionError("duplicate timestamps must be rejected")
 
 
+def test_regime_config_rejects_non_finite_numeric_thresholds():
+    fields = (
+        "trend_er_min", "range_er_max", "trend_slope_atr_min",
+        "range_slope_atr_max", "high_vol_ratio", "high_vol_er_max",
+    )
+    for field in fields:
+        for value in (float("nan"), float("inf"), float("-inf")):
+            try:
+                RegimeConfig(**{field: value}).validate()
+            except ValueError as exc:
+                assert field in str(exc)
+            else:
+                raise AssertionError(f"{field} must reject non-finite value {value}")
+
+
 if __name__ == "__main__":
     for name, value in sorted(globals().items()):
         if name.startswith("test_") and callable(value):

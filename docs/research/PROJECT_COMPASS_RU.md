@@ -388,3 +388,9 @@ Candidate deduplication across E04/E06/E08–E13 found only two main historical 
 - This quantifies coverage of the existing research sample only. It does not establish Bybit PIT listings, full-market coverage or effective-dated history. D4 remains partial/unverified; D5/D6 remain PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED.
 - Follow-up read-only verification downloaded only the existing E11/E13 result-artifact ZIPs (not market archives): both 50-row universe manifests and all six archive SHA-256 entries match exactly; 47 symbols included, same three exclusions. No market/PnL experiment, collector or Bybit API request was run.
 - Full audit: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 41](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#41-coverage-of-dated-metadata-snapshots-against-the-exact-e11e13-47-symbol-proxy-universe).
+
+
+### 2026-11-24 — sbt2 daily Bybit snapshot lead assessed
+
+- `sbOogway/sbt2` can write one dated current-spec snapshot per symbol/day, but its public repo excludes local `/data/` and contains no published raw Bybit daily archive. Its snapshot captures only the lowest risk tier as margin fields, not the full D6 tier table.
+- D5 is a potential lead only if the maintainer's local dated files become independently available; D6 is insufficient as implemented. No API call, archive download, collector or PnL run. Details: [acceptance ledger Section 43](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#43-sboogwaysbt2--daily-instrument-snapshots-are-a-source-lead-not-a-public-archive).

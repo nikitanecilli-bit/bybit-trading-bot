@@ -105,6 +105,11 @@ class TestHBExit(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "policy version"):
             evaluate_h_b_exit(position, self.candle(2), 2)
 
+    def test_holding_counter_outside_frozen_window_is_rejected(self):
+        for bars_held in (0, H_B_TIME_STOP_BARS + 1, True):
+            with self.assertRaisesRegex(ValueError, "bars_held"):
+                evaluate_h_b_exit(self.position, self.candle(2), bars_held)
+
 
 if __name__ == "__main__":
     unittest.main()

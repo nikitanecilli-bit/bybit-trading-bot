@@ -332,3 +332,13 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 ### 2026-11-24 — E05/E06 classification correction
 - E05 is a failed Bybit public-data download attempt (HTTP 403 across tested endpoints), not a PnL experiment; it is a data-access blocker, not affected by exit-cost accounting.
 - E06 is not merely descriptive: its signal/trade diagnostic workflow ran `UnifiedQuantEngine.run_simulation_pass()` on Binance proxy data. Exact checkout `9601f4d855f69d58e7353655a0c62060f519de13` uses the pre-fix engine blob `e4501bd...`; therefore E06's reported net-PnL is affected. E12 remains descriptive-only. Confirmed affected PnL scope is E01–E04, E06–E11 and E13.
+
+### Salvageable historical observations after exit-cost audit (2026-11-24)
+
+A read-only review of E06/E11/E12 artifacts verified that the old PnL defect does not erase every raw observation:
+- E12 is a descriptive-only artifact (4,249 hourly rows; 47 included symbols). Its completed-bar breadth, rolling returns, efficiency, ATR and cross-sectional dispersion can be retained as descriptive features. Joining its rows to E11 baseline selected-signal timestamps reproduced 499 / 499 / 730 hours and the reported fold medians exactly. Fold 2's selected-signal hours had lower broad 72h breadth/return, ATR and IQR than folds 1 and 3.
+- E06/E11 raw candidate signal features are computed from historical candles plus the completed signal candle before engine replay; they may be retained for exploratory description. Deduplicate E11 factorial copies by (symbol, signal_ts). Forward-return columns are future labels, not features. Exclude engine-derived fill/status/trade selection and all trade/PnL outputs from reliable evidence.
+- The timestamp stored as Candle.ts is the H1 bar OPEN; features using its close are only available at bar close (ts + 1 hour).
+- This is not evidence of edge: the three folds are contiguous, cross-sectionally correlated, based on a fixed Binance-style proxy universe and already inspected. The compression q25 rule was formed on the same sample and is not independently validated. No new market test or PnL calculation was performed.
+
+Current boundary: preserve raw signal/context observations as exploratory historical data; do not use them to tune/promote filters or claim profitability.

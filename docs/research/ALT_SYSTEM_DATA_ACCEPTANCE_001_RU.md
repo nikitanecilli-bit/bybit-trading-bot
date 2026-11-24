@@ -1125,3 +1125,81 @@ A public announcement may identify affected symbols and some parameter changes, 
 - **D6 remains unaccepted for historical account-level margin/liquidation replay.** Announcement-ledger work can reduce uncertainty for selected symbols and dates, but cannot substitute for the full tier history and account-state observations.
 
 No API request, market-data download, private account access, paid subscription, collector, PnL replay, or execution was used.
+
+
+## 34. Announcement API pagination does not establish historical retention or completeness
+
+The current official V5 Get Announcement page documents:
+- required `locale`;
+- optional `type` and `tag`;
+- `page` and `limit`;
+- response `total`, `list`, publication timestamps and announcement URLs.
+
+It does **not** document a publication-time range filter, a cursor tied to immutable history, a retention period, a completeness guarantee, or a maximum historical page depth.
+
+Official reference: https://bybit-exchange.github.io/docs/v5/announcement
+
+The official example's `total: 735` and ARB example timestamp are static documentation sample values, not a live count and not evidence that the endpoint currently retains all historical notices.
+
+A historical Bybit V2 connector schema in the official `bybit-exchange/api-connectors` repository describes `/v2/public/announcement` as returning OpenAPI announcements from the **last 30 days** in reverse order. That older endpoint is explicitly unsuitable as a long-term event archive:
+https://github.com/bybit-exchange/api-connectors/blob/master/swagger.json
+
+A direct anonymous GET attempt to the V5 announcements endpoint from this research environment again failed at the web transport layer with “URL is not accessible”. No Bybit HTTP status, JSON response, `total`, earliest record, or pagination behavior was observed. This is a tooling/network limitation, not a Bybit rejection and not evidence that the endpoint is unavailable to a normal client. No other Bybit endpoint was attempted.
+
+### D4 consequence
+
+The V5 announcement endpoint remains a potentially useful discovery and retrieval interface, but its historical retention and completeness are unverified. Even a successful page walk to the last page would only establish exhaustion of the endpoint's currently exposed result set, not that Bybit retained every notice ever published. The older V2 endpoint's 30-day description reinforces that retention must be tested rather than assumed.
+
+**Acceptance test still required:** once a successful permitted GET is possible, record raw response bytes, request parameters, retrieval time, `total`, per-page counts, first/last publication timestamps, duplicate IDs/URLs, locale/type/tag coverage, and page-walk termination. Then reconcile known listing/delisting/tick-size/risk-limit notices against independently collected official notice URLs. A page walk alone cannot pass D4; known-case recall and explicit retention boundary are required.
+
+D4 remains **partial/unverified**.
+
+## 35. Public GitHub ecosystem audit: no qualifying historical D5/D6 archive found
+
+A read-only GitHub code search was performed for:
+- Bybit historical instrument specifications, tickSize and qtyStep snapshots;
+- historical risk-limit tier rows and maxLeverage/maintenanceMargin values;
+- legacy `instrument_info` contract-state payloads;
+- instrument/risk-limit snapshot archives.
+
+The search surfaced useful corroborating engineering references, but no public dataset with a symbol-complete, effective-dated Bybit specification or risk-tier history.
+
+### 35.1 Independent reference catalogs
+
+The public TriggerTrade raw-data catalog classifies:
+- Instruments Info as reference data/current metadata that must be refreshed;
+- Risk Limit as reference data, not a historical research time series by default.
+
+It also explicitly distinguishes historical market-data endpoints from current reference endpoints. This is a third-party methodology document, not Bybit authority, but its classification agrees with the official API request schemas:
+https://github.com/Lugovele/trigger-trade/blob/d3aec0a333ddf78e84b2ef625c00d3064780b0db/docs/archive/trading-methodology-pre-v1.2.14/data/BYBIT_RAW_DATA_CATALOG.md
+
+A separate Bybit venue audit in another public repository states that its instrument-spec source is today's `instruments-info` and `risk-limit` REST response, and that delisted symbols are not served by those current lookups. This is a third-party observation, not a guarantee about every API retention case:
+https://github.com/sbOogway/sbt2/wiki/Source-Bybit
+
+### 35.2 A good snapshot pattern is not a historical archive
+
+A public GitHub implementation found during the search contains one captured BTCUSDT linear instrument response, with:
+- a specific retrieval timestamp (2026-09-14);
+- the raw response object preserved;
+- a SHA-256 payload hash;
+- derived instrument values tied to that exact source snapshot.
+
+This is a useful provenance pattern for future snapshots, but the inspected code contains a single symbol/single capture example, not a time series or historical universe:
+https://github.com/omerasik/investing_tradin_platform/blob/14d62c46a10822f618186f822deca1f85d2d59c3/src/trade_platform/bybit_instrument_onboarding.py
+
+Its tests explicitly bind `effective_at` to the snapshot's retrieval time. That is honest observation-time provenance, but it must not be mistaken for the exchange's historical effective time of the parameter change.
+
+### 35.3 Repository search findings are not proof of non-existence
+
+GitHub code search is incomplete by design: private repositories, unindexed files, binary datasets, deleted history, and differently named artifacts may not appear. Therefore the result is:
+- no qualifying public archive identified in this search;
+- not a proof that no such archive exists anywhere;
+- no third-party source is promoted to exchange-authoritative evidence.
+
+### 35.4 D5/D6 disposition
+
+- D5: current snapshots and selected announcement events can be retained as future point-in-time evidence, but no accepted full historical spec series has been found.
+- D6: selected risk notices and dated rule changes can be recorded, but no accepted full symbol-tier history or account-state history has been found.
+- No new dataset has passed provenance, completeness, field coverage, effective-time semantics, and gap accounting.
+
+**DATA GATE REMAINS BLOCKED.** No market archives were downloaded, no API collectors were run, no private/account endpoints were called, no vendor account or subscription was created, and no PnL/backtest/execution was run.

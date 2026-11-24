@@ -1425,11 +1425,11 @@ The derivative fallback in `apps/server/src/trading/bybitSpec.ts` is not a secon
 
 Repository: https://github.com/aoventuresdomain-cloud/sleeve-fund
 
-**2026-10-15 BTCUSDT risk-limit capture**
+**2026-10-15 BTCUSDT risk-limit corroboration (manually pasted, not a recorder capture)**
 - File: https://github.com/aoventuresdomain-cloud/sleeve-fund/blob/7c04fe480883578a52ef581709209af85b039fed/tests/data/fee_live/risk-limit-BTCUSDT-2026-10-15.json
 - Commit: https://github.com/aoventuresdomain-cloud/sleeve-fund/commit/7c04fe480883578a52ef581709209af85b039fed
-- Raw API `time`: `2026-10-15T10:26:49.276Z`
-- 35 BTCUSDT risk tiers; `nextPageCursor` empty.
+- Embedded JSON `time`: `2026-10-15T10:26:49.276Z`; 35 BTCUSDT risk tiers; `nextPageCursor` empty.
+- The repository's `tests/data/fee_live/README.md` explicitly says the PM pasted this public risk-limit page on Oct 15 and the DA hand-checked it. Treat it as manually sourced corroboration, **not** as a second direct recorder/API capture. The same README says its neighboring fee-rate file was not captured from an account and its neighboring instrument-info file was written to the documented shape, not captured; neither of those files is accepted evidence.
 
 **2026-10-21 venue-table capture**
 - Capture marker: https://github.com/aoventuresdomain-cloud/sleeve-fund/blob/c72e9391c1c98e3c31d26a83ea7f5c731fa83ba3/tests/data/venue_tables/read-at.txt
@@ -1453,7 +1453,7 @@ The two projects' risk-limit rows compare **exactly**, including IDs and every t
 - SOLUSDT
 - XRPUSDT
 
-The 2026-10-15 BTCUSDT risk-limit response also compares exactly with the 2026-10-21 BTCUSDT response across all 35 tiers. The 2026-10-21 BTCUSDT instrument-info response compares exactly, field-for-field, with the BTCUSDT Linear row in the 2026-09-29 crypto-dashboard fixture.
+The manually pasted 2026-10-15 BTCUSDT tier file also compares exactly with the 2026-10-21 BTCUSDT raw response across all 35 tiers, but its weaker manual provenance means this is corroboration rather than a second independent raw capture. The 2026-10-21 BTCUSDT instrument-info response compares exactly, field-for-field, with the BTCUSDT Linear row in the 2026-09-29 crypto-dashboard fixture.
 
 This is meaningful cross-project replication for those symbols and dates. It does **not** prove that no parameter changed between captures, nor does it recover values before the first capture. The agreement is a consistency check across snapshots, not a complete history.
 
@@ -1472,6 +1472,6 @@ This is a useful three-part consistency chain for **BNBUSDT Linear**: dated pre-
 | Requirement | New evidence | Remaining gap | Decision |
 |---|---|---|---|
 | D5 — instrument specs | 9-symbol Spot+Linear result fixture at 2026-09-29; raw BTCUSDT Linear response at 2026-10-21; exact BTC overlap; BNB tick event cross-checked | No continuous effective-dated history, only one raw BTC instrument response in the second project, incomplete full-market coverage, no long historical interval | **PARTIAL CANDIDATE EVIDENCE — NOT ACCEPTED** |
-| D6 — exchange risk tiers | 9-symbol tier fixture at 2026-09-29; raw 4-symbol tables at 2026-10-21; BTC raw table at 2026-10-15; exact 35-tier cross-source matches for BTC/ETH/SOL/XRP | Only four symbols independently replicated; short time span; no full historical tier-change ledger; no account-specific applied-tier/position/order state | **PARTIAL CANDIDATE EVIDENCE — NOT ACCEPTED** |
+| D6 — exchange risk tiers | 9-symbol tier fixture at 2026-09-29; raw 4-symbol tables at 2026-10-21; a manually pasted BTC table dated 2026-10-15; exact 35-tier cross-source matches for BTC/ETH/SOL/XRP | Only four symbols have raw cross-project replication; the Oct 15 BTC corroboration is manually pasted; short time span; no full historical tier-change ledger; no account-specific applied-tier/position/order state | **PARTIAL CANDIDATE EVIDENCE — NOT ACCEPTED** |
 
 These snapshots are not yet imported into the project repository and are not authorized for historical market-PnL replay. They should be treated as source leads for a future provenance acceptance package, not as permission to start collectors or market tests. No Bybit endpoint was called by this research session, no new market archive was downloaded, and no backtest/PnL calculation was run.

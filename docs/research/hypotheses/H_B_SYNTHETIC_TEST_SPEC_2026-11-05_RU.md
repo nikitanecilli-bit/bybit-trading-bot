@@ -268,3 +268,10 @@ No trading-engine production path was changed. The exact repository test suite r
 The pure H-B signal predicate is now wrapped by `h_b_regime.py`, which applies an explicit frozen candidate `RegimeConfig`, requires an uninterrupted exact H1 timestamp grid across all history through the stabilization bar, and uses only the causal regime/ATR values at t-1. The config values are inherited from the existing classifier defaults and are not market-calibrated. The adapter ignores candles after t+1 and records its complete config in the candidate metadata.
 
 Research CI [45464653488](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45464653488) passed. The H-B regime adapter ran 6 standard-library tests successfully; the H-B signal suite ran 13 tests successfully; the market-regime regression suite passed. This confirms only synthetic signal/regime mechanics. No t+2 fill, costs, engine lifecycle, market PnL or profitability has been tested.
+
+
+### 18. Next-open geometry evidence — 2026-11-24
+
+The isolated replay boundary `h_b_fill.py` validates the actual t+2 H1 candle and accepts only an open strictly between the frozen absolute stop and target. It verifies the signal's shock timestamp, stabilization timestamp, scheduled entry timestamp and OHLC integrity. Eight deterministic tests passed in Research CI [45465377742](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45465377742). The H-B signal suite passed 19 tests and the regime adapter suite passed 6 tests in the same run.
+
+This remains a reference-price geometry check, not an execution model. It excludes spread, queue position, fill probability, slippage, fees, funding, partial fills and adverse selection. No sizing, persistence, position manager, engine integration or market PnL was performed. Current synthetic mechanics gates are complete; do not extend lifecycle without an allowed independent market-validation path.

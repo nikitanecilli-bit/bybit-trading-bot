@@ -1493,7 +1493,7 @@ The 47 symbols are:
 
 `AAVEUSDT, ADAUSDT, ALGOUSDT, APTUSDT, ARBUSDT, ASTERUSDT, ATOMUSDT, AVAXUSDT, BCHUSDT, BNBUSDT, BTCUSDT, CAKEUSDT, DASHUSDT, DOGEUSDT, DOTUSDT, ENAUSDT, ETCUSDT, ETHUSDT, GMXUSDT, HBARUSDT, ICPUSDT, JSTUSDT, LINKUSDT, LTCUSDT, MINAUSDT, MORPHOUSDT, NEARUSDT, ONDOUSDT, PAXGUSDT, PEPEUSDT, POLUSDT, PUMPUSDT, QNTUSDT, RAYUSDT, RENDERUSDT, SHIBUSDT, SKYUSDT, SOLUSDT, SUIUSDT, TAOUSDT, TRXUSDT, UNIUSDT, WLDUSDT, WLFIUSDT, XLMUSDT, XRPUSDT, ZECUSDT`.
 
-The log prints `UNIVERSE <symbol>` and bar/fold counts for each row. No archive or workflow artifact ZIP was downloaded; this comparison used only existing text logs and source metadata.
+The log prints `UNIVERSE <symbol>` and bar/fold counts for each row. At the time of the initial comparison, no workflow artifact ZIP had been downloaded; the later read-only artifact verification is recorded in Section 42. No market archive was downloaded.
 
 ### Exact overlap with the dated metadata snapshots
 
@@ -1531,3 +1531,18 @@ Therefore:
 ### Updated decision
 
 D5 and D6 remain **PARTIAL CANDIDATE EVIDENCE — NOT ACCEPTED**. The next highest-value source search is for additional dated raw Bybit Linear instrument/risk-limit captures covering the 38 currently uncovered symbols and earlier dates, with per-response server timestamps and original request/response envelopes. Do not import third-party files or start any PnL/backtest until provenance acceptance and existing authorization gates are separately satisfied.
+
+
+## 42. E11/E13 workflow artifact manifest cross-check (read-only verification)
+
+After Section 41 was drafted from workflow logs, the two pre-existing result artifacts were downloaded for a stronger manifest-level check:
+- E11 run 41361376448, artifact 13105661683 (e11-h1-shared-capital-portfolio.zip).
+- E13 run 41362217727, artifact 13105403824 (e13-h1-compression-gate.zip).
+
+Only the already-existing research result ZIPs were downloaded. No CryptoFetch/Bybit market archive was downloaded and no workflow was dispatched.
+
+Both ZIPs contain their own universe manifest CSV. The two manifests compare IDENTICALLY across all 50 rows and all 10 columns, not merely by the 47-symbol subset. Each has 47 included rows and the same three exclusions: AEROUSDT, GRAMUSDT and HYPEUSDT, each excluded for fewer than 100 bars in one or more folds. The six source-archive SHA-256 entries also match exactly between E11 and E13.
+
+This independently confirms the exact denominator and universe used in Sections 41 and the E11/E13 reports. It does not change the coverage percentages or data-gate decision; it upgrades the evidence for universe identity from log text to the original run artifacts. The manifests describe the Binance-style proxy sample and do not establish a Bybit point-in-time universe.
+
+No market calculations were performed on the artifacts. D4 remains partial/unverified; D5/D6 remain PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED.

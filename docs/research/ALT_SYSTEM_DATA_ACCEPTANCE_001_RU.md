@@ -265,20 +265,36 @@ The provider describes an independent hourly Parquet archive beginning 2025-06-2
 
 Preliminary fit: possible D7 and partial D2/D3 research input, not a complete strategy-validation package. D1 and D4–D6 are not supplied by the listed families. Provider documentation and sample rows are not a substitute for independent raw-file verification.
 
-**Candidate C — official Bybit public archives and APIs**  
+**Candidate C — official Bybit public archives and APIs**
+
+**Candidate D — Tardis.dev Bybit Derivatives archive**  
+Bybit-specific coverage: https://docs.tardis.dev/historical-data-details/bybit.md  
+General data semantics: https://docs.tardis.dev/faq/data.md
+
+The provider documents Bybit derivatives history from 2020-05-28 for linear contracts and 2019-11-07 for inverse contracts. Its Bybit-specific page lists raw WebSocket channels and coverage transitions: legacy `trade` through 2023-04-05 and `publicTrade` from 2023-04-05; L2 order-book channels with several depth/version changes; ticker snapshots/deltas; and an `instrument_info` channel only through 2023-04-05. The provider says the raw messages are sourced from exchange WebSocket feeds and stored with local receive timestamps. Some monthly first-day CSV samples are publicly downloadable without an API key; broader historical replay/API access is subscription-controlled.
+
+Preliminary fit:
+- **D1:** potentially strong native trade-event input from which H1 OHLCV can be deterministically aggregated, but the two trade-channel eras, event ordering, symbol coverage and collection gaps must be reconciled. This is not a ready-made accepted OHLCV package.
+- **D2/D3:** ticker/derivatives fields may support mark/funding context, but the Bybit-specific channel/schema and event coverage must be verified before treating them as complete mark-price and settlement history. No acceptance from the general provider capability statement alone.
+- **D4:** historical recorded symbols and delisted-instrument inclusion are useful, but do not establish every suspension/resumption transition or a complete point-in-time tradability log.
+- **D5/D6:** no effective-time instrument-specification or risk-tier history is established by the reviewed Bybit page. The listed `instrument_info` stream ends on 2023-04-05 and cannot alone cover later changes.
+- **D7:** strongest current public-documentation lead for execution research: raw Bybit L2 snapshots/deltas and trades, but it is L2 market-by-price rather than L3 order-by-order queue data. Depth/channel versions change over time, so replay rules must be channel-specific.
+
+No Tardis data, samples, or API responses were downloaded or inspected in this screening. The provider is a **candidate for a future provenance/coverage spot-check**, not an accepted source and not a substitute for D4-D6. Its subscription cost and exact symbol/date coverage for the proposed experiment remain unverified.
+  
 Bybit's public documentation says historical trades can be downloaded from its archive site and documents public market endpoints for klines, mark-price klines, funding history, instruments, and risk limits. The existing AAVE diagnostic used public Bybit trade and quote-saver L2 archives. This is a potential venue-origin source, but it does not remove the historical PIT problem: current instrument/risk endpoints do not reconstruct old effective-time specifications or complete delisted/suspension history. Any future collection remains blocked by the active project hold and is not authorized by this inventory.
 
 ### 11.4. Acceptance decision
 
 | Requirement | Current decision after this checkpoint |
 |---|---|
-| D1 Bybit-native OHLCV | `missing` in repository; Hugging Face lead is `unverified` |
-| D2 Bybit Mark | `missing/unverified` in repository; external leads are `unverified` |
-| D3 Funding + settlements | `missing/unverified` in repository; external leads are `unverified`; settlement completeness not established |
-| D4 PIT universe/lifecycle | `missing/unverified`; delisted-symbol inclusion claims do not prove full PIT transitions |
+| D1 Bybit-native OHLCV | `missing` in repository; Hugging Face lead is `unverified`; Tardis raw trades are a promising but unverified bar-construction input |
+| D2 Bybit Mark | `missing/unverified` in repository; external leads, including Tardis ticker fields, remain `unverified` for full historical coverage |
+| D3 Funding + settlements | `missing/unverified` in repository; external leads, including Tardis derivative ticker fields, remain `unverified`; settlement completeness not established |
+| D4 PIT universe/lifecycle | `missing/unverified`; delisted-symbol inclusion in HF/Tardis does not prove full PIT transitions |
 | D5 Effective-time instrument specs | `missing` |
 | D6 Effective-time risk tiers | `missing` |
-| D7 Representative trades/L2 | `missing`; only one old, non-retained AAVE diagnostic is evidenced |
+| D7 Representative trades/L2 | `missing`; Tardis is a promising documented lead, but no sample/coverage acceptance has been performed; old AAVE diagnostic is not retained |
 | D8 Fee assumptions | `unverified` for dated account/symbol-specific rates; conservative scenario assumptions remain a separate model choice |
 
 **Decision: DATA GATE REMAINS BLOCKED.** No source found in this screening qualifies as a complete, independently verified D1–D6 package for the target market and interval. Combining several unverified providers does not create a verified dataset. These leads do not authorize downloads, account creation, API calls, collectors, runner setup, market-PnL tests, or paper/live execution.

@@ -359,3 +359,11 @@ Candidate deduplication across E04/E06/E08–E13 found only two main historical 
 - Current `risk-limit` returns the current symbol tier table, not historical tier versions. Bybit's own risk-limit help article says the account's applied tier changes dynamically with positions, active orders and mark price; account-level replay therefore needs both dated exchange tier schedules and account-state history.
 - Official historical-data downloads are referenced by the public-trades documentation, but no historical spec/risk archive is established by that reference.
 - D5 and D6 remain NOT ACCEPTED. No archives/API collectors/PnL runs were started. Detailed evidence: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 38](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#38-official-market-api-and-risk-limit-documentation-historical-data-boundary).
+
+
+### 2026-11-24 — Bybit official docs Git history reviewed
+
+- Public repository `bybit-exchange/docs` has versioned V5 instrument and risk-limit documentation from 2022-12-05 onward. Instrument page history contains 100 commits through the queried range; risk-limit page contains 34.
+- Recovered schema milestones include status-filter expansion (2023-04), funding-bound fields (2024-02), order-size field changes (2024-02 and 2025-10/11), risk-limit pagination (2024-05 and page-size reduction 2024-12), PreLaunch risk-limit support (2025-08), periodic order-size adjustments (documented 2026-02), and further instrument schema/price-limit changes in 2026.
+- This is useful evidence of **schema chronology**, not a complete historical archive of per-symbol numeric values. Documentation code examples contain timestamped but limited/possibly illustrative payloads; the risk-limit example is still a single BTCUSD tier with ellipsis.
+- D5/D6 remain NOT ACCEPTED. Details and primary commit links: [ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md, section 39](ALT_SYSTEM_DATA_ACCEPTANCE_001_RU.md#39-bybit-official-documentation-git-history-schema-chronology-recovered-historical-values-not-recovered).

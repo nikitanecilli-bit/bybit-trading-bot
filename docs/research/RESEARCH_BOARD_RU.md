@@ -152,3 +152,6 @@
 - A temporary standalone H-B exit evaluator was explored but deliberately removed before acceptance. It crossed the current scope boundary: H-B synthetic signal/regime/fill mechanics are enough to establish the next decision; more lifecycle code would not answer the missing economic question. No active `h_b_exit.py` or exit test remains.
 - **Freeze decision:** do not add more H-B mechanics, engine integration, persistence, sizing, exit manager or new strategies. The synthetic package is complete for its narrow purpose. Current data and authorization gates do not allow market validation; adding code would create activity, not evidence.
 - Resume only when an independent market-validation route is legitimately available under the existing user permissions and data/provenance gates. Until then, permitted work is read-only audits, provenance/coverage review, and documentation/decision hygiene only.
+
+
+- Детальная запись H-B-SYNTHETIC-001 добавлена в `EXPERIMENT_LEDGER_RU.md`: точный сигнал, frozen regime candidate, состав тестов, итоговый CI, synthetic gross R/R 0.4 и ограничения. Это техническая mechanics record, не market experiment.

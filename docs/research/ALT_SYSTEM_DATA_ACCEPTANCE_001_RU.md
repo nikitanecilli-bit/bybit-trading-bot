@@ -1315,3 +1315,83 @@ A third-party Bybit adapter's source notes also describe instrument-info and ris
 - D6 remains **NOT ACCEPTED**: current tier tables and selected announcements do not form a complete tier history; account-specific applied tiers require account-state reconstruction.
 - Official trade archives may help a later, separately authorized market-data stage, but do not close D4/D5/D6.
 - No archive was downloaded, no collector or API endpoint was run, no market calculation/backtest was run, and no permission boundary was changed.
+
+
+## 39. Bybit official documentation Git history: schema chronology recovered, historical values not recovered
+
+### Repository and coverage
+
+Bybit publishes its V5 API documentation in the public GitHub repository:
+https://github.com/bybit-exchange/docs
+
+The repository metadata reports creation on 2022-11-14 and active updates through 2026-11-23. Its current default branch is `master`. The Git history for `docs/v5/market/instrument.mdx` contains 100 commits in the queried history, with the oldest returned commit dated 2022-12-05; a second page returned no additional commits. The corresponding `docs/v5/market/risk-limit.mdx` history contains 34 commits and also reaches 2022-12-05.
+
+This is a real, useful version history of the **documentation contract**. It is not an archive of the API's per-symbol response values.
+
+### Recovered instrument-schema milestones
+
+The following changes are visible in the official docs Git history and/or the official V5 changelog:
+
+| Date | Documented change | What it proves |
+|---|---|---|
+| 2022-12-05 | Initial V5 instrument and risk-limit pages in the public docs history | Earliest schema evidence found in this repository |
+| 2023-04-06 | Instrument status filter added | API query coverage changed; not a complete lifecycle event log |
+| 2024-01-18 | Spot instrument risk-parameter documentation updated | Schema/field coverage evolved |
+| 2024-02-06 | `upperFundingRate` and `lowerFundingRate` added to instrument response | These fields must not be assumed present before this date |
+| 2024-02-21 | `maxMktOrderQty` added; `postOnlyMaxOrderQty` deprecated/replaced by `maxOrderQty` for the documented order types | Order-size schema changed |
+| 2024-06-27 | `Closed`, `Delivering`, and `PreLaunch` status filters documented for linear/inverse | Earlier default/status coverage cannot be assumed equivalent |
+| 2025-01 | Derivatives limit-order price formula change referenced by instrument docs | `riskParameters` semantics changed, not merely a field name |
+| 2025-10-09 | Spot `maxLimitOrderQty` and `maxMarketOrderQty` added | Spot size limits gained distinct market/limit fields |
+| 2025-10-23 | Spot `maxOrderQty` and `maxOrderAmt` marked deprecated | Backward compatibility assumptions changed |
+| 2025-11-03/11 | Spot `postOnlyMaxLimitOrderSize` documented | Further order-type-specific field introduced |
+| 2026-02-12 | Docs warn that `maxLimitOrderQty`, `maxMarketOrderQty`, and `postOnlyMaxLimitOrderSize` are adjusted on the 3rd and 17th of each month at 08:00 UTC+8 | These values are explicitly time-varying |
+| 2026-05-27 | Derivatives limit-order price formula reference updated to May 2026 | Another effective rule change requiring date-aware interpretation |
+| 2026-09-29 | `tags` response field added | Current schema contains fields absent from earlier versions |
+
+Useful primary history links:
+- Initial instrument page: https://github.com/bybit-exchange/docs/commit/f18a4894ec8df9cfe762f6d8f03f0790e8b82c37
+- Status filter: https://github.com/bybit-exchange/docs/commit/423d67c0775e378f3cb676b83dae32962b44000d
+- Funding-rate bounds: https://github.com/bybit-exchange/docs/commit/208e13bc0447b0d520593b6872d025264d0a93ae
+- Max market quantity: https://github.com/bybit-exchange/docs/commit/b689da76f0ec934376fd8ea2049a44f67d54f741
+- Spot market/limit quantity fields: https://github.com/bybit-exchange/docs/commit/ca2d8136b84b29e99fffc68cfa702515f97a9e53
+- Spot legacy-field deprecation: https://github.com/bybit-exchange/docs/commit/df666b4a3bc8dba3c76cf7d29beaec35afa54f1d
+- Dynamic size-field warning: https://github.com/bybit-exchange/docs/commit/302c912ae9e1844d7d59979dfb9ccee31e284763
+- May 2026 price-limit formula reference: https://github.com/bybit-exchange/docs/commit/b3f09bd5621e2b0edbb7639607d58b35de0c6505
+- Full current V5 changelog: https://github.com/bybit-exchange/docs/blob/master/docs/changelog/v5.mdx
+
+### Recovered risk-limit API chronology
+
+The official risk-limit page history shows:
+- Initial response contract in December 2022 included `riskLimitValue`, `maintenanceMargin`, `initialMargin`, `isLowestRisk`, and `maxLeverage`.
+- On 2024-05-09, cursor pagination was documented and linear requests returned 30 symbols per page.
+- On 2024-12-12, the documented page size changed from 30 to 15 symbols per request.
+- On 2025-08-28, querying risk-limit tables for PreLaunch contracts was added.
+- The current response schema includes `mmDeduction`; the historical example response is still a single BTCUSD tier followed by ellipses, not a complete tier table.
+
+Primary history:
+- Initial risk-limit documentation: https://github.com/bybit-exchange/docs/commit/f18a4894ec8df9cfe762f6d8f03f0790e8b82c37
+- Cursor/30-symbol pagination: https://github.com/bybit-exchange/docs/commit/f294053e29816ccd8e1a037fd27021dd43452b10
+- 15-symbol page size: https://github.com/bybit-exchange/docs/commit/54d23664ddea5f8e7ce95bcdbb9aeea96feb2b72
+- PreLaunch support: https://github.com/bybit-exchange/docs/commit/38a6faa02add1c5429cc44e3f0cf708f0be2413b
+- Current risk-limit page: https://github.com/bybit-exchange/docs/blob/master/docs/v5/market/risk-limit.mdx
+
+### What the documentation examples can and cannot contribute
+
+The original instrument documentation contains example response payloads with millisecond `time` fields from late December 2022. The current instrument page also contains a BTCUSDT linear example with a timestamp from early January 2025. These are potentially useful as **dated illustrative specimens** for field names and isolated example values.
+
+However, they are not accepted historical snapshots:
+- the documentation does not provide the original request/response capture manifest, full raw response archive, or proof that the example was retained unchanged from a production capture;
+- examples cover only selected categories/symbols and do not establish complete symbol coverage;
+- example payloads may be revised independently of the underlying historical API state;
+- the current risk-limit example still carries a December 2022 `time` value and shows only one BTCUSD tier before an ellipsis, so it cannot represent a current or complete risk table.
+
+Do not ingest documentation examples as production metadata or silently forward-fill them. Preserve them only as weak corroborative evidence unless independently reconciled against a source capture.
+
+### Updated assessment
+
+1. **Schema history is partially recoverable.** The official Git history provides a credible timeline of when documented fields, filters, and response semantics were introduced or revised, beginning in December 2022.
+2. **Historical numeric specification values are not recovered.** The repository does not contain a complete effective-dated per-symbol series for tick size, quantity steps, min notional, leverage bounds, funding limits, or max order sizes.
+3. **Historical risk-tier values are not recovered.** The docs show endpoint shape changes and a truncated example, not full per-symbol tier tables over time.
+4. **Documentation commit date is not automatically the market-effective timestamp.** Use the official changelog/announcement's effective time where explicitly provided; otherwise store the documentation commit date only as a publication/version observation, not as a parameter effective time.
+
+D5 remains **NOT ACCEPTED**. D6 remains **NOT ACCEPTED**. The docs repository materially improves schema chronology and auditability, but it does not close the historical data gate.

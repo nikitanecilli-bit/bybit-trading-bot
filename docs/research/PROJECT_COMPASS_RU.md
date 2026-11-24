@@ -258,3 +258,12 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - Predicate currently accepts precomputed regime and ATR arrays; it does not bind them to a specific `RegimeConfig` or prove that `market_regime.classify_candles()` generated them. This remains the principal H-B mechanics/design gap before any engine adapter.
 - `RegimeConfig.validate()` had a validation gap: non-finite slope thresholds and some wrong threshold types could pass. Added finite numeric validation and tests in commits `65da09dce517a93d089bc88fc716707891eecd59` and `e9782d15ff4f5ab226d4c89d842a544ed4cddf6a`. Research CI run `45463921785` completed SUCCESS: compile, causal market-regime classifier tests, H-B signal tests and all other configured deterministic steps passed.
 - The next allowed step is a pure, explicit-config adapter from causal classifier to predicate, plus synthetic tests that prove config binding, regime/ATR index alignment and prefix/future invariance. Do not select RegimeConfig values by inspecting CryptoFetch PnL. If a configuration cannot be justified independently, retain H-B as design-blocked.
+
+
+## 2026-11-24 — H-B explicit classifier adapter
+
+- Added `evaluate_h_b_signal_with_classifier(candles, config, shock_index)` in `h_b_signal.py`. It requires a concrete `RegimeConfig`, validates it, classifies only the prefix ending at t+1, passes causal regime/ATR to the predicate, and returns the exact config values as signal provenance. No default config is selected silently.
+- Added 3 synthetic tests for required explicit config, config provenance, and exclusion of rows after t+1 from the classifier prefix.
+- Research CI run `45464213667` on `7d27224942a7082889d8e98f3155668d18a9c5bb` completed SUCCESS. H-B test step: 13/13 OK; causal regime classifier tests and other configured deterministic checks passed.
+- This establishes mechanical wiring from an explicit causal classifier to the H-B predicate. It does not establish that the classifier thresholds are economically justified, nor does it validate pending/fill, sizing, exits, persistence, market PnL or edge.
+- Next possible isolated task: synthetic pending-entry contract for open[t+2], missing/gap cancellation, and entry/stop/target geometry without engine integration or PnL. Do not use CryptoFetch PnL to select RegimeConfig.

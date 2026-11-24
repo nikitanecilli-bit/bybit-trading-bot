@@ -49,10 +49,10 @@
 
 1. Довести PR #16 до актуальной базы рабочей ветки без потери изменений.
 2. Включить H-B signal-only module/tests в технический Research CI так, чтобы CI выполнял только compile и deterministic tests — без market-PnL workflows. **Выполнено.**
-3. Получить фактический запуск точных H-B tests и релевантных legacy regression tests; прочитать логи и убедиться, что выполнялись именно нужные тесты. **Выполнено:** первый запуск #45463120336 остановился на отсутствии pytest (assertions не запускались); после перехода на unittest повторный run #45463406898 завершился SUCCESS, H-B 10/10.
-4. Провести независимый code review временной семантики и входных контрактов. Исправлять только подтверждённые дефекты.
-5. Зафиксировать результат как **SIGNAL MECHANICS PASS**, не как strategy/edge pass. Не расширять сразу на pending/fill/position lifecycle.
-6. Отдельно проверить causal RegimeConfig, timestamp semantics и следующий-bar/fill boundary без рыночного PnL. Если режим нельзя обосновать без tuning на использованных folds — H-B остаётся design-blocked.
+3. Получить фактический запуск точных H-B tests и релевантных legacy regression tests; прочитать логи и убедиться, что выполнялись именно нужные тесты. **Выполнено:** Research CI #45463406898 подтвердил 10/10 signal tests; #45464653488 подтвердил 13 market-regime tests, 13 H-B signal tests и 6 H-B regime-adapter tests.
+4. Провести независимый code review временной семантики и входных контрактов. Исправлять только подтверждённые дефекты. **Выполнено для signal/regime layer.**
+5. Зафиксировать результат как **SIGNAL + REGIME MECHANICS PASS**, не как strategy/edge pass. Engine integration не выполнять.
+6. Следующий узкий шаг — pure next-open fill geometry: наличие t+2 бара, exact timestamp, actual open между frozen stop и target. Без sizing, fees/PnL и engine lifecycle.
 
 ## 6. Критерии остановки и доказательности
 
@@ -107,3 +107,13 @@
 - Research CI run `45464213667` на commit `7d27224942a7082889d8e98f3155668d18a9c5bb` завершился SUCCESS. H-B test step: **13/13 OK**; causal market-regime classifier tests и остальные deterministic checks также прошли.
 - Это закрывает связь signal predicate с causal classifier и явной конфигурацией на механическом уровне. Не доказывает, что значения RegimeConfig экономически обоснованы, и не проверяет fill, pending, sizing, exits, persistence или market edge.
 - Следующий допустимый вопрос: нужен ли отдельный synthetic adapter contract для pending entry на open[t+2] и геометрии entry/stop/target, без включения в engine. Не использовать CryptoFetch PnL для выбора RegimeConfig.
+
+
+## 2026-11-24 — H-B regime adapter и повторный CI
+
+- Read-only audit подтвердил: `market_regime.classify_candles()` строит causal labels, но не проверяет cadence; функция допускает любые строго возрастающие timestamps. Для H-B это недостаточно, потому что classifier использует rolling windows и recursive EMA.
+- Добавлен `h_b_regime.py`: явный frozen candidate `RegimeConfig` (значения унаследованы от существующих defaults, не подбирались на market PnL), требование непрерывной H1-сетки на всей истории до t+1, применение classifier и передача regime/ATR в pure H-B predicate. Данные после t+1 отсекаются.
+- Исправлена валидация `RegimeConfig`: NaN/Inf, bool и нечисловые threshold values теперь fail closed. Это исправление конфигурационной целостности, не рыночная оптимизация.
+- Research CI [45464653488](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45464653488) — SUCCESS на актуальном SHA `6540e375d6d2ad7dfd321202973e60e2e0815dae`. Логи: market-regime suite passed; H-B signal `Ran 13 tests / OK`; H-B regime adapter `Ran 6 tests / OK`; все остальные шаги завершились успешно.
+- Вывод: **SIGNAL + REGIME MECHANICS PASS** на synthetic inputs. Frozen config — только исследовательский кандидат; он не оптимизирован и не подтверждён на рынке. Реальный t+2 fill, fill geometry, costs, engine lifecycle и edge не проверены.
+- Следующий узкий шаг: отдельный pure next-open fill-geometry check; без engine integration, market PnL, data collection или Bybit.

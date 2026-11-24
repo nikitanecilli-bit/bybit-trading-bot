@@ -238,4 +238,4 @@
 - Sep 29 Linear fixture overlaps 9/47 (19.1%) for both instrument specs and risk tiers: ADA, AVAX, BNB, BTC, DOGE, ETH, LINK, SOL, XRP. Its nine Spot rows do not count toward Linear coverage.
 - Oct 21 raw capture coverage: instrument specs 1/47 (2.1%), risk tiers 4/47 (8.5%).
 - The 38 uncovered symbols and full interpretation are in acceptance ledger Section 41.
-- D5/D6 remain PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED; D4 remains partial/unverified. No PnL replay, collector, market archive download or workflow artifact download was performed.
+- D5/D6 remain PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED; D4 remains partial/unverified. Subsequent read-only download of existing E11/E13 result artifacts confirmed identical 50-row manifests, 47 included symbols, same three exclusions and identical six source-archive hashes. No market archive, collector, Bybit API request or PnL replay was performed.

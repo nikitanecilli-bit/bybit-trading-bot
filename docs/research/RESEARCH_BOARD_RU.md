@@ -32,7 +32,7 @@
 | Базовая H1 breakout / E01–E13 | **DEFERRED / NO EDGE** | Ряд shared-capital proxy результатов отрицателен; выборка не PIT Bybit; старые результаты имеют ограничения исполнения и provenance | Не тюнить прежние folds. Возвращаться только при новом независимом основании и закрытых data/method gates |
 | H-A relative-strength breakout | **REJECTED — tested configuration** | В preregistered proxy comparison хуже baseline и отрицательна по folds | Не подбирать параметры и символы на тех же folds |
 | H-C post-break invalidation | **REJECTED AS PROFITABILITY CANDIDATE / MECHANICS ONLY** | Проверенная proxy-конфигурация не показала превосходства; реализация находится за default-OFF флагом; synthetic tests не доказывают edge | Не продолжать tuning на использованном окне |
-| H-B mean reversion | **SIGNAL MECHANICS PASS / DESIGN BLOCKED** | Pure predicate и 10 deterministic tests прошли Research CI #45463406898; нет H-B market PnL, frozen RegimeConfig и engine integration | Провести статический аудит causal RegimeConfig и timestamp semantics; затем решить, нужен ли следующий изолированный шаг |
+| H-B mean reversion | **SIGNAL PREDICATE PASS / CLASSIFIER BINDING BLOCKED** | Pure predicate и 10 deterministic tests прошли Research CI #45463406898; нет единого frozen RegimeConfig → classifier → predicate adapter, engine integration и market PnL | Связать predicate только с явно переданной frozen RegimeConfig; добавить synthetic integration tests на causal regime/ATR; не подключать engine |
 | Новые стратегии/фильтры | **DEFERRED** | Ни один новый кандидат не обоснован достаточно, чтобы оправдать расширение | Не добавлять до закрытия текущего H-B mechanical question |
 
 Статусы REJECTED относятся к конкретным проверенным конфигурациям/окнам, а не к утверждению, что любой вариант семейства стратегий математически невозможен.
@@ -88,3 +88,13 @@
 - Первый запуск [45463120336](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463120336) провалился из-за отсутствующего pytest; после перевода тестов на stdlib unittest проблема закрыта. Это была инфраструктурная ошибка запуска, не ошибка assertions.
 - Решение: **H-B SIGNAL MECHANICS PASS** только для изолированного контракта. Не означает market validation, profitability, edge, engine integration или readiness.
 - Следующий шаг: статически проверить существующий causal regime classifier/RegimeConfig, timestamp convention и границы следующего бара. Не выполнять market-PnL, parameter tuning, data collection или lifecycle integration.
+
+
+## 2026-11-24 — independent H-B / regime code review
+
+- Статический review подтвердил: `h_b_signal.evaluate_h_b_signal()` проверяет 26 непрерывных H1 баров от t-24 до t+1, берет regime[t-1], ATR[t-1], shock close[t], stabilization close[t+1], stop=low[t], target=mean из 24 pre-shock closes; entry только планируется на timestamp open[t+2]. Функция не использует бары после t+1.
+- Ограничение: функция принимает `regimes` и `atr_values` отдельными массивами. Сам интерфейс не доказывает, что метки получены из `market_regime.classify_candles()` с явной frozen `RegimeConfig`. Поэтому PASS относится к predicate contract, но не к end-to-end classifier binding и не к торговой стратегии.
+- До engine integration остаются отдельные контракты: проверка фактического open[t+2] и entry-price geometry (entry > stop и target > entry), pending cancellation при gap/missing next bar, position state/exit lifecycle. Это не покрывается signal-only predicate.
+- Найден integrity defect в `RegimeConfig.validate()`: slope thresholds принимали NaN/Infinity и некоторые неверные типы, что могло позволить невалидную конфигурацию classifier. Добавлена проверка finite numeric thresholds и тесты для NaN, ±Infinity, bool и string. Commit с кодом: `65da09dce517a93d089bc88fc716707891eecd59`; тесты: `e9782d15ff4f5ab226d4c89d842a544ed4cddf6a`.
+- Новый Research CI run `45463921785` на HEAD `e9782d15ff4f5ab226d4c89d842a544ed4cddf6a` выполняется. До его завершения изменение RegimeConfig не объявляется проверенным.
+- Следующий узкий шаг после CI: сделать pure adapter, который требует явный `RegimeConfig`, вызывает causal classifier и передает regime/ATR в H-B predicate; закрепить точные параметры конфигурации в тестах/выходной provenance. Не выбирать пороги по market data. Если нельзя обосновать конкретную конфигурацию без tuning — H-B остаётся design-blocked.

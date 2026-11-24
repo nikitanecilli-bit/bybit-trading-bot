@@ -1546,3 +1546,26 @@ Both ZIPs contain their own universe manifest CSV. The two manifests compare IDE
 This independently confirms the exact denominator and universe used in Sections 41 and the E11/E13 reports. It does not change the coverage percentages or data-gate decision; it upgrades the evidence for universe identity from log text to the original run artifacts. The manifests describe the Binance-style proxy sample and do not establish a Bybit point-in-time universe.
 
 No market calculations were performed on the artifacts. D4 remains partial/unverified; D5/D6 remain PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED.
+
+
+## 43. sbOogway/sbt2 — daily instrument snapshots are a source lead, not a public archive
+
+A public Bybit data-source adapter in [sbOogway/sbt2](https://github.com/sbOogway/sbt2) documents one UTC-dated instrument snapshot per symbol under `raw/bybit/linear/{SYM}/instrument/{SYM}{YYYY-MM-DD}.json`. Its parser initializes the instrument snapshot at 00:00 UTC on the capture date. The adapter's source code constructs this dated file through a current public REST request to `instruments-info` plus `risk-limit`.
+
+Important limitations established from the source code and repository:
+- The API method explicitly documents **today's spec**, not a historical query. The wiki says delisted symbols are not served. A daily filename means the adapter can create a dated observation when run; it does not prove that a historical daily series exists.
+- The snapshot method calls `_lowest_risk_tier()` and stores only the tier marked `isLowestRisk` as `margin_init` / `margin_maint`. It does **not** preserve the full risk-limit table in each instrument snapshot. Therefore this is not a D6 full-tier-history source.
+- The public repository's current tree has no `raw/bybit/` data files. Its `.gitignore` excludes `/data/` and `/sbt2-backend/data/`; the wiki describes raw/catalog data as local storage. The public repo therefore exposes the capture mechanism, not the generated daily archive.
+- A committed test fixture `bybit_responses.json` contains a BTCUSDT instrument-info response and a full 35-tier risk-limit response. It is a test fixture, not a multi-date series or a complete symbol universe.
+
+Source inspection:
+- Wiki: https://github-wiki-see.page/m/sbOogway/sbt2/wiki/Source-Bybit (last modified 2026-10-02).
+- Capture method: https://github.com/sbOogway/sbt2/blob/main/sbt2-backend/packages/sbt2-data/src/sbt2/data/sources/bybit/api.py
+- Dated path construction: https://github.com/sbOogway/sbt2/blob/main/sbt2-backend/packages/sbt2-data/src/sbt2/data/sources/bybit/source.py
+- Test response fixture: https://github.com/sbOogway/sbt2/blob/main/sbt2-backend/packages/sbt2-data/tests/sources/bybit_responses.json
+- Ignore rules: https://github.com/sbOogway/sbt2/blob/main/.gitignore
+
+Assessment:
+- D5: potentially useful **if** the maintainer's local daily instrument snapshots can be independently obtained with dates, hashes and coverage manifests. No such public dataset was found in the tracked repository.
+- D6: insufficient as implemented for tier-history replay because only the lowest tier is embedded in the instrument snapshot; a separate full raw risk-limit response archive would be required.
+- This does not change acceptance status: D5/D6 remain PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED. No contact, download of the ignored dataset, Bybit API request, collector, market-data download or PnL run was performed.

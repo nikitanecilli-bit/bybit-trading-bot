@@ -1395,3 +1395,83 @@ Do not ingest documentation examples as production metadata or silently forward-
 4. **Documentation commit date is not automatically the market-effective timestamp.** Use the official changelog/announcement's effective time where explicitly provided; otherwise store the documentation commit date only as a publication/version observation, not as a parameter effective time.
 
 D5 remains **NOT ACCEPTED**. D6 remains **NOT ACCEPTED**. The docs repository materially improves schema chronology and auditability, but it does not close the historical data gate.
+
+
+## 40. Third-party dated Bybit metadata snapshots: partial raw captures and cross-source replication
+
+A targeted public-GitHub search found two separate projects preserving Bybit mainnet metadata responses. This changes the previous assessment: **dated candidate snapshots do exist**, although they do not yet meet the project's full-universe, interval-coverage, and provenance acceptance requirements.
+
+### Source A — crypto-dashboard, capture beginning 2026-09-29
+
+Repository: https://github.com/mannar-hielal/crypto-dashboard
+
+- Committed fixture: https://github.com/mannar-hielal/crypto-dashboard/blob/main/apps/server/fixtures/bybit/recorded.json
+- Recorder source: https://github.com/mannar-hielal/crypto-dashboard/blob/main/apps/server/src/tools/recordBybitFixtures.ts
+- Commit adding fixture: https://github.com/mannar-hielal/crypto-dashboard/commit/3674bed796bdbc15b89ee774242734a721a331dd
+- Fixture Git blob SHA: `edd5ad5958b0a5dbaf53cf7917f4ce314b33f162`
+- Embedded `recordedAt`: `2026-09-29T03:36:42.964Z`
+- Embedded source: `https://api.bybit.com`
+
+The recorder source documents unauthenticated public mainnet GETs and shows the exact query shapes. The committed fixture contains:
+- 9 Spot instrument rows and 9 Linear instrument rows: BTC, ETH, SOL, BNB, XRP, DOGE, ADA, AVAX, LINK;
+- risk-limit arrays for those same 9 Linear symbols, with 30–35 rows per symbol;
+- additional ticker/orderbook/funding/kline/WS fixtures, outside the present metadata assessment.
+
+Important provenance limitation: the script stores the API `result` objects, not the complete REST response envelope. It sets one `recordedAt` before making a sequence of requests, and does not preserve each response's server `time`, request ID, or per-symbol retrieval timestamp. It is therefore a dated capture window, not an atomic point-in-time snapshot. The raw fixture is more useful than a hand-entered table, but its exact per-row capture time is not independently established.
+
+The derivative fallback in `apps/server/src/trading/bybitSpec.ts` is not a second independent dataset. It is a reduced implementation copy: instrument rules are reduced to four fields and risk tiers are truncated at the first tier below the project's 10× leverage cap. Use the original `recorded.json` for evidence, not that fallback.
+
+### Source B — sleeve-fund, raw API captures on 2026-10-15 and 2026-10-21
+
+Repository: https://github.com/aoventuresdomain-cloud/sleeve-fund
+
+**2026-10-15 BTCUSDT risk-limit capture**
+- File: https://github.com/aoventuresdomain-cloud/sleeve-fund/blob/7c04fe480883578a52ef581709209af85b039fed/tests/data/fee_live/risk-limit-BTCUSDT-2026-10-15.json
+- Commit: https://github.com/aoventuresdomain-cloud/sleeve-fund/commit/7c04fe480883578a52ef581709209af85b039fed
+- Raw API `time`: `2026-10-15T10:26:49.276Z`
+- 35 BTCUSDT risk tiers; `nextPageCursor` empty.
+
+**2026-10-21 venue-table capture**
+- Capture marker: https://github.com/aoventuresdomain-cloud/sleeve-fund/blob/c72e9391c1c98e3c31d26a83ea7f5c731fa83ba3/tests/data/venue_tables/read-at.txt
+- Commit: https://github.com/aoventuresdomain-cloud/sleeve-fund/commit/c72e9391c1c98e3c31d26a83ea7f5c731fa83ba3
+- Capture marker: `2026-10-21T21:30:27+00:00`
+- Raw BTCUSDT instrument response: https://github.com/aoventuresdomain-cloud/sleeve-fund/blob/c72e9391c1c98e3c31d26a83ea7f5c731fa83ba3/tests/data/venue_tables/instruments-info-BTCUSDT.json
+- Raw risk-limit responses: BTCUSDT, ETHUSDT, SOLUSDT and XRPUSDT under `tests/data/venue_tables/`.
+- The BTC instrument response server `time` is `2026-10-21T21:30:28.189Z`; the BTC risk-limit response server `time` is `2026-10-21T21:30:28.021Z`. The other three risk responses were returned within the same second.
+- Each of the four risk files contains 35 tiers and an empty `nextPageCursor`.
+
+The source workflow is inspectable:
+https://github.com/aoventuresdomain-cloud/sleeve-fund/blob/c72e9391c1c98e3c31d26a83ea7f5c731fa83ba3/.github/workflows/venue-tables.yml
+
+It documents a manually dispatched, read-only public GET workflow, preserves complete JSON response envelopes, follows risk-limit cursors (up to its configured safety cap), and records a UTC capture marker. The checked-in files are raw response JSON, not only normalized tier tuples. The committed instrument-info sample is BTCUSDT only; do not infer that instrument rows for ETH/SOL/XRP were preserved just because their risk tables were.
+
+### Cross-source checks performed
+
+The two projects' risk-limit rows compare **exactly**, including IDs and every tier field, for all 35 tiers of each overlapping symbol:
+- BTCUSDT
+- ETHUSDT
+- SOLUSDT
+- XRPUSDT
+
+The 2026-10-15 BTCUSDT risk-limit response also compares exactly with the 2026-10-21 BTCUSDT response across all 35 tiers. The 2026-10-21 BTCUSDT instrument-info response compares exactly, field-for-field, with the BTCUSDT Linear row in the 2026-09-29 crypto-dashboard fixture.
+
+This is meaningful cross-project replication for those symbols and dates. It does **not** prove that no parameter changed between captures, nor does it recover values before the first capture. The agreement is a consistency check across snapshots, not a complete history.
+
+### Independent lifecycle cross-check: BNBUSDT tick
+
+The 2026-09-29 crypto-dashboard fixture records BNBUSDT Linear `tickSize=0.1`. Bybit's official Oct 8 announcement states that BNBUSDT USDT Perpetual tick size would change from `0.1` to `0.01` by 2026-10-12 07:30 UTC, and that resting orders placed before the change would retain their original tick:
+https://announcements.bybit.com/en/article/change-tick-size-for-usdt-perpetual-contract-oct-12-2026--art5c4a8b8eef37/
+
+The crypto-dashboard project's Oct 12 commit then records that its live spec-drift check found the BNBUSDT tick changed from 0.1 to 0.01 and updates its Spot and Linear fallback values:
+https://github.com/mannar-hielal/crypto-dashboard/commit/f217f1860b65aaf0c78a96db84e6d6de2f1dd4a7
+
+This is a useful three-part consistency chain for **BNBUSDT Linear**: dated pre-change snapshot → official effective-time announcement → later third-party drift observation. The announcement itself covers USDT Perpetual, not Spot; do not treat it as official evidence for the Spot change.
+
+### Updated D5/D6 assessment
+
+| Requirement | New evidence | Remaining gap | Decision |
+|---|---|---|---|
+| D5 — instrument specs | 9-symbol Spot+Linear result fixture at 2026-09-29; raw BTCUSDT Linear response at 2026-10-21; exact BTC overlap; BNB tick event cross-checked | No continuous effective-dated history, only one raw BTC instrument response in the second project, incomplete full-market coverage, no long historical interval | **PARTIAL CANDIDATE EVIDENCE — NOT ACCEPTED** |
+| D6 — exchange risk tiers | 9-symbol tier fixture at 2026-09-29; raw 4-symbol tables at 2026-10-21; BTC raw table at 2026-10-15; exact 35-tier cross-source matches for BTC/ETH/SOL/XRP | Only four symbols independently replicated; short time span; no full historical tier-change ledger; no account-specific applied-tier/position/order state | **PARTIAL CANDIDATE EVIDENCE — NOT ACCEPTED** |
+
+These snapshots are not yet imported into the project repository and are not authorized for historical market-PnL replay. They should be treated as source leads for a future provenance acceptance package, not as permission to start collectors or market tests. No Bybit endpoint was called by this research session, no new market archive was downloaded, and no backtest/PnL calculation was run.

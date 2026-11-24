@@ -402,3 +402,74 @@ The public announcement API and Telegram archive are therefore **promising suppl
 - Search-engine results and Telegram preview pages are not a complete machine-readable event archive; they may omit posts, expose only excerpts, or change as the platform updates.
 - D4 remains `partial/unverified`; D5 and D6 remain `missing` for the required full historical interval.
 - **DATA GATE REMAINS BLOCKED.** This screening does not authorize API collectors, market-data downloads, runner setup, market-PnL tests, or paper/live execution.
+
+
+## 15. Additional historical channel evidence and completeness counterexamples (2026-11-24)
+
+This is a further read-only review of public Telegram previews and current official Help Center rules. It is not a bulk archive, API response, or exhaustive event census.
+
+### 15.1. Historical evidence from the main Bybit announcement channel
+
+The main public `@Bybit_Announcements` channel exposes dated derivatives lifecycle and risk notices from 2022, separate from the API-focused `@Bybit_API_Announcements` channel.
+
+Examples visible in public previews:
+- 2022-05-12: LUNAUSDT Perpetual delisting notice describes the price-triggered mechanism; the later notice says the contract was settled/delisted at 10:03 UTC after the index price reached the trigger.
+- 2022-05-13: USTUSDT Perpetual delisting at 01:30 UTC, with active/conditional orders cancelled and open positions closed using the best available price with taker fee.
+- 2022-05-13: ANCUSDT Perpetual delisting at 03:45 UTC.
+- 2022-07-21: GSTUSDT Perpetual delisting at 08:00 UTC.
+- A 2022 derivatives risk-limit adjustment notice names AAVEUSDT, FILUSDT, RUNEUSDT, CHZUSDT and IOSTUSDT.
+
+These are useful dated event records, but public Telegram search previews do not establish that every historical message is indexed or that all notices are retained.
+
+References:
+- Main Bybit announcements around May 2022: https://t.me/s/Bybit_Announcements?before=1013
+- GSTUSDT delisting context: https://t.me/s/Bybit_Announcements?before=1256
+
+### 15.2. A direct counterexample to announcement-only lifecycle reconstruction
+
+The official Derivatives Delisting Mechanism states that Bybit may delist a derivatives contract without further notice when its last traded price falls below 20 times the minimum price precision (tick size). It also describes an earlier notification threshold at 50 times tick size.
+
+This means a complete lifecycle history cannot be reconstructed from scheduled delisting announcements alone: the exchange's published rules explicitly allow some delistings without a prior announcement. The LUNAUSDT May 2022 notices illustrate a price-triggered emergency case, but they do not prove every such event was documented in the same way.
+
+Official rule: https://www.bybit.com/en/help-center/article/Bybit-Derivatives-Delisting-Mechanism-DDM
+
+**D4 consequence:** event announcements are supplemental evidence only. To accept a historical universe, we need an authoritative source that captures actual status transitions (including unexpected suspension/delisting) or a defensible reconciliation of dated snapshots with independently verified event logs. A list of announced delistings cannot satisfy this requirement.
+
+### 15.3. D6 is account-state dependent, not just a symbol table
+
+The current official Risk Limit help article describes automatic tier adjustment based on the value of open positions and active orders, with the mark price affecting position/order value. It also distinguishes One-Way and Hedge calculations and excludes Reduce Only / Close on Trigger orders from the effective position value.
+
+The article further states that exchange-wide risk-parameter changes can affect IMR, MMR, maximum leverage and position limits, and may be applied immediately or after a 10-day buffer depending on account risk.
+
+Official rule: https://www.bybit.com/en/help-center/article/Risk-Limit-Perpetual-and-Expiry-Contracts
+
+**D6 consequence:** dated instrument risk-tier snapshots alone are not enough to reproduce an account's effective tier. A historically faithful model would need, at minimum, the applicable tier schedule and rules version, mark-price inputs, position and active-order state, position mode, leverage setting, and the timing/eligibility of parameter changes. Account-specific margin mode and any buffer/restriction state are additional variables. The current help article documents today's rule description; it does not establish when every clause became effective historically.
+
+### 15.4. API-channel chronology: useful for discovery, not a market-event ledger
+
+The public API-announcement preview shows:
+- 2019-12-27: initial Set Risk Limit and Get Risk Limit List endpoints;
+- 2021-02-01: an API changelog says Tiered Margin was upgraded to Risk Limit and adds Set Risk Limit;
+- 2021-03-18: Get Risk Limit response added `max_leverage`;
+- 2021-06-28: the inverse Query Symbol endpoint corrected `min_price` and `tick_size` for BCHUSDT and UNIUSDT;
+- 2021-06-29: new USDT perpetual symbols were added;
+- 2022-03-01: Query Symbol added `funding_interval`;
+- 2022-04-29: maximum PostOnly trading quantity was increased, with the value exposed through Query Symbol;
+- a later API notice says the V5 Get Risk Limit endpoint's page size would change from 30 to 15, requiring cursor pagination.
+
+These entries show that API schemas and available fields changed over time. They do not provide the underlying historical values for every symbol and date. In particular, a changelog that says a field was added or corrected is not a historical specification snapshot.
+
+References:
+- API channel early history: https://t.me/s/Bybit_API_Announcements?before=25
+- 2021 API history: https://t.me/s/Bybit_API_Announcements?before=85
+- 2022 API history: https://t.me/s/Bybit_API_Announcements?before=102
+- Risk-limit pagination notice: https://t.me/s/bybit_api_announcements?before=306
+
+### 15.5. Updated decision
+
+- D4: official channel evidence confirms selected scheduled and emergency delisting events, while the official rule confirms that delisting can occur without further notice. Announcement-only reconstruction is structurally incomplete. Status remains `partial/unverified`.
+- D5: API changelogs reveal schema evolution and selected historical field corrections, but do not reconstruct full effective-time instrument specifications. Status remains `missing`.
+- D6: risk-limit rules are dynamic and account-state dependent; a static dated tier table is insufficient by itself. Status remains `missing`.
+- The public API GET is still not verified by a live response; no total count, oldest returned record, or complete pagination depth is known.
+- No new market-data archive, collector, runner, market-PnL test, paper trade, or live trade was run.
+- **DATA GATE REMAINS BLOCKED.** The next legitimate improvement is source-level acceptance design for actual lifecycle and account-state records, not more isolated announcement examples.

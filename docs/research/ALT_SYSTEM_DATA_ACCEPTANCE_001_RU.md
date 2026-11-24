@@ -1203,3 +1203,44 @@ GitHub code search is incomplete by design: private repositories, unindexed file
 - No new dataset has passed provenance, completeness, field coverage, effective-time semantics, and gap accounting.
 
 **DATA GATE REMAINS BLOCKED.** No market archives were downloaded, no API collectors were run, no private/account endpoints were called, no vendor account or subscription was created, and no PnL/backtest/execution was run.
+
+
+## 36. Official linkmap sampling: useful discovery index, not a chronological completeness proof
+
+A read-only sample of official announcement linkmap pages 4–12 was inspected. It confirms that the catalogue exposes many relevant article slugs, including:
+- repeated derivatives max-order-size notices (e.g. Oct 5, Oct 9, Oct 11, Oct 14, Oct 16–24 and Nov 3–18, 2025);
+- repeated USDT perpetual tick-size notices (e.g. Oct 9, Oct 21, Oct 29 and Nov 6, 2025; Jan 9, Jan 15, Jan 22 and Jan 27, 2026; Feb 3 and Feb 9, 2026);
+- repeated derivatives risk-limit notices (e.g. Oct 20 and Oct 22, 2025; Jan 8–28 and Feb 26–27, 2026);
+- multiple perpetual-contract delistings.
+
+Sampled official catalogue pages:
+- https://announcements.bybit.com/en/linkmap/4/
+- https://announcements.bybit.com/en/linkmap/5/
+- https://announcements.bybit.com/en/linkmap/6/
+- https://announcements.bybit.com/en/linkmap/7/
+- https://announcements.bybit.com/en/linkmap/8/
+- https://announcements.bybit.com/en/linkmap/9/
+- https://announcements.bybit.com/en/linkmap/10/
+- https://announcements.bybit.com/en/linkmap/11/
+- https://announcements.bybit.com/en/linkmap/12/
+
+The sampled pages are not safely interpretable as a simple oldest-to-newest sequence: publication dates in the visible entries do not monotonically follow the page number, and repeated article slugs occur across sampled pages. Therefore:
+- page number cannot be used as a date proxy;
+- the apparent count of linkmap pages cannot be translated into a reliable time-depth estimate;
+- sitemap presence proves discoverability of a specific URL, not that all notices in a period are present;
+- this sample does not establish whether the catalogue reaches 2024, 2023, or earlier.
+
+Individual article pages can also be rendered in localized language variants and may expose only title/publication date in the accessible page extraction. For example, the Nov 6, 2025 tick-size article is discoverable from the catalogue, but the extracted localized page did not expose the full old/new parameter table. A URL in the catalogue is therefore not by itself a structured event record.
+
+Official V5 API documentation confirms that `/v5/announcements/index` has `page` and `limit`, returns `total` and `list`, and exposes publication-related timestamps. It documents no time-range filter, retention period, or historical completeness guarantee:
+https://bybit-exchange.github.io/docs/v5/announcement
+
+The documentation response example contains a static `total: 735` and an ARB listing timestamp from March 2023; these are example payload values, not a live API count or proof of current retention. A permitted anonymous GET to the exact V5 announcements endpoint was attempted from the research web environment, but the tool reported the URL inaccessible. No HTTP response or live payload was obtained. No other Bybit API endpoint was called.
+
+### Updated D4/D5/D6 implication
+
+The official catalogue is a valuable **event-discovery source** and confirms that changes are frequent enough that carrying current metadata backward is unsafe. However, the sampled catalogue does not provide a defensible completeness boundary or continuous effective-dated event ledger.
+
+Keep announcement-derived events as individually sourced observations. Do not forward-fill a parameter across an interval unless a trustworthy baseline and complete change coverage for that symbol/field/period are independently established. Otherwise the value remains unknown.
+
+D4 remains **partial/unverified**. D5 and D6 remain **not accepted** for historical replay.

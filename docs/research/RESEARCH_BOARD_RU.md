@@ -8,7 +8,9 @@
 
 **Метод управления:** Theory of Constraints — найти ограничение, использовать его, подчинить ему остальную работу, расширить и повторить. Любая задача должна снимать текущее ограничение или быть обязательным контролем качества/риска; активность и количество артефактов не являются результатом.
 
-**Текущее ограничение:** нет принятой доказательной базы для достоверного подтверждения/опровержения реализуемого edge на условиях Bybit. Приоритет — минимально достаточный путь к независимому доказательству. Текущий диагноз пересматривается по фактам.
+**Текущее ограничение:** ни одна гипотеза не соединяет сейчас полностью специфицированный trading lifecycle с независимым допустимым data/evidence path. H-B — только signal/entry mechanics; H1 baseline — lifecycle есть, но прежние folds уже использованы и net-PnL старых прогонов не годится для доказательства. Реальные Bybit archives и effective-time evidence также отсутствуют.
+
+Ближайшая задача — найти один минимальный кандидат и действительно независимый период/данные. Узкий single-instrument scope может убрать cross-sectional universe requirement, но не отменяет lifecycle, D1/D3/D5 и применимые D2/D6/D8 gates. Детали: [Minimum Viable Edge Validation](MINIMUM_VIABLE_EDGE_VALIDATION_RU.md).
 
 Канон: [Философия и операционная модель компании](../COMPANY_OPERATING_PHILOSOPHY_RU.md).
 
@@ -271,3 +273,10 @@
 - Пользователь утвердил цель компании: устойчивый чистый денежный результат на финансовых рынках при контролируемом риске. Принят цикл Theory of Constraints; канонический документ: [COMPANY_OPERATING_PHILOSOPHY_RU.md](../COMPANY_OPERATING_PHILOSOPHY_RU.md).
 - Текущее ограничение остаётся: нет принятой доказательной базы для подтверждения/опровержения реализуемого edge на условиях Bybit. Любая задача должна снимать это ограничение или быть обязательным контролем качества/риска.
 - Уточнены статусы D5 leads: Hassnain metadata не считается независимым raw snapshot; найденный 2026-10-18 capture относится к Spot и не расширяет Linear universe. D5/D6 остаются не приняты. Подробности — acceptance ledger Section 45.
+
+
+### 2026-11-24 — Minimum viable validation path and funding regime update
+
+- Добавлен [MINIMUM_VIABLE_EDGE_VALIDATION_RU.md](MINIMUM_VIABLE_EDGE_VALIDATION_RU.md): single-instrument scope, обязательные/условные data gates, conservative taker-only execution boundaries и независимость выборки. Это design only, не разрешение на сбор данных или market PnL.
+- Новое подтверждённое ограничение: H-B не имеет полного lifecycle; H1 baseline имеет полный кодовый путь, но нет независимого неиспользованного периода и валидного net-PnL доказательства. Сейчас нет кандидата, готового к честной независимой проверке.
+- Bybit объявил поэтапное изменение формулы funding с 2026-11-24 по 2026-12-01. В D3 нужно хранить formula regime отдельно от settlement rate и funding interval; конкретные effective dates символов пока не подтверждены. Подробности: acceptance ledger Section 46.

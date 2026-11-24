@@ -258,4 +258,6 @@ python -m pytest -q
 
 ## 16. Current evidence statement
 
-This document is a design specification derived from read-only source inspection and prior documented H-B contracts. No production code was changed. No synthetic tests were written or run. No market data, exchange APIs, archives, private/account APIs, PnL backtests, parameter sweeps, paper trading or live trading were used. CI status is not evidence until a workflow run is observed.
+This document remains the broader lifecycle design specification derived from read-only source inspection and prior H-B contracts. As of 2026-11-24, a deliberately narrower pure signal predicate has been added separately in `h_b_signal.py`, with 10 deterministic tests in `tests/test_h_b_signal.py` on branch `research/hb-signal-contract` (PR #16). These tests cover only the causal signal predicate through t+1; they do not implement or validate pending/fill lifecycle, sizing, persistence, position management, exits, accounting, reporting or legacy parity.
+
+No trading-engine production path was changed. The exact repository pytest suite has not yet been observed running; direct execution of the copied predicate passed four core assertions, which is not CI evidence. No market data, exchange APIs, archives, private/account APIs, PnL backtests, parameter sweeps, paper trading or live trading were used. CI status is not evidence until a workflow run is observed.

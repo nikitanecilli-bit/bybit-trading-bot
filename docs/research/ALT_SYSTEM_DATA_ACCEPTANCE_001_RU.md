@@ -824,3 +824,41 @@ If a free trial or sample metadata response is available, the acceptance test sh
 5. Reject any claim of completeness unless the vendor states coverage scope and the known-case reconciliation passes.
 
 No CoinAPI API request, API-key creation, paid trial, market-data download, or subscription was made. This is a vendor-evaluation lead only.
+
+
+## 27. CoinAPI Bybit identifiers and access gate: metadata-only test is defined, but cannot yet be executed
+
+A closer check of CoinAPI's current public documentation resolves part of the identifier ambiguity:
+
+- CoinAPI's Bybit integration page explicitly uses `exchange_id=BYBIT` and documents perpetual/futures coverage under the Bybit integration.
+- CoinAPI's FAQ separately lists `BYBIT`, `BYBITINVERSE`, and `BYBITUSDC` as distinct exchange identifiers for funding-rate coverage. This is strong evidence that the metadata test must not assume one identifier covers every derivatives category.
+- The historical-symbol endpoint is `GET /v1/symbols/{exchange_id}/history`, paginated by `page` and `limit`; it requires an API key in the Authorization header (or an accepted API-key header). The public documentation's response example is for Kraken and is not evidence of Bybit symbol coverage.
+- CoinAPI's FAQ says inactive/delisted symbols are retained only if CoinAPI supported the symbol when it was introduced. The same FAQ says metadata does not guarantee that every dataset is available for every symbol.
+
+References:
+- Bybit integration and `BYBIT` example: https://www.coinapi.io/products/market-data-api/exchanges/bybit
+- Funding coverage exchange IDs: https://www.coinapi.io/products/market-data-api/faq
+- Historical-symbol endpoint and authentication: https://www.coinapi.io/products/market-data-api/docs/rest-api/metadata/symbols/exchange_id/history/get
+
+### Consequence for the proposed known-case test
+
+The minimum useful metadata-only test, if an already-authorized API key or vendor-provided sample becomes available, should query separately:
+1. `BYBIT` — expected primary linear/perpetual candidate;
+2. `BYBITINVERSE` — inverse derivatives;
+3. `BYBITUSDC` — USDC derivatives.
+
+For each identifier, retrieve active and historical symbol pages, follow pagination to exhaustion, preserve the raw response and retrieval timestamp, and compare exchange-native symbol identifiers against the already-known Bybit cases (LUNAUSDT, USTUSDT, ANCUSDT, plus independently documented listings/delistings). Do not merge categories until duplicate and naming semantics are understood. For each matching symbol, record CoinAPI's data coverage dates separately from the actual Bybit lifecycle dates.
+
+### Access and permission boundary
+
+The endpoint requires an API key. No key is currently available in the authorized project context, and creating an account/key or starting a trial would cross the existing permission boundary. Therefore no live metadata request was made. This is not a technical failure and must not be described as a failed API test.
+
+No paid plan, trial, API key, vendor account, data download, or market archive was created or accessed. A public documentation review is the furthest permissible step under the current authorization.
+
+### Updated assessment
+
+- **D4:** CoinAPI is now a more precisely scoped candidate, with at least three Bybit-related identifiers to test. It remains unverified because no actual symbol-history response or pagination count has been inspected. Its conditional retention policy prevents treating the vendor list as a complete Bybit universe without reconciliation.
+- **D5:** remains missing. CoinAPI symbol precision metadata is not established as an effective-dated exchange-rule history.
+- **D6:** remains missing. No historical risk-tier schedule or account-state reconstruction is established.
+
+**Decision:** do not spend money or create an account/key just to test this lead. First use any already-authorized sample response if one is later supplied; otherwise request a vendor sample/coverage statement without committing to a subscription.

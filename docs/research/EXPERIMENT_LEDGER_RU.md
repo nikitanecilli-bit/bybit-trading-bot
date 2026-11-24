@@ -1368,3 +1368,23 @@ Detailed report: [E13_CAUSAL_COMPRESSION_GATE_RU.md](../reports/E13_CAUSAL_COMPR
 - **E11 signal CSV** contains 18,472 rows across repeated body-gate cells. Raw candle/signal-time feature fields are generated before the engine simulation and can be retained descriptively, but rows must be deduplicated by `(symbol, signal_ts)`; otherwise the factorial cells duplicate observations. Its engine status/fill/trade outputs remain tainted. E12's signal-hour match above is an independent check of the timestamp aggregation, not a PnL comparison.
 - E12's causal compression flag was computed against expanding quantiles of prior observations, but the q25/336-hour rule was developed after inspecting these same folds. Its higher activation in fold 2 (23.3% of fold bars versus 3.2% and 6.0%) is descriptive separation on the already-seen sample, not independent validation. Do not promote it to a strategy filter.
 - **Evidence boundary:** retain E06/E11 raw signal-time OHLCV features and E12 completed-bar context as exploratory descriptive archives; keep forward returns as labels only; exclude engine-derived fills, trade selection and all net-PnL claims. The three contiguous folds, fixed/survivor-biased Binance-style proxy universe, serial dependence and cross-symbol correlation prevent treating rows/hours as independent replications. No Bybit-native mark/funding/fees or execution evidence is added by this audit.
+
+
+### 2026-11-24 — E08–E13 signal-artifact structure cross-check
+
+Downloaded and SHA-256-verified the preserved signal/trade archives; row counts below are file counts, **not independent observations**:
+
+| Experiment | Candidate signal rows | Engine trade rows | Artifact ZIP SHA-256 (prefix) |
+|---|---:|---:|---|
+| E06 | 5,060 | 910 | `d52b42bc8e39…` |
+| E08 | 10,120 | 2,160 | `05e8aaa9b18c…` |
+| E09 | 8,096 | 1,644 | `503aa4ef24f6…` |
+| E10 | 18,630 | 4,219 | `64832db93e59…` |
+| E11 | 18,472 | 1,452 | `441e518a6834…` |
+| E12 | 4,249 hourly context rows | — | `5ac82041680e…` |
+| E13 | 18,472 | 1,496 | `9930d6f36513…` |
+
+- Exact run-commit source inspection for E06, E08, E09, E10, E11 and E13 confirms a repeated structure: candidate rows and signal-time features are built and appended before the script calls `run_simulation_pass()`. Thus raw candle-derived fields (OHLCV, ATR, volume ratio, breakout geometry, candle body/range, trailing returns/efficiency, and completed-bar context where present) are not numerically altered by the exit-fee bug.
+- The same CSV rows also contain later outcome labels (`fwd_6h/12h/24h/48h_*`) and engine annotations. Forward fields are future labels only. Engine-emitted/rejected/fill/cancel/status/order columns and all trade CSVs are simulation-dependent; do not treat them as clean candidate observations or valid PnL evidence.
+- E08/E09/E10/E11/E13 repeat candidate rows across threshold/factor/gate configurations. E06 also uses a selected five-symbol universe. Any descriptive reuse must choose a canonical configuration and deduplicate by fold + symbol + signal timestamp; never sum CSV row counts across experiments as sample size. E10's per-symbol simulation and E11/E13's shared-capital replay are different designs and their rows/results are not interchangeable.
+- This cross-check widens the salvageable archive boundary, not the evidence for a strategy: raw signal-time features are retained only for exploratory description on the already-inspected Binance-style proxy history. No thresholds, predictive relationships, or trading rules are accepted from these files. All market PnL remains unusable because of the exit-cost defect and other data/execution limitations.

@@ -556,3 +556,29 @@ Official references:
 **D6 consequence:** the public risk-limit endpoint is a current-state lookup, not a time-series endpoint. Its cursor only traverses the current response set; it does not page through historical effective dates. The timestamps added to Position Info are account/position fields, not a public historical risk-tier archive, and they appeared only in October 2023. They cannot fill earlier history or replace periodic snapshots. Historical tier reconstruction therefore requires independently retained dated responses or a verifiable exchange event archive plus the exact rules in force at each time.
 
 Acceptance remains `missing` for D6. No private account API was accessed or requested, and no live response from the risk-limit endpoint was collected in this audit.
+
+
+## 18. Important qualification: historical-time parameters once documented for Get Instruments Info (2023-04-04)
+
+A closer reading of the official V5 changelog reveals an item not covered by the current endpoint reference:
+
+- On 2023-04-04, the changelog says **Get Instruments Info added request parameters `startTime` and `endTime`, effective for UTA mode**.
+- The current official Get Instruments Info reference and current API Explorer request schema list `category`, `symbol`, `symbolType`, `status`, `baseCoin`, `limit`, and `cursor`, but do not list `startTime` or `endTime`.
+- The current response still describes instrument specifications for online trading pairs and includes launch/delivery timestamps, but does not document an effective-dated history response contract.
+
+Official references:
+- Changelog: https://bybit-exchange.github.io/docs/changelog/v5
+- Current endpoint reference: https://bybit-exchange.github.io/docs/v5/market/instrument
+- Current API Explorer schema: https://bybit-exchange.github.io/docs/api-explorer/v5/market/instrument
+
+### Interpretation and required follow-up
+
+This is a material unresolved lead for D4/D5, not evidence that historical specifications are available:
+1. The 2023 changelog establishes that time parameters were documented for this endpoint at that date and under a UTA-mode qualification.
+2. The changelog does not define whether the parameters queried historical instrument state, filtered account-instrument records by time, or had another limited meaning.
+3. The current endpoint reference and API Explorer omit those parameters. We have not established when or why they disappeared, whether the behavior remains accepted by the server, what date range/retention exists, or whether results include historical values rather than current records.
+4. No API request was made as part of this documentary audit. In particular, the prior permission for anonymous public GET access was limited to the announcements endpoint; it does not authorize probing the instruments endpoint.
+
+**Correction to Section 16:** do not treat the current reference's lack of time parameters as proof that Bybit never offered historical instrument queries. Equally, do not treat the 2023 changelog line as proof of a usable, complete historical metadata archive. D5 remains `missing / unresolved historical-query lead` until official semantics, current support, historical depth, and field coverage are independently established. D4 remains partial/unverified.
+
+A bounded next documentary task is to recover the 2023-04-04 API schema/PR history and determine the exact meaning and removal date of `startTime`/`endTime`. If that cannot be established from public documentation history, the next step requires explicit permission for a read-only public GET against the instruments-info endpoint; it must not be silently tested under the announcements-only authorization.

@@ -235,3 +235,9 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 - Текущий `.github/workflows/research-checks.yml` запускается push только на рабочую ветку и включает `tests/**` в path filter, но явный compile/test command для новых H-B файлов отсутствует. Поэтому PR #16 пока не имеет repository pytest/CI evidence. Прямой ручной запуск скопированной функции не заменяет pytest.
 - Следующий безопасный шаг: review/rebase PR #16 на актуальную рабочую базу; добавить H-B compile + deterministic test command в технический Research CI; выполнить CI и прочитать логи, убедившись, что market-PnL workflows не запускались. Не объединять и не расширять H-B lifecycle до получения реального тестового evidence.
 - Никаких Bybit API, runner, новых архивов, market-PnL backtests, paper/live trading или реальных ордеров не выполнялось. Действующие запреты сохранены.
+
+
+### 2026-11-24 — H-B Research CI dependency failure and correction
+- Первый CI run [45463120336](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45463120336) прошёл compile и все предшествующие regression steps, но завершился на H-B test command: GitHub runner не имеет установленного `pytest` (`No module named pytest`). Само тело 10 H-B assertions не запускалось; не трактовать как логическую ошибку сигнала.
+- H-B tests переведены на стандартный Python `unittest`, workflow-команда заменена на `python tests/test_h_b_signal.py`; внешняя зависимость не добавлялась.
+- Повторный CI [45463406898] для commit `582ccedf943ed7d4a5a60db0436bbb63d4f5741c` запущен и на момент записи ещё выполняется. До результата не объявлять H-B mechanics pass.

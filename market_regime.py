@@ -37,17 +37,18 @@ class RegimeConfig:
         )
         if any(isinstance(p, bool) or not isinstance(p, int) or p < 2 for p in periods):
             raise ValueError("all indicator periods must be integers >= 2")
-        thresholds = (
-            self.trend_er_min, self.range_er_max, self.trend_slope_atr_min,
-            self.range_slope_atr_max, self.high_vol_ratio, self.high_vol_er_max,
+        threshold_fields = (
+            "trend_er_min", "range_er_max", "trend_slope_atr_min",
+            "range_slope_atr_max", "high_vol_ratio", "high_vol_er_max",
         )
-        if any(
-            isinstance(value, bool)
-            or not isinstance(value, (int, float))
-            or not math.isfinite(float(value))
-            for value in thresholds
-        ):
-            raise ValueError("all regime thresholds must be finite numbers")
+        for field in threshold_fields:
+            value = getattr(self, field)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+            ):
+                raise ValueError(f"{field} must be a finite number")
         if self.ema_fast_period >= self.ema_slow_period:
             raise ValueError("ema_fast_period must be less than ema_slow_period")
         if not 0 <= self.range_er_max < self.trend_er_min <= 1:

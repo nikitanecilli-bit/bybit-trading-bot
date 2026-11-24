@@ -1244,3 +1244,25 @@ The official catalogue is a valuable **event-discovery source** and confirms tha
 Keep announcement-derived events as individually sourced observations. Do not forward-fill a parameter across an interval unless a trustworthy baseline and complete change coverage for that symbol/field/period are independently established. Otherwise the value remains unknown.
 
 D4 remains **partial/unverified**. D5 and D6 remain **not accepted** for historical replay.
+
+
+## 37. Re-audit of the 2023-04-04 changelog anomaly: not historical instrument lookup
+
+The V5 changelog contains a misleading entry dated 2023-04-04:
+
+- Its visible label says **Get Instruments Info** and claims `startTime` / `endTime` were added, effective for UTA.
+- However, the hyperlink attached to that label resolves to the official **Get Order History** page, endpoint `GET /v5/order/history`, not Get Instruments Info.
+- The immediately following separate 2023-04-04 entry is also Get Order History and describes the same `startTime` / `endTime` parameters.
+
+Official evidence:
+- Changelog entry: https://bybit-exchange.github.io/docs/changelog/v5
+- The link attached to the suspicious label resolves to: https://bybit-exchange.github.io/docs/v5/order/order-list
+- Current Get Instruments Info request schema: https://bybit-exchange.github.io/docs/v5/market/instrument
+
+The current Get Instruments Info schema lists `category`, `symbol`, `symbolType`, `status`, `baseCoin`, `limit`, and `cursor`; it does not list `startTime` or `endTime`. Its description is to query instrument specifications of online trading pairs. The current Get Order History schema explicitly lists `startTime` and `endTime`, including a maximum seven-day query window.
+
+The most defensible interpretation is a **changelog hyperlink/label copy-paste error**, not proof that Get Instruments Info ever supported historical specification queries. The earlier Section 20 correction therefore stands. No request was sent to either market endpoint.
+
+### Consequence
+
+Do not reopen the historical `instruments-info` API path based on the 2023-04-04 changelog line. D5 remains without a documented historical query mechanism in the current official endpoint. The historical event-ledger and baseline-snapshot requirements remain unchanged.

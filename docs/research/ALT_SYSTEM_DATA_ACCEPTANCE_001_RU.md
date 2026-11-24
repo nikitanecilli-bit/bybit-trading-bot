@@ -862,3 +862,93 @@ No paid plan, trial, API key, vendor account, data download, or market archive w
 - **D6:** remains missing. No historical risk-tier schedule or account-state reconstruction is established.
 
 **Decision:** do not spend money or create an account/key just to test this lead. First use any already-authorized sample response if one is later supplied; otherwise request a vendor sample/coverage statement without committing to a subscription.
+
+
+## 28. D5: bounded historical Bybit instrument-state stream is real, but field-level spec coverage is unproven
+
+The Bybit Derivatives coverage page maintained by Tardis provides an exact capture boundary for the legacy public channel:
+- Bybit Derivatives history begins 2019-11-07 for inverse and 2020-05-28 for linear.
+- Legacy `instrument_info` was captured until 2023-04-05 and is described as “instrument ticker and contract state updates”.
+- Tardis states that before 2023-04-05 collection used `wss://stream.bybit.com/realtime`; after that date it used the V5 public WebSocket infrastructure.
+- The current documented Tardis channel list after 2023-04-05 includes `publicTrade`, `tickers`, and order-book channels, but no explicitly named replacement instrument-specification/state-update channel.
+
+Reference: https://docs.tardis.dev/historical-data-details/bybit
+
+This is a stronger and more precise D5 research lead than a generic market-data archive: it identifies an actual historical Bybit-originated stream and a bounded time interval. It does **not** yet establish that the captured payload contains every required specification field, or that all symbol updates were captured continuously.
+
+### Field-level acceptance rule
+
+Do not equate a contract-state stream with a complete instrument-specification history. Before accepting any Tardis `instrument_info` payload for D5, inspect a separately authorized sample and verify, field by field:
+- `tickSize` / price increment and its event timestamp;
+- `qtyStep` / quantity increment;
+- minimum quantity and minimum notional;
+- maximum limit, market and post-only quantities;
+- price bounds;
+- leverage bounds and leverage step;
+- funding interval and funding-rate bounds where relevant;
+- symbol identity, category, status, and lifecycle timestamps.
+
+For each field, establish whether the message is a full snapshot or partial delta, how omitted fields are carried forward, whether updates are emitted on every exchange change, and whether the timestamp represents exchange event time or collector receive time. Preserve unknown intervals rather than interpolating values across gaps.
+
+The current Bybit `Get Instruments Info` response exposes many of these fields, but that is a current-state endpoint; it does not make the old stream schema equivalent. The newer `Get Instrument Summary` endpoint returns only a narrower summary (including `qtyStep`, `tickSize`, and `deliveryTime`) and is also current-state, not historical.
+
+Official references:
+- https://bybit-exchange.github.io/docs/v5/market/instrument
+- https://bybit-exchange.github.io/docs/v5/market/instrument-summary
+- https://bybit-exchange.github.io/docs/changelog/v5
+
+### D5 conclusion
+
+- **2020/2023 bounded interval:** a real candidate exists in Tardis' historical `instrument_info` capture, but field completeness, per-symbol coverage, update semantics, and gap rates are not yet proven.
+- **After 2023-04-05:** no equivalent complete public instrument-spec update stream is established by the reviewed Bybit/Tardis documentation.
+- **Before the applicable collection start:** no evidence from this channel.
+- **Current REST snapshots:** useful only from the moment they are independently captured; they cannot backfill historical changes.
+
+D5 therefore remains **missing for acceptance**, although a bounded historical segment may be recoverable after an authorized sample-level audit. No Tardis API request, replay, download, account connection, or subscription was performed.
+
+## 29. D6: risk-tier history is not the same thing as instrument leverage metadata
+
+The current public `GET /v5/market/risk-limit` endpoint returns rows containing `riskLimitValue`, `maintenanceMargin`, `initialMargin`, `maxLeverage`, and `mmDeduction`, with cursor pagination. Its documented request parameters are category, symbol, and cursor; no effective-time or historical time-range parameter is documented.
+
+Reference: https://bybit-exchange.github.io/docs/v5/market/risk-limit
+
+The Bybit changelog records pagination changes and the addition of pre-market risk-limit support, but these are API/schema changes, not an archive of historical tier values:
+- 2024-05-09: cursor pagination introduced for the linear risk-limit response.
+- 2024-12-12: linear page size changed from 30 to 15.
+- 2025-08-28: pre-market risk-limit tables supported.
+
+Reference: https://bybit-exchange.github.io/docs/changelog/v5
+
+### Account-state dependence makes a static tier table insufficient
+
+Bybit's current risk-limit help article explains that effective tier selection can change dynamically with positions, active orders, and mark price. It also describes exchange-wide risk-parameter changes affecting IMR, MMR, maximum leverage, and position limits; email notices are not sent for every risk-limit adjustment. Depending on account risk, new parameters may apply immediately or after a buffer period.
+
+Reference: https://www.bybit.com/en/help-center/article/Risk-Limit-Perpetual-and-Expiry-Contracts
+
+The private Position stream exposes fields such as `riskId`, `riskLimitValue`, `positionValue`, `markPrice`, and `leverage`. These are account/position observations, not a public historical archive of all symbol tier schedules. The documentation also notes that `riskLimitValue` becomes meaningless when automatic risk-limit tiering is applied.
+
+Reference: https://bybit-exchange.github.io/docs/v5/websocket/private/position
+
+The API-announcement channel records the migration from manual tier selection to automatic tier adjustment beginning 2024-02-05. This is an important rules-regime boundary, but does not provide the full historical tier tables or each subsequent effective change:
+https://t.me/s/Bybit_API_Announcements?before=217
+
+### Minimum evidence required for D6
+
+A valid reconstruction would need, for every symbol and effective interval:
+1. The complete tier schedule: risk limit values, IMR/MMR, max leverage, maintenance-margin deduction, and tier identifiers.
+2. Exchange-wide schedule-change events with announced/effective timestamps and any staged/buffer application rules.
+3. The rule version for automatic tier selection, including the relevant position/order valuation logic.
+4. For account-specific replay: positions, active orders, mark-price path, position mode, configured leverage, and any account-specific buffer/restriction state.
+5. Explicit coverage and gap accounting. A current tier table or a few dated announcement examples cannot be interpolated into a complete history.
+
+### D6 conclusion
+
+- Public risk-limit REST endpoint: current lookup, not historical time series.
+- Current help article: describes dynamic/current mechanics; historical applicability of every clause is not established.
+- Announcements: selected rule-change evidence, not complete tier-value history.
+- Private position stream: account-specific observations, not a substitute for public schedule history.
+- No reviewed Tardis/CoinAPI metadata source establishes a complete effective-dated Bybit risk-tier archive.
+
+**D6 remains structurally unaccepted for historical replay.** Even if a partial symbol-level tier history is later recovered, account-specific historical margin state must remain a separate requirement rather than being inferred from a static tier table.
+
+No private API, account data, market data, paid vendor access, or execution was used.

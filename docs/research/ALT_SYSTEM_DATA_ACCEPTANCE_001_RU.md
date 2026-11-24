@@ -1569,3 +1569,64 @@ Assessment:
 - D5: potentially useful **if** the maintainer's local daily instrument snapshots can be independently obtained with dates, hashes and coverage manifests. No such public dataset was found in the tracked repository.
 - D6: insufficient as implemented for tier-history replay because only the lowest tier is embedded in the instrument snapshot; a separate full raw risk-limit response archive would be required.
 - This does not change acceptance status: D5/D6 remain PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED. No contact, download of the ignored dataset, Bybit API request, collector, market-data download or PnL run was performed.
+
+
+## 44. Third independent raw risk-tier capture: CandleViewer (2026-10-25)
+
+### Source and provenance
+
+Repository: https://github.com/CandleViewer/CandleViewer
+
+- Fixture corpus notes: https://github.com/CandleViewer/CandleViewer/blob/a1faa8373d43b694de6c3f93ed8b765ca76038b0/packages/fixtures/bybit/README.md
+- Per-file manifest: https://github.com/CandleViewer/CandleViewer/blob/a1faa8373d43b694de6c3f93ed8b765ca76038b0/packages/fixtures/bybit/2026-10-05/manifest.json
+- BTC response: https://github.com/CandleViewer/CandleViewer/blob/a1faa8373d43b694de6c3f93ed8b765ca76038b0/packages/fixtures/bybit/2026-10-05/rest/risk_limit_BTCUSDT.json
+- ETH response: https://github.com/CandleViewer/CandleViewer/blob/a1faa8373d43b694de6c3f93ed8b765ca76038b0/packages/fixtures/bybit/2026-10-05/rest/risk_limit_ETHUSDT.json
+- Commit adding the recorded replies: https://github.com/CandleViewer/CandleViewer/commit/8e2e36bfd092d8c7331b56792dc1a00a93d9bee7
+
+The directory is named `2026-10-05` because it is the corpus date, but the README and manifest explicitly state that these two risk-limit files were retrieved on **2026-10-25 at 18:45 UTC**. The response server timestamps are:
+- BTCUSDT: `2026-10-25T18:45:35.185Z`
+- ETHUSDT: `2026-10-25T18:45:35.564Z`
+
+The project documents the capture command and implementation. It records one `GET /v5/market/risk-limit` response per symbol from public `api.bybit.com`, with `category=linear`, no key/signature/auth headers, HTTP 200 and `retCode=0` required, then redacts and checks for credential leakage. Each file contains the full REST envelope and 35 tiers; the cursor is empty. This is stronger raw-capture provenance than a derived table.
+
+### Exact comparison with the 2026-10-21 raw capture
+
+Compared all 35 rows and all tier fields, not just tier-1 values:
+
+| Symbol | Oct 21 sleeve-fund | Oct 25 CandleViewer | Exact match |
+|---|---:|---:|---|
+| BTCUSDT | 35 tiers | 35 tiers | Yes |
+| ETHUSDT | 35 tiers | 35 tiers | Yes |
+
+The same BTC/ETH rows had already matched the 2026-09-29 `crypto-dashboard` fixture. Thus for BTCUSDT and ETHUSDT there are now three separate project repositories with matching 35-tier tables across the Sep 29, Oct 21 and Oct 25 observations. This supports consistency of those particular observed tables over this period; it does not prove no intervening change occurred.
+
+For SOLUSDT and XRPUSDT, the exact cross-project comparison remains Sep 29 vs Oct 21 (35 tiers each). CandleViewer does not add those symbols.
+
+### D5 check — no new instrument-spec capture
+
+The same CandleViewer corpus includes `instruments_before.json` and `instruments_after.json`, but the manifest labels them `documented-shape (exception #1778 A)`. The README says the current corpus is built from documented shapes and existing recordings; these two instrument files are generated examples for a delisted symbol / changed tick scenario, not captured live instrument-info responses. They must not be counted as D5 historical evidence.
+
+A targeted search for raw `GET /v5/market/instruments-info` captures found no additional qualifying instrument-spec snapshot beyond the previously identified BTCUSDT response from sleeve-fund on Oct 21. This is a bounded search result, not proof that no other public snapshot exists.
+
+### Secondary corroboration, not a raw snapshot
+
+A separate report in `Nguyenchitrai62/Agentic_Alpha_Lab` states that live Bybit Linear risk tiers were fetched on 2026-10-06 and frozen in a `results.json`, and prints tier-1 limit/MMR summaries for BTC, ETH, SOL, BNB and XRP:
+https://github.com/Nguyenchitrai62/Agentic_Alpha_Lab/blob/21a07449f29da793f7f5296290156a3ea2f7cd3e/research/tournament/oc_utamargin/REPORT.md
+
+The listed tier-1 values match the corresponding values in the Sep 29 crypto-dashboard fixture for those five symbols. However, the referenced raw `results.json` is not present in the inspected repository tree, and the report prints only summary fields, not full tier tables or response envelopes. Count this as secondary corroboration only; it does not add accepted raw-capture coverage.
+
+### Updated D6 evidence map
+
+- **Sep 29:** 9-symbol Linear tier fixture (crypto-dashboard; response result objects, common capture-start time).
+- **Oct 6:** five-symbol tier-1 summary in a research report (secondary only; underlying JSON not committed).
+- **Oct 15:** BTC tier table manually pasted/hand-checked in sleeve-fund (secondary only).
+- **Oct 21:** raw 35-tier captures for BTC/ETH/SOL/XRP (sleeve-fund).
+- **Oct 25:** raw 35-tier captures for BTC/ETH (CandleViewer).
+
+The unique symbol coverage remains:
+- Sep 29 candidate fixture: **9/47 = 19.1%**.
+- Raw Oct 21 captures: **4/47 = 8.5%**.
+- Raw Oct 25 captures: **2/47 = 4.3%**, both already within the four-symbol raw Oct 21 set.
+- Across the raw cross-project observations, unique replicated symbols remain BTC, ETH, SOL and XRP: **4/47 = 8.5%**. The new contribution is an additional independently captured date and repository for BTC/ETH, not additional symbol breadth.
+
+**Decision:** D6 evidence is stronger for four named symbols and spans more dates, but remains PARTIAL CANDIDATE EVIDENCE — NOT ACCEPTED. D5 remains unchanged. D4 remains partial/unverified. Do not import, forward-fill, or use these external fixtures for market-PnL replay without a separate provenance decision and authorization.

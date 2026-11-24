@@ -600,3 +600,29 @@ References:
 - Changelog: https://bybit-exchange.github.io/docs/changelog/v5
 
 **Conclusion:** the 2023 changelog line is an unresolved documentation anomaly, not a verified historical metadata endpoint. The historical instrument-info query hypothesis remains unproven. Do not use it to accept D4 or D5, and do not claim the endpoint never had such parameters. Resolving this requires locating the exact historical API implementation/announcement or receiving explicit authorization for a narrowly scoped public GET test of the instruments-info endpoint.
+
+
+## 20. Correction: the 2023-04-04 startTime/endTime changelog item is NOT for Get Instruments Info
+
+**Sections 18 and 19 contain a source-attribution error and must not be used as evidence for D4/D5.** The official V5 changelog source was reopened at the historical repository commit `3c9259f42468544ecad1aa7149ffdd111e0a61fe`, which contains the actual 2023-04-04 entry. It explicitly says:
+
+- `Get Order History` [UPDATE]
+  - add request param `startTime` `endTime`, effective for UTA mode
+  - add response param `placeType`, used for option
+
+The entry does **not** mention `Get Instruments Info`. The earlier attribution to instrument metadata was a misread of the changelog and is withdrawn.
+
+The later Git-history results are consistent with this correction:
+- Historical changelog file at the April 4, 2023 repository commit: https://github.com/bybit-exchange/docs/blob/3c9259f42468544ecad1aa7149ffdd111e0a61fe/docs/changelog/v5.mdx
+- The December 4, 2023 commit titled `startTime and endTime` (PR #245) changes time-range descriptions for closed PnL, executions, transaction logs, and order history; it does not change Get Instruments Info: https://github.com/bybit-exchange/docs/commit/72510bd779bec629f36faacab44db83fdb7936be
+- The February 29, 2024 changelog addition of two-year retrieval windows applies to borrow history, delivery records, and USDC settlement records, not instrument specifications: https://github.com/bybit-exchange/docs/commit/b42fcf16e647cc305b98f87e1f845a4e9d257a9c
+
+### Corrected conclusion
+
+1. There is no verified evidence in the examined official changelog or repository history that Get Instruments Info ever supported historical `startTime`/`endTime` queries.
+2. The historical instrument schema at commit `8cce6d002d126ad9a48c0584a317c37ce17ba6ce` and the current schema both omit those parameters. This is consistent with, but does not prove every historical server behavior.
+3. The prior proposed historical-query lead for D5 is closed as a false lead. No instruments-info GET was made; no new API permission is needed to close this documentation question.
+4. D5 remains `missing` for full historical acceptance. D4 remains `partial/unverified`. The existing independent evidence about recurring quantity-limit changes, schema evolution, and lifecycle gaps remains valid.
+5. **DATA GATE REMAINS BLOCKED.**
+
+This correction supersedes the factual claim and proposed follow-up in Sections 18 and 19. Those sections are retained only as an audit trail of the mistaken hypothesis and its falsification.

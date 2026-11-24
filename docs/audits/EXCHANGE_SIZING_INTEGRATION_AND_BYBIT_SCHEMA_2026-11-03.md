@@ -389,3 +389,15 @@ The H1 workflow requires three explicit repository paths: kline_dir, funding_dir
 Research CI #41623727845 — SUCCESS on e696af2f78e8ec7724d169899566c3825a9da56e (the tested code/test commit). The subsequent workflow-path/docstring-only changes are recorded separately. No market PnL backtest has been run; there are still no dated exchange snapshots or full Bybit market-history archives in the repo.
 
 Remaining execution limitations: OHLCV is now Bybit-native, but H1 limit fills still use OHLC penetration as a proxy, not order-book queue position; spread and partial-fill adverse selection are not modelled. The funding mark uses the exact-timestamp mark-candle open proxy, not a separately archived exchange settlement mark. Account-specific fee rates and account margin mode are still not configured.
+
+
+## 30. Correction: current snapshot workflow state (read-only audit, 2026-11-24)
+
+Sections 6–7 above describe an earlier workflow revision and are superseded by the current YAML on `research/market-regime-v1-main`:
+
+- `.github/workflows/bybit-instrument-snapshots.yml` and `.github/workflows/bybit-risk-limit-snapshots.yml` currently expose **only** `workflow_dispatch`; neither contains a `schedule` trigger. The earlier weekly / 3rd-and-17th cron statements are no longer true for the current branch files.
+- Both workflows accept only the `self-hosted` runner choice. They check egress geography and fail closed for US, Mainland China or unknown country, then use one configured official host (`BYBIT_API_BASE_URL`, default `https://api.bybit.com`). They do not iterate regional hosts.
+- Current workflow definitions are dormant preparation, not evidence that a runner is registered, that a snapshot was captured, or that data exists. The Research Board still records no committed dated Bybit instrument/risk snapshots or Bybit-native market archives.
+- The user’s explicit hold remains controlling: do not register/configure a self-hosted runner, dispatch these workflows, download new Bybit archives, or connect Bybit. The workflow files must not be treated as permission to bypass that hold.
+
+This correction is documentation-only. No workflow was dispatched, no network request to Bybit was made, and no data was collected.

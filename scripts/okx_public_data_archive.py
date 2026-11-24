@@ -292,6 +292,11 @@ def main(argv: list[str] | None = None) -> int:
         instruments = payload.get("data", [])
         if not isinstance(instruments, list) or len(instruments) != 1:
             raise ValueError(f"instrument endpoint returned {len(instruments) if isinstance(instruments, list) else 'invalid'} rows")
+        instrument_row = instruments[0]
+        if instrument_row.get("instId") != args.instrument:
+            raise ValueError("instrument metadata instId does not match the requested instrument")
+        if instrument_row.get("ctType") != "linear" or instrument_row.get("settleCcy") != "USDT":
+            raise ValueError("instrument metadata is not a linear USDT-settled contract")
         (root / "instrument_current.json").write_bytes(body)
         manifest["datasets"]["instrument_current"] = {
             **instrument_meta, "file": "instrument_current.json",

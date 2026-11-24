@@ -675,3 +675,34 @@ A read-only request using `category=linear&status=Closed` (and separately invers
 **D5 assessment:** even if Closed records are returned, one current response cannot reconstruct the historical sequence of mutable specification values. D5 remains `missing`.
 
 No request was made to `/v5/market/instruments-info`; existing permission remains limited to the public announcements endpoint. No market data, collector, archive, runner, PnL or execution action was performed.
+
+
+## 23. Bybit public trade-archive directory index: verified historical symbol evidence, not a complete lifecycle ledger
+
+A read-only inspection of the public Bybit archive directory index at `https://public.bybit.com/trading/` revealed that the archive retains directories for several historically delisted contracts. This is stronger evidence of historical symbol presence than a search-engine result or a third-party symbol list.
+
+Direct directory listings inspected (filenames only; no archive files were downloaded):
+- `ANCUSDT`: daily files from 2022-03-15 through 2022-05-13, plus an isolated `2022-12-12` filename. Directory: https://public.bybit.com/trading/ANCUSDT/
+- `USTUSDT`: files dated 2022-05-10 through 2022-05-13, plus an isolated `2022-12-12` filename. Directory: https://public.bybit.com/trading/USTUSDT/
+- `LUNAUSDT`: files dated 2021-10-11 through 2022-05-12, plus an isolated `2022-12-12` filename. Directory: https://public.bybit.com/trading/LUNAUSDT/
+- `CANTOUSDT`: daily files from 2024-05-23 through 2024-08-12. Directory: https://public.bybit.com/trading/CANTOUSDT/
+- The parent index itself currently lists these symbol directories, including ANCUSDT, LUNAUSDT, USTUSDT and CANTOUSDT: https://public.bybit.com/trading/
+
+The ANC and UST directory date spans align with the known May 2022 delisting notices already documented in Sections 14–15. LUNA's last contiguous daily filename is 2022-05-12, also aligned with the known emergency delisting window. These are useful cross-checks between the exchange-hosted trade archive and announcement evidence.
+
+### Important limits and anomalies
+
+1. A directory proves that the archive exposes files associated with a symbol and dates; it does not by itself prove every file is non-empty, complete, or contains a trade at the filename's date. File contents and row-level timestamps were not downloaded or inspected.
+2. The isolated `2022-12-12` filename in the ANC, UST and LUNA directories is an anomaly. It must not be interpreted as evidence that trading resumed, that the contract was relisted, or that this was the final trade. It requires row-level inspection and independent event context.
+3. A last daily filename is not an exact delisting timestamp. At best, after validating the file contents, it can bound the last observed trade date. The exchange may stop trading intraday; an empty/partial file or archive correction can also distort the apparent boundary.
+4. No published retention policy, completeness guarantee, immutable manifest, or historical symbol-universe coverage statement was found for the directory index. The absence of a directory/file cannot be treated as proof that a symbol never traded or was not listed.
+5. The public index appears to be a current directory view, not a dated snapshot of what the index contained at every historical point. It cannot independently reconstruct point-in-time membership without archived snapshots or a complete symbol-event source.
+6. The index and files are a trade-history source, not an instrument-specification source. They do not supply historical tick size, qty step, min notional, leverage/risk tiers, or other effective-dated constraints.
+
+### D4 assessment update
+
+The public Bybit trade archive is now a **verified supplementary source for historical symbol-presence evidence** and a useful cross-check against notices. It may support a partial historical universe after a separately authorized and validated metadata/indexing step. It does not close D4 because it lacks a proven complete universe, explicit lifecycle events, reliable exact transition timestamps, and a documented retention/completeness guarantee.
+
+### Permission boundary
+
+This audit inspected only public directory-index pages and their visible filenames. It did not download any `.csv.gz` market archive, fetch trade rows, create a local archive, or run a collector. No new permission is implied. The existing no-market-archive/no-collector restriction remains in force.

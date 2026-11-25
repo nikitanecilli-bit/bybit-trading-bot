@@ -1,0 +1,39 @@
+name: OKX BTC Funding Monthly Archive Capture
+
+on:
+  push:
+    branches:
+      - research/okx-public-data-loader
+    paths:
+      - scripts/okx_funding_archive_download.py
+      - .github/workflows/okx-funding-archive-download.yml
+
+permissions:
+  contents: read
+
+jobs:
+  download-public-funding-archives:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/okx-public-data-loader
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download official OKX monthly funding archives
+        run: python scripts/okx_funding_archive_download.py
+
+      - name: Upload raw ZIPs and manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: okx-btc-usdt-swap-funding-monthly-archives
+          path: data/archives/okx/funding-monthly/BTC-USDT-SWAP/
+          if-no-files-found: warn
+          retention-days: 7

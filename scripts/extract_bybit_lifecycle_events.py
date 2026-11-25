@@ -108,7 +108,13 @@ def extract_events(root: Path) -> tuple[dict, list[dict]]:
         article_title = payload.get("title") or title
         text = payload.get("content_text") or ""
         full_text = article_title + " " + text
-        symbols = sorted(set(SYMBOL_PATTERN.findall(full_text.upper())))
+        symbols = sorted(set(SYMBOL_PATTERN.findall(article_title.upper())))
+        if not symbols and is_delisting:
+            title_symbol = re.search(r"^Delisting of\\s+([A-Z0-9]+)", article_title, re.IGNORECASE)
+            if title_symbol:
+                symbols = [title_symbol.group(1).upper()]
+        if not symbols:
+            symbols = sorted(set(SYMBOL_PATTERN.findall(text.upper())))
         if not symbols:
             failures.append({"kind": "lifecycle_article_without_symbol", "url": record.get("url"), "title": article_title})
             continue

@@ -59,8 +59,23 @@ def multiset_diff(reference: Counter, candidate: Counter) -> dict:
                   for key, count in reference.items())
     extra = sum(max(count - reference.get(key, 0), 0)
                 for key, count in candidate.items())
+    def examples(counter, other):
+        out = []
+        for key, count in counter.items():
+            difference = max(count - other.get(key, 0), 0)
+            if difference:
+                out.append({
+                    "trade_time_ms": key[0], "aggressor_side": key[1],
+                    "price": str(key[2]), "quantity": str(key[3]),
+                    "unmatched_count": difference,
+                })
+            if len(out) >= 5:
+                break
+        return out
     return {"matched_rows": matched, "missing_from_cryptohftdata": missing,
             "extra_in_cryptohftdata": extra,
+            "missing_examples": examples(reference, candidate),
+            "extra_examples": examples(candidate, reference),
             "tardis_rows": sum(reference.values()),
             "cryptohftdata_rows": sum(candidate.values()),
             "match_pct_of_tardis": round(100 * matched / max(1, sum(reference.values())), 4)}
@@ -141,7 +156,13 @@ def main() -> int:
                     key = (d["trade_time"][i], side, dec(d["price"][i]),
                            dec(d["quantity"][i]))
                     candidate[key] += 1
+                ids = [str(x) for x in d["trade_id"] if x is not None]
                 item["parquet_rows"] = table.num_rows
+                item["trade_id_integrity"] = {
+                    "null_ids": len(d["trade_id"]) - len(ids),
+                    "unique_ids": len(set(ids)),
+                    "duplicate_ids": len(ids) - len(set(ids)),
+                }
                 item["comparison"] = multiset_diff(tardis_by_hour[hour], candidate)
                 item["status"] = "COMPARED"
             except Exception as exc:

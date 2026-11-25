@@ -1,0 +1,30 @@
+name: Tardis Bybit one-day sample inspection
+
+on:
+  push:
+    branches:
+      - research/market-regime-v1-main
+    paths:
+      - "scripts/inspect_tardis_bybit_sample.py"
+      - ".github/workflows/tardis-bybit-sample-inspection.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Download and validate one public Bybit sample day
+        run: python scripts/inspect_tardis_bybit_sample.py /tmp/tardis_bybit_sample_inspection.json
+      - name: Upload compact validation report only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tardis-bybit-sample-inspection
+          path: /tmp/tardis_bybit_sample_inspection.json
+          if-no-files-found: warn

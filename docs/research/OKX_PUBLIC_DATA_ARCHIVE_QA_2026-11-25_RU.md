@@ -118,3 +118,8 @@ A second cloud capture was run after the workflow was hardened to fail the job o
 - Both manifests report the same 8,760-row complete H1 grids and the same Funding coverage limitation.
 
 This is a useful repeatability check for the capture pipeline and normalized data. It does not establish exchange-side historical immutability, Funding completeness, or strategy validity.
+
+
+## Follow-up — funding archive extension (2026-11-25)
+
+The original H1 QA above recorded only the 278-row REST Funding slice and therefore marked D3 incomplete. That limitation has now been resolved for the one-year realized-rate event series by the official monthly archive. The updated decision, 1,095-row merged series, exact 21-row overlap check, formula-regime evidence, and remaining metadata boundary are recorded in [OKX_FUNDING_ARCHIVE_QA_2026-11-25_RU.md](OKX_FUNDING_ARCHIVE_QA_2026-11-25_RU.md). Use the follow-up report as the current D3 decision.

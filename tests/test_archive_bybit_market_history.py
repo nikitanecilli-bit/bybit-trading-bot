@@ -71,6 +71,8 @@ class BybitMarketHistoryTests(unittest.TestCase):
                 return FakeResponse()
 
         with tempfile.TemporaryDirectory() as tmp:
+            archive_root = Path(tmp) / "archive"
+            raw_root = archive_root / "raw_responses" / "BTCUSDT"
             records = []
             with patch(
                 "scripts.archive_bybit_market_history.urllib.request.build_opener",
@@ -79,21 +81,63 @@ class BybitMarketHistoryTests(unittest.TestCase):
                 result = _request_json(
                     "https://api.bybit.com", "/v5/market/kline",
                     {"category": "linear", "symbol": "BTCUSDT", "interval": "60"},
-                    raw_evidence_dir=tmp, raw_records=records,
+                    raw_evidence_dir=raw_root, raw_records=records,
                 )
             self.assertEqual(result["list"][0][0], "3600000")
             self.assertEqual(len(records), 1)
-            record = records[0]
-            body_path = Path(tmp) / record["body_file"]
+            trade_record = records[0]
+            body_path = raw_root / trade_record["body_file"]
             self.assertEqual(body_path.read_bytes(), body)
-            self.assertEqual(
-                hashlib.sha256(body_path.read_bytes()).hexdigest(),
-                record["body_sha256"],
-            )
-            manifest_path = Path(tmp) / "manifest.json"
+            self.assertEqual(hashlib.sha256(body_path.read_bytes()).hexdigest(), trade_record["body_sha256"])
+
+            _append_fake_raw_response(raw_root, records, "/v5/market/funding/history")
+            funding_record = records[-1]
+            _append_fake_raw_response(raw_root, records, "/v5/market/mark-price-kline")
+            mark_record = records[-1]
+
+            output_files = {
+                "funding_csv": (archive_root / "funding" / "BTCUSDT.csv",
+                                "symbol,funding_timestamp_ms,funding_rate\\nBTCUSDT,3600000,0.0001\\n"),
+                "trade_kline_csv": (archive_root / "kline" / "BTCUSDT.csv",
+                                    "symbol,timestamp_ms,open,high,low,close,volume,turnover\\nBTCUSDT,3600000,1,2,1,2,3,6\\n"),
+                "mark_price_csv": (archive_root / "mark_price" / "BTCUSDT.csv",
+                                   "symbol,timestamp_ms,open,high,low,close\\nBTCUSDT,3600000,1,2,1,2\\n"),
+            }
+            normalized_outputs = {}
+            for key, (path, content) in output_files.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+                normalized_outputs[key] = {
+                    "path": os.path.relpath(path, raw_root).replace(os.sep, "/"),
+                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                    "rows": 1,
+                }
+
+            def page(record):
+                return {
+                    "request_start_ms": 3_600_000,
+                    "request_end_ms": 3_600_000,
+                    "response_rows": 1,
+                    "first_ts": 3_600_000,
+                    "last_ts": 3_600_000,
+                    "raw_response_request_id": record["request_id"],
+                    "raw_response_body_sha256": record["body_sha256"],
+                    "raw_response_audit_file": record["audit_file"],
+                }
+
+            manifest_path = raw_root / "manifest.json"
             manifest_path.write_text(json.dumps({
                 "schema_version": 1,
                 "source": "Bybit V5 public GET raw responses",
+                "symbol": "BTCUSDT",
+                "category": "linear",
+                "interval": "60",
+                "normalized_outputs": normalized_outputs,
+                "collection_pages": {
+                    "funding": [{**page(funding_record), "complete": True, "saturated": False}],
+                    "trade_kline": [page(trade_record)],
+                    "mark_price": [page(mark_record)],
+                },
                 "records": records,
             }), encoding="utf-8")
             self.assertTrue(validate_raw_response_manifest(manifest_path)["ok"])

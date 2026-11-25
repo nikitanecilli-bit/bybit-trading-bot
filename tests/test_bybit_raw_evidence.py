@@ -72,7 +72,7 @@ class RawEvidenceTests(unittest.TestCase):
                     "page_index": 1,
                     "raw_response_request_id": record["request_id"],
                     "raw_response_body_sha256": record["body_sha256"],
-                }], capture_dir=root / "raw_evidence" / "capture-test",
+                }],
             )
             self.assertTrue(validate_evidence_manifest(manifest)["ok"])
             (root / record["body_file"]).write_bytes(body + b" ")
@@ -101,7 +101,7 @@ class RawEvidenceTests(unittest.TestCase):
                     "page_index": 1,
                     "raw_response_request_id": record["request_id"],
                     "raw_response_body_sha256": record["body_sha256"],
-                }],
+                }], capture_dir=root / "raw_evidence" / "capture-test",
             )
             report = validate_evidence_manifest(manifest)
             self.assertTrue(report["ok"], report["errors"])

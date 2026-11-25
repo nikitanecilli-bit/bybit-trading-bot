@@ -75,6 +75,28 @@ def extract_events(root: Path) -> tuple[dict, list[dict]]:
     manifest_path = root / "inventory.json"
     inventory = json.loads(manifest_path.read_text(encoding="utf-8"))
     failures = []
+    if inventory.get("complete") is not True or inventory.get("content_validation", {}).get("semantic_complete") is not True:
+        failure = {
+            "kind": "inventory_not_semantically_complete",
+            "inventory_complete": inventory.get("complete"),
+            "content_semantic_complete": inventory.get("content_validation", {}).get("semantic_complete"),
+        }
+        output = {
+            "schema_version": 1,
+            "source": "official Bybit public announcement HTML captured in inventory.json",
+            "scope": "candidate listing/delisting events; product class and event times require review",
+            "summary": {
+                "candidate_article_records_checked": 0, "event_symbol_rows": 0,
+                "unique_symbols": 0, "listing_rows": 0, "delisting_rows": 0,
+                "delistings_with_explicit_effective_time": 0,
+                "listings_confirmed_open_at_publication": 0, "proxy_matched_rows": 0,
+                "failures": 1, "out_of_scope_article_records": 0, "scope_review_required": False,
+            },
+            "events": [], "failures": [failure], "out_of_scope_articles": [],
+            "extraction_complete": False, "scope_review_required": False,
+            "historical_universe_complete": False,
+        }
+        return output, [failure]
     out_of_scope = []
     events = []
     checked = 0

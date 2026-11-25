@@ -3,7 +3,7 @@ name: Download Bybit BTCUSDT public history
 on:
   push:
     branches:
-      - research/market-regime-v1-main
+      - research/h1-volume-lookback-provenance-fix
     paths:
       - scripts/download_bybit_btcusdt_public_history.py
       - .github/workflows/download-bybit-btcusdt-public-history.yml
@@ -20,8 +20,11 @@ jobs:
       - name: Check out research branch
         uses: actions/checkout@v4
         with:
-          ref: research/market-regime-v1-main
-      - name: Download Bybit BTCUSDT H1 trade candles from official public archive
+          ref: research/h1-volume-lookback-provenance-fix
+      - name: Download limited Bybit BTCUSDT H1 gap-repair sample from official public archive
+        env:
+          START_DATE: "2023-12-01"
+          END_DATE: "2024-04-01"
         run: python scripts/download_bybit_btcusdt_public_history.py
       - name: Upload raw responses, normalized data and manifest
         if: always()

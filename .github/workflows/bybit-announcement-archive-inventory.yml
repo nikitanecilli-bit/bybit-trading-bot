@@ -5,7 +5,9 @@ on:
     branches: [research/bybit-raw-response-evidence-v1]
     paths:
       - 'scripts/collect_bybit_announcements.py'
+      - 'scripts/validate_bybit_announcement_content.py'
       - 'tests/test_collect_bybit_announcements.py'
+      - 'tests/test_validate_bybit_announcement_content.py'
       - '.github/workflows/bybit-announcement-archive-inventory.yml'
   workflow_dispatch:
 
@@ -29,7 +31,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Run offline parser and safety tests
-        run: python tests/test_collect_bybit_announcements.py
+        run: |
+          python tests/test_collect_bybit_announcements.py
+          python tests/test_validate_bybit_announcement_content.py
       - name: Collect public Bybit announcement pages only
         run: |
           python scripts/collect_bybit_announcements.py \
@@ -37,6 +41,8 @@ jobs:
             --delay 1.0 \
             --timeout 25 \
             --max-pages-per-category 100
+      - name: Validate non-empty article content and raw-body integrity
+        run: python scripts/validate_bybit_announcement_content.py --output announcement_inventory
       - name: Upload raw HTML and inventory evidence
         if: always()
         uses: actions/upload-artifact@v4

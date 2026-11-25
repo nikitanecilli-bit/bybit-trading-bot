@@ -411,7 +411,7 @@ def main() -> None:
         record["body_file"] = str(Path("raw_evidence") / stamp / record["body_file"]).replace(os.sep, "/")
         record["audit_file"] = str(Path("raw_evidence") / stamp / record["audit_file"]).replace(os.sep, "/")
         (output_root / record["audit_file"]).write_text(
-            json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+            json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
             encoding="utf-8",
         )
     evidence_manifest = output_root / f"{stamp}.evidence.json"

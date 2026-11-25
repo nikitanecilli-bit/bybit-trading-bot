@@ -542,3 +542,13 @@ Artifact `bybit-btcusdt-public-history` из GitHub Actions run `45645008915` (a
 6. Preregistration описывает Maker limit proxy и leverage model. Эти допущения не меняются в рамках данного аудита; maker fill remains optimistic and no execution edge is established.
 
 Решение: не запускать этот runner и не считать его готовым к эксперименту. Следующая безопасная задача — отдельный небольшой refactor конфигурации/validation design и unit tests, не затрагивающий торговую логику движка, затем CI. После этого повторно сверить весь runner с preregistration. Даже успешный CI не откроет PnL gate: текущий Bybit archive содержит gaps, не содержит Mark/Funding и заканчивается 2025-11-03.
+
+## 6E. Результат исправления Donchian runner (2026-11-25)
+
+После статического аудита внесены и проверены изменения в `scripts/run_h1_shared_capital_portfolio_validation.py`: volume lookback теперь равен Donchian period (D20=20, D48=48); дополнительный breakout-distance ATR-фильтр удалён из сигнального wrapper; Explore/Confirm оставляет breakout threshold только как фиксированный ноль; paired three-arm comparison требует BTCUSDT-only строки и lookbacks 20/48/48.
+
+Обновлены deterministic fixtures для BTCUSDT scope и соответствия нулевому breakout threshold. GitHub Actions `45649835753` завершился SUCCESS на commit `6082860b6be3284e890b39e841d73e55f953d1b8`; H1 runner execution gate, EMA gate, validation manifest и прочие jobs завершились успешно. Это только инженерная проверка, не рыночный тест.
+
+**Оставшийся блокер:** main path по-прежнему требует Top-5 selection manifest и старую multi-symbol provenance схему. Проверка BTCUSDT в paired summary сама по себе не создаёт работающий BTC-only runner. Нужны отдельная BTCUSDT preregistration/selection manifest схема, отдельный single-symbol route и тесты; до этого runner не запускать.
+
+**PnL gate остаётся закрыт:** официальный H1 archive имеет 4 gaps / 1,928 пропущенных баров, заканчивается 2025-11-03 и не закрывает Mark/Funding и полные исторические instrument/risk данные. Никакой PnL replay, paper или live trading не запускались.

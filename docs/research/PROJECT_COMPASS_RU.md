@@ -493,3 +493,14 @@ Read-only inspection of the frozen H1 preregistration, shared-capital runner and
 **Decision:** do not write a taker-only runner or run market PnL yet. The minimum next useful input is a user-provided, provenance-preserving BTCUSDT Bybit public-data package for one sufficiently long, genuinely unseen interval: H1 trade candles, matching H1 Mark candles, complete settled funding events, and the available dated BTC instrument/risk evidence. Include original endpoint/archive identifiers, UTC capture/download details, raw response/files and SHA-256; do not normalize away missing rows. Until such a package exists, stay in design/static-audit mode. No new API attempts, collectors, archive expansion, PnL, paper or live trading under the current scope.
 
 This audit narrows the implementation change to a possible **entry execution ablation only**; it does not establish that taker-only has positive expectancy or that the data gate is close to passing.
+
+### 2026-11-25 — статический аудит реализации Donchian(48)+EMA
+
+Проверены frozen preregistration и фактический shared-capital runner без PnL:
+- Preregistration требует volume lookback 48, runner фактически использует 20 для всех arms.
+- Runner дополнительно перебирает breakout-ATR thresholds 0 / 0.10 / 0.25; эта размерность не описана в frozen candidate rules.
+- Runner не допускает single-symbol: selection manifest требует ровно Top-5, загрузчик — минимум два инструмента. Значит, single-symbol MVP — отдельный дизайн, не конфигурация существующего runner.
+- Execution path подтверждён как maker-proxy entry + taker TP1/final exits.
+- Funding accounting использует Mark H1 open как proxy settlement mark; liquidation — position-level isolated approximation, не полная модель Bybit.
+
+**Статус:** implementation/preregistration mismatch; market PnL запрещён. Не исправлять runner молча и не переписывать preregistration задним числом. Перед будущим тестом выбрать буквальную preregistration (lookback 48, без breakout-ATR фильтра) либо зарегистрировать фактический runner как новую гипотезу. Для single-symbol — отдельный preregistered дизайн. Подробности внесены в MINIMUM_VIABLE_EDGE_VALIDATION_RU.md, раздел 6B.

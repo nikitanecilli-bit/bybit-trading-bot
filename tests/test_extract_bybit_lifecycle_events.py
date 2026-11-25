@@ -32,6 +32,8 @@ def build_fixture(title: str, published_at: str, body_text: str):
     relative = "articles/test.html"
     (root / relative).write_bytes(body)
     inventory = {
+        "complete": True,
+        "content_validation": {"semantic_complete": True},
         "article_records": [{
             "title": title,
             "url": "https://announcements.bybit.com/en/article/test",
@@ -136,6 +138,21 @@ class LifecycleExtractionTests(unittest.TestCase):
         self.assertEqual(result["events"], [])
         self.assertEqual(result["out_of_scope_articles"][0]["reason"], "product_scope_not_explicitly_perpetual")
         self.assertEqual(result["out_of_scope_articles"][0]["symbols"], ["ABCUSDT"])
+    def test_incomplete_archive_inventory_blocks_event_extraction(self):
+        tmp, root = build_fixture(
+            "Delisting of TMXUSDT Perpetual Contract",
+            "2026-10-28T09:04:42Z",
+            "Bybit will be delisting the TMXUSDT Perpetual Contract at Oct 30, 2026, 9:00AM UTC.",
+        )
+        self.addCleanup(tmp.cleanup)
+        manifest = root / "inventory.json"
+        inventory = json.loads(manifest.read_text(encoding="utf-8"))
+        inventory["complete"] = False
+        manifest.write_text(json.dumps(inventory), encoding="utf-8")
+        result, failures = extract_events(root)
+        self.assertEqual(result["events"], [])
+        self.assertFalse(result["extraction_complete"])
+        self.assertEqual(failures[0]["kind"], "inventory_not_semantically_complete")
     def test_raw_body_hash_mismatch_fails_closed(self):
         tmp, root = build_fixture(
             "Delisting of TMXUSDT Perpetual Contract",

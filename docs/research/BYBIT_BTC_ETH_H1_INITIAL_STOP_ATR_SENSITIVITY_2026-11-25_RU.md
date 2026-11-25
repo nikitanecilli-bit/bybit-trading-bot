@@ -56,16 +56,30 @@ BTC:
 All initial-stop exits in this BTC sample were losing trades. Wider stops reduce the number of initial-stop exits and shift more trades into time exits, but trailing/TP2 contribution also declines. This is not proof that simply widening the stop creates a durable edge.
 
 ## Exploratory uncertainty check
-To avoid treating a small number of profitable trades as conclusive, a moving-block bootstrap was applied to BTC trade PnLs separately within each fold and stop setting: 20,000 resamples, blocks of 5 consecutive trades, with wraparound. This preserves some local sequencing but is still only a rough diagnostic; it does not model market-path uncertainty or validate the strategy.
+A circular moving-block bootstrap was applied to BTC trade PnLs separately within each fold and stop setting: 20,000 resamples, blocks of 5 consecutive trades, wraparound, fixed seed 20261125. This preserves some local sequencing but is a rough diagnostic; it does not model market-path uncertainty or validate the strategy.
 
-At 1x costs, the 95% bootstrap interval for total fold PnL crossed zero in every fold/stop combination except Fold 2 with 3.5 ATR (approximately +112 to +2,046 USDT). At 2x costs, every fold/stop interval crossed zero. This reinforces that the apparent aggregate advantage is uncertain and that the strategy has not established a robust positive expectancy.
+At 1x costs, the 95% bootstrap interval for total fold PnL crossed zero in every fold/stop combination except Fold 2 with 3.5 ATR (approximately +112 to +2,046 USDT). At 2x costs, every fold/stop interval crossed zero. This reinforces that the apparent aggregate advantage is uncertain.
+
+## Entry-quality diagnostic (preliminary local calculation; reproducible workflow added)
+Features are measured at the signal candle close, before entry at the next candle open. For the 3.5 ATR BTC candidate, 1x costs:
+
+| Fold | Trades | Win rate | Median ATR% | Median volume ratio | Median EMA spread% | Median 6h momentum% | Median 24h momentum% | Median forward 6h return% | Median forward 32h return% |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 32 | 43.8% | 0.609 | 5.324 | 0.952 | 1.664 | 2.668 | +0.232 | -0.353 |
+| 2 | 41 | 58.5% | 0.680 | 3.765 | 1.647 | 1.981 | 2.688 | +0.031 | +0.827 |
+| 3 | 70 | 41.4% | 0.551 | 3.054 | 1.038 | 1.179 | 1.990 | -0.135 | -0.073 |
+
+Fold 3's signals had weaker preceding momentum and lower volume expansion than Fold 1/2. Median forward 6h/32h returns were also weaker. This is a description of the market period, not evidence that these features can identify future winners.
+
+Within Fold 3, 3.5 ATR winning and losing trades had very similar pre-entry medians: 6h momentum 1.033% vs 1.089%, volume ratio 2.666 vs 3.075, ATR% 0.526 vs 0.583. There is no clean one-variable separation that justifies a filter. Do not add thresholds based on this sample.
 
 ## Interpretation
-1. 3.5 ATR is the strongest of the tested BTC settings on the aggregate, including under 1.5x and 2x cost stress.
-2. The result is not robust enough for selection: BTC fold 3 remains negative at 1.5x and 2x costs for all tested stops; at 2x even the best 3.5 ATR fold 3 is -5.76%.
+1. 3.5 ATR is the strongest of the tested BTC settings on aggregate, including under 1.5x and 2x cost stress.
+2. It is not robust enough for selection: BTC Fold 3 remains negative at 1.5x and 2x costs for all tested stops; at 2x even 3.5 ATR Fold 3 is -5.76%.
 3. ETH does not reproduce the BTC result. Do not generalize 3.5 ATR to ETH.
-4. Do not promote any stop setting to live trading. These are OHLCV-only results without funding, mark-price liquidation, historical instrument specs/risk tiers, spread, and execution/fill modeling.
-5. Fold PnLs are independent 10,000 USDT-start simulations. Summed PnL is useful for comparing configurations, but must not be described as a continuous compounded equity curve.
+4. No pre-entry filter is supported by this diagnostic.
+5. Do not promote any stop setting to live trading. These are OHLCV-only results without funding, mark-price liquidation, historical instrument specs/risk tiers, spread, and execution/fill modeling.
+6. Fold PnLs are independent 10,000 USDT-start simulations. Summed PnL is useful for comparing configurations, but must not be described as a continuous compounded equity curve.
 
 ## Next research step
-Keep 3.0 and 3.5 ATR as BTC research candidates, not selected production parameters. Before further parameter search, inspect whether the persistent weak third fold reflects entry-signal quality or adverse market regime, using only pre-entry information and without adding a filter based on the same test-fold outcomes. Then validate the frozen candidate on a genuinely untouched later Bybit data period if/when an official archive covering it is available. Do not optimize ETH alongside BTC.
+Do not widen the stop further or optimize entry thresholds on these same folds. Keep 3.0 and 3.5 ATR as BTC research candidates only. Next, validate the diagnostics workflow and freeze a candidate before testing on genuinely untouched future Bybit data when available. Any filter proposal must be preregistered and evaluated on a separate untouched period. Do not optimize ETH alongside BTC.

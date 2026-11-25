@@ -1,3 +1,5 @@
+> **Follow-up:** The zero-match result applies only to the 47-symbol proxy. The same captured archive contains 106 USDT perpetual delisting notices with explicit UTC effective times, 238 USDT perpetual listing notices covering 236 distinct symbols, plus separate TradFi, Pre-IPO, USDC and inverse events. See [BYBIT_LIFECYCLE_EVENT_INVENTORY_PARTIAL_2026-11-25_RU.md](BYBIT_LIFECYCLE_EVENT_INVENTORY_PARTIAL_2026-11-25_RU.md). This is positive Bybit-specific lifecycle evidence, but it does not supply the missing starting universe or exact listing times for every symbol; D4 remains NOT ACCEPTED.
+
 # Bybit Listing/Delisting Lifecycle Scan — 47-Symbol Proxy (Partial)
 
 **Review date:** 2026-11-25  

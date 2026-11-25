@@ -219,7 +219,8 @@ def main():
         "forward_horizons_hours": [1,3,6,12,24,32],
         "cost_filter": "cost_multiplier=1.0; trade PnL labels only",
         "purpose": "descriptive entry-quality diagnostics; no feature selection",
-        "rows": len(detailed),\n        "correlation_method": "Spearman rank correlation of each pre-entry feature with net trade PnL, separately by fold and pooled; exploratory only",
+        "rows": len(detailed),
+        "correlation_method": "Spearman rank correlation of each pre-entry feature with net trade PnL, separately by fold and pooled; exploratory only",
         "limitations": ["OHLCV only", "no funding", "no mark price", "no liquidation model",
                         "no dated instrument/risk specs", "no spread or execution model"]
     }, indent=2), encoding="utf-8")

@@ -19,7 +19,7 @@ from scripts.collect_bybit_announcements import SYMBOLS, extract_article_payload
 
 SYMBOL_PATTERN = re.compile(r"(?<![A-Z0-9])([A-Z0-9]{2,30}(?:USDT|USDC|USD))(?![A-Z0-9])")
 EFFECTIVE_PATTERN = re.compile(
-    r"(?:will be delisting|will delist)[^.!?]{0,240}?\b(?:at|on)\s+"
+    r"(?:will be delisting|will delist|will be delisted)[^.!?]{0,240}?\b(?:at|on)\s+"
     r"([A-Z][a-z]{2}\s+\d{1,2},\s+\d{4},\s+\d{1,2}(?::\d{2})?\s*(?:AM|PM)\s*UTC)",
     re.IGNORECASE,
 )
@@ -110,7 +110,7 @@ def extract_events(root: Path) -> tuple[dict, list[dict]]:
         full_text = article_title + " " + text
         symbols = sorted(set(SYMBOL_PATTERN.findall(article_title.upper())))
         if not symbols and is_delisting:
-            title_symbol = re.search(r"^Delisting of\\s+([A-Z0-9]+)", article_title, re.IGNORECASE)
+            title_symbol = re.search(r"^Delisting of\s+([A-Z0-9]+)", article_title, re.IGNORECASE)
             if title_symbol:
                 symbols = [title_symbol.group(1).upper()]
         if not symbols:

@@ -1,0 +1,56 @@
+name: OKX public data cloud archive
+
+on:
+  push:
+    branches: [research/okx-public-data-loader]
+    paths:
+      - '.github/workflows/okx-public-data-cloud-archive.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  collect-public-market-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/okx-public-data-loader
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download OKX public data
+        id: download
+        shell: bash
+        run: |
+          if python scripts/okx_public_data_archive.py --days 365; then
+            echo "exit_code=0" >> "$GITHUB_OUTPUT"
+          else
+            rc=$?
+            echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+            echo "Downloader exited with code $rc; preserving diagnostic output."
+          fi
+
+      - name: Upload archive and manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: okx-btc-usdt-swap-public-archive
+          path: data/archives/okx/BTC-USDT-SWAP/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Report collection status
+        if: always()
+        run: |
+          echo "Downloader exit code: ${{ steps.download.outputs.exit_code }}"
+          if [ -f data/archives/okx/BTC-USDT-SWAP/manifest.json ]; then
+            cat data/archives/okx/BTC-USDT-SWAP/manifest.json
+          else
+            echo "No manifest was produced."
+          fi

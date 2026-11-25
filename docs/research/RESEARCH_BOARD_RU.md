@@ -440,3 +440,12 @@
 - Exact and separator-normalized symbol search found zero confirmed listing/delisting candidate articles matching the 47-symbol proxy.
 - This does not establish zero Bybit lifecycle events: the proxy is not a Bybit point-in-time universe and the four-category archive is not proven exhaustive. D4 remains NOT ACCEPTED.
 - Report: `BYBIT_LIFECYCLE_EVENT_SCAN_47_PROXY_PARTIAL_2026-11-25_RU.md`. Next requirement is a Bybit-specific historical universe before lifecycle matching.
+
+
+### 2026-11-25 — Bybit-specific lifecycle candidates recovered (Section 62)
+
+- The corrected archive scan found 238 USDT perpetual listing notices covering 236 distinct symbols, and 106 USDT perpetual delisting notices with explicit UTC effective times.
+- Separate classes were retained: 62 TradFi listings, 3 Pre-IPO listing articles (one with two symbols), 1 inverse listing, plus one USDC and one inverse delisting.
+- The 47-symbol proxy still has zero listing/delisting matches; the captured archive contains real Bybit lifecycle events for symbols outside it (e.g. TMXUSDT, AGIUSDT, ASPUSDT, IPUSDT).
+- Added offline extractor `scripts/extract_bybit_lifecycle_events.py` and regression tests. It does not invent listing effective times: “Trading is now open” is recorded as availability confirmed at publication.
+- D4 remains PARTIAL / NOT ACCEPTED because the starting universe at 2026-01-01 is missing, exact listing times are often absent, and underlying/product classification needs review. See `BYBIT_LIFECYCLE_EVENT_INVENTORY_PARTIAL_2026-11-25_RU.md`.

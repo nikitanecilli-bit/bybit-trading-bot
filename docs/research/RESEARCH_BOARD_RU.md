@@ -356,3 +356,12 @@
 - D8 fee-group endpoint describes Pro/Market Maker group fees and explicitly excludes retail from that grouped structure; updateTime is not a historical fee series.
 - No API calls, market downloads, collectors, workflows or PnL were run. No gate status changed. The ledger now distinguishes potentially retrievable D1–D3 from the historical PIT blockers D4–D6 and the limited D7/D8 evidence.
 - Independent holdout remains unavailable: CryptoFetch data through 2026-10-27 were already used; the later OKX slice is too short and cross-venue/calendar overlap is not independent temporal replication. Current status: **BLOCKED BY DATA + INDEPENDENCE**.
+
+
+### 2026-11-25 — official announcement event path for D4–D6 (acceptance ledger Section 51)
+
+- Found primary Bybit listing notices with launch/open time and initial specs (e.g. CPUSDT: tick size, max leverage, capped funding rate, 4h interval); delisting notices with exact UTC end time (SC, ASP, TMX, AGI and multi-symbol migration notices); and temporary contract adjustment notices with trading halt/resume windows and skipped funding during halt.
+- Found dated tick-size changes (Nov 20, Oct 12, Aug 11), dated max-order-size before/after tables (Nov 20, Nov 5, Nov 9), and risk-limit notices that either give before/after maximum leverage or only list affected symbols/effective time.
+- This materially improves the evidence path: D4 listing/delisting and selected halt events; D5 selected tick size, max order size, initial listing parameters and corporate-action contract-size changes; D6 selected dated leverage/risk notices.
+- Important limitation: announcements are not a complete historical spec/tier database. Many D6 notices do not include full tier ladders; D5 fields such as qtyStep/minNotional and all changes are not guaranteed; targeted search is not archive completeness.
+- Decision: D4/D5/D6 remain PARTIAL / NOT ACCEPTED. No notices downloaded or normalized into data; no API calls, collectors, workflows or PnL were run. Proposed next step is a bounded offline announcement inventory against the frozen 47-symbol Linear universe, subject to separately confirmed authorization for any automated collection.

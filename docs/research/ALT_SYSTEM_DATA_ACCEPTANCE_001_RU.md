@@ -2187,3 +2187,12 @@ Official Bybit documentation and V5 API schema were compared with the research e
 - Detailed audit and recommended implementation sequence: `BYBIT_RISK_LIMIT_MODEL_VS_OFFICIAL_RULES_GAP_AUDIT_2026-11-25_RU.md`.
 
 Decision: risk-tier calculation is a PARTIAL foundation, not a complete Bybit risk manager. Aggregate position/order risk, buffer lifecycle and account-level margin remain NOT IMPLEMENTED. No code change, public API call, account API call, order, PnL or backtest was performed for this audit.
+
+
+## 61. Listing/delisting lifecycle scan against the 47-symbol proxy (2026-11-25)
+
+The existing 1,275-article / 66-category-page announcement artifact was scanned again using dual-format body extraction (`content_html` or `content.json`) and exact/separator-normalized symbol matching. The bounded scan found **zero confirmed listing/delisting candidate articles matching the 47-symbol proxy**.
+
+This does not establish that Bybit had zero lifecycle events. The proxy is Binance-style and survivor-biased, not a Bybit point-in-time universe; the four selected categories do not prove complete historical announcement coverage; and notices can concern Spot, Alpha, TradFi, Options, Convert or derivatives. The result means this proxy cannot currently provide usable D4 coverage. Detailed scope and caveats: `BYBIT_LIFECYCLE_EVENT_SCAN_47_PROXY_PARTIAL_2026-11-25_RU.md`.
+
+**D4 remains NOT ACCEPTED.** The next valid route is to establish a Bybit-specific point-in-time universe and then reconcile product-specific listing/status/delisting events. No market/account API, orders, PnL or backtests were used.

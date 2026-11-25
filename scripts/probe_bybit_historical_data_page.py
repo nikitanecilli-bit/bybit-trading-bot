@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""Inspect Bybit's official public historical market-data page and page bundle."""
+"""Inspect Bybit's official public historical market-data catalog and list-products API."""
 import hashlib, json, re, urllib.request
 from pathlib import Path
 from html.parser import HTMLParser
 
 BASE="https://www.bybit.com"
 URL=BASE+"/en/derivative-activity/history-data"
-HEADERS={"User-Agent":"Mozilla/5.0 (compatible; bybit-public-data-research/1.2)","Accept":"text/html,application/javascript,*/*"}
+HEADERS={"User-Agent":"Mozilla/5.0 (compatible; bybit-public-data-research/1.3)","Accept":"text/html,application/javascript,application/json,*/*","Referer":URL,"Origin":BASE}
 
 def get(url):
     req=urllib.request.Request(url,headers=HEADERS)
     with urllib.request.urlopen(req,timeout=60) as response:
-        return response.status,response.read()
+        return response.status,response.read(),dict(response.headers)
 
-status,raw=get(URL)
+status,raw,_=get(URL)
 html=raw.decode("utf-8",errors="replace")
 
 class Tags(HTMLParser):
@@ -28,16 +28,28 @@ p=Tags(); p.feed(html)
 page_scripts=[x for x in p.scripts if "pages/history-data-" in x]
 bundles=[]
 for path in page_scripts:
-    js_status,js_raw=get(BASE+path)
+    js_status,js_raw,_=get(BASE+path)
     js=js_raw.decode("utf-8",errors="replace")
     strings=[]
+    contexts=[]
     for m in re.finditer(r'"([^"]{1,400})"',js):
         value=m.group(1)
         if re.search(r'api/|/v[0-9]/|history.?data|data.?product|download|funding|mark.?price|premium',value,re.I) and value not in strings:
             strings.append(value)
-    bundles.append({"path":path,"status":js_status,"bytes":len(js_raw),"sha256":hashlib.sha256(js_raw).hexdigest(),"matches":strings[:400],"snippet":js[:1000]})
+    for endpoint in ("/quote/public/support/download/list-products","/quote/public/support/download/list-options","/quote/public/support/download/list-files"):
+        pos=js.find(endpoint)
+        if pos>=0: contexts.append({"endpoint":endpoint,"context":js[max(0,pos-1400):pos+1800]})
+    bundles.append({"path":path,"status":js_status,"bytes":len(js_raw),"sha256":hashlib.sha256(js_raw).hexdigest(),"matches":strings[:400],"contexts":contexts})
 
-result={"url":URL,"http_status":status,"html_bytes":len(raw),"html_sha256":hashlib.sha256(raw).hexdigest(),"scripts":p.scripts,"page_scripts":page_scripts,"links":p.links[:120],"bundles":bundles}
+api_probe=[]
+for path in ("/quote/public/support/download/list-products","/quote/public/support/download/list-options","/quote/public/support/download/list-files"):
+    try:
+        st,data,headers=get(BASE+path)
+        api_probe.append({"path":path,"status":st,"headers":{k:v for k,v in headers.items() if k.lower() in ("content-type","content-length","server")},"body":data.decode("utf-8",errors="replace")[:5000]})
+    except Exception as e:
+        api_probe.append({"path":path,"error":repr(e)})
+
+result={"url":URL,"http_status":status,"html_bytes":len(raw),"html_sha256":hashlib.sha256(raw).hexdigest(),"scripts":p.scripts,"page_scripts":page_scripts,"links":p.links[:120],"bundles":bundles,"api_probe":api_probe}
 Path("bybit_history_page_probe").mkdir(exist_ok=True)
 Path("bybit_history_page_probe/result.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
 print(json.dumps(result,indent=2))

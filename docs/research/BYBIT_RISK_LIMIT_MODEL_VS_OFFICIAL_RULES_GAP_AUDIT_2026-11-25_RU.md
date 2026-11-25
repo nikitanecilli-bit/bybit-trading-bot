@@ -33,6 +33,7 @@ Relevant files:
 
 Existing foundations:
 - Decimal-based risk-tier parsing and point-in-time snapshot selection.
+- The public risk-limit snapshot collector paginates the V5 endpoint, records page-level request times/symbols/tier counts, validates tier monotonicity and the maintenance-margin deduction recurrence, and writes point-in-time snapshots.
 - Dated tier snapshots can be joined with dated instrument specifications.
 - Entry sizing can reject missing/stale tier data, position value above the highest tier, or leverage above the selected tier's maximum.
 - Initial margin and maintenance margin are calculated from tier MMR, IMR, maximum leverage and maintenance-margin deduction.

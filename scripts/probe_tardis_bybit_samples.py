@@ -61,9 +61,7 @@ def main() -> int:
             year, month, day = date.split("-")
             url = f"{BASE}/{dataset}/{year}/{month}/{day}/{symbol}.csv.gz"
             head = request_once(url, "HEAD")
-            ranged = request_once(url, "GET") if head.get("status") == 200 else {
-                "status": "skipped_after_head_failure", "bytes_read": 0
-            }
+            ranged = request_once(url, "GET")  # HEAD support is not assumed by the dataset host
             results.append({"date": date, "symbol": symbol, "dataset": dataset, "url": url,
                             "head": head, "range_get": ranged})
     pairs = {}

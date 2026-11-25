@@ -1,0 +1,33 @@
+name: Download Bybit BTCUSDT public history
+
+on:
+  push:
+    branches:
+      - research/market-regime-v1-main
+    paths:
+      - scripts/download_bybit_btcusdt_public_history.py
+      - .github/workflows/download-bybit-btcusdt-public-history.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/market-regime-v1-main
+      - name: Download Bybit BTCUSDT H1, Mark and funding history
+        run: python scripts/download_bybit_btcusdt_public_history.py
+      - name: Upload raw responses, normalized data and manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bybit-btcusdt-public-history
+          path: bybit_btcusdt_initial/
+          if-no-files-found: warn
+          retention-days: 30

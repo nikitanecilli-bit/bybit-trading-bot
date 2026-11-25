@@ -55,6 +55,11 @@ BTC:
 
 All initial-stop exits in this BTC sample were losing trades. Wider stops reduce the number of initial-stop exits and shift more trades into time exits, but trailing/TP2 contribution also declines. This is not proof that simply widening the stop creates a durable edge.
 
+## Exploratory uncertainty check
+To avoid treating a small number of profitable trades as conclusive, a moving-block bootstrap was applied to BTC trade PnLs separately within each fold and stop setting: 20,000 resamples, blocks of 5 consecutive trades, with wraparound. This preserves some local sequencing but is still only a rough diagnostic; it does not model market-path uncertainty or validate the strategy.
+
+At 1x costs, the 95% bootstrap interval for total fold PnL crossed zero in every fold/stop combination except Fold 2 with 3.5 ATR (approximately +112 to +2,046 USDT). At 2x costs, every fold/stop interval crossed zero. This reinforces that the apparent aggregate advantage is uncertain and that the strategy has not established a robust positive expectancy.
+
 ## Interpretation
 1. 3.5 ATR is the strongest of the tested BTC settings on the aggregate, including under 1.5x and 2x cost stress.
 2. The result is not robust enough for selection: BTC fold 3 remains negative at 1.5x and 2x costs for all tested stops; at 2x even the best 3.5 ATR fold 3 is -5.76%.

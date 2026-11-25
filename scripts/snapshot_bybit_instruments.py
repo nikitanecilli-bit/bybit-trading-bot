@@ -359,9 +359,10 @@ def main() -> None:
     collection_pages: list[dict[str, Any]] = []
     collection_started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     output_root = Path(args.output_dir) / args.category
-    pending_dir = output_root / "raw_evidence" / "pending"
-    if pending_dir.exists():
-        raise FileExistsError(f"unfinished raw evidence capture exists: {pending_dir}")
+    capture_id = collection_started_at.replace(":", "-").replace(".", "-")
+    capture_dir = output_root / "raw_evidence" / f"capture-{capture_id}"
+    if capture_dir.exists():
+        raise FileExistsError(f"raw evidence capture path already exists: {capture_dir}")
 
     def fetch(cursor: str | None, status: str):
         page_counts[status] = page_counts.get(status, 0) + 1
@@ -369,7 +370,7 @@ def main() -> None:
         before = len(raw_records)
         page, next_cursor = _request_page(
             args.base_url, args.category, cursor, status=status,
-            raw_evidence_dir=pending_dir,
+            raw_evidence_dir=capture_dir,
             raw_records=raw_records,
         )
         record = raw_records[-1] if len(raw_records) > before else None
@@ -387,7 +388,6 @@ def main() -> None:
             time.sleep(args.pause)
         return page, next_cursor
 
-    collection_started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     rows = fetch_all_instruments(args.category, fetch)
     snapshot = build_snapshot(
         rows, args.category, collection_started_at=collection_started_at,
@@ -401,7 +401,7 @@ def main() -> None:
     evidence_manifest = finalize_snapshot_evidence(
         output_root, stamp, source="Bybit V5 GET /v5/market/instruments-info",
         category=args.category, normalized_output=output, records=raw_records,
-        collection_pages=collection_pages,
+        collection_pages=collection_pages, capture_dir=capture_dir,
     )
     print(f"Saved {len(rows)} {args.category} instruments to {output}; evidence: {evidence_manifest}")
 

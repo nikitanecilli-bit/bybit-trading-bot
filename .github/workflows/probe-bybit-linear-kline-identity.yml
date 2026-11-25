@@ -1,0 +1,33 @@
+name: Verify Bybit BTCUSDT H1 archive identity
+
+on:
+  push:
+    branches:
+      - research/market-regime-v1-main
+    paths:
+      - scripts/probe_bybit_linear_kline_identity.py
+      - .github/workflows/probe-bybit-linear-kline-identity.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/market-regime-v1-main
+      - name: Compare Bybit linear trades with Bybit MT4 H1 archive
+        run: python scripts/probe_bybit_linear_kline_identity.py
+      - name: Upload identity comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bybit-linear-kline-identity-probe
+          path: bybit_linear_identity_probe/
+          if-no-files-found: warn
+          retention-days: 30

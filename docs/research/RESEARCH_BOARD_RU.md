@@ -423,3 +423,12 @@
 - Two January maximum-order-size notices conflict internally: titles/publication point to 2026, body text states 2025 effective dates. Preserved but quarantined; no silent date correction.
 - Detailed tables, effective timestamps, source URLs and raw body hashes: `BYBIT_DATED_PERPETUAL_PARAMETER_EVENTS_EXPANDED_PARTIAL_2026-11-25_RU.md`. The earlier parameter-event document is marked superseded.
 - D5 remains NOT ACCEPTED: this is partial historical parameter evidence, not a complete instrument-specification history. D6 remains NOT ACCEPTED: maximum order sizes and leverage notices are not risk-tier ladders. No trading, PnL or backtests.
+
+
+### 2026-11-25 — Bybit risk-limit mechanics vs engine gap audit (Section 60)
+
+- Official Help Center rules specify effective position value as max(long position + long open orders, short position + short open orders), excluding Reduce-only and Close-on-Trigger orders; Mark Price can move a position between tiers in real time. Official V5 public GET risk-limit schema includes riskLimitValue, IMR, MMR, maxLeverage and mmDeduction.
+- The engine already has dated tier snapshots, Decimal tier selection, single-position Mark-Price MM and liquidation components.
+- Confirmed missing: aggregate position + active-order risk value, order classification, aggregate cap enforcement, the 10-day risk-parameter change buffer state machine, and cross/portfolio account-level margin.
+- Full gap audit: `BYBIT_RISK_LIMIT_MODEL_VS_OFFICIAL_RULES_GAP_AUDIT_2026-11-25_RU.md`. This is a research/backtest simulator gap analysis, not a live execution finding.
+- No code change, public API request, private/account API, orders, PnL or backtests were run.

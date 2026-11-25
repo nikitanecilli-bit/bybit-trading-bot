@@ -15,15 +15,24 @@ from decimal import Decimal, InvalidOperation
 from statistics import median
 from pathlib import Path
 import sys
+import os
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bybit_l2_queue_replay import strict_int
 from report_io import write_json_report
 
-URL = "https://quote-saver.bycsi.com/orderbook/linear/AAVEUSDT/2025-09-02_AAVEUSDT_ob200.data.zip"
-TRADES_URL = "https://public.bybit.com/trading/AAVEUSDT/AAVEUSDT2025-09-02.csv.gz"
-SYMBOL = "AAVEUSDT"
+SYMBOL = os.getenv("SYMBOL", "AAVEUSDT").upper()
+TRADE_DATE = os.getenv("TRADE_DATE", "2025-09-02")
+DEPTH = int(os.getenv("ORDERBOOK_DEPTH", "200"))
+URL = os.getenv(
+    "ORDERBOOK_URL",
+    f"https://quote-saver.bycsi.com/orderbook/linear/{SYMBOL}/{TRADE_DATE}_{SYMBOL}_ob{DEPTH}.data.zip",
+)
+TRADES_URL = os.getenv(
+    "TRADES_URL",
+    f"https://public.bybit.com/trading/{SYMBOL}/{SYMBOL}{TRADE_DATE.replace('-', '')}.csv.gz",
+)
 CHUNK = 1024 * 1024
 
 

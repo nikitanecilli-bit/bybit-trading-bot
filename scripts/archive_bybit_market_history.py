@@ -714,7 +714,7 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
     raw_manifest_path.parent.mkdir(parents=True, exist_ok=True)
     _atomic_write_bytes(
         raw_manifest_path,
-        (json.dumps(raw_manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\\n").encode("utf-8"),
+        (json.dumps(raw_manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8"),
     )
     raw_validation = validate_raw_response_manifest(raw_manifest_path)
     if not raw_validation["ok"]:

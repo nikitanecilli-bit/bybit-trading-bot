@@ -1819,3 +1819,110 @@ Self-hosted runner и новые collectors остаются запрещены 
 Не выбирать другие старые folds, не делать временной split внутри уже использованных архивов и не подменять независимость сменой venue при совпадающем календарном периоде. Не переписывать holdout script и не трогать workflow.
 
 **Исследовательский статус остаётся BLOCKED BY DATA + INDEPENDENCE.** Следующее событие, которое действительно меняет статус: появление разрешённого, воспроизводимого Bybit-native набора с provenance и достаточным новым временным окном либо предоставление такого набора пользователем. После этого отдельно проверяются lifecycle, funding completeness, specs/risk effective-time и пригодность периода до любого PnL.
+
+
+## 50. Повторная проверка официальных публичных источников: D1–D8 и пределы исторического покрытия (2026-11-25)
+
+### 50.1. D1 — Linear trade OHLCV: исторический REST endpoint есть, максимальная глубина не специфицирована
+
+Официальная документация: [Get Kline](https://bybit-exchange.github.io/docs/v5/market/kline).
+
+- Endpoint: `GET /v5/market/kline`, категория `linear`, интервал `60` для H1.
+- Можно задавать `start` и `end`; максимальный размер одной страницы — 1,000 свечей.
+- Ответ отсортирован по времени открытия свечи в обратном порядке.
+- Для одного инструмента и одного непрерывного года H1 это ориентировочно 8,760 строк, то есть минимум 9 страниц при лимите 1,000 (без учёта дополнительных проверочных запросов).
+- Документация не устанавливает гарантированный срок хранения/максимальную историческую глубину. Наличие параметров start/end не доказывает, что любая дата доступна и что выдача полна.
+
+**Вывод:** D1 — потенциально закрываемый публичным REST источником для ограниченного инструмента/периода. Требуются фактические raw responses, полная сетка timestamp, OHLC invariants и проверка границ. Сейчас D1 NOT ACCEPTED: данные не загружены.
+
+### 50.2. D2 — Mark Price: исторический REST endpoint есть, но это не tick-level mark
+
+Официальная документация: [Get Mark Price Kline](https://bybit-exchange.github.io/docs/v5/market/mark-kline).
+
+- Endpoint: `GET /v5/market/mark-price-kline`; для Linear доступны те же H1 интервалы и start/end границы.
+- Максимум — 1,000 свечей на страницу; ответ отсортирован по времени открытия.
+- Это Mark Price OHLC candles, а не непрерывная история каждого изменения Mark Price внутри H1.
+- Документированная максимальная глубина хранения отсутствует.
+
+**Вывод:** D2 потенциально закрываем для H1 Mark-candle valuation при совпадающем периоде D1. Этого недостаточно для заявлений о tick-accurate liquidation или intrabar mark-trigger execution. D2 NOT ACCEPTED: фактического архива нет.
+
+### 50.3. D3 — Funding: история settlements доступна, но пагинация и regime metadata требуют отдельного контроля
+
+Официальная документация: [Get Funding Rate History](https://bybit-exchange.github.io/docs/v5/market/history-fund-rate).
+
+- Endpoint: `GET /v5/market/funding/history`; для Linear обязательны category и symbol.
+- Максимум — 200 settlement records на страницу.
+- API отдельно предупреждает, что у символов могут быть разные funding intervals. Интервал предлагается получать через Instruments Info, то есть через текущие спецификации.
+- Если передать только startTime, API возвращает ошибку; endTime без startTime возвращает до 200 событий к указанной границе; без обоих параметров — до 200 последних событий.
+- Документация не обещает максимальную глубину хранения и не предоставляет effective-time историю интервалов или версий funding formula.
+
+Для BTC с постоянным интервалом 8h ориентир составил бы около 1,095 событий в год, примерно 6 страниц при лимите 200. Это только арифметическая оценка для такого интервала, не подтверждение фактического расписания или полноты.
+
+**Вывод:** D3 можно потенциально собрать по фактическим settlement events, но interval/formula history должны быть отдельными сущностями. Реальные опубликованные ставки нельзя пересчитывать по новой формуле задним числом. D3 NOT ACCEPTED: архива и доказательства полноты нет.
+
+### 50.4. D4 — lifecycle/universe: публичный current endpoint не даёт историческую последовательность статусов
+
+Официальная документация [Get Instruments Info](https://bybit-exchange.github.io/docs/v5/market/instrument) описывает запущенные инструменты и текущие статусы/поля. В схеме присутствуют статусы PreLaunch, Trading, Settling, Delivering и Closed, но endpoint не предлагает запрос состояния universe на произвольную историческую дату.
+
+Набор текущих записей со статусом Closed не восстанавливает все прошлые переходы, intraday suspend/resume, момент фактической доступности для торговли и полный состав уже исчезнувших контрактов.
+
+**Вывод:** D4 не закрывается разовой выгрузкой текущего instruments-info. Нужны датированные последовательные наблюдения/первичные listing-delisting announcements и доказуемая реконструкция переходов. D4 PARTIAL / NOT ACCEPTED.
+
+### 50.5. D5 — instrument specs: известны текущие значения и некоторые периодические изменения, но не вся effective-time история
+
+Документация Instruments Info прямо предупреждает, что maxLimitOrderQty, maxMarketOrderQty и postOnlyMaxLimitOrderSize корректируются дважды в месяц — 3-го и 17-го числа в 08:00 UTC+8. Это доказывает, что некоторые параметры изменяются по расписанию; оно не даёт всех прошлых значений и не заменяет историю tickSize, qtyStep, minNotional и остальных execution filters по каждому символу.
+
+**Вывод:** регулярный snapshot может накапливать будущую историю, но не восстанавливает автоматически прошлое. Известные сторонние snapshots остаются частичными и не принимаются. D5 PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED.
+
+### 50.6. D6 — risk tiers: endpoint возвращает текущую таблицу, не архив effective-time
+
+Официальная документация [Get Risk Limit](https://bybit-exchange.github.io/docs/v5/market/risk-limit) описывает текущие таблицы risk limits; для Linear выдаётся 15 символов на страницу с cursor pagination. В ответе есть tier IDs, position limits, initial/maintenance margin и max leverage, но endpoint не документирует исторический запрос tier table на дату.
+
+Кроме того, исторический account-applied tier зависит от позиции/активных ордеров и состояния аккаунта; публичная таблица биржи сама по себе не восстанавливает индивидуальный applied tier.
+
+**Вывод:** D6 можно регулярно фиксировать вперёд для будущего времени, но нельзя считать текущую таблицу исторической. D6 PARTIAL CANDIDATE EVIDENCE / NOT ACCEPTED.
+
+### 50.7. D7 — архивные сделки: официальный lead найден, но не доказан как полноценный L2 источник
+
+В официальной документации [Get Recent Public Trades](https://bybit-exchange.github.io/docs/v5/market/recent-trade) прямо сказано, что архивные исторические сделки можно скачать с сайта Bybit. Endpoint recent-trade сам по себе возвращает ограниченную страницу, максимум 1,000 записей для контрактных категорий.
+
+Официальная страница [Historical data download](https://www.bybit.com/en/derivative-activity/history-data) открывается и показывает каталог Data products, но доступный текстовый просмотр не раскрывает inventory конкретных файлов, глубину дат, символы, частоту или контрольные суммы.
+
+Следовательно:
+- официальный lead на архив исторических сделок существует;
+- это потенциальный материал для самостоятельной агрегации trade OHLCV, только если будут подтверждены полнота, timestamps, coverage и отсутствие пропущенных файлов;
+- наличие trade archive не доказывает наличие Mark Price, Funding settlements, L2 snapshots/deltas или очереди заявок;
+- maker fill / queue replay на основании одного trade archive не принимается.
+
+**Вывод:** D7 остаётся DEFERRED / NOT ACCEPTED. Не скачивать архив и не собирать данные без отдельного разрешения.
+
+### 50.8. D8 — fees: публичный fee-group endpoint не является историческим retail fee schedule
+
+Официальная документация [Get Fee Group Structure](https://bybit-exchange.github.io/docs/v5/market/fee-group-info) описывает групповые ставки Pro-level и Market Maker; документация отдельно говорит, что новый grouped fee structure не применяется к retail traders. В ответе есть updateTime, то есть timestamp последнего обновления доступной структуры, а не архив всех прошлых ставок.
+
+Публичная текущая ставка не доказывает историческую ставку конкретного аккаунта. Для исследовательского taker-only сценария можно заранее задать консервативную явно маркированную базовую ставку и stress cases, если это разрешено спецификацией эксперимента; такой сценарий не следует выдавать за фактическую историческую комиссию пользователя. Для maker claims D7 и отдельное подтверждение fee/fill assumptions остаются обязательными.
+
+**Вывод:** D8 может быть ограничен прозрачным fee scenario для исследовательского расчёта, но фактическая историческая retail/account fee series не установлена. D8 NOT ACCEPTED как исторический источник.
+
+### 50.9. Независимый период и реальный путь закрытия блокера
+
+- CryptoFetch proxy заканчивается не позднее 2026-10-27 и уже использован в E01–E13; никакой новый split внутри этого архива не становится независимым.
+- OKX archive, который ранее был проверен, имеет лишь около 29 дней после конца CryptoFetch на дату этого аудита. Это не создаёт независимый годовой holdout; venue change при совпадающем календарном периоде — cross-venue robustness, а не untouched temporal replication.
+- Новый будущий период может стать независимым только после заморозки гипотезы, правил и критериев и при условии, что сбор данных будет отдельно разрешён и воспроизводимо зафиксирован. Одного факта, что календарная дата позже 2026-10-27, недостаточно: нужно заранее определить длительность/достаточность выборки и не смотреть outcomes до завершения Confirm.
+- Официальный архив сделок — lead для последующего read-only review интерфейса и метаданных, но не готовый substitute для D1–D6.
+- Существующий user authorization scope не расширяется этим аудитом: никаких новых Bybit API calls, скачивания market archives, запуска collectors/workflows или PnL/backtests.
+
+### Итоговая матрица
+
+| Gate | Что реально существует публично | Что остаётся неизвестным/непринятым | Статус |
+|---|---|---|---|
+| D1 OHLCV | Historical REST candles, 1,000/page | Retention/completeness, raw archive | NOT ACCEPTED |
+| D2 Mark | Historical Mark candles, 1,000/page | Retention/completeness, intrabar mark | NOT ACCEPTED |
+| D3 Funding | Historical settlement events, 200/page | Full history, historical interval/formula regime | NOT ACCEPTED |
+| D4 Lifecycle | Current instrument statuses | Full PIT transitions/universe | PARTIAL / NOT ACCEPTED |
+| D5 Specs | Current specs, known scheduled field updates | Full per-symbol effective-time history | PARTIAL / NOT ACCEPTED |
+| D6 Risk tiers | Current paginated risk tables | Historical tiers and account-applied tier | PARTIAL / NOT ACCEPTED |
+| D7 Trades/L2 | Official archived-trades lead | File coverage, L2/sequence/queue history | DEFERRED / NOT ACCEPTED |
+| D8 Fees | Current grouped Pro/MM fee information | Historical retail/account-specific fees | NOT ACCEPTED |
+
+**Решение:** не писать ещё один downloader и не переписывать runner. Основной технический вопрос теперь не «можем ли мы вызвать API», а «есть ли разрешённый, достаточно полный, воспроизводимый и независимый исторический период». Исследовательский статус остаётся **BLOCKED BY DATA + INDEPENDENCE**.

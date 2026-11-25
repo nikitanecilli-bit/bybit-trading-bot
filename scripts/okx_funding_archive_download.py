@@ -327,3 +327,5 @@ if __name__ == "__main__":
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         raise SystemExit(1)
+
+# Trigger final merged funding capture after the merge logic update.

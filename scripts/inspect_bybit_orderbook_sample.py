@@ -12,6 +12,7 @@ import zipfile
 from collections import Counter
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from statistics import median
 from pathlib import Path
 import sys
 
@@ -78,6 +79,34 @@ def parse_event_integer_fields(event: dict) -> tuple[int, int | None, int, int]:
     return ts, cts, seq, update_id
 
 
+def summarize_integer_offsets(values: list[int]) -> dict:
+    """Summarize signed millisecond offsets without inferring clock correction."""
+    if not values:
+        return {
+            "count": 0, "min_ms": None, "max_ms": None, "mean_ms": None,
+            "median_ms": None, "p95_ms": None, "p99_ms": None,
+            "positive_count": 0, "zero_count": 0, "negative_count": 0,
+        }
+    ordered = sorted(values)
+
+    def nearest_rank(percent: int) -> int:
+        index = max(0, (len(ordered) * percent + 99) // 100 - 1)
+        return ordered[index]
+
+    return {
+        "count": len(values),
+        "min_ms": ordered[0],
+        "max_ms": ordered[-1],
+        "mean_ms": round(sum(values) / len(values), 3),
+        "median_ms": median(ordered),
+        "p95_ms": nearest_rank(95),
+        "p99_ms": nearest_rank(99),
+        "positive_count": sum(value > 0 for value in values),
+        "zero_count": sum(value == 0 for value in values),
+        "negative_count": sum(value < 0 for value in values),
+    }
+
+
 def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
     event_types = Counter()
     ts_min = ts_max = cts_min = cts_max = None
@@ -85,6 +114,9 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
     nonmonotonic_ts = nonmonotonic_seq = duplicate_ts = 0
     cts_missing = u_reset_count = 0
     first_events, last_events = [], []
+    ts_cts_offsets = []
+    offset_segments = {}
+    first_cts_for_segments = None
     max_bid_levels = max_ask_levels = 0
     first_snapshot = None
     book_bids, book_asks = {}, {}
@@ -129,6 +161,13 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
                 u_reset_count += 1
             if cts is None:
                 cts_missing += 1
+            else:
+                ts_cts_offsets.append(ts - cts)
+                if first_cts_for_segments is None:
+                    first_cts_for_segments = cts
+                segment = max(0, (cts - first_cts_for_segments) // (6 * 3_600_000))
+                bucket = offset_segments.setdefault(int(segment), [])
+                bucket.append(ts - cts)
 
             bids, asks = data.get("b"), data.get("a")
             if kind == "delta" and first_snapshot is None:
@@ -199,6 +238,11 @@ def inspect_member(zf: zipfile.ZipFile, member: str) -> dict:
         "nonmonotonic_cross_sequence_count": nonmonotonic_seq,
         "update_id_reset_count": u_reset_count,
         "missing_cts_count": cts_missing,
+        "ts_minus_cts_offset_ms": summarize_integer_offsets(ts_cts_offsets),
+        "ts_minus_cts_by_six_hour_segment_ms": {
+            str(segment): summarize_integer_offsets(values)
+            for segment, values in sorted(offset_segments.items())
+        },
         "max_snapshot_bid_levels": max_bid_levels,
         "max_snapshot_ask_levels": max_ask_levels,
         "first_snapshot": first_snapshot,

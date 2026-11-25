@@ -473,7 +473,9 @@ def load_frozen_selection_manifest(environ=None):
     if payload.get("schema_version") != 1 or payload.get("selection_protocol") != protocol:
         raise SystemExit(f"Unsupported H1 selection manifest schema/protocol for {selection_mode}")
     if payload.get("selection_status") != "ok":
-        raise SystemExit("H1 selection manifest is not successful; refusing validation")
+        if selection_mode == "top5":
+            raise SystemExit("H1 selection manifest has no valid top-five set; refusing validation")
+        raise SystemExit("BTC single-symbol selection manifest is not successful; refusing validation")
     strategy_config = payload.get("strategy_config")
     if not isinstance(strategy_config, dict) or strategy_config.get("direction") != "long_only":
         raise SystemExit("H1 runner is long-only; selection manifest must explicitly declare strategy_config.direction=long_only")

@@ -177,6 +177,13 @@ class BybitMarketHistoryTests(unittest.TestCase):
                            raw_evidence_dir=None, raw_records=None, audit_pages=None):
                 mark_requests.append((start_ms, end_ms, interval))
                 _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/mark-price-kline")
+                audit_pages.append({
+                    "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
+                    "response_rows": 2, "first_ts": hour, "last_ts": hour * 2,
+                    "raw_response_request_id": raw_records[-1]["request_id"],
+                    "raw_response_body_sha256": raw_records[-1]["body_sha256"],
+                    "raw_response_audit_file": raw_records[-1]["audit_file"],
+                })
                 return [
                     {
                         "symbol": symbol, "timestamp_ms": hour,
@@ -191,6 +198,13 @@ class BybitMarketHistoryTests(unittest.TestCase):
             def fake_trade(symbol, start_ms, end_ms, interval, *, base_url, pause,
                            raw_evidence_dir=None, raw_records=None, audit_pages=None):
                 _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/kline")
+                audit_pages.append({
+                    "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
+                    "response_rows": 1, "first_ts": hour, "last_ts": hour,
+                    "raw_response_request_id": raw_records[-1]["request_id"],
+                    "raw_response_body_sha256": raw_records[-1]["body_sha256"],
+                    "raw_response_audit_file": raw_records[-1]["audit_file"],
+                })
                 return [candle]
 
             candle = {

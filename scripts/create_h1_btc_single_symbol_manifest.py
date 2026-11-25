@@ -61,9 +61,9 @@ def build_manifest(*, kline_dir, funding_dir, mark_price_dir, instrument_specs_d
         "universe_snapshot": [_file_manifest_record(universe_path)],
     }
     for key in ("kline", "funding", "mark_price"):
-        rows = input_files[key]
-        if len(rows) != 1 or Path(rows[0]["path"]).stem != "BTCUSDT":
-            raise SystemExit(f"{key} archive must contain exactly BTCUSDT data")
+        csv_rows = [row for row in input_files[key] if Path(row["path"]).suffix.lower() == ".csv"]
+        if len(csv_rows) != 1 or Path(csv_rows[0]["path"]).stem != "BTCUSDT":
+            raise SystemExit(f"{key} archive must contain exactly one BTCUSDT CSV")
     for key in ("instrument_specs", "risk_tiers"):
         if not input_files[key]:
             raise SystemExit(f"Missing dated Bybit {key} archive")

@@ -322,3 +322,5 @@
 - Current contract snapshot confirms linear BTC-USDT-SWAP, ctVal 0.01 BTC, USDT settlement, tick 0.1, lot/min 0.01. This is not historical effective-time evidence; D5 remains open. D4/D6/D8 remain unaccepted.
 - This establishes an OKX public H1 data source for one instrument, not Bybit execution evidence and not an independent calendar-time holdout. No PnL/backtest was run or authorized.
 - Full audit: [OKX_PUBLIC_DATA_ARCHIVE_QA_2026-11-25_RU.md](OKX_PUBLIC_DATA_ARCHIVE_QA_2026-11-25_RU.md).
+
+- Follow-up official-doc review: OKX's standard Funding History API is limited to three months, but the official historical-data portal advertises perpetual Funding from March 2022 and the official API changelog records a separate public historical-market-data query capability with funding module support. This is a promising D3 lead, not yet retrieved or accepted; using it requires a separate scope decision. Current `upcChg` means upcoming instrument changes, not a past effective-time history. Account fee endpoint requires authentication and remains out of scope. No further API calls/downloads were made.

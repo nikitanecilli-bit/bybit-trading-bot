@@ -8,7 +8,7 @@ from pathlib import Path
 
 DATE, HOUR, SYMBOL = "2026-11-01", "12", "BTCUSDT"
 TARDIS_URL = "https://datasets.tardis.dev/v1/bybit/incremental_book_L2/2026/11/01/BTCUSDT.csv.gz"
-CHD_URL = "https://api.cryptohftdata.com/download?file=bybit%2F2026-11-01%2F12%2FBTCUSDT_orderbook.parquet"
+CHD_URLS = {hour: "https://api.cryptohftdata.com/download?file=" + f"bybit%2F2026-11-01%2F{hour}%2FBTCUSDT_orderbook.parquet" for hour in ("12", "13")}
 START = int(datetime.fromisoformat(f"{DATE}T{HOUR}:00:00+00:00").timestamp() * 1000)
 END = START + 3600000
 
@@ -41,9 +41,8 @@ def main():
               "scope": "exact multiset comparison of L2 updates by message timestamp, side, price and absolute quantity; snapshots excluded; no PnL",
               "raw_archives_uploaded": False}
     with tempfile.TemporaryDirectory(prefix="bybit-l2-crosscheck-") as tmp:
-        root = Path(tmp); tp = root / "tardis.csv.gz"; cp = root / "chd.parquet"
+        root = Path(tmp); tp = root / "tardis.csv.gz"
         report["tardis_download"] = download(TARDIS_URL, tp, 100*1024*1024)
-        report["cryptohftdata_download"] = download(CHD_URL, cp, 50*1024*1024)
         t = Counter(); snapshot_t = updates_t = 0; local_prev = None; local_regressions = 0
         with gzip.open(tp, "rt", encoding="utf-8", newline="") as stream:
             reader = csv.DictReader(stream, strict=True)
@@ -62,23 +61,43 @@ def main():
                 t[key(ts,row["side"],row["price"],row["amount"])] += 1
                 updates_t += 1
         if local_regressions: raise ValueError(f"Tardis local timestamp regressions: {local_regressions}")
-        table = pq.read_table(cp)
         expected = ["received_time","event_time","transaction_time","symbol","event_type","first_update_id","final_update_id","prev_final_update_id","last_update_id","side","price","quantity","order_count"]
-        if table.schema.names != expected: raise ValueError("CryptoHFTData schema mismatch")
-        d = table.to_pydict(); c = Counter(); snapshot_c = updates_c = 0
-        for i in range(len(d["event_time"])):
-            if d["symbol"][i] != SYMBOL: raise ValueError(f"bad symbol row {i}")
-            if d["event_type"][i] == "snapshot": snapshot_c += 1; continue
-            if d["event_type"][i] != "update": raise ValueError(f"bad event type row {i}")
-            ts = int(d["event_time"][i])
-            if START <= ts < END:
-                c[key(ts,d["side"][i],d["price"][i],d["quantity"][i])] += 1
-                updates_c += 1
+        c = Counter(); snapshot_c = updates_c = file_rows = 0
+        chd_by_received_hour = {}
+        for received_hour, url in CHD_URLS.items():
+            cp = root / f"chd_{received_hour}.parquet"
+            report[f"cryptohftdata_download_received_hour_{received_hour}"] = download(url, cp, 50*1024*1024)
+            table = pq.read_table(cp)
+            if table.schema.names != expected: raise ValueError("CryptoHFTData schema mismatch")
+            d = table.to_pydict()
+            hour_updates = 0
+            receive_clock_hours = Counter()
+            for i in range(len(d["event_time"])):
+                if d["symbol"][i] != SYMBOL: raise ValueError(f"bad symbol row {i}")
+                if d["event_type"][i] == "snapshot":
+                    snapshot_c += 1
+                    continue
+                if d["event_type"][i] != "update": raise ValueError(f"bad event type row {i}")
+                ts = int(d["event_time"][i])
+                if START <= ts < END:
+                    c[key(ts,d["side"][i],d["price"][i],d["quantity"][i])] += 1
+                    updates_c += 1
+                    hour_updates += 1
+                    received_clock_hour = datetime.fromtimestamp(
+                        int(d["received_time"][i]) / 1_000_000_000, tz=timezone.utc
+                    ).strftime("%H")
+                    receive_clock_hours[received_clock_hour] += 1
+            file_rows += len(d["event_time"])
+            chd_by_received_hour[received_hour] = {
+                "file_rows": len(d["event_time"]),
+                "selected_event_hour_update_rows": hour_updates,
+                "received_clock_hour_counts_for_selected_events": dict(receive_clock_hours),
+            }
         missing, extra = t-c, c-t
         matched = sum((t & c).values())
         report.update({
             "tardis_scan":{"selected_hour_update_rows":updates_t,"selected_hour_snapshot_rows":snapshot_t,"distinct_update_keys":len(t),"local_timestamp_regressions":local_regressions,"timestamp_basis":"Bybit message.ts (microseconds converted to milliseconds)"},
-            "cryptohftdata_scan":{"file_rows":len(d["event_time"]),"selected_hour_update_rows":updates_c,"snapshot_rows_in_file":snapshot_c,"distinct_update_keys":len(c),"timestamp_basis":"Bybit message.ts stored as event_time in milliseconds"},
+            "cryptohftdata_scan":{"file_rows_across_received_hours":file_rows,"selected_event_hour_update_rows":updates_c,"snapshot_rows_across_files":snapshot_c,"distinct_update_keys":len(c),"files_partitioned_by":"received_time UTC hour","by_received_hour":chd_by_received_hour,"timestamp_basis":"Bybit message.ts stored as event_time in milliseconds"},
             "comparison":{"tardis_update_rows":sum(t.values()),"cryptohftdata_update_rows":sum(c.values()),"matched_rows":matched,"missing_from_cryptohftdata":sum(missing.values()),"extra_in_cryptohftdata":sum(extra.values()),"match_pct_of_tardis":round(100*matched/max(1,sum(t.values())),6),"missing_examples":[[list(map(str,k)),v] for k,v in missing.most_common(5)],"extra_examples":[[list(map(str,k)),v] for k,v in extra.most_common(5)]}
         })
         report["comparison_status"] = "EXACT_MATCH" if not missing and not extra else "MISMATCH"

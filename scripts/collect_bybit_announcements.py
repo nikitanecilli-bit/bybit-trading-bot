@@ -157,6 +157,36 @@ def parse_page(body, category_url):
                     articles[clean] = label
     return max(page_numbers), articles
 
+def extract_article_payload(body):
+    match = re.search(
+        rb'<script[^>]+id=["\\']__NEXT_DATA__["\\'][^>]*>(.*?)</script>',
+        body, flags=re.DOTALL
+    )
+    if not match:
+        raise ValueError("article page has no __NEXT_DATA__ payload")
+    data = json.loads(match.group(1).decode("utf-8"))
+    detail = data.get("props", {}).get("pageProps", {}).get("articleDetail")
+    if not isinstance(detail, dict):
+        raise ValueError("article page has no articleDetail object")
+    title = detail.get("title") or ""
+    content_html = detail.get("content_html") or ""
+    content_parser = VisibleText()
+    content_parser.feed(content_html)
+    content_text = " ".join(content_parser.parts)
+    category_keys = []
+    connection = detail.get("categoryConnection") or {}
+    for edge in connection.get("edges") or []:
+        node = (edge or {}).get("node") or {}
+        key = node.get("key")
+        if key:
+            category_keys.append(key)
+    return {
+        "title": title,
+        "published_at": detail.get("date"),
+        "category_keys": sorted(set(category_keys)),
+        "content_text": content_text,
+    }
+
 def classify(title, text, category):
     sample = (title + " " + text[:12000]).lower()
     if re.search(r"\btradfi\b|\bstock\b|\bpre-ipo\b", sample):
@@ -262,12 +292,15 @@ def main():
             slug = article_slug(url)
             cap = write_capture(root, Path("articles") / f"{slug}.html",
                                 body, url=final_url, status=status, headers=headers, retrieved=retrieved)
-            parser = VisibleText()
-            parser.feed(body.decode("utf-8", errors="replace"))
-            text = " ".join(parser.parts)
-            matched = [s for s in SYMBOLS if re.search(rf"(?<![A-Z0-9]){re.escape(s)}(?![A-Z0-9])", text.upper())]
-            product, event = classify(title, text, "mixed")
-            record = {"title": title, "url": url, "symbols": matched,
+            payload = extract_article_payload(body)
+            article_title = payload["title"] or title
+            text = payload["content_text"]
+            matched = [s for s in SYMBOLS if re.search(rf"(?<![A-Z0-9]){re.escape(s)}(?![A-Z0-9])", (article_title + " " + text).upper())]
+            product, event = classify(article_title, text, "mixed")
+            record = {"title": article_title, "url": url, "symbols": matched,
+                      "published_at": payload["published_at"],
+                      "category_keys": payload["category_keys"],
+                      "content_extraction": "next_data_articleDetail.content_html",
                       "product_class_candidate": product, "event_type_candidate": event, **cap}
             article_records.append(record)
             for symbol in matched:

@@ -470,3 +470,24 @@ The next experiment should not be blocked on L2 queue reconstruction if the chos
 **Immediate decision gate:** first determine whether a single-symbol BTCUSDT H1 taker-only experiment can be supported by a sufficiently long independent Bybit period with verified H1/Mark/funding inputs and usable dated BTC specifications/risk constraints. If yes, preregister that narrow experiment and run only after the existing accounting and data gates are satisfied. If not, state the exact missing input and stop adding unrelated infrastructure. No L2 expansion, multi-symbol universe rebuild, new general-purpose runner, market PnL, paper trading or live orders are authorized by this decision.
 
 The north-star remains realized positive net expectancy after all costs and risk, not test count, code volume, GitHub activity or data archive size.
+
+
+### 2026-11-25 — static feasibility audit of the BTCUSDT taker-only shortcut
+
+Read-only inspection of the frozen H1 preregistration, shared-capital runner and engine resolved an important execution detail:
+
+- The current runner hardcodes `maker_entry_and_tp1=True` and `maker_tp1_and_target=False`. Because the latter explicitly overrides exit behavior, the actual frozen implementation is **maker-proxy entry + taker TP1/final exits**, not maker TP1/target exits.
+- The runner does not expose a ready taker-only switch in its frozen config; a taker-entry arm would require a small, explicit execution ablation and a separate preregistration. It must not silently replace the frozen primary.
+- In the engine, market-mode pending entry is filled at the next H1 bar open, subject to the existing max-chase rejection. Limit-mode entry uses an OHLC touch/penetration proxy. Thus a taker-entry variant can avoid L2 queue reconstruction, but it still needs a frozen rule for next-open price, gap/chase rejection and costs.
+- Current base model constants are taker fee 5.5 bps and taker slippage 2.25 bps per executed leg; the H1 preregistration's primary cost multiplier is 2.0x. The runner applies stress multipliers to fee/slippage constants. These are assumptions, not verified historical realized fills.
+- Protective stop/TP trigger detection in the audited engine uses Last/Trade OHLC; liquidation checks use Mark candles. Same-bar stop precedence is conservative, but OHLC cannot reveal intrabar event order. The taker-only contract must preserve explicit stop-first ambiguity handling and distinguish trigger price from modeled execution cost.
+
+**BTC single-symbol feasibility remains blocked, for specific reasons:**
+1. No Bybit-native H1 or Mark candle files are present in the repository; the earlier five-endpoint BTC pilot returned no valid response. D1/D2 remain unverified.
+2. No settled BTC funding history has been accepted for the intended period. Funding interval/formula regime and exact settlement cashflow still need an evidence-backed treatment; D3 remains unverified.
+3. BTC has partial dated specification/risk-tier candidate snapshots from Sep/Oct 2026, but they do not cover a continuous historical period or establish effective-time changes. D5/D6 remain not accepted.
+4. The official-vs-CryptoHFTData trade archive match on 2026-09-01 is a one-day integrity sample only; it is not H1/Mark/funding coverage and does not create an independent strategy holdout. The wider Bybit period remains absent. The old proxy data are contaminated by prior research.
+
+**Decision:** do not write a taker-only runner or run market PnL yet. The minimum next useful input is a user-provided, provenance-preserving BTCUSDT Bybit public-data package for one sufficiently long, genuinely unseen interval: H1 trade candles, matching H1 Mark candles, complete settled funding events, and the available dated BTC instrument/risk evidence. Include original endpoint/archive identifiers, UTC capture/download details, raw response/files and SHA-256; do not normalize away missing rows. Until such a package exists, stay in design/static-audit mode. No new API attempts, collectors, archive expansion, PnL, paper or live trading under the current scope.
+
+This audit narrows the implementation change to a possible **entry execution ablation only**; it does not establish that taker-only has positive expectancy or that the data gate is close to passing.

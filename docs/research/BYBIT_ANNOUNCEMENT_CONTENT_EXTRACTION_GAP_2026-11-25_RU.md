@@ -40,7 +40,7 @@ Regression tests cover HTML extraction, rich-text JSON fallback, truly empty con
 
 ## What this does and does not prove
 
-- The existing artifact has 1,275/1,275 article pages captured and byte-integrity metadata in its manifest.
+- The existing artifact has 1,275/1,275 article pages and 66/66 category pages captured. An independent local audit rechecked every article and category-page body against its recorded byte size and SHA-256: 1,341/1,341 matched, with zero missing files or mismatches.
 - The independent content-format audit found visible text for all 1,275 pages using the two supported payload fields. Extracted body lengths ranged from 199 to 25,736 characters; median length was 1,069 characters and the 10th percentile was 692 characters. No article had fewer than 120 extracted characters.
 - This is not a new crawl. The corrected extractor still needs to be exercised by the next manual full-archive run.
 - Archive-page pagination counts are the observed 2026-11-25 baseline, not proof that Bybit exposes every historical announcement.

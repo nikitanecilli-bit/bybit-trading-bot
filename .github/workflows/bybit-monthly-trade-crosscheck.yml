@@ -1,5 +1,5 @@
 name: Bybit independent trade sample cross-check
-# Two available daily samples; joins adjacent receive-hour partitions by exchange trade_time; no PnL.
+# Four sampled daily windows; joins adjacent receive-hour partitions by exchange trade_time; no PnL.
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Install Parquet reader
         run: python -m pip install --quiet pyarrow zstandard
-      - name: Compare two daily samples using event-time windows and adjacent receive partitions
+      - name: Compare four daily samples using event-time windows and adjacent receive partitions
         run: python scripts/compare_bybit_monthly_trade_samples.py /tmp/bybit_monthly_trade_crosscheck.json
       - name: Upload compact comparison report only
         if: always()

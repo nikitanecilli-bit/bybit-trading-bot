@@ -1,0 +1,32 @@
+name: CryptoHFTData Bybit one-hour sample inspection
+
+on:
+  push:
+    branches:
+      - research/market-regime-v1-main
+    paths:
+      - "scripts/inspect_cryptohftdata_bybit_sample.py"
+      - ".github/workflows/cryptohftdata-bybit-sample-inspection.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install Parquet reader
+        run: python -m pip install --quiet pyarrow
+      - name: Download and validate one public Bybit sample hour
+        run: python scripts/inspect_cryptohftdata_bybit_sample.py /tmp/cryptohftdata_bybit_sample_inspection.json
+      - name: Upload compact validation report only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cryptohftdata-bybit-sample-inspection
+          path: /tmp/cryptohftdata_bybit_sample_inspection.json
+          if-no-files-found: warn

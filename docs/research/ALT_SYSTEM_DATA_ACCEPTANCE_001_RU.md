@@ -2102,3 +2102,30 @@ The offline parser/safety tests passed in the initial workflow attempts, includi
 ### 54.4. Acceptance boundary
 
 No archive completeness claim, event-study input, backtest or PnL is accepted from an in-progress workflow. Even after a successful run, inventory completion only means the selected pages/articles were retrievable under this protocol; it does not prove the announcements site itself is historically exhaustive or that regex candidate classifications are correct. D4/D5/D6 remain PARTIAL / NOT ACCEPTED until captured records are reviewed, reconciled to a genuine Bybit Linear point-in-time universe, and effective-time fields are evidenced. The workflow does not query Bybit market APIs or collect market data.
+
+
+## 55. Collector live-HTML validation and invalidation of the first “success” (2026-11-25)
+
+### 55.1. Important correction: first run was a false-complete result
+
+Workflow run `45584843911` finished SUCCESS, but inspection of its artifact `15008282616` showed that the collector had parsed only page 1 from each category: 1/1 pages per category, 80 unique article pages total (20 per category), and marked `complete=true`. The real captured Bybit HTML visibly contains pagination list items with numeric `title` attributes (for example pages 1, 2, 3, 4, 5, 25) rather than ordinary page-number hrefs, and article links use `/en/article/.../?category=...`. The first parser missed both structures. Therefore this run is **INVALID / NOT ACCEPTED**, despite GitHub Actions reporting success. Its 80-article artifact must not be used for coverage counts or event records.
+
+### 55.2. Strict-pagination parser correction
+
+Updated the parser to read numeric `li.ant-pagination-item[title]` values and accept actual `/en/article/...` paths. A live-page HTML inspection confirmed the observed New Listings page exposes 25 as the last pagination item and 20 article links. The other categories use the same markup family. The strict 25/11/19/11 baseline now fails closed if the parsed last page differs.
+
+### 55.3. Article-content extraction correction
+
+The first article classifier used all visible page text, including global navigation/footer text. This could contaminate product/event classification (for example a generic site-wide “TradFi” or “delist” string could be mistaken for article content). The collector now extracts `props.pageProps.articleDetail` from the page's `__NEXT_DATA__` JSON and uses only the article's structured `title`, `date`, `categoryConnection`, and `content_html`. Candidate symbol matching and event/product classification run on article title/body only; raw HTML remains preserved. Offline regression tests now verify the structured body excludes unrelated page chrome. Classification is still a candidate for manual review, not an accepted ledger record.
+
+### 55.4. CI state at this update
+
+- Run `45585129324`: strict-pagination version correctly failed closed because the parser still did not read numeric pagination list-item titles; artifact records four explicit pagination mismatches. This is a useful fail-closed result, not an accepted inventory.
+- Run `45585145736`: same pagination failure on the next code revision; not accepted.
+- Run `45585616214`: failed offline tests due a syntax error in the first attempt to quote the embedded JSON regex; collection was skipped. Fixed immediately.
+- Run `45585668574`: latest revision with structured article extraction and the new regression test; offline tests passed, public collection step was in progress at last check. This is the intended strict run to inspect when complete.
+- Earlier runs `45585362357`, `45585379582`, `45585495358`, and `45585646168` were started from intermediate revisions. Their artifacts/results must be inspected but cannot supersede the latest code; none is accepted merely because a workflow returns success.
+
+### 55.5. Acceptance rule
+
+Only an artifact produced by the latest code revision, with all four category page sequences complete, all discovered article pages captured, zero retrieval/parsing failures, and manually reviewed article classifications can support an event ledger. Any run with a different code SHA, incomplete page inventory, parser mismatch, or candidate-only classifications remains diagnostic. D4/D5/D6 stay PARTIAL / NOT ACCEPTED. No market data, account API, trading, PnL or backtest was involved.

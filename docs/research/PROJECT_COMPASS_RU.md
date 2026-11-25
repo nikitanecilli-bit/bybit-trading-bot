@@ -432,3 +432,8 @@ Candidate deduplication across E04/E06/E08–E13 found only two main historical 
 ### 2026-11-25 — независимый holdout повторно проверен
 
 В repo нет accepted independent dataset для H1 D48+EMA: шесть CryptoFetch proxy ZIP заканчиваются не позднее 2026-10-27 и уже использованы. Старый Bybit holdout script — другая гипотеза (D20, 11 ранее выбранных Binance symbols, independent per-symbol capital, approximate funding, Last-price exits) и сам указывает на календарное пересечение с Binance study; нужных Bybit файлов нет. Archive workflow требует self-hosted по умолчанию и предупреждает о hosted US egress block; self-hosted/collector запрещены. Значит текущее ограничение точнее формулируется как **BLOCKED BY DATA + INDEPENDENCE**. Не строить runner и не перемаркировать старые folds. Полный аудит — acceptance ledger Section 49.
+
+
+### 2026-11-25 — OKX public-data source pilot completed
+
+A GitHub-hosted read-only capture of official OKX public endpoints completed successfully for `BTC-USDT-SWAP`. QA verified 8,760 continuous, unique, closed H1 trade candles and 8,760 aligned Mark Price candles across the requested 365-day interval; all raw-page and normalized-file hashes matched. Funding coverage is only about three months (278 normalized settlements), so D3 remains incomplete. Current instrument metadata is a snapshot, not historical effective-time evidence; D5 remains open, and D4/D6/D8 are not accepted. This is source availability evidence for OKX only—not Bybit execution evidence, a time-independent holdout, or a trading edge. No PnL/backtest was run. Full report: [OKX_PUBLIC_DATA_ARCHIVE_QA_2026-11-25_RU.md](OKX_PUBLIC_DATA_ARCHIVE_QA_2026-11-25_RU.md).

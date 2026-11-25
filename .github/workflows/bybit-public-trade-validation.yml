@@ -34,7 +34,7 @@ jobs:
       - name: Download selected official Bybit public trade days across years
         env:
           SYMBOL: BTCUSDT
-          TRADE_DATES: "2020-04-01,2021-04-01,2022-04-01,2023-04-01,2024-04-11,2025-04-01"
+          TRADE_DATES: "2020-04-01,2020-12-01,2021-04-01,2021-12-01,2022-04-01,2022-12-01,2023-04-01,2023-12-01,2024-04-11,2024-12-01,2025-04-01,2025-11-02"
           KLINE_PATH: bybit_btcusdt_initial/trade_h1.csv
           OUT_DIR: trade_flow_validation
         run: python scripts/validate_bybit_public_trade_archive.py

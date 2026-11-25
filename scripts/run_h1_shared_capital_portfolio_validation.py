@@ -853,8 +853,13 @@ def aligned_h1_datasets(kline_dir):
             raise SystemExit(f"Selected symbols missing Bybit H1 datasets: {missing}")
         raw = {symbol: raw[symbol] for symbol in sorted(allowlist)}
         print("Selected Bybit universe: " + ", ".join(sorted(raw)))
-    if len(raw) < 2:
-        raise SystemExit(f"Need at least 2 official Bybit H1 symbols, found {len(raw)}")
+    minimum_symbols = 1 if allowlist else 2
+    if len(raw) < minimum_symbols:
+        raise SystemExit(
+            f"Need at least {minimum_symbols} official Bybit H1 symbol(s) for "
+            f"{'frozen single/multi-symbol allowlist' if allowlist else 'unrestricted portfolio'}, "
+            f"found {len(raw)}"
+        )
 
     ref_symbol, (_, ref_candles) = max(
         raw.items(), key=lambda item: item[1][1][-1].ts - item[1][1][0].ts

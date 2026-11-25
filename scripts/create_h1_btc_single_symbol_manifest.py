@@ -14,6 +14,8 @@ from scripts.run_h1_shared_capital_portfolio_validation import (
     _file_manifest_record,
     load_bybit_h1_datasets,
     resolve_h1_replay_code_paths,
+    validate_funding_mark_coverage,
+    validate_snapshot_history_coverage,
 )
 from scripts.snapshot_bybit_linear_universe import is_linear_usdt_perpetual_within_lifecycle_at
 
@@ -51,6 +53,17 @@ def build_manifest(*, kline_dir, funding_dir, mark_price_dir, instrument_specs_d
     delivery = int(matches[0].get("deliveryTime") or 0)
     if timestamps[0] < launch or (delivery and timestamps[-1] >= delivery):
         raise SystemExit("BTC H1 archive extends outside the lifecycle bounds in the Bybit snapshot")
+
+    # Freeze only data whose Bybit provenance and full-history coverage have
+    # already passed the same strict preflight used by the market replay.
+    close_boundary = timestamps[-1] + 3_600_000
+    validate_funding_mark_coverage(
+        funding_dir, mark_price_dir, ["BTCUSDT"], timestamps,
+        timestamps[0], close_boundary, trade_kline_dir=kline_dir,
+    )
+    validate_snapshot_history_coverage(
+        instrument_specs_dir, risk_tiers_dir, timestamps[0], close_boundary,
+    )
 
     input_files = {
         "kline": _directory_file_manifest(kline_dir, {".csv"}),

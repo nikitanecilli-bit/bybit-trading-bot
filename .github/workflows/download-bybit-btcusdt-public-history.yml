@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: research/h1-volume-lookback-provenance-fix
-      - name: Download limited Bybit BTCUSDT H1 gap-repair sample from official public archive
+      - name: Download limited Bybit BTCUSDT H1 overlap sample from official public archive
         env:
           START_DATE: "2023-12-01"
           END_DATE: "2024-04-01"

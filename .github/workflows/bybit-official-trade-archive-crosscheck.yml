@@ -1,5 +1,5 @@
 name: Bybit official trade archive cross-check
-# Two bounded daily samples. Downloads public archives only; no API keys, account data, orders or PnL.
+# Two bounded daily samples (BTCUSDT). Public market data only; no credentials, account data, orders or PnL.
 
 on:
   push:

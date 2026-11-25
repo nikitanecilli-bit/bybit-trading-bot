@@ -68,6 +68,10 @@ def inspect(day: date):
     max_bid_depth = max_ask_depth = 0
     snapshot_levels = []
     outside_samples = []
+    sample_snapshot = None
+    sample_delta = None
+    top_level_keys = data_keys = None
+    cts_top_level_count = cts_data_count = 0
     zip_names = []
 
     with zipfile.ZipFile(path) as zf:
@@ -95,6 +99,9 @@ def inspect(day: date):
                 if typ not in ("snapshot", "delta"):
                     raise RuntimeError(f"Unexpected record type: {typ!r}")
                 counts[typ] += 1
+                if top_level_keys is None:
+                    top_level_keys = sorted(obj.keys())
+                    data_keys = sorted(data.keys())
                 if first_type is None:
                     first_type = typ
                 last_type = typ
@@ -110,19 +117,29 @@ def inspect(day: date):
                     topic_mismatch += 1
                 if data.get("s") != SYMBOL:
                     symbol_mismatch += 1
+                if obj.get("cts") is not None:
+                    cts_top_level_count += 1
+                    cts = int(obj["cts"])
+                    first_cts = cts if first_cts is None else min(first_cts, cts)
+                    last_cts = cts if last_cts is None else max(last_cts, cts)
                 if data.get("cts") is not None:
+                    cts_data_count += 1
                     cts = int(data["cts"])
                     first_cts = cts if first_cts is None else min(first_cts, cts)
                     last_cts = cts if last_cts is None else max(last_cts, cts)
                 bids = data.get("b", [])
                 asks = data.get("a", [])
                 if typ == "snapshot":
+                    if sample_snapshot is None:
+                        sample_snapshot = {"top_level_keys": sorted(obj.keys()), "data_keys": sorted(data.keys()), "bids_first3": bids[:3], "asks_first3": asks[:3], "u": u, "seq": seq}
                     max_bid_depth = max(max_bid_depth, len(bids))
                     max_ask_depth = max(max_ask_depth, len(asks))
                     snapshot_levels.append((len(bids), len(asks)))
                     prev_u = u
                     prev_seq = seq
                 elif typ == "delta":
+                    if sample_delta is None:
+                        sample_delta = {"top_level_keys": sorted(obj.keys()), "data_keys": sorted(data.keys()), "bids_first3": bids[:3], "asks_first3": asks[:3], "u": u, "seq": seq}
                     if u is not None:
                         min_u = u if min_u is None else min(min_u, u)
                         max_u = u if max_u is None else max(max_u, u)
@@ -161,6 +178,10 @@ def inspect(day: date):
         "delta_seq_min": min_seq, "delta_seq_max": max_seq,
         "malformed": malformed, "topic_mismatch": topic_mismatch,
         "symbol_mismatch": symbol_mismatch, "outside_day_timestamps": outside_day,
+        "outside_day_samples": outside_samples,
+        "top_level_keys": top_level_keys, "data_keys": data_keys,
+        "cts_top_level_count": cts_top_level_count, "cts_data_count": cts_data_count,
+        "sample_snapshot": sample_snapshot, "sample_delta": sample_delta,
         "interpretation": "Raw Bybit snapshot/delta archive validated; update continuity and replay semantics still require a dedicated full-book reconstruction test."
     }
 

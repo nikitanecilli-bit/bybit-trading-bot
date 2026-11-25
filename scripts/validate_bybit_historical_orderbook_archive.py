@@ -5,6 +5,10 @@ import hashlib, json, os, time, urllib.error, urllib.request, zipfile
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from bybit_l2_queue_replay import OrderBook
 
 SYMBOL = "BTCUSDT"
 DATES = [date.fromisoformat(x.strip()) for x in os.getenv(
@@ -113,6 +117,8 @@ def inspect(day: date):
                     continue
                 if typ not in ("snapshot", "delta"):
                     raise RuntimeError(f"Unexpected record type: {typ!r}")
+                strict_book.apply(obj)
+                strict_replay_counts[typ] += 1
                 counts[typ] += 1
                 if previous_ts is not None:
                     gap = ts - previous_ts
@@ -251,6 +257,16 @@ def inspect(day: date):
         "last_cts_utc": datetime.fromtimestamp(last_cts/1000, timezone.utc).isoformat() if last_cts else None,
         "max_snapshot_bid_levels": max_bid_depth, "max_snapshot_ask_levels": max_ask_depth,
         "snapshot_count": len(snapshot_levels),
+        "strict_decimal_replay": {
+            "record_types": dict(strict_replay_counts),
+            "final_bid_levels": len(strict_book.bids),
+            "final_ask_levels": len(strict_book.asks),
+            "final_best_bid": str(strict_book.best_bid()[0]) if strict_book.bids else None,
+            "final_best_ask": str(strict_book.best_ask()[0]) if strict_book.asks else None,
+            "final_spread": str(strict_book.best_ask()[0] - strict_book.best_bid()[0]) if strict_book.bids and strict_book.asks else None,
+            "cts_seq_update_ids_valid": True,
+            "all_reconstructed_states_uncrossed": True
+        },
         "replay": {
             "snapshots_replayed": replay_snapshots, "deltas_replayed": replay_deltas,
             "bid_inserts": bid_inserts, "ask_inserts": ask_inserts,

@@ -552,3 +552,40 @@ Artifact `bybit-btcusdt-public-history` из GitHub Actions run `45645008915` (a
 **Оставшийся блокер:** main path по-прежнему требует Top-5 selection manifest и старую multi-symbol provenance схему. Проверка BTCUSDT в paired summary сама по себе не создаёт работающий BTC-only runner. Нужны отдельная BTCUSDT preregistration/selection manifest схема, отдельный single-symbol route и тесты; до этого runner не запускать.
 
 **PnL gate остаётся закрыт:** официальный H1 archive имеет 4 gaps / 1,928 пропущенных баров, заканчивается 2025-11-03 и не закрывает Mark/Funding и полные исторические instrument/risk данные. Никакой PnL replay, paper или live trading не запускались.
+
+
+## 6F. Отдельный BTCUSDT-only manifest route (2026-11-25)
+
+Реализован отдельный маршрут подготовки BTCUSDT-only данных, не меняющий исходный Top-5 protocol:
+
+- Добавлен manifest protocol `h1-btc-single-symbol-v1`; он требует ровно BTCUSDT и отдельный lifecycle snapshot.
+- Добавлен `scripts/create_h1_btc_single_symbol_manifest.py`. Builder не запускает PnL; он проверяет непрерывную H1 сетку, минимум 3,000 train bars, BTCUSDT lifecycle на cutoff и фиксирует SHA-256 input/replay files.
+- Runner теперь различает `H1_SELECTION_MODE=top5` и `btc_single`. Для BTC route replay provenance не включает Top-5 selector; Top-5 режим сохраняет прежний протокол.
+- Workflow получил выбор режима и отдельную подготовку BTC manifest. Исправлена форма lifecycle snapshot provenance; funding audit sidecars учитываются согласованно.
+- Исправлена совместимость старого Top-5 D20 selector с per-arm volume lookback: D20 selector явно использует 20, а portfolio arms продолжают разрешать 20/48 по Donchian period.
+- Исходная preregistration Top-5 не переписана. Новый отдельный протокол: `BTC_ONLY_H1_DONCHIAN48_EMA_PREREGISTRATION_RU.md`.
+
+GitHub Actions `45652703809` — **SUCCESS** на code commit `8a4f1b90b7a95cbfc19bcb81a1798c5477f8469d`. H1 selector, runner execution gate, EMA/Donchian tests и validation manifest tests прошли. Это только инженерная проверка.
+
+PR: https://github.com/nikitanecilli-bit/bybit-trading-bot/pull/18
+
+**PnL gate остаётся закрыт:** доступный H1 архив имеет gaps и заканчивается 2025-11-03; funding/mark history и полные датированные instrument/risk данные не подтверждены. Ни market PnL, ни paper/live trading не запускались. Математическое преимущество не доказано.
+
+
+## 6G. BTC-only runner end-to-end gate correction (2026-11-25)
+
+При проверке single-symbol пути после предыдущего CI был найден дефект: общий H1 alignment loader всё ещё требовал минимум две монеты даже при явно заданном frozen allowlist `BTCUSDT`. Это означало, что manifest мог быть подготовлен, но runner не мог принять один инструмент.
+
+Исправлено в commit `4426df7dfd3a58fd8f705694f8fd65bb69eca961`:
+
+- Минимум 1 инструмент разрешён только при явном `H1_SYMBOL_ALLOWLIST`; без allowlist прежнее требование multi-symbol сохраняется.
+- Добавлены тесты: BTCUSDT-only allowlist проходит загрузчик; unrestricted режим по-прежнему отказывает с одной монетой.
+- BTC manifest builder теперь до фиксации selection manifest запускает те же строгие проверки funding/mark coverage, Bybit funding query + dated settlement schedule evidence и непрерывности instrument/risk snapshot history, что используются перед PnL replay.
+- Builder по-прежнему не запускает PnL.
+
+GitHub Actions `45653543436` — **SUCCESS** на commit `4426df7dfd3a58fd8f705694f8fd65bb69eca961`. Прошли compile/deterministic checks, audit step, multi-bar lifecycle, H1 selector, runner execution proxy gate, EMA gate, validation manifest и связанные проверки.
+
+**Фактический market PnL не запускался.** Доступный BTC H1 archive всё ещё содержит пропуски и не покрывает все необходимые исторические Bybit data/accounting inputs. PnL gate закрыт.
+
+
+Дополнительная проверка тестового запуска: новые regression tests были включены в ручной список тестов `test_h1_runner_execution_gate.py` (проект запускает этот файл напрямую, а не через auto-discovery). Это важно: до включения в список функции тестов были написаны, но не исполнялись. В CI run `45653889966` тесты `test_aligned_h1_datasets_accepts_one_symbol_only_with_frozen_allowlist` и `test_unrestricted_h1_datasets_still_requires_multiple_symbols` действительно исполнены; run завершился **SUCCESS** на commit `4f874a7b1a6651a8b57c65114e0b0efc3f8a39ea`.

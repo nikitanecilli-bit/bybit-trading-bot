@@ -1,0 +1,42 @@
+name: Diagnose Bybit ETH H1 losing fold 2
+
+on:
+  push:
+    branches:
+      - research/h1-volume-lookback-provenance-fix
+    paths:
+      - scripts/preliminary_bybit_eth_h1_fold2_diagnostic.py
+      - scripts/preliminary_bybit_btc_h1_backtest.py
+      - scripts/download_bybit_btcusdt_public_history.py
+      - .github/workflows/preliminary-bybit-eth-h1-fold2-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/h1-volume-lookback-provenance-fix
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download official Bybit ETHUSDT H1 history
+        env:
+          SYMBOL: ETHUSDT
+          OUT_DIR: bybit_ethusdt_initial
+          START_DATE: "2020-04-01"
+          END_DATE: "2025-11-04"
+        run: python scripts/download_bybit_btcusdt_public_history.py
+      - name: Diagnose fold 2 trades
+        run: python scripts/preliminary_bybit_eth_h1_fold2_diagnostic.py
+      - name: Upload fold 2 diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: preliminary-bybit-eth-h1-fold2-diagnostic
+          path: eth_fold2_diagnostic/
+          if-no-files-found: error
+          retention-days: 90

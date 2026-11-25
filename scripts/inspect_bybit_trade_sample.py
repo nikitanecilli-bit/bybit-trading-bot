@@ -13,14 +13,19 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 import sys
+import os
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bybit_l2_queue_replay import parse_exchange_bool, parse_trade_timestamp_ms
 from report_io import write_json_report
 
-URL = "https://public.bybit.com/trading/AAVEUSDT/AAVEUSDT2025-09-02.csv.gz"
-SYMBOL = "AAVEUSDT"
+SYMBOL = os.getenv("SYMBOL", "AAVEUSDT").upper()
+TRADE_DATE = os.getenv("TRADE_DATE", "2025-09-02")
+URL = os.getenv(
+    "TRADES_URL",
+    f"https://public.bybit.com/trading/{SYMBOL}/{SYMBOL}{TRADE_DATE}.csv.gz",
+)
 ORDERBOOK_REPORT = Path("bybit_orderbook_sample_inspection.json")
 CHUNK = 1024 * 1024
 

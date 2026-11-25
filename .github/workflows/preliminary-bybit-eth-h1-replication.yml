@@ -1,0 +1,42 @@
+name: Bybit ETH H1 fixed BTC strategy replication
+
+on:
+  push:
+    branches:
+      - research/h1-volume-lookback-provenance-fix
+    paths:
+      - scripts/preliminary_bybit_eth_h1_replication.py
+      - scripts/preliminary_bybit_btc_h1_backtest.py
+      - scripts/download_bybit_btcusdt_public_history.py
+      - .github/workflows/preliminary-bybit-eth-h1-replication.yml
+
+permissions:
+  contents: read
+
+jobs:
+  replication:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/h1-volume-lookback-provenance-fix
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download official Bybit ETHUSDT H1 history
+        env:
+          SYMBOL: ETHUSDT
+          OUT_DIR: bybit_ethusdt_initial
+          START_DATE: "2020-04-01"
+          END_DATE: "2025-11-04"
+        run: python scripts/download_bybit_btcusdt_public_history.py
+      - name: Run fixed BTC strategy on ETH
+        run: python scripts/preliminary_bybit_eth_h1_replication.py
+      - name: Upload ETH replication outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: preliminary-bybit-eth-h1-fixed-btc-replication
+          path: eth_replication/
+          if-no-files-found: error
+          retention-days: 90

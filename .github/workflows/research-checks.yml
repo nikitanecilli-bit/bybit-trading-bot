@@ -2,9 +2,11 @@ name: Research engine checks
 # Rerun trigger for ENG-PERSIST-001 after test-fixture initialization
 
 on:
+  pull_request:
+    branches: [research/market-regime-v1-main]
   workflow_dispatch:
   push:
-    branches: [research/market-regime-v1-main]
+    branches: [research/market-regime-v1-main, research/h1-volume-lookback-provenance-fix]
     paths:
       - 'Bybit_Trading_Engine_v14_research.py'
       - 'market_regime.py'

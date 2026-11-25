@@ -1,0 +1,49 @@
+name: Same-window BTC ETH comparison
+
+on:
+  push:
+    branches:
+      - research/h1-volume-lookback-provenance-fix
+    paths:
+      - scripts/preliminary_bybit_btc_h1_backtest.py
+      - scripts/preliminary_bybit_same_window_btc_eth_comparison.py
+      - scripts/download_bybit_btcusdt_public_history.py
+      - .github/workflows/preliminary-bybit-same-window-btc-eth.yml
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/h1-volume-lookback-provenance-fix
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download official Bybit BTCUSDT H1 history
+        env:
+          SYMBOL: BTCUSDT
+          OUT_DIR: bybit_btcusdt_initial
+          START_DATE: "2020-04-01"
+          END_DATE: "2025-11-04"
+        run: python scripts/download_bybit_btcusdt_public_history.py
+      - name: Download official Bybit ETHUSDT H1 history
+        env:
+          SYMBOL: ETHUSDT
+          OUT_DIR: bybit_ethusdt_initial
+          START_DATE: "2020-04-01"
+          END_DATE: "2025-11-04"
+        run: python scripts/download_bybit_btcusdt_public_history.py
+      - name: Compare fixed strategy on identical calendar window
+        run: python scripts/preliminary_bybit_same_window_btc_eth_comparison.py
+      - name: Upload same-window comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: preliminary-bybit-same-window-btc-eth-comparison
+          path: same_window_comparison/
+          if-no-files-found: error
+          retention-days: 90

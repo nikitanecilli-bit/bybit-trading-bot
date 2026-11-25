@@ -86,7 +86,7 @@ def _write_funding_manifest(
 from run_h1_shared_capital_portfolio_validation import (
     resolve_execution_snapshot_dirs, validate_snapshot_history_coverage,
     resolve_funding_dirs, validate_funding_mark_coverage,
-    resolve_bybit_kline_dir, load_bybit_h1_datasets,
+    resolve_bybit_kline_dir, load_bybit_h1_datasets, aligned_h1_datasets,
     round_limit_quote_to_bybit_tick, engine_cost_stress,
     BASE_TAKER_FEE, BASE_MAKER_FEE, BASE_TAKER_SLIP,
     resolve_validation_design, load_frozen_selection_manifest, resolve_h1_replay_code_paths,
@@ -781,6 +781,43 @@ def test_load_bybit_h1_datasets_rejects_gaps_and_loads_exchange_candles():
             raise AssertionError("gapped/duplicate Bybit H1 series must fail")
 
 
+
+def test_aligned_h1_datasets_accepts_one_symbol_only_with_frozen_allowlist():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        path = root / "BTCUSDT.csv"
+        rows = ["symbol,timestamp_ms,open,high,low,close,volume,turnover"]
+        first_ts = (1_700_000_000_000 // 3_600_000) * 3_600_000
+        for index in range(3_001):
+            ts = first_ts + index * 3_600_000
+            rows.append(f"BTCUSDT,{ts},100,102,99,101,10,1010")
+        path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+        with patch.dict(os.environ, {"H1_SYMBOL_ALLOWLIST": "BTCUSDT"}):
+            with patch.object(em, "check_alignment", lambda _data: None):
+                aligned, archives, timestamps = aligned_h1_datasets(root)
+        assert list(aligned) == ["BTCUSDT"]
+        assert archives["BTCUSDT"] == str(path)
+        assert len(timestamps) == 3_001
+
+
+def test_unrestricted_h1_datasets_still_requires_multiple_symbols():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        path = root / "BTCUSDT.csv"
+        rows = ["symbol,timestamp_ms,open,high,low,close,volume,turnover"]
+        first_ts = (1_700_000_000_000 // 3_600_000) * 3_600_000
+        for index in range(3_001):
+            ts = first_ts + index * 3_600_000
+            rows.append(f"BTCUSDT,{ts},100,102,99,101,10,1010")
+        path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+        with patch.dict(os.environ, {"H1_SYMBOL_ALLOWLIST": ""}):
+            try:
+                aligned_h1_datasets(root)
+            except SystemExit as exc:
+                assert "Need at least 2 official Bybit H1 symbol(s)" in str(exc)
+            else:
+                raise AssertionError("unrestricted portfolio must retain multi-symbol requirement")
+
 def test_load_bybit_h1_datasets_rejects_off_hour_timestamp_grid():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -878,6 +915,8 @@ if __name__ == "__main__":
         test_funding_mark_coverage_rejects_no_settlement_in_fold,
         test_funding_mark_coverage_rejects_missing_or_unverified_archive_manifest,
         test_bybit_kline_dir_is_mandatory,
+        test_aligned_h1_datasets_accepts_one_symbol_only_with_frozen_allowlist,
+        test_unrestricted_h1_datasets_still_requires_multiple_symbols,
         test_load_bybit_h1_datasets_rejects_gaps_and_loads_exchange_candles,
         test_load_bybit_h1_datasets_rejects_off_hour_timestamp_grid,
         test_load_bybit_h1_datasets_rejects_symbol_filename_mismatch,

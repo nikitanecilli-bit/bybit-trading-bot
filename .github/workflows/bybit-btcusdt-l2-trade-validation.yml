@@ -1,0 +1,43 @@
+name: Bybit BTCUSDT matched L2 and public-trade archive validation
+
+on:
+  push:
+    branches:
+      - research/h1-volume-lookback-provenance-fix
+    paths:
+      - scripts/inspect_bybit_orderbook_sample.py
+      - scripts/inspect_bybit_trade_sample.py
+      - .github/workflows/bybit-btcusdt-l2-trade-validation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SYMBOL: BTCUSDT
+      TRADE_DATE: "2025-11-02"
+      ORDERBOOK_DEPTH: "200"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/h1-volume-lookback-provenance-fix
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Inspect full official Bybit BTCUSDT L2 archive
+        run: python scripts/inspect_bybit_orderbook_sample.py
+      - name: Inspect matching official Bybit BTCUSDT public trades
+        run: python scripts/inspect_bybit_trade_sample.py
+      - name: Upload L2 and trade validation reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: bybit-btcusdt-matched-l2-trades-validation
+          path: |
+            bybit_orderbook_sample_inspection.json
+            bybit_trade_sample_inspection.json
+          if-no-files-found: error
+          retention-days: 90

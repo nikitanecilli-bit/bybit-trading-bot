@@ -142,3 +142,8 @@ PnL replay запрещён, пока не выполнены все сущес�
 **Ограничение scope:** исходный протокол выше был описан с Top-5 universe. Текущий проектный scope ограничен BTCUSDT. Это не считается автоматически эквивалентным исходному Top-5 эксперименту. Runner всё ещё требует train-only Top-5 selection manifest в загрузчике и main path; следовательно, полностью работающий BTC-only путь ещё не реализован. До отдельной preregistration/реализации и тестов запускать runner нельзя.
 
 CI `45649835753` — SUCCESS (commit `6082860b6be3284e890b39e841d73e55f953d1b8`). Подтверждены компиляция и детерминированные тесты; это не PnL, не подтверждение edge и не открытие data gate. Market PnL, paper trading и реальные ордера не запускались.
+
+
+## 10. Отдельный single-symbol протокол
+
+Для проекта с фиксированным BTCUSDT создан отдельный документ `BTC_ONLY_H1_DONCHIAN48_EMA_PREREGISTRATION_RU.md` и manifest protocol `h1-btc-single-symbol-v1`. Он не заменяет и не переопределяет Top-5 universe из настоящего документа. Сравнивать результаты этих двух протоколов как один эксперимент нельзя. До закрытия Bybit data/accounting gates PnL replay запрещён.

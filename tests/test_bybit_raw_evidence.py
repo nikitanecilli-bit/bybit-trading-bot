@@ -55,7 +55,7 @@ class RawEvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             output = root / "snapshot.json"
-            output.write_text('{"instruments":[]}', encoding="utf-8")
+            output.write_text(json.dumps({"instruments": [], "page_observations": [{"page_index": 1}]}), encoding="utf-8")
             records = []
             record = capture_response(
                 body, base_url="https://api.bybit.com",
@@ -93,7 +93,7 @@ class RawEvidenceTests(unittest.TestCase):
             )
             output = root / "2026-11-25T08-00-00Z.json"
             assert_snapshot_paths_available(root, "2026-11-25T08-00-00Z")
-            output.write_text('{"tiers":[]}', encoding="utf-8")
+            output.write_text(json.dumps({"tiers": [], "page_observations": [{"page_index": 1}]}), encoding="utf-8")
             manifest = finalize_snapshot_evidence(
                 root, "2026-11-25T08-00-00Z", source="fixture",
                 category="linear", normalized_output=output, records=records,
@@ -114,13 +114,25 @@ class RawEvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             output = root / "snapshot.json"
-            output.write_text('{"version":1}', encoding="utf-8")
+            output.write_text(json.dumps({"version": 1, "page_observations": [{"page_index": 1}]}), encoding="utf-8")
+            records = []
+            record = capture_response(
+                b'{"fixture":true}', base_url="https://api.bybit.com",
+                endpoint="/v5/market/risk-limit", params={"category": "linear"},
+                http_status=200, response_headers={}, evidence_dir=root / "raw",
+                records=records,
+            )
             manifest = root / "evidence.json"
             write_evidence_manifest(
                 manifest, source="fixture", category="linear",
-                normalized_output=output, records=[], collection_pages=[],
+                normalized_output=output, records=records,
+                collection_pages=[{
+                    "page_index": 1,
+                    "raw_response_request_id": record["request_id"],
+                    "raw_response_body_sha256": record["body_sha256"],
+                }],
             )
-            output.write_text('{"version":2}', encoding="utf-8")
+            output.write_text(json.dumps({"version": 2, "page_observations": [{"page_index": 1}]}), encoding="utf-8")
             report = validate_evidence_manifest(manifest)
             self.assertFalse(report["ok"])
             self.assertIn("normalized_output_hash_mismatch", report["errors"])

@@ -60,7 +60,9 @@
 
 Один полный день BTCUSDT (2026-11-01) скачан и прошёл gzip/CSV schema scan. Trades: 360 226 строк; L2: 11 612 155 строк. Дополнительно выполнено сравнение всех 24 часовых CryptoHFTData trade files с Tardis daily trades по (trade_time, aggressor side, price, quantity): 360 226 из 360 226 Tardis trades найдены в CryptoHFTData; пропусков относительно Tardis — 0; в CryptoHFTData одна дополнительная запись в 18:00 UTC (2026-11-01 18:11:26.056, Buy, 77929.70, qty 0.007), с уникальным trade ID и без совпадения у Tardis. Причина дополнительной записи не установлена; в остальных 23 часах exact multiset match 100%. Отчёт: Actions run 45626273387, artifact 15027427890.
 
-Однако normalized L2 CSV сохраняет Bybit system ts, но не matching-engine cts и sequence IDs; поэтому для queue replay он уступает CryptoHFTData. Полный raw replay API Tardis требует платного доступа; покупка подписки этим разрешением не одобрена.
+Дополнительная L2 cross-check одного event-hour (2026-11-01 12:00 UTC) дала exact match: 655 631 Tardis update rows = 655 631 CryptoHFTData update rows, missing/extra = 0. Для совпадения пришлось скачать CryptoHFTData receive-hour partitions 12 и 13: одиннадцать updates с event_time 12:59:59.934 были записаны в файл 13 по receive_time. Следовательно, все исторические hourly loaders должны брать соседние receive-hour files и фильтровать события по event_time/transaction_time; нельзя считать час файла часом события. Отчёт: Actions run 45626768545, artifact 15027383267.
+
+Однако normalized L2 CSV сохраняет Bybit system ts, но не matching-engine cts и sequence IDs; поэтому для проверки matching-engine chronology и queue replay он уступает CryptoHFTData. L2 cross-check выше сравнивал только message.ts/event_time и не закрывает cts/sequence validation. Полный raw replay API Tardis требует платного доступа; покупка подписки этим разрешением не одобрена.
 
 Решение: CryptoHFTData — основной кандидат для следующего ограниченного backfill и проверки; Tardis — вторичная независимая сверка там, где есть доступные бесплатные samples. Ни один источник пока не принят для market-PnL validation.
 

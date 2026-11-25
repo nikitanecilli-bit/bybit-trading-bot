@@ -16,7 +16,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,18 +24,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Download official Bybit BTCUSDT H1 candles for sample window
+      - name: Download official Bybit BTCUSDT H1 history for alignment checks
         env:
           SYMBOL: BTCUSDT
           OUT_DIR: bybit_btcusdt_initial
-          START_DATE: "2024-04-11"
-          END_DATE: "2024-04-14"
+          START_DATE: "2020-04-01"
+          END_DATE: "2025-11-04"
         run: python scripts/download_bybit_btcusdt_public_history.py
-      - name: Download and validate official Bybit public trades
+      - name: Download selected official Bybit public trade days across years
         env:
           SYMBOL: BTCUSDT
-          START_DATE: "2024-04-11"
-          END_DATE: "2024-04-13"
+          TRADE_DATES: "2020-04-01,2021-04-01,2022-04-01,2023-04-01,2024-04-11,2025-04-01"
           KLINE_PATH: bybit_btcusdt_initial/trade_h1.csv
           OUT_DIR: trade_flow_validation
         run: python scripts/validate_bybit_public_trade_archive.py

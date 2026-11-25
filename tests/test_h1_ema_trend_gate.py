@@ -14,6 +14,7 @@ from scripts.run_h1_shared_capital_portfolio_validation import (
     resolve_volume_lookback_period,
     resolve_donchian_variant_modes,
     h1_variant_modes, h1_variant_name, resolve_ema50_200_gate,
+    load_frozen_selection_manifest,
 )
 import Bybit_Trading_Engine_v14_research as em
 from market_structure import lookup_trend_label
@@ -42,6 +43,37 @@ def test_h1_execution_risk_settings_are_explicitly_frozen():
     assert MAX_CHASE_LIMIT_PCT == 1.5
     assert ACCELERATED_ATR_TRAIL_AFTER_1_5R is False
     assert ENABLE_POST_BREAK_INVALIDATION is False
+
+
+def test_btc_single_symbol_manifest_mode_is_separate_and_fail_closed():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "btc.json"
+        path.write_text(json.dumps({
+            "schema_version": 1,
+            "selection_protocol": "h1-btc-single-symbol-v1",
+            "selection_status": "ok",
+            "generated_at_utc": "2026-11-25T00:00:00Z",
+            "strategy_config": {"direction": "long_only", "symbol": "BTCUSDT"},
+            "training_window": {"cutoff_timestamp_ms": 1000},
+            "input_files": {key: [] for key in ("kline", "funding", "mark_price", "instrument_specs", "risk_tiers", "universe_snapshot")},
+            "code_files": [],
+            "primary": ["BTCUSDT"],
+        }), encoding="utf-8")
+        env = {
+            "H1_SELECTION_MODE": "btc_single",
+            "H1_SELECTION_MANIFEST": str(path),
+            "H1_SYMBOL_ALLOWLIST": "BTCUSDT",
+        }
+        selection = load_frozen_selection_manifest(env)
+        assert selection["selection_mode"] == "btc_single"
+        assert selection["symbols"] == ["BTCUSDT"]
+        env["H1_SYMBOL_ALLOWLIST"] = "BTCUSDT,ETHUSDT"
+        try:
+            load_frozen_selection_manifest(env)
+        except SystemExit as exc:
+            assert "exactly match" in str(exc)
+        else:
+            raise AssertionError("BTC-only manifest must reject additional symbols")
 
 
 def test_ema50_200_gate_is_explicitly_opt_in_and_rejects_invalid_values():

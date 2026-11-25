@@ -60,6 +60,7 @@ H1_REPLAY_CODE_PATHS = [
     "bybit_downloader.py",
     "scripts/archive_bybit_market_history.py",
 ]
+BTC_H1_REPLAY_CODE_PATHS = [path for path in H1_REPLAY_CODE_PATHS if path != "scripts/select_h1_top5_train_only.py"] + ["scripts/create_h1_btc_single_symbol_manifest.py"]
 SELECTION_INPUT_KEYS = ("kline", "funding", "mark_price", "instrument_specs", "risk_tiers", "universe_snapshot")
 
 
@@ -452,11 +453,14 @@ def validate_selection_provenance(selection, current_input_files, current_code_f
 
 
 def load_frozen_selection_manifest(environ=None):
-    """Load and validate the train-only top-five manifest required by every mode."""
+    """Load either the original Top-5 protocol or a separately registered BTC-only protocol."""
     env = os.environ if environ is None else environ
+    selection_mode = str(env.get("H1_SELECTION_MODE", "top5")).strip().lower()
+    if selection_mode not in {"top5", "btc_single"}:
+        raise SystemExit("H1_SELECTION_MODE must be 'top5' or 'btc_single'")
     raw_path = str(env.get("H1_SELECTION_MANIFEST", "")).strip()
     if not raw_path:
-        raise SystemExit("H1_SELECTION_MANIFEST is required; run the train-only top-five selector first")
+        raise SystemExit("H1_SELECTION_MANIFEST is required")
     path = Path(raw_path)
     if not path.is_file():
         raise SystemExit(f"H1 selection manifest does not exist: {path}")
@@ -464,28 +468,26 @@ def load_frozen_selection_manifest(environ=None):
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise SystemExit(f"Invalid H1 selection manifest: {exc}") from exc
-    if payload.get("schema_version") != 1 or payload.get("selection_protocol") != "h1-top5-train-only-v2":
-        raise SystemExit("Unsupported H1 selection manifest schema/protocol")
+    protocol = "h1-top5-train-only-v2" if selection_mode == "top5" else "h1-btc-single-symbol-v1"
+    if payload.get("schema_version") != 1 or payload.get("selection_protocol") != protocol:
+        raise SystemExit(f"Unsupported H1 selection manifest schema/protocol for {selection_mode}")
     if payload.get("selection_status") != "ok":
-        raise SystemExit("H1 selection manifest has no valid top-five set; refusing validation")
+        raise SystemExit("H1 selection manifest is not successful; refusing validation")
     strategy_config = payload.get("strategy_config")
     if not isinstance(strategy_config, dict) or strategy_config.get("direction") != "long_only":
         raise SystemExit("H1 runner is long-only; selection manifest must explicitly declare strategy_config.direction=long_only")
     if not isinstance(payload.get("input_files"), dict) or not isinstance(payload.get("code_files"), list):
         raise SystemExit("H1 selection manifest lacks immutable data/code provenance")
     primary = payload.get("primary")
-    if not isinstance(primary, list) or len(primary) != 5:
-        raise SystemExit("H1 selection manifest must contain exactly five primary symbols")
-    symbols = [str(item).strip().upper() for item in primary]
-    if any(not item for item in symbols) or len(set(symbols)) != 5:
-        raise SystemExit("H1 selection manifest primary symbols must be unique and non-empty")
-    allowlist = [
-        item.strip().upper()
-        for item in str(env.get("H1_SYMBOL_ALLOWLIST", "")).split(",")
-        if item.strip()
-    ]
-    if len(allowlist) != 5 or set(allowlist) != set(symbols):
-        raise SystemExit("H1_SYMBOL_ALLOWLIST must exactly match the five symbols in the selection manifest")
+    expected_count = 5 if selection_mode == "top5" else 1
+    symbols = [str(item).strip().upper() for item in primary] if isinstance(primary, list) else []
+    if len(symbols) != expected_count or any(not item for item in symbols) or len(set(symbols)) != expected_count:
+        raise SystemExit(f"H1 {selection_mode} manifest must contain exactly {expected_count} unique symbol(s)")
+    if selection_mode == "btc_single" and symbols != ["BTCUSDT"]:
+        raise SystemExit("BTC single-symbol manifest must select exactly BTCUSDT")
+    allowlist = [item.strip().upper() for item in str(env.get("H1_SYMBOL_ALLOWLIST", "")).split(",") if item.strip()]
+    if len(allowlist) != expected_count or set(allowlist) != set(symbols):
+        raise SystemExit(f"H1_SYMBOL_ALLOWLIST must exactly match the {expected_count} symbol(s) in the selection manifest")
     try:
         cutoff = int(payload["training_window"]["cutoff_timestamp_ms"])
     except (KeyError, TypeError, ValueError) as exc:
@@ -493,13 +495,11 @@ def load_frozen_selection_manifest(environ=None):
     if cutoff <= 0:
         raise SystemExit("H1 selection training cutoff must be positive")
     return {
-        "path": str(path),
-        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-        "symbols": sorted(symbols),
-        "training_cutoff_timestamp_ms": cutoff,
+        "path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "symbols": sorted(symbols), "training_cutoff_timestamp_ms": cutoff,
         "generated_at_utc": payload.get("generated_at_utc"),
-        "input_files": payload["input_files"],
-        "code_files": payload["code_files"],
+        "input_files": payload["input_files"], "code_files": payload["code_files"],
+        "selection_mode": selection_mode,
     }
 
 
@@ -1377,7 +1377,7 @@ def build_validation_manifest(
             "Hashes identify exact files but do not independently attest remote origin."
         ),
         "universe": {
-            "selection_mode": "frozen_train_only_top5",
+            "selection_mode": design["selection"].get("selection_mode", "top5"),
             "allowlist": allowlist,
             "selected_symbols": selected_symbols,
             "selected_symbol_count": len(selected_symbols),
@@ -1503,11 +1503,14 @@ def main():
     if set(design["selection"]["symbols"]) != set(symbols):
         raise SystemExit("Aligned Bybit universe does not exactly match frozen selection manifest")
     repo_root = Path(__file__).resolve().parents[1]
+    replay_seeds = BTC_H1_REPLAY_CODE_PATHS if design["selection"].get("selection_mode") == "btc_single" else H1_REPLAY_CODE_PATHS
     selection_code_files = [
         _file_manifest_record(repo_root / relative)
-        for relative in resolve_h1_replay_code_paths(repo_root)
+        for relative in resolve_h1_replay_code_paths(repo_root, replay_seeds)
     ]
     recorded_universe = design["selection"]["input_files"].get("universe_snapshot")
+    if isinstance(recorded_universe, dict):
+        recorded_universe = [recorded_universe]
     if not isinstance(recorded_universe, list) or len(recorded_universe) != 1:
         raise SystemExit("H1 selection manifest must identify exactly one lifecycle universe snapshot")
     universe_path = Path(recorded_universe[0].get("path", ""))

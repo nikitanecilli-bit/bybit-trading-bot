@@ -124,6 +124,18 @@ class LifecycleExtractionTests(unittest.TestCase):
         self.assertEqual(result["events"], [])
         self.assertEqual(len(result["out_of_scope_articles"]), 1)
         self.assertEqual(result["out_of_scope_articles"][0]["reason"], "alpha_spot_or_token_notice")
+    def test_spot_pair_with_usdt_ticker_is_not_classified_as_perpetual(self):
+        tmp, root = build_fixture(
+            "New listing: ABCUSDT spot trading pair",
+            "2026-11-25T10:00:00Z",
+            "ABCUSDT spot trading is now open.",
+        )
+        self.addCleanup(tmp.cleanup)
+        result, failures = extract_events(root)
+        self.assertEqual(failures, [])
+        self.assertEqual(result["events"], [])
+        self.assertEqual(result["out_of_scope_articles"][0]["reason"], "product_scope_not_explicitly_perpetual")
+        self.assertEqual(result["out_of_scope_articles"][0]["symbols"], ["ABCUSDT"])
     def test_raw_body_hash_mismatch_fails_closed(self):
         tmp, root = build_fixture(
             "Delisting of TMXUSDT Perpetual Contract",

@@ -70,7 +70,7 @@ for path in p.scripts:
         st,data,_=get(BASE+path)
         js=data.decode("utf-8",errors="replace")
         snippets=[]
-        for term in ("api.bybit.com","api2.bybit.com","api.bytick.com","baseURL","10831:","ml:function","ml:"):
+        for term in ("api.bybit.com","api2.bybit.com","api.bytick.com","baseURL","getApiHost","serviceDomainList","serviceHost","apiHost","10831:","ml:function","ml:"):
             pos=js.find(term)
             if pos>=0: snippets.append({"term":term,"context":js[max(0,pos-250):pos+650]})
         if snippets:

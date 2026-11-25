@@ -2,7 +2,7 @@
 """Download Bybit's own public BTCUSDT H1 archive (CSV.GZ), no credentials."""
 from __future__ import annotations
 import csv, gzip, hashlib, io, json, os, time, urllib.error, urllib.request
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 from pathlib import Path
 
 SYMBOL = "BTCUSDT"
@@ -67,8 +67,10 @@ for y, m in months_between(START, END):
         if len(parts) < 6:
             continue
         try:
-            dt = datetime.strptime(parts[0].strip(), "%Y.%m.%d %H:%M").replace(tzinfo=timezone.utc)
-            ts = int(dt.timestamp() * 1000)
+            # Bybit MT4 archive labels use UTC+3; normalize to UTC.
+            dt_local = datetime.strptime(parts[0].strip(), "%Y.%m.%d %H:%M")
+            dt_utc = (dt_local - timedelta(hours=3)).replace(tzinfo=timezone.utc)
+            ts = int(dt_utc.timestamp() * 1000)
             if ts < int(datetime.combine(START, datetime.min.time(), tzinfo=timezone.utc).timestamp()*1000):
                 continue
             if ts > int(datetime.combine(END, datetime.min.time(), tzinfo=timezone.utc).timestamp()*1000):

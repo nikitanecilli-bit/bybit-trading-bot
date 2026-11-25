@@ -440,3 +440,5 @@ A GitHub-hosted read-only capture of official OKX public endpoints completed suc
 
 
 A documentation-only follow-up identified a possible official OKX historical-data route for Funding beyond the three-month standard endpoint: the historical-data portal advertises perpetual Funding from March 2022, and the API changelog records a separate public historical-market-data query capability with Funding support. This remains an unverified retrieval lead and is not authorized as part of the completed narrow pilot. The current instrument `upcChg` field is for upcoming changes only; the account fee endpoint is authenticated and out of scope.
+
+Повторный OKX cloud capture завершился успешно и дал побайтно идентичные нормализованные CSV/JSON относительно первого запуска; оба архива независимо прошли проверку всех 180 raw-файлов и SHA-256. Workflow исправлен так, чтобы ошибка загрузчика завершала job ошибкой, а артефакты хранились 90 дней. Повторяемость данных подтверждена, оставшиеся D3/D4/D5/D6/D8 и независимость holdout не закрыты.

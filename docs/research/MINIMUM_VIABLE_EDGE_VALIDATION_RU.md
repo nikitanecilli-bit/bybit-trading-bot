@@ -1,7 +1,7 @@
 # Минимальный путь к доказательству торгового преимущества
 
-**Дата пересмотра:** 2026-11-24  
-**Статус:** DESIGN / NO DATA COLLECTION / NO MARKET PNL AUTHORIZATION  
+**Дата пересмотра:** 2026-11-25  
+**Статус:** PUBLIC HISTORICAL DATA COLLECTION AUTHORIZED / SAMPLE ACCESS VALIDATED / NO MARKET PNL AUTHORIZATION  
 **Управленческая основа:** `docs/COMPANY_OPERATING_PHILOSOPHY_RU.md`
 
 ## 1. Задача
@@ -10,9 +10,9 @@
 
 Минимальный эксперимент не равен слабому эксперименту. Он может сузить охват, но не должен снижать достоверность вывода в пределах заявленного охвата.
 
-## 2. Сначала кандидат, затем данные
+## 2. Кандидат фиксируется до PnL; проверочные samples можно получать заранее
 
-До получения данных нужно выбрать ровно одну гипотезу, которая:
+Для проверки доступности источника и качества его формата можно получать ограниченные публичные исторические samples до окончательного выбора кандидата. Но до любого market-PnL replay нужно выбрать ровно одну гипотезу, которая:
 - полностью определяет сигнал, вход, выход, отмену, максимальное время удержания, частичное закрытие и поведение при неоднозначном баре;
 - имеет frozen parameters и заранее зафиксированную причину существования;
 - не требует подбора параметров на тестовом периоде;
@@ -26,9 +26,41 @@
 
 **Текущий runner не является готовым single-symbol pilot:** `run_h1_shared_capital_portfolio_validation.py` требует точное совпадение с frozen train-only Top-5 manifest, lifecycle universe snapshot и directories для kline/funding/mark/specs/risk tiers; он перебирает заранее заданные folds, arms и cost multipliers. Переделка его под один символ была бы отдельной инженерной задачей, а не простой настройкой. Не создавать новый runner до доказательства, что он необходим для выбранного независимого эксперимента.
 
-**Вывод:** сейчас нет кандидата, одновременно готового к честному новому PnL validation и имеющего независимый допустимый период/реалистичную модель исполнения. Это отдельный блокер наряду с данными. Не маскировать его сбором ещё большего архива или инфраструктурой.
+**Вывод:** источник данных и базовая доступность файлов больше не являются блокером. Но нет кандидата, одновременно готового к честному новому PnL validation, принятого независимого периода и полной реалистичной модели исполнения. Сбор данных теперь разрешён только как целевой шаг к снятию этих ограничений; не превращать его в бесконечный backfill или инфраструктурный проект.
 
 
+
+
+## 2B. Первый фактический data milestone — 2026-11-25
+
+Пользователь отдельно разрешил получать публичные независимые исторические рыночные данные. Это разрешение не включает private/account API, реальные ордера, paper/live trading или платные подписки.
+
+### CryptoHFTData — основной кандидат источника
+
+В GitHub Actions скачан и проверен один час BTCUSDT, 2026-11-01 12:00 UTC. Проверка: Parquet schema, row counts, временные последовательности, значения, trade IDs, восстановление L2 книги и SHA-256. Сырые файлы не сохранялись в публичном artifact.
+
+- Trades: 25 700 строк; 25 700 уникальных ID; ноль null/duplicate IDs и ноль regressions в event/trade/received timestamps.
+- Orderbook: 655 729 строк; 1 snapshot и 105 736 update messages; ноль crossed states, 50 bid и 50 ask уровней в итоговой книге. final_update_id не имел регрессий или скачков в этом часе. prev_final_update_id отсутствовал во всех строках, поэтому сравнить предыдущий ID напрямую невозможно. На 100 snapshot rows transaction_time отсутствовал; все update messages имели его.
+- Mark Price: 5 728 строк; mark/index/funding_rate/next_funding_time заполнены; estimated_settle_price пуст, что ожидаемо для perpetual.
+- Временная проверка: Bybit orderbook.cts и publicTrade.T используют миллисекундную шкалу matching-engine time. В этом часе 4.482% trade rows имели хотя бы один book update с тем же миллисекундным timestamp; nearest book timestamp для уникальных trade timestamps — median 5 ms, p95 14 ms, p99 18 ms, max 75 ms. Это подтверждает сопоставимую шкалу, но не причинную связь конкретной сделки с конкретным обновлением и не порядок доставки между каналами.
+- SHA-256 и полный отчёт: GitHub Actions run 45625276612, artifact 15028337972. Проверка завершилась SUCCESS.
+
+Поставщик указывает историю с 2025-06-28, hourly Parquet и бесплатный доступ к отдельным файлам без API key (ограничение 60 files/min на IP). Но sample одного часа не доказывает непрерывность полного периода.
+
+### Ограничения CryptoHFTData, которые обязательны к учёту
+
+- Bybit trades имеют reconnect gaps от нескольких секунд примерно до 3 минут, в основном около ежедневного переподключения 02:00–02:50 UTC; заявленный backfill ещё не опубликован. Такие окна нельзя автоматически считать полными.
+- Известные отсутствующие Bybit orderbook partitions: 2025-11-26 10 — 2025-12-26 19 UTC и 2026-04-13 15 — 2026-04-14 21 UTC.
+- У поставщика отмечена отдельная проблема REST orderbook snapshots, опубликованных как resets с update IDs от другого depth stream; статус исправления 2026-10 release на странице Known Gaps указан как not yet deployed. Каждый snapshot/sequence transition нужно проверять, а проблемные участки исключать.
+- После 2026-09 data-integrity release Bybit mark_price должен содержать полное состояние per symbol; sample 2026-11-01 согласуется с этим. Это не заменяет проверку всех часов и не является settled funding ledger.
+- Funding Rate + next funding time — состояние будущего funding, а не список фактически прошедших settlement cashflows. Для точного PnL нужен отдельный settled funding history и точное сопоставление времени/ставки.
+- Dated instrument specs/risk tiers, PIT universe, fees и полная историческая lifecycle выбранного контракта всё ещё не закрыты.
+
+### Tardis.dev — вторичный cross-check
+
+Один полный день BTCUSDT (2026-11-01) скачан и прошёл gzip/CSV schema scan. Trades: 360 226 строк; L2: 11 612 155 строк. Однако normalized L2 CSV сохраняет Bybit system ts, но не matching-engine cts и sequence IDs; поэтому для queue replay он уступает CryptoHFTData. Полный raw replay API Tardis требует платного доступа; покупка подписки этим разрешением не одобрена.
+
+Решение: CryptoHFTData — основной кандидат для следующего ограниченного backfill и проверки; Tardis — вторичная независимая сверка там, где есть доступные бесплатные samples. Ни один источник пока не принят для market-PnL validation.
 
 ## 2A. Решение по готовности кандидатов — read-only review 2026-11-24
 
@@ -132,15 +164,14 @@ The existing scripts/run_bybit_h1_long_only_holdout.py is not a substitute: it r
 
 The existing archive workflow defaults to self-hosted and warns hosted US runners are blocked. Self-hosted runners and new collectors remain prohibited. Do not modify the workflow or relabel old folds as holdout.
 
-Decision: **BLOCKED BY DATA + INDEPENDENCE**. No runner rewrite or PnL run is justified until a permitted independent Bybit-native dataset exists and passes the relevant gates.
+Decision: **BLOCKED BY DATA COVERAGE + INDEPENDENCE + EXECUTION CONTRACT**. Public historical data collection is authorized and one-hour sample access is validated, but no accepted full independent period or PnL run is authorized yet.
 
 ## 7. Что делать сейчас
 
-Пока действуют ограничения пользователя:
-1. Не подключать Bybit API, кроме отдельно разрешённого публичного announcements endpoint.
-2. Не скачивать market archives, не запускать collectors и не настраивать self-hosted runner.
-3. Не выполнять market-PnL backtests, sweeps или event studies на текущем proxy package.
-4. Продолжать только read-only audit публичной документации/объявлений, существующего кода, Git history и уже сохранённых артефактов.
-5. Не менять H-B lifecycle и не выбирать новые параметры без отдельного обоснования и разрешения.
+1. Не подключать Bybit private/account API, API keys, trading endpoints, paper/live trading или реальные ордера.
+2. Разрешено получать публичные исторические архивы в ограниченном scope; не использовать paid subscriptions/API keys без отдельного согласования.
+3. Не выполнять market-PnL backtests, sweeps или event studies, пока не приняты coverage, funding, dated specs/risk, candidate contract и preregistration.
+4. Следующий data step — один заранее ограниченный BTCUSDT период: сначала adjacent-hour continuity и missing/reconnect audit, затем только необходимое число часов для выбранной H1 гипотезы.
+5. Не менять H-B lifecycle и не подбирать новые параметры на уже использованных folds.
 
-**Следующий допустимый результат:** выбрать один полностью специфицированный кандидат и доказать наличие действительно независимого допустимого периода/данных. Если такого сочетания нет, честный статус — BLOCKED; не создавать работу ради видимости движения.
+**Следующий допустимый результат:** frozen candidate + воспроизводимый, покрытый по времени Bybit-native sample с проверенными gap exclusions, settled funding, dated specs/risk и заранее заданными ACCEPT / REJECT / INCONCLUSIVE criteria. До этого статус остаётся BLOCKED; не создавать работу ради видимости движения.

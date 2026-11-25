@@ -155,7 +155,7 @@ class RawEvidenceTests(unittest.TestCase):
             record = capture_response(
                 b'{"fixture":true}', base_url="https://api.bybit.com",
                 endpoint="/v5/market/risk-limit", params={"category": "linear"},
-                http_status=200, response_headers={}, evidence_dir=root / "raw",
+                http_status=200, response_headers={}, evidence_dir=root,
                 records=records,
             )
             manifest = root / "evidence.json"

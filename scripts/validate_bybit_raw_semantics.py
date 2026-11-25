@@ -166,8 +166,9 @@ def validate_semantics(manifest_path: str | Path) -> dict[str, Any]:
                 errors.append(f"{stream}_empty_page")
                 continue
             try:
-                timestamps = [_timestamp(stream, row) for row in rows]
-                reconstructed[stream].extend(_normalized_row(stream, row, symbol))
+                timestamps = [_timestamp(stream, item) for item in rows]
+                for item in rows:
+                    reconstructed[stream].append(_normalized_row(stream, item, symbol))
             except ValueError as exc:
                 errors.append(f"{stream}_{exc}")
                 continue

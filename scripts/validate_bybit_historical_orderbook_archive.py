@@ -77,6 +77,8 @@ def inspect(day: date):
     top_level_keys = data_keys = None
     cts_top_level_count = cts_data_count = 0
     zip_names = []
+    strict_book = OrderBook()
+    strict_replay_counts = Counter()
     bid_book, ask_book = {}, {}
     replay_initialized = False
     replay_deltas = replay_snapshots = 0

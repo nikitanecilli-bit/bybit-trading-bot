@@ -38,7 +38,7 @@ def _append_fake_raw_response(raw_evidence_dir, raw_records, endpoint):
     body_path.write_bytes(body)
     audit_path = root / record["audit_file"]
     audit_path.parent.mkdir(parents=True, exist_ok=True)
-    audit_path.write_text(json.dumps(record, sort_keys=True, indent=2) + "\\n", encoding="utf-8")
+    audit_path.write_text(json.dumps(record, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     raw_records.append(record)
 
 

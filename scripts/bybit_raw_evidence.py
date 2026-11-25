@@ -110,6 +110,57 @@ def write_evidence_manifest(
     return manifest
 
 
+
+def assert_snapshot_paths_available(output_root: str | Path, stamp: str) -> None:
+    """Fail closed rather than overwrite a dated snapshot or its evidence."""
+    root = Path(output_root)
+    candidates = (
+        root / f"{stamp}.json",
+        root / f"{stamp}.evidence.json",
+        root / "raw_evidence" / stamp,
+        root / "raw_evidence" / "pending",
+    )
+    existing = [str(path) for path in candidates if path.exists()]
+    if existing:
+        raise FileExistsError(
+            "dated snapshot/evidence path already exists; refusing to overwrite: "
+            + ", ".join(existing)
+        )
+
+
+def finalize_snapshot_evidence(
+    output_root: str | Path, stamp: str, *, source: str, category: str,
+    normalized_output: str | Path, records: list[dict[str, Any]],
+    collection_pages: list[dict[str, Any]],
+) -> Path:
+    """Move one capture into its dated directory, rebase audit paths, and seal manifest."""
+    root = Path(output_root)
+    pending = root / "raw_evidence" / "pending"
+    dated = root / "raw_evidence" / stamp
+    manifest_path = root / f"{stamp}.evidence.json"
+    if dated.exists() or manifest_path.exists():
+        raise FileExistsError("dated raw evidence already exists; refusing to overwrite")
+    if records and not pending.is_dir():
+        raise FileNotFoundError("raw response capture directory is missing")
+    if pending.exists():
+        dated.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(pending, dated)
+    for record in records:
+        record["body_file"] = str(Path("raw_evidence") / stamp / record["body_file"]).replace(os.sep, "/")
+        record["audit_file"] = str(Path("raw_evidence") / stamp / record["audit_file"]).replace(os.sep, "/")
+        audit_path = root / record["audit_file"]
+        _atomic_write(
+            audit_path,
+            (json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\\n").encode("utf-8"),
+        )
+    write_evidence_manifest(
+        manifest_path, source=source, category=category,
+        normalized_output=normalized_output, records=records,
+        collection_pages=collection_pages,
+    )
+    return manifest_path
+
+
 def validate_evidence_manifest(manifest_path: str | Path) -> dict[str, Any]:
     path = Path(manifest_path)
     errors: list[str] = []

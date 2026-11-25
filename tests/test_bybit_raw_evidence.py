@@ -92,8 +92,8 @@ class RawEvidenceTests(unittest.TestCase):
                 evidence_dir=root / "raw_evidence" / "capture-test", records=records,
             )
             output = root / "2026-11-25T08-00-00Z.json"
-            output.write_text('{"tiers":[]}', encoding="utf-8")
             assert_snapshot_paths_available(root, "2026-11-25T08-00-00Z")
+            output.write_text('{"tiers":[]}', encoding="utf-8")
             manifest = finalize_snapshot_evidence(
                 root, "2026-11-25T08-00-00Z", source="fixture",
                 category="linear", normalized_output=output, records=records,

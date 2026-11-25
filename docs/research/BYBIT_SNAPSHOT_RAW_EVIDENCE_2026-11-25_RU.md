@@ -34,9 +34,9 @@ The shared validator checks raw body hashes and sizes, audit-record equality, un
 
 GitHub Actions run:
 
-https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45581283920
+https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45581812910
 
-**Result: SUCCESS** (latest strengthened validator, commit `32a1f6a11a2ec1d40653f3d08242ca8b24635bf1`)
+**Result: SUCCESS** (latest strengthened validator, commit `c8df338b2b4605c307af02ccd92b5ccdd30a8090`)
 
 - Python compilation: PASS
 - Raw evidence capture/finalization, body and normalized-output tamper tests: PASS
@@ -44,7 +44,7 @@ https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45581283920
 - Instrument snapshot regression tests: PASS
 - Linear universe snapshot regression tests: PASS
 - Risk-limit snapshot regression tests: PASS
-- Existing market-history collector regression tests: PASS
+- Existing market-history collector regression tests, including archive-level page/response and normalized CSV integrity checks: PASS
 
 The workflow uses synthetic fixtures and GitHub-hosted runners. It does not call Bybit or collect market data.
 

@@ -1,8 +1,9 @@
 # Initial Stop ATR Sensitivity — Bybit BTC/ETH H1
 Date: 2026-11-25
 Branch: research/h1-volume-lookback-provenance-fix
-Workflow: https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45661144975
-Artifact: preliminary-bybit-initial-stop-sensitivity (54 configurations)
+Sensitivity workflow: https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45661144975
+Reproducible diagnostics workflow: https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45663273561
+Artifact: preliminary-bybit-initial-stop-sensitivity (includes 54 configurations and entry diagnostics)
 
 ## Scope
 Official Bybit public H1 archives only. Fixed Arm C: Donchian 48, EMA50 > EMA200, EMA200 rising over 5 bars, close > EMA200, volume ratio 1.6. Tested initial stops 2.5 / 3.0 / 3.5 ATR(14), folds 50–65%, 65–80%, 80–100%, cost multipliers 1.0 / 1.5 / 2.0. Position quantity is recalculated from each fold's current equity to target 1% nominal initial risk. TP1=2R on 50%, TP2=5R on remainder, 3 ATR trailing after TP1, time exit 32 bars. One position at a time.
@@ -60,8 +61,10 @@ A circular moving-block bootstrap was applied to BTC trade PnLs separately withi
 
 At 1x costs, the 95% bootstrap interval for total fold PnL crossed zero in every fold/stop combination except Fold 2 with 3.5 ATR (approximately +112 to +2,046 USDT). At 2x costs, every fold/stop interval crossed zero. This reinforces that the apparent aggregate advantage is uncertain.
 
-## Entry-quality diagnostic (preliminary local calculation; reproducible workflow added)
-Features are measured at the signal candle close, before entry at the next candle open. For the 3.5 ATR BTC candidate, 1x costs:
+## Entry-quality diagnostic (reproduced successfully)
+Workflow 45663273561 completed successfully. The script scripts/preliminary_bybit_entry_quality_diagnostics.py writes entry_diagnostics/trade_features.csv, group_medians.csv, report.md, and methodology.json into the artifact. Features are measured at the signal candle close, before entry at the next candle open.
+
+For the 3.5 ATR BTC candidate, 1x costs:
 
 | Fold | Trades | Win rate | Median ATR% | Median volume ratio | Median EMA spread% | Median 6h momentum% | Median 24h momentum% | Median forward 6h return% | Median forward 32h return% |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -69,9 +72,9 @@ Features are measured at the signal candle close, before entry at the next candl
 | 2 | 41 | 58.5% | 0.680 | 3.765 | 1.647 | 1.981 | 2.688 | +0.031 | +0.827 |
 | 3 | 70 | 41.4% | 0.551 | 3.054 | 1.038 | 1.179 | 1.990 | -0.135 | -0.073 |
 
-Fold 3's signals had weaker preceding momentum and lower volume expansion than Fold 1/2. Median forward 6h/32h returns were also weaker. This is a description of the market period, not evidence that these features can identify future winners.
+Fold 3 signals had weaker preceding momentum and lower volume expansion than Fold 1/2. Median forward 6h/32h returns were also weaker. This describes the market period; it does not establish a predictive filter.
 
-Within Fold 3, 3.5 ATR winning and losing trades had very similar pre-entry medians: 6h momentum 1.033% vs 1.089%, volume ratio 2.666 vs 3.075, ATR% 0.526 vs 0.583. There is no clean one-variable separation that justifies a filter. Do not add thresholds based on this sample.
+Within Fold 3, 3.5 ATR winning and losing trades had similar pre-entry medians: 6h momentum 1.187% vs 1.175%, volume ratio 2.666 vs 3.075, ATR% 0.525% vs 0.583%. The differences do not provide a reliable one-variable separation. Do not add thresholds from this sample.
 
 ## Interpretation
 1. 3.5 ATR is the strongest of the tested BTC settings on aggregate, including under 1.5x and 2x cost stress.
@@ -82,4 +85,4 @@ Within Fold 3, 3.5 ATR winning and losing trades had very similar pre-entry medi
 6. Fold PnLs are independent 10,000 USDT-start simulations. Summed PnL is useful for comparing configurations, but must not be described as a continuous compounded equity curve.
 
 ## Next research step
-Do not widen the stop further or optimize entry thresholds on these same folds. Keep 3.0 and 3.5 ATR as BTC research candidates only. Next, validate the diagnostics workflow and freeze a candidate before testing on genuinely untouched future Bybit data when available. Any filter proposal must be preregistered and evaluated on a separate untouched period. Do not optimize ETH alongside BTC.
+Do not widen the stop further or optimize entry thresholds on these same folds. Keep 3.0 and 3.5 ATR as BTC research candidates only. Next, validate a frozen candidate on genuinely untouched future Bybit data when available. Any filter proposal must be preregistered and evaluated on a separate untouched period. Do not optimize ETH alongside BTC.

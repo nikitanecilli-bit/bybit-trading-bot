@@ -1,5 +1,5 @@
 name: CryptoHFTData Bybit sample probe
-# Public one-hour file reachability only; no API key or trading credentials.
+# Historical per-symbol file reachability across monthly dates; reads only four bytes.
 
 on:
   push:

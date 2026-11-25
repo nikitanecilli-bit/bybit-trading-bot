@@ -304,3 +304,14 @@
 - Старый run_bybit_h1_long_only_holdout.py не подходит: Donchian(20), 11 символов отобраны на Binance train, отдельный капитал на символ, funding upper-bound, Last-price exits и явное пересечение календарного периода с прежним Binance study. Bybit data files, которых он требует, в repo отсутствуют.
 - Существующий Bybit archive workflow требует self-hosted по умолчанию и предупреждает о блокировке hosted US egress. Self-hosted/collector запрещены; workflow не запускать и не менять.
 - Статус: **BLOCKED BY DATA + INDEPENDENCE**. Ни старые folds, ни другой venue на том же календарном периоде не создают независимый holdout. Подробности: acceptance ledger Section 49 и Minimum Viable Validation Section 6A.
+
+
+## 2026-11-25 — Bybit raw-response provenance strengthened (no data collection)
+
+- На отдельной ветке `research/bybit-raw-response-evidence-v1` усилены **уже существующие** Bybit collectors; новый market-data collector не создавался.
+- Для исторических Funding/OHLCV/Mark Price responses и трёх snapshot streams (instruments-info, linear universe, risk-limit) добавлена фиксация исходных HTTP response bodies, request identity/params, UTC retrieval time, HTTP status, selected headers, SHA-256 и byte length.
+- Snapshot evidence manifest связывает каждую collection page с raw response request ID/body hash и итоговым normalized snapshot hash. Общий validator проверяет raw body, audit JSON, page-to-response links и normalized output; dated outputs fail closed при попытке перезаписи.
+- Offline regression workflow [45580464884](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45580464884) — SUCCESS на code SHA `c926b4065d89cd3c2e3a968749dbb8483da9ff98`: raw evidence tests, instrument snapshot tests, linear universe tests, risk-limit tests и market-history collector tests прошли.
+- Draft PR #17: https://github.com/nikitanecilli-bit/bybit-trading-bot/pull/17; base — `research/market-regime-v1-main`, не `main`. PR не объединён.
+- Это подтверждает только качество реализации и synthetic/offline regression. **Ни одного реального Bybit snapshot или market archive не собрано; ни один data gate не переведён в ACCEPTED.** Исторические lifecycle/spec/risk/fees limitations сохраняются.
+- Решение: оставить PR draft до отдельного review. Не запускать архивные workflows, PnL, backtest, sweeps или event studies без отдельного разрешения и прохождения текущих data gates.

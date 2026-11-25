@@ -68,7 +68,7 @@ def main() -> int:
                             "head": head, "range_get": ranged})
     pairs = {}
     for item in results:
-        pairs.setdefault(item["symbol"], {})[item["dataset"]] = (
+        pairs.setdefault(item["date"] + ":" + item["symbol"], {})[item["dataset"]] = (
             item["range_get"].get("status") == 206
             and item["range_get"].get("bytes_read") == 1
         )

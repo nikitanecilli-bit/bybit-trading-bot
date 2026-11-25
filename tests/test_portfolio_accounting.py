@@ -1895,6 +1895,39 @@ def test_end_of_test_finalization_is_order_independent_for_simultaneous_position
     assert win_first["kill_switch"] is False
 
 
+def test_exported_journal_summary_reconciles_with_trade_ledger():
+    e = make_engine()
+    pos = make_position(size=1_000.0, order_type="market", maker_exits=False)
+    e.open_positions["BTCUSDT"] = pos
+    e._last_mark_prices["BTCUSDT"] = 110.0
+
+    with tempfile.TemporaryDirectory() as tmp:
+        e.journal_output_path = str(Path(tmp) / "trade-journal.json")
+        e._close_position(
+            pos, exit_price=110.0, exit_reason="take_profit",
+            exit_ts=1_800_003_600_000, mae_r=0.0, mfe_r=2.0,
+        )
+        summary = e.export_journal_for_dashboard()
+        payload = json.loads(Path(e.journal_output_path).read_text(encoding="utf-8"))
+
+    ledger = payload["trades"]
+    assert len(ledger) == 1
+    assert summary == payload["summary"]
+    assert summary["total_trades"] == len(ledger)
+    assert summary["gross_pnl"] == round(sum(row["gross_pnl"] for row in ledger), 2)
+    assert summary["total_costs"] == round(sum(
+        row["exchange_fees_usdt"] + row["slippage_cost_usdt"] + row["funding_cost_usdt"]
+        for row in ledger
+    ), 2)
+    assert summary["net_pnl"] == round(sum(row["pnl_usdt"] for row in ledger), 2)
+    assert abs(
+        e.risk_mgr.realized_equity
+        - (e.cfg.capital_usdt + sum(row["pnl_usdt"] for row in ledger))
+    ) < 0.01
+    assert e.open_positions == {}
+    assert abs(e.risk_mgr.current_equity - e.risk_mgr.realized_equity) < 0.001
+
+
 if __name__ == "__main__":
     tests = [(name, value) for name, value in sorted(globals().items())
              if name.startswith("test_") and callable(value)]

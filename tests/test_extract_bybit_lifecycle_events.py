@@ -101,6 +101,29 @@ class LifecycleExtractionTests(unittest.TestCase):
         self.assertEqual(failures, [])
         self.assertEqual(result["events"][0]["effective_at_utc"], "2026-05-01T10:00:00Z")
 
+    def test_single_character_base_asset_perpetual_symbols_are_supported(self):
+        tmp, root = build_fixture(
+            "New listing: OUSDT Perpetual Contract, with up to 20x leverage",
+            "2026-11-25T10:00:00Z",
+            "Trading is now open for OUSDT Perpetual Contract.",
+        )
+        self.addCleanup(tmp.cleanup)
+        result, failures = extract_events(root)
+        self.assertEqual(failures, [])
+        self.assertEqual(result["events"][0]["symbol"], "OUSDT")
+
+    def test_alpha_token_delisting_is_retained_as_out_of_scope_not_perpetual(self):
+        tmp, root = build_fixture(
+            "Bybit Alpha: Delisting of ARENA",
+            "2026-11-25T10:00:00Z",
+            "Bybit Alpha will delist ARENA.",
+        )
+        self.addCleanup(tmp.cleanup)
+        result, failures = extract_events(root)
+        self.assertEqual(failures, [])
+        self.assertEqual(result["events"], [])
+        self.assertEqual(len(result["out_of_scope_articles"]), 1)
+        self.assertEqual(result["out_of_scope_articles"][0]["reason"], "alpha_spot_or_token_notice")
     def test_raw_body_hash_mismatch_fails_closed(self):
         tmp, root = build_fixture(
             "Delisting of TMXUSDT Perpetual Contract",

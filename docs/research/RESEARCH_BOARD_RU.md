@@ -345,3 +345,14 @@
 - Изменения остаются в Draft PR #17; base `research/market-regime-v1-main`, `main` не затронут. Никаких реальных данных, API-запросов, backtest или PnL не выполнялось.
 
 - Повторный полный offline CI [45583520435 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45583520435), code SHA `ab5dc2d5e039fee731862147fb1801a8e6dc7f33`: semantic raw-to-CSV reconstruction, raw-evidence, instrument, universe, risk-limit и market-history test groups прошли. Последующие коммиты `649a46d...` и обновление Research Board меняли только документацию. Это подтверждает тесты синтетических fixtures, но не полноту исторических ответов API и не реальные data gates.
+
+
+### 2026-11-25 — official Bybit public history endpoints re-audited (acceptance ledger Section 50)
+
+- D1 OHLCV and D2 Mark Price historical candle REST endpoints are documented with start/end windows and up to 1,000 records/page; maximum historical retention/completeness is not guaranteed in the docs.
+- D3 Funding History is documented with up to 200 settlements/page and symbol-specific intervals; historical interval/formula effective-time history is not supplied by the endpoint schema.
+- D4 instruments-info and D5 specs are current-state endpoints; the docs explicitly note selected order-size fields are adjusted twice monthly, without supplying the complete past effective-time values. D6 risk-limit is a current paginated table (15 Linear symbols/page), not a historical tier archive.
+- D7: official docs link to a historical public-trades download page. Its accessible catalog page does not expose verifiable file inventory/date coverage in text view; this is a lead only, not accepted data or L2 evidence.
+- D8 fee-group endpoint describes Pro/Market Maker group fees and explicitly excludes retail from that grouped structure; updateTime is not a historical fee series.
+- No API calls, market downloads, collectors, workflows or PnL were run. No gate status changed. The ledger now distinguishes potentially retrievable D1–D3 from the historical PIT blockers D4–D6 and the limited D7/D8 evidence.
+- Independent holdout remains unavailable: CryptoFetch data through 2026-10-27 were already used; the later OKX slice is too short and cross-venue/calendar overlap is not independent temporal replication. Current status: **BLOCKED BY DATA + INDEPENDENCE**.

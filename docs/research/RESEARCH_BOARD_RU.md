@@ -324,3 +324,13 @@
 - Добавлены offline regression cases на потерянную страницу, orphan response и подмену normalized output.
 - Последний GitHub Actions run [45581283920 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45581283920), code SHA `32a1f6a11a2ec1d40653f3d08242ca8b24635bf1`: все шесть групп тестов прошли.
 - PR #17 остаётся Draft, открыт и не объединён; review comments пока отсутствуют. Ни один collector не запускался, реальные данные не собирались, gates не менялись.
+
+
+### Дополнение 2026-11-25 — archive-level evidence chain завершена
+
+- Та же проверка полноты распространена на исторический архиватор D1/D2/D3: Funding, trade OHLCV и Mark Price.
+- Теперь валидатор требует все три потока страниц, уникальные raw request IDs, one-to-one page↔response links без orphan/duplicate, соответствие audit path и body hash, а также наличие всех трёх нормализованных CSV с совпадающими SHA-256 и row counts.
+- Добавлены synthetic offline tests на потерянную страницу, orphan response и подмену нормализованного CSV. Обновлённые archive tests также проверяют повторный запуск после прерванной Mark-загрузки.
+- GitHub Actions [45581812910 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45581812910), code SHA `c8df338b2b4605c307af02ccd92b5ccdd30a8090`: все шесть test groups прошли.
+- PR #17 всё ещё Draft; изменения остаются изолированными в `research/bybit-raw-response-evidence-v1`. Последующие изменения документации не меняли протестированный код.
+- Сбор реальных данных, PnL/backtest и изменение data gates не выполнялись. Статус проекта по независимому holdout остаётся **BLOCKED BY DATA + INDEPENDENCE**.

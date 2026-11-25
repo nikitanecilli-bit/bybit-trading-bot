@@ -29,7 +29,7 @@ from multibar_limit_wait import evaluate_limit_wait, prepare_signal_for_next_bar
 FOLDS = [(1, 0.50, 0.65), (2, 0.65, 0.80), (3, 0.80, 1.00)]
 VOL_THRESHOLDS = [1.2, 1.6, 2.0, 2.5]
 BREAKOUT_ATR_THRESHOLDS = [0.0]  # no additional breakout-distance filter in preregistered signal
-VOLUME_LOOKBACK_PERIOD = None  # per-arm volume lookback equals its Donchian period
+# Volume lookback is resolved per strategy arm; there is no global shared value.
 ENTRY_OFFSET_BPS = 20.0
 ENTRY_PENETRATION_BPS = 5.0
 WAIT_BARS = 3
@@ -160,6 +160,15 @@ def resolve_ema50_200_gate(environ=None):
         return True
     raise SystemExit("H1_EMA50_200_GATE must be one of 0/1, false/true, off/on")
 
+
+
+def resolve_volume_lookback_period(donchian_period):
+    """Resolve the preregistered volume lookback for a Donchian strategy arm."""
+    if isinstance(donchian_period, bool) or not isinstance(donchian_period, int):
+        raise ValueError("Donchian period must be an integer")
+    if donchian_period not in (20, 48):
+        raise ValueError("Donchian period must be one of the preregistered arms: 20 or 48")
+    return donchian_period
 
 
 def h1_variant_name(min_vol, min_breakout_atr, cost_multiplier, ema_gate_enabled=False,
@@ -1021,7 +1030,7 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
     cfg.daily_stop_loss_pct = 5.0
     cfg.emergency_kill_switch_pct = 30.0
     cfg.donchian_period = int(donchian_period)
-    cfg.volume_lookback_period = int(donchian_period)
+    cfg.volume_lookback_period = resolve_volume_lookback_period(int(donchian_period))
     cfg.atr_period = 14
     cfg.min_volume_ratio = min_vol
     cfg.stop_atr_mult = 2.5
@@ -1145,7 +1154,7 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
             donchian_period=donchian_period,
         ),
         "donchian_period": int(donchian_period),
-        "volume_lookback_period": VOLUME_LOOKBACK_PERIOD,
+        "volume_lookback_period": resolve_volume_lookback_period(int(donchian_period)),
         "ema50_200_gate": ema_trend_labels_by_symbol is not None,
         "cost_multiplier": cost_multiplier,
         "min_volume_ratio": min_vol,
@@ -1422,7 +1431,8 @@ def build_validation_manifest(
             "accelerated_atr_trail_after_1_5r": ACCELERATED_ATR_TRAIL_AFTER_1_5R,
             "enable_post_break_invalidation": ENABLE_POST_BREAK_INVALIDATION,
             "donchian_period": int(design.get("primary_donchian_period", 20)),
-            "volume_lookback_period": VOLUME_LOOKBACK_PERIOD,
+            "volume_lookback_policy": "per_arm_equals_donchian_period",
+            "volume_lookback_periods_by_donchian_period": {"20": 20, "48": 48},
             "donchian_variant_modes": design.get(
                 "donchian_variant_modes", [{"donchian_period": 20, "ema50_200_gate": False}]
             ),

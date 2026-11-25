@@ -11,6 +11,7 @@ from scripts.run_h1_shared_capital_portfolio_validation import (
     LEVERAGE_MODE, LEVERAGE_VAL, MAX_CHASE_LIMIT_PCT,
     build_ema50_200_label_maps, build_paired_ema_comparison,
     build_paired_donchian48_comparison, build_paired_h1_comparison_summaries,
+    resolve_volume_lookback_period,
     resolve_donchian_variant_modes,
     h1_variant_modes, h1_variant_name, resolve_ema50_200_gate,
 )
@@ -331,6 +332,18 @@ def test_paired_donchian48_rejects_missing_or_invalid_arm_metadata():
             raise AssertionError("missing or invalid arm metadata must fail closed")
 
 
+def test_volume_lookback_is_resolved_per_registered_donchian_arm():
+    assert resolve_volume_lookback_period(20) == 20
+    assert resolve_volume_lookback_period(48) == 48
+    for invalid in (True, 20.0, "48", 96):
+        try:
+            resolve_volume_lookback_period(invalid)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid Donchian period accepted: {invalid!r}")
+
+
 def test_donchian_arms_use_their_own_volume_lookback():
     cfg = em.BotConfig()
     cfg.timeframe = "1h"
@@ -443,6 +456,7 @@ if __name__ == "__main__":
         test_paired_donchian48_rejects_missing_shared_invariant,
         test_paired_donchian48_rejects_missing_or_invalid_arm_metadata,
         test_donchian_arms_use_their_own_volume_lookback,
+        test_volume_lookback_is_resolved_per_registered_donchian_arm,
         test_paired_donchian48_rejects_changed_volume_lookback,
         test_three_arm_donchian48_manifest_pairs_ema_only_within_d48,
     ]

@@ -27,7 +27,7 @@ import zstandard
 
 from compare_bybit_trade_archives import dec, multiset_diff
 
-DATES = ("2025-07-01", "2025-07-02", "2025-08-01", "2026-11-01")
+DATES = ("2025-07-01", "2025-07-03", "2025-08-01", "2025-08-15", "2026-11-01")
 HOURS = tuple(f"{hour:02d}" for hour in range(24))
 SYMBOL = "BTCUSDT"
 CHD_BASE = "https://api.cryptohftdata.com/v1/download"

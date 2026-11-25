@@ -237,6 +237,8 @@ def main() -> int:
                     d = table.to_pydict()
                     candidate = Counter()
                     ids = [str(x) for x in d["trade_id"] if x is not None]
+                    id_to_keys = {}
+                    order_types = Counter()
                     for i in range(len(d["trade_id"])):
                         if d["symbol"][i] != SYMBOL:
                             raise ValueError(f"unexpected symbol in {date} {hour}")
@@ -244,9 +246,23 @@ def main() -> int:
                         key = (d["trade_time"][i], side, dec(d["price"][i]),
                                dec(d["quantity"][i]))
                         candidate[key] += 1
+                        order_types[str(d["order_type"][i])] += 1
+                        trade_id = d["trade_id"][i]
+                        if trade_id is not None:
+                            id_to_keys.setdefault(str(trade_id), set()).add(key)
+                    duplicate_id_conflicts = sum(
+                        1 for payloads in id_to_keys.values() if len(payloads) > 1
+                    )
                     item["container"] = container
                     item["parquet_rows"] = table.num_rows
-                    item["trade_id_duplicates"] = len(ids) - len(set(ids))
+                    item["trade_id_integrity"] = {
+                        "null_ids": len(d["trade_id"]) - len(ids),
+                        "unique_ids": len(set(ids)),
+                        "duplicate_rows": len(ids) - len(set(ids)),
+                        "conflicting_ids_with_multiple_trade_payloads": duplicate_id_conflicts,
+                        "sample_unique_ids": list(dict.fromkeys(ids))[:5],
+                    }
+                    item["order_type_counts"] = dict(order_types)
                     item["comparison"] = multiset_diff(tardis_by_hour[hour], candidate)
                     item["status"] = "COMPARED"
                     total["cryptohftdata_rows"] += item["comparison"]["cryptohftdata_rows"]

@@ -58,10 +58,12 @@
 
 Tardis также проверен на однодневном BTCUSDT sample 2026-11-01: trades и L2 CSV прошли gzip/CSV проверку. Но его нормализованный L2 CSV не содержит Bybit `cts`/sequence IDs; для точного queue replay он уступает CryptoHFTData и остаётся вторичным источником.
 
-Повторная проверка двух Tardis daily samples выполнена с правильным объединением соседних receive-hour partitions и группировкой по trade_time UTC:
-- 2026-11-01: Tardis 360 226; CryptoHFTData 360 227; 0 missing, 1 extra (18:11:26.056 UTC, Buy, 77929.70, 0.007). Остальные event-hours совпали.
-- 2025-07-01: Tardis 1 116 359; CryptoHFTData 2 683 702; 521 missing, 1 567 865 extra. В активных часах 10–20 систематический тройной multiplicity (например 10:00 — 48 277 против 144 831; 35 199 payload keys имеют соотношение 1:3). У примеров три различных received_time. В receive partition 10 все 144 819 строк имеют trade_id=0 (1 unique ID); order_type=Market — documented placeholder, не фактический тип ордера. Механизм повторной публикации не установлен; payload-based dedup небезопасен. Июльский sample NOT ACCEPTED для replay.
-- Ранний четырёхдатный отчёт отозван: он смешивал формат Zstandard, лимит размера и фактическую полноту. Также отозван same-receive-hour comparison; валидатор теперь читает соседние receive partitions и группирует по trade_time. Подробности — Minimum Viable Edge Validation; run #45630139139 (event-time/multiplicity diagnostics), #45629444005 (предыдущая event-time сверка).
+Event-time cross-check четырёх дневных окон Tardis/CryptoHFTData (соседние receive-hour partitions, группировка по trade_time UTC), run #45632069094:
+- 2025-07-01: Tardis 1 116 359; CryptoHFTData 2 683 702; 521 missing / 1 567 865 extra. В активных часах 10–20 тройной multiplicity; у примеров три разных received_time. trade_id=0 в проверенных partitions.
+- 2025-08-01: Tardis 2 360 190; CryptoHFTData 2 360 132; 102 missing / 44 extra, расхождения в 08,09,15 UTC. В том числе trade_id=0 во всех проверенных partitions; идентификатор непригоден для дедупликации.
+- 2026-11-01: Tardis 360 226; CryptoHFTData 360 227; 0 missing / 1 extra.
+- 2025-07-02: Tardis HTTP 401, контрольный день не оценён.
+Вывод: июльский multiplicity — локальная аномалия периода; trade_id=0 — более широкий структурный дефект как минимум в июле и августе. Payload dedup небезопасен. Июль/август NOT ACCEPTED для L2 replay; ноябрьская одна дата не доказывает качество всего архива. Ранний same-receive-hour comparison отозван; используйте только event-time результат.
 
 
 **Это подтверждает доступность и базовую корректность отдельных файлов, но не полную пригодность источника для backtest.** В Bybit trades у CryptoHFTData задокументированы reconnect gaps до примерно 3 минут около 02:00–02:50 UTC; Bybit orderbook имеет известные пропуски часов 2025-11-26 10 — 2025-12-26 19 и 2026-04-13 15 — 2026-04-14 21. Funding rate/next funding time в mark stream — это опубликованное состояние будущего funding, а не settled funding ledger. PIT universe и effective-time instrument/risk-tier history также не закрыты.

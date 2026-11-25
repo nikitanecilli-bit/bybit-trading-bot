@@ -448,3 +448,25 @@ Candidate deduplication across E04/E06/E08–E13 found only two main historical 
 ### 2026-11-25 — независимый holdout повторно проверен
 
 В repo нет accepted independent dataset для H1 D48+EMA: шесть CryptoFetch proxy ZIP заканчиваются не позднее 2026-10-27 и уже использованы. Старый Bybit holdout script — другая гипотеза (D20, 11 ранее выбранных Binance symbols, independent per-symbol capital, approximate funding, Last-price exits) и сам указывает на календарное пересечение с Binance study; нужных Bybit файлов нет. Archive workflow требует self-hosted по умолчанию и предупреждает о hosted US egress block; self-hosted/collector запрещены. Значит текущее ограничение точнее формулируется как **BLOCKED BY DATA + INDEPENDENCE**. Не строить runner и не перемаркировать старые folds. Полный аудит — acceptance ledger Section 49.
+
+
+### 2026-11-25 — official Bybit trade archive cross-check: transition window completed
+
+Actions run #45639262986, artifact #15033673197. The run completed; its red conclusion is a data mismatch verdict, not an infrastructure failure. Four BTCUSDT UTC dates were compared against Bybit's official daily trade archive, including payload and documented trade-ID hash:
+
+- **2026-05-01:** 1,507,843 official rows vs 1,507,453 CryptoHFTData rows; 390 missing, zero extra. All 1,507,453 CryptoHFTData IDs are zero; 0 hashed-ID matches. REJECT.
+- **2026-06-01:** 2,307,090 official vs 2,307,067 CryptoHFTData; 23 missing, zero extra. All 2,307,067 comparable hashed IDs match. NOT ACCEPTED because of missing trades.
+- **2026-08-01:** 531,091 official vs 531,087 CryptoHFTData; 4 missing, zero extra. All 531,087 comparable hashed IDs match. NOT ACCEPTED because of missing trades.
+- **2026-09-01:** 2,017,359 official and CryptoHFTData rows; zero missing/extra; all 2,017,359 hashed IDs match. EXACT_PAYLOAD_AND_ID_MATCH for this date only.
+
+Combined with earlier checks: the tested ID repair boundary is between May and June 2026; completeness is still imperfect in June and August; September 1 passes. This is a sparse set of daily samples, not a claim that every intervening day or the whole period is complete. The workflow now runs by manual dispatch only to avoid repeated downloads.
+
+**Correction to the immediately preceding chat status:** run #45639262986 did not test September 2 and did not test L2 synchronization. It tested May 1, June 1, August 1 and September 1 trades only. Do not cite it as an L2/trade synchronization result.
+
+### 2026-11-25 — first strategy-path simplification decision
+
+The next experiment should not be blocked on L2 queue reconstruction if the chosen execution contract is taker-only. L2 remains necessary for a maker/queue claim, not for a conservative taker-only first pass. However, the frozen H1 D48+EMA preregistration currently specifies maker entry with OHLC penetration and maker TP1; switching its flags is a different execution hypothesis and must be separately frozen before any market PnL. Engine mechanics show market-mode pending entries fill at the next bar open, while maker-mode entries use an intrabar OHLC touch proxy. A taker-only variant must explicitly fix next-bar entry timing, taker exits, fee/slippage stress, ambiguous-bar policy, funding and sizing; it must not inherit the old D20/11-symbol holdout runner or its invalid assumptions.
+
+**Immediate decision gate:** first determine whether a single-symbol BTCUSDT H1 taker-only experiment can be supported by a sufficiently long independent Bybit period with verified H1/Mark/funding inputs and usable dated BTC specifications/risk constraints. If yes, preregister that narrow experiment and run only after the existing accounting and data gates are satisfied. If not, state the exact missing input and stop adding unrelated infrastructure. No L2 expansion, multi-symbol universe rebuild, new general-purpose runner, market PnL, paper trading or live orders are authorized by this decision.
+
+The north-star remains realized positive net expectancy after all costs and risk, not test count, code volume, GitHub activity or data archive size.

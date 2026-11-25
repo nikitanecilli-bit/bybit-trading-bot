@@ -147,7 +147,16 @@ def backtest(rows, fold, arm, cost_mult, date_range=None, stop_atr=2.5):
                         pos={"entry":en,"entry_ts":rows[i+1][0],"qty":qty,"remaining":qty,"initial_qty":qty,
                              "stop":stop,"initial_stop":stop,"risk":risk_per_unit*qty,
                              "tp1_price":en+2*risk_per_unit,"tp2_price":en+5*risk_per_unit,
-                             "tp1":False,"bars":0,"gross":0.0,"fees":0.0,"next_trail":None}
+                             "tp1":False,"bars":0,"gross":0.0,"fees":0.0,"next_trail":None,
+                             "signal_ts":ts,"signal_close":c,"signal_atr":a,"signal_volume_ratio":vr,
+                             "signal_breakout_atr":(c-prior_high)/a,
+                             "signal_ema_spread_pct":((ema50[i]/ema200[i])-1)*100 if use_ema and ema50[i] and ema200[i] else None,
+                             "signal_ema_slope_atr":(ema200[i]-ema200[i-5])/a if use_ema and ema200[i] is not None and ema200[i-5] is not None else None,
+                             "signal_atr_pct":a/c*100,
+                             "signal_candle_range_atr":(h-l)/a,
+                             "signal_body_fraction":abs(c-o)/(h-l) if h>l else 0,
+                             "signal_close_location":(c-l)/(h-l) if h>l else 0.5,
+                             "signal_close_vs_ema200_pct":((c/ema200[i])-1)*100 if use_ema and ema200[i] else None}
         i+=1
     if pos:
         _close_position(pos,rows[end_idx-1][4],rows[end_idx-1][0]+BAR_MS,"fold_end",cost_mult,trades)
@@ -187,7 +196,17 @@ def _close_position(pos, raw_px, ts, reason, mult, out):
     net=pos["gross"]-pos["fees"]
     out.append({"entry_ts":pos["entry_ts"],"exit_ts":ts,"entry":pos["entry"],"exit":raw_px,
                 "gross_pnl":pos["gross"],"costs":pos["fees"],"net_pnl":net,"risk":pos["risk"],
-                "reason":reason,"bars":pos["bars"]})
+                "reason":reason,"bars":pos["bars"],
+                "signal_ts":pos.get("signal_ts"),"signal_close":pos.get("signal_close"),
+                "signal_atr":pos.get("signal_atr"),"signal_volume_ratio":pos.get("signal_volume_ratio"),
+                "signal_breakout_atr":pos.get("signal_breakout_atr"),
+                "signal_ema_spread_pct":pos.get("signal_ema_spread_pct"),
+                "signal_ema_slope_atr":pos.get("signal_ema_slope_atr"),
+                "signal_atr_pct":pos.get("signal_atr_pct"),
+                "signal_candle_range_atr":pos.get("signal_candle_range_atr"),
+                "signal_body_fraction":pos.get("signal_body_fraction"),
+                "signal_close_location":pos.get("signal_close_location"),
+                "signal_close_vs_ema200_pct":pos.get("signal_close_vs_ema200_pct")})
 
 def main():
     rows=load()

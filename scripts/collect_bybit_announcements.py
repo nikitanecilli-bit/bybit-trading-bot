@@ -159,7 +159,7 @@ def parse_page(body, category_url):
 
 def extract_article_payload(body):
     match = re.search(
-        rb'<script[^>]+id=["\\']__NEXT_DATA__["\\'][^>]*>(.*?)</script>',
+        rb"""<script[^>]+id=["']__NEXT_DATA__["'][^>]*>(.*?)</script>""",
         body, flags=re.DOTALL
     )
     if not match:

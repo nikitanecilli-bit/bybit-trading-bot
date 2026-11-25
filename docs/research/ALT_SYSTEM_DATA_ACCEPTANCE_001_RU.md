@@ -2196,3 +2196,16 @@ The existing 1,275-article / 66-category-page announcement artifact was scanned 
 This does not establish that Bybit had zero lifecycle events. The proxy is Binance-style and survivor-biased, not a Bybit point-in-time universe; the four selected categories do not prove complete historical announcement coverage; and notices can concern Spot, Alpha, TradFi, Options, Convert or derivatives. The result means this proxy cannot currently provide usable D4 coverage. Detailed scope and caveats: `BYBIT_LIFECYCLE_EVENT_SCAN_47_PROXY_PARTIAL_2026-11-25_RU.md`.
 
 **D4 remains NOT ACCEPTED.** The next valid route is to establish a Bybit-specific point-in-time universe and then reconcile product-specific listing/status/delisting events. No market/account API, orders, PnL or backtests were used.
+
+
+## 62. Partial Bybit listing/delisting lifecycle evidence (2026-11-25)
+
+The corrected dual-format scan of the existing 1,275-article capture identified:
+- 238 USDT perpetual listing announcement articles, representing 236 distinct symbols; 301 of 304 total listing articles say trading is already open at publication, but this does not establish exact first-trade time.
+- 106 USDT perpetual delisting notices, all with explicit UTC effective times in article bodies.
+- Separate product classes: 62 TradFi listings, 3 Pre-IPO listing articles (one article names two symbols), 1 inverse listing, plus 1 USDC and 1 inverse delisting.
+- Zero exact listing/delisting candidate matches against the 47-symbol proxy. The archive nevertheless contains Bybit-specific lifecycle events for symbols outside that proxy, including TMXUSDT, AGIUSDT, ASPUSDT and IPUSDT.
+
+A new offline extractor `scripts/extract_bybit_lifecycle_events.py` and regression tests were added. It preserves publication time separately from effective time, records listing “open at publication” without inventing a start timestamp, extracts explicit delisting times, classifies product type as a candidate, and checks raw-body hashes before emitting events. Detailed counts, sample sources and limitations: `BYBIT_LIFECYCLE_EVENT_INVENTORY_PARTIAL_2026-11-25_RU.md`.
+
+**D4 — PARTIAL EVIDENCE / NOT ACCEPTED.** The 2026 listing/delisting event stream is useful, but the starting Bybit universe at 2026-01-01 is missing, some listing effective times are not explicit, and product/underlying classification remains incomplete. The 47-symbol proxy is rejected as a Bybit universe substitute. No PnL or backtests were run.

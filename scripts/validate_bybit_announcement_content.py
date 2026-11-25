@@ -8,6 +8,7 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.collect_bybit_announcements import extract_article_payload
 
 

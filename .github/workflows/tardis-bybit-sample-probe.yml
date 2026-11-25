@@ -1,4 +1,5 @@
 name: Tardis Bybit historical sample probe
+# Public-data-only probe; no API key or trading credentials are used.
 
 on:
   push:

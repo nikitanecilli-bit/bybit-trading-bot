@@ -406,7 +406,7 @@ def main() -> None:
         record["audit_file"] = str(Path("raw_evidence") / stamp / record["audit_file"]).replace(os.sep, "/")
         audit_path = output_root / record["audit_file"]
         audit_path.write_text(
-            json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+            json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
             encoding="utf-8",
         )
     # Keep manifest at category root so its paths can safely resolve from that root.

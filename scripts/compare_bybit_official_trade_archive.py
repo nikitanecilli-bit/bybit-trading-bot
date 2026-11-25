@@ -24,7 +24,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 import zstandard
 
-DATES = ("2026-05-01", "2026-06-01", "2026-08-01", "2026-09-01")
+DATES = ("2026-09-02",)
 SYMBOL = "BTCUSDT"
 CHD_BASE = "https://api.cryptohftdata.com/v1/download"
 OFFICIAL_BASE = "https://public.bybit.com/trading"

@@ -220,14 +220,29 @@ def main() -> int:
                     total.setdefault("failed_hour_checks", 0)
                     total["failed_hour_checks"] += 1
                 day_report["hours"][hour] = item
+            operational_gaps = any(
+                v["status"] != "COMPARED" for v in day_report["hours"].values()
+            )
+            data_mismatches = any(
+                v.get("comparison", {}).get("missing_from_cryptohftdata", 0)
+                or v.get("comparison", {}).get("extra_in_cryptohftdata", 0)
+                for v in day_report["hours"].values()
+            )
             day_report["status"] = (
-                "COMPARED_WITH_GAPS" if any(v["status"] != "COMPARED"
-                                             for v in day_report["hours"].values())
-                else "COMPARED"
+                "DOWNLOAD_OR_DECODE_GAPS" if operational_gaps
+                else "COMPARED_WITH_MISMATCH" if data_mismatches
+                else "EXACT_MATCH"
             )
             report["days"][date] = day_report
 
     report["totals"] = total
+    report["comparison_status"] = (
+        "OPERATIONAL_GAPS" if total.get("missing_hour_files", 0)
+        or total.get("failed_hour_checks", 0)
+        else "MISMATCH_REVIEW_REQUIRED"
+        if total["missing_from_cryptohftdata"] or total["extra_in_cryptohftdata"]
+        else "EXACT_MATCH"
+    )
     report["crypto_files_requested"] = request_count
     report["rate_limit_policy"] = "1.05 second delay between CryptoHFTData file requests"
     output = Path(sys.argv[1] if len(sys.argv) > 1 else "bybit_monthly_trade_crosscheck.json")

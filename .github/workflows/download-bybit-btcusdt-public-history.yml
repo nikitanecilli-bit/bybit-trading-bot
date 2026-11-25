@@ -6,8 +6,7 @@ on:
       - research/market-regime-v1-main
     paths:
       - scripts/download_bybit_btcusdt_public_history.py
-      - scripts/probe_bybit_archive.py
-      - .github/workflows/download-bybit-archive-probe.yml
+      - .github/workflows/download-bybit-btcusdt-public-history.yml
   workflow_dispatch:
 
 permissions:
@@ -23,12 +22,12 @@ jobs:
         with:
           ref: research/market-regime-v1-main
       - name: Download Bybit BTCUSDT H1, Mark and funding history
-        run: python scripts/probe_bybit_archive.py
+        run: python scripts/download_bybit_btcusdt_public_history.py
       - name: Upload raw responses, normalized data and manifest
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: bybit-btcusdt-public-history
-          path: bybit_archive_probe/
+          path: bybit_btcusdt_initial/
           if-no-files-found: warn
           retention-days: 30

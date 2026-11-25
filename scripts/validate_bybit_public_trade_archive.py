@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Validate Bybit public BTCUSDT linear trade archives against official H1 candles."""
+"""Validate Bybit public BTCUSDT linear trade archives against official H1 candles and detect timestamp offset."""
 from __future__ import annotations
 import csv, gzip, hashlib, io, json, os, time, urllib.error, urllib.request
 from collections import defaultdict
 from datetime import date, datetime, timezone, timedelta
+from decimal import Decimal
 from pathlib import Path
 from statistics import median
 
 SYMBOL = os.getenv("SYMBOL", "BTCUSDT").upper()
 START = date.fromisoformat(os.getenv("START_DATE", "2024-04-11"))
 END = date.fromisoformat(os.getenv("END_DATE", "2024-04-13"))
+DATES_RAW = os.getenv("TRADE_DATES", "").strip()
+TRADE_DATES = [date.fromisoformat(x.strip()) for x in DATES_RAW.split(",") if x.strip()] if DATES_RAW else None
 KLINE = Path(os.getenv("KLINE_PATH", "bybit_btcusdt_initial/trade_h1.csv"))
 OUT = Path(os.getenv("OUT_DIR", "trade_flow_validation"))
 OUT.mkdir(parents=True, exist_ok=True)
@@ -49,23 +52,21 @@ def main():
     candles = {}
     with KLINE.open(newline="", encoding="utf-8-sig") as f:
         for r in csv.DictReader(f):
-            ts = int(r["start_ms"])
-            candles[ts] = float(r["volume"])
+            candles[int(r["start_ms"])] = float(r["volume"])
 
     agg = defaultdict(lambda: {"buy": 0.0, "sell": 0.0, "count": 0,
                                "buy_count": 0, "sell_count": 0,
                                "max_trade_size": 0.0, "notional": 0.0})
     manifest_days, missing = [], []
-    total_rows = 0
-    total_bytes = 0
-    for day in days(START, END):
+    total_rows = total_bytes = 0
+    selected_days = sorted(set(TRADE_DATES or list(days(START, END))))
+    for day in selected_days:
         url, raw, payload = fetch_day(day)
         if payload is None:
             missing.append(day.isoformat())
             continue
         digest = hashlib.sha256(raw).hexdigest()
-        text = payload.decode("utf-8-sig", errors="replace")
-        reader = csv.DictReader(io.StringIO(text))
+        reader = csv.DictReader(io.StringIO(payload.decode("utf-8-sig", errors="replace")))
         required = {"timestamp", "symbol", "side", "size", "price", "trdMatchID"}
         if not reader.fieldnames or not required.issubset(set(reader.fieldnames)):
             raise SystemExit(f"Unexpected columns in {url}: {reader.fieldnames}")
@@ -76,10 +77,10 @@ def main():
             side = r.get("side")
             if side not in ("Buy", "Sell"):
                 raise SystemExit(f"Unexpected taker side {side!r} in {url}")
-            ts_ms = int(float(r["timestamp"]) * 1000)
+            # Decimal avoids binary-float truncation around millisecond boundaries.
+            ts_ms = int(Decimal(r["timestamp"]) * Decimal(1000))
             hour = (ts_ms // HOUR_MS) * HOUR_MS
-            size = float(r["size"])
-            price = float(r["price"])
+            size, price = float(r["size"]), float(r["price"])
             x = agg[hour]
             x["buy" if side == "Buy" else "sell"] += size
             x["buy_count" if side == "Buy" else "sell_count"] += 1
@@ -94,17 +95,44 @@ def main():
                               "columns": reader.fieldnames})
         time.sleep(0.15)
 
+    if missing:
+        raise SystemExit(f"Missing trade archive dates: {missing}")
+    if not agg:
+        raise SystemExit("No public trade rows downloaded")
+
+    # Detect the constant shift by comparing each trade-hour volume with candle volumes
+    # at candidate offsets. Positive offset means candle timestamp is later than trade UTC.
+    alignment = []
+    for offset in range(-6, 7):
+        diffs = []
+        for hour, x in agg.items():
+            candle_volume = candles.get(hour + offset * HOUR_MS)
+            total = x["buy"] + x["sell"]
+            if candle_volume is not None and candle_volume > 0:
+                diffs.append(abs(total / candle_volume - 1.0) * 100)
+        if diffs:
+            ordered = sorted(diffs)
+            alignment.append({
+                "candle_timestamp_offset_hours": offset,
+                "matched_hours": len(diffs),
+                "median_abs_volume_difference_pct": round(median(diffs), 8),
+                "p95_abs_volume_difference_pct": round(ordered[int(0.95*(len(ordered)-1))], 8),
+                "max_abs_volume_difference_pct": round(max(diffs), 8),
+            })
+    best = min(alignment, key=lambda x: (x["median_abs_volume_difference_pct"],
+                                         x["p95_abs_volume_difference_pct"]))
+    best_offset = best["candle_timestamp_offset_hours"]
+
     out_rows = []
-    diffs = []
     for hour in sorted(agg):
         x = agg[hour]
         total = x["buy"] + x["sell"]
-        candle_volume = candles.get(hour)
+        candle_ts = hour + best_offset * HOUR_MS
+        candle_volume = candles.get(candle_ts)
         diff_pct = ((total / candle_volume) - 1.0) * 100 if candle_volume else None
-        if diff_pct is not None:
-            diffs.append(abs(diff_pct))
         out_rows.append({
-            "hour_utc": datetime.fromtimestamp(hour/1000, timezone.utc).isoformat(),
+            "trade_hour_utc": datetime.fromtimestamp(hour/1000, timezone.utc).isoformat(),
+            "matched_candle_timestamp": datetime.fromtimestamp(candle_ts/1000, timezone.utc).isoformat(),
             "buy_taker_volume": round(x["buy"], 10),
             "sell_taker_volume": round(x["sell"], 10),
             "delta": round(x["buy"] - x["sell"], 10),
@@ -114,7 +142,7 @@ def main():
             "max_trade_size": round(x["max_trade_size"], 10),
             "trade_notional_usdt": round(x["notional"], 4),
             "official_h1_volume": candle_volume,
-            "volume_difference_pct": round(diff_pct, 6) if diff_pct is not None else None,
+            "volume_difference_pct": round(diff_pct, 8) if diff_pct is not None else None,
         })
     if out_rows:
         with (OUT / "hourly_trade_flow.csv").open("w", newline="", encoding="utf-8") as f:
@@ -122,22 +150,22 @@ def main():
             w.writeheader(); w.writerows(out_rows)
     report = {
         "source": "Bybit official public linear trade archive: public.bybit.com/trading",
-        "symbol": SYMBOL, "start_date": START.isoformat(), "end_date": END.isoformat(),
+        "symbol": SYMBOL,
+        "trade_dates": [d.isoformat() for d in selected_days],
         "daily_files_found": len(manifest_days), "daily_files_missing": missing,
         "trade_rows": total_rows, "compressed_bytes": total_bytes,
         "hourly_buckets": len(out_rows),
-        "hours_matched_to_official_h1": len(diffs),
-        "absolute_volume_difference_pct_median": round(median(diffs), 6) if diffs else None,
-        "absolute_volume_difference_pct_p95": round(sorted(diffs)[int(0.95*(len(diffs)-1))], 6) if diffs else None,
+        "best_alignment": best,
+        "alignment_candidates": alignment,
+        "interpretation": (
+            "Positive offset means official H1 candle timestamps are later than trade UTC. "
+            "If +3h remains exact across years, normalize H1 timestamps by subtracting 3h. "
+            "Trade side is taker/aggressor side; trade archives do not reconstruct resting limit orders."
+        ),
         "days": manifest_days,
-        "interpretation": "Trade side is aggressor/taker side. Historical trades do not reconstruct resting limit orders or historical order-book depth."
     }
     (OUT / "manifest.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
-    if missing:
-        raise SystemExit(f"Missing trade archive dates: {missing}")
-    if not diffs:
-        raise SystemExit("No hourly trade buckets matched the official H1 archive")
 
 if __name__ == "__main__":
     main()

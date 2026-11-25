@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import time
@@ -10,6 +11,8 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
+
+from scripts.bybit_raw_evidence import write_evidence_manifest
 
 from scripts.snapshot_bybit_instruments import (
     DEFAULT_BASE_URL, _request_page, _snapshot_timestamp, _validate_base_url,
@@ -201,12 +204,27 @@ def main() -> None:
 
     page_observations: list[dict[str, Any]] = []
     page_counts: Counter[str] = Counter()
+    raw_records: list[dict[str, Any]] = []
+    collection_pages: list[dict[str, Any]] = []
+    output_root = Path(args.output_dir) / "linear"
+    pending_dir = output_root / "raw_evidence" / "pending"
 
     def fetch_page(status: str | None, cursor: str | None):
         status_filter = status or "default"
         page_counts[status_filter] += 1
         request_started_at = _snapshot_timestamp(None)
-        rows, next_cursor = _request_page(args.base_url, "linear", cursor, status=status)
+        before = len(raw_records)
+        rows, next_cursor = _request_page(
+            args.base_url, "linear", cursor, status=status,
+            raw_evidence_dir=pending_dir, raw_records=raw_records,
+        )
+        record = raw_records[-1] if len(raw_records) > before else None
+        collection_pages.append({
+            "status_filter": status_filter, "page_index": page_counts[status_filter],
+            "request_cursor": cursor,
+            "raw_response_request_id": record.get("request_id") if record else None,
+            "raw_response_body_sha256": record.get("body_sha256") if record else None,
+        })
         request_completed_at = _snapshot_timestamp(None)
         page_observations.append(build_page_observation(
             status_filter, page_counts[status_filter], request_started_at,
@@ -224,11 +242,28 @@ def main() -> None:
     )
     fetched = datetime.fromisoformat(snapshot["fetched_at"].replace("Z", "+00:00"))
     stamp = fetched.astimezone(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-    output = Path(args.output_dir) / "linear" / f"{stamp}.json"
+    output = output_root / f"{stamp}.json"
     write_snapshot(snapshot, output)
+    evidence_dir = output_root / "raw_evidence" / stamp
+    if pending_dir.exists():
+        evidence_dir.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(pending_dir, evidence_dir)
+    for record in raw_records:
+        record["body_file"] = str(Path("raw_evidence") / stamp / record["body_file"]).replace(os.sep, "/")
+        record["audit_file"] = str(Path("raw_evidence") / stamp / record["audit_file"]).replace(os.sep, "/")
+        (output_root / record["audit_file"]).write_text(
+            json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+            encoding="utf-8",
+        )
+    evidence_manifest = output_root / f"{stamp}.evidence.json"
+    write_evidence_manifest(
+        evidence_manifest, source="Bybit V5 GET /v5/market/instruments-info",
+        category="linear", normalized_output=output, records=raw_records,
+        collection_pages=collection_pages,
+    )
     now_ms = int(fetched.timestamp() * 1000)
     active = sum(is_linear_usdt_perpetual_within_lifecycle_at(row, now_ms) for row in rows)
-    print(f"Saved {len(rows)} linear instruments ({active} USDT perpetuals within launch/delivery bounds) to {output}")
+    print(f"Saved {len(rows)} linear instruments ({active} USDT perpetuals within launch/delivery bounds) to {output}; evidence: {evidence_manifest}")
     print("Status counts: " + ", ".join(f"{key}={counts[key]}" for key in CAPTURED_STATUSES))
 
 

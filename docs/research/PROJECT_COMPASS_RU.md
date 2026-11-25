@@ -504,3 +504,5 @@ This audit narrows the implementation change to a possible **entry execution abl
 - Funding accounting использует Mark H1 open как proxy settlement mark; liquidation — position-level isolated approximation, не полная модель Bybit.
 
 **Статус:** implementation/preregistration mismatch; market PnL запрещён. Не исправлять runner молча и не переписывать preregistration задним числом. Перед будущим тестом выбрать буквальную preregistration (lookback 48, без breakout-ATR фильтра) либо зарегистрировать фактический runner как новую гипотезу. Для single-symbol — отдельный preregistered дизайн. Подробности внесены в MINIMUM_VIABLE_EDGE_VALIDATION_RU.md, раздел 6B.
+
+**Дополнительный lifecycle finding (2026-11-25):** в H1 engine исходный stop проверяется до TP1 и обновления ATR trailing stop. Если TP1 и новый trailing stop могли быть задеты в одной свече, после поднятия stop текущий low/high повторно не проверяется — новый stop начинает действовать со следующей свечи. Поскольку H1 OHLC не показывает порядок экстремумов, это потенциально оптимистичное разрешение same-bar ambiguity. До PnL нужен явный frozen rule; считать эту неоднозначность закрытой нельзя.

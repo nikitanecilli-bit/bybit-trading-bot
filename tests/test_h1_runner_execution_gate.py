@@ -915,6 +915,8 @@ if __name__ == "__main__":
         test_funding_mark_coverage_rejects_no_settlement_in_fold,
         test_funding_mark_coverage_rejects_missing_or_unverified_archive_manifest,
         test_bybit_kline_dir_is_mandatory,
+        test_aligned_h1_datasets_accepts_one_symbol_only_with_frozen_allowlist,
+        test_unrestricted_h1_datasets_still_requires_multiple_symbols,
         test_load_bybit_h1_datasets_rejects_gaps_and_loads_exchange_candles,
         test_load_bybit_h1_datasets_rejects_off_hour_timestamp_grid,
         test_load_bybit_h1_datasets_rejects_symbol_filename_mismatch,

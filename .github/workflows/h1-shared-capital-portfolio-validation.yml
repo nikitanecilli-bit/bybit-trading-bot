@@ -119,8 +119,8 @@ jobs:
           mode = os.environ["SELECTION_MODE"]
           if mode == "btc_single":
               with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
-                  env.write("H1_SYMBOL_ALLOWLIST=BTCUSDT\\n")
-                  env.write("H1_SELECTION_MANIFEST=/tmp/h1_btc_single_selection_manifest.json\\n")
+                  env.write("H1_SYMBOL_ALLOWLIST=BTCUSDT\n")
+                  env.write("H1_SELECTION_MANIFEST=/tmp/h1_btc_single_selection_manifest.json\n")
               print("BTCUSDT-only route selected; manifest preparation follows")
           else:
               path = os.environ["SELECTION_MANIFEST"]
@@ -132,8 +132,8 @@ jobs:
               if payload.get("selection_status") != "ok" or not isinstance(symbols, list) or len(symbols) != 5 or len(set(symbols)) != 5:
                   raise SystemExit("Top-five manifest must contain exactly five unique approved primary symbols")
               with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
-                  env.write("H1_SYMBOL_ALLOWLIST=" + ",".join(symbols) + "\\n")
-                  env.write("H1_SELECTION_MANIFEST=" + path + "\\n")
+                  env.write("H1_SYMBOL_ALLOWLIST=" + ",".join(symbols) + "\n")
+                  env.write("H1_SELECTION_MANIFEST=" + path + "\n")
               print("Frozen top-five: " + ",".join(symbols))
           PY
       - name: Prepare BTCUSDT-only manifest without running PnL

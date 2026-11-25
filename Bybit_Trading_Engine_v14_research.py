@@ -2785,6 +2785,7 @@ class UnifiedQuantEngine:
                     order_type=effective_order_type,
                     side="buy" if is_long else "sell",
                     price_is_execution=True,
+                    position_qty_cap=instrument_spec.max_market_order_qty,
                 )
             except ValueError as exc:
                 logger.warning(
@@ -3051,17 +3052,44 @@ class UnifiedQuantEngine:
                         exit_ts: int, mae_r: float, mfe_r: float,
                         final_exit_maker: Optional[bool] = None) -> None:
         sign = 1.0 if pos.direction == "long" else -1.0
+        maker_exits = (pos.order_type == "limit") if pos.maker_exits is None else pos.maker_exits
+        final_maker = (
+            maker_exits and exit_reason == "take_profit"
+            if final_exit_maker is None
+            else bool(final_exit_maker) and exit_reason == "take_profit"
+        )
         if pos.exchange_sized:
             remaining_qty = Decimal(str(pos.remaining_contract_qty))
             if exit_reason != "liquidation":
-                step = Decimal(str(pos.qty_step))
-                min_qty = Decimal(str(pos.min_order_qty))
-                min_notional = Decimal(str(pos.min_notional_value))
+                spec_history = getattr(self, "instrument_spec_history", None)
+                if spec_history is None:
+                    raise RuntimeError(
+                        f"{pos.symbol}: dated instrument history is required to validate exchange-sized close"
+                    )
+                try:
+                    exit_spec = spec_history.get_spec(
+                        pos.symbol, exit_ts,
+                        max_age_ms=getattr(self, "max_instrument_spec_age_ms", None),
+                    )
+                except ValueError as exc:
+                    raise RuntimeError(
+                        f"{pos.symbol}: cannot validate dated exchange constraints at close: {exc}"
+                    ) from exc
+                step = exit_spec.qty_step
+                min_qty = exit_spec.min_order_qty
+                min_notional = exit_spec.min_notional_value
+                max_qty = exit_spec.max_order_qty if final_maker else exit_spec.max_market_order_qty
+                max_name = "maxOrderQty" if final_maker else "maxMktOrderQty"
                 if remaining_qty <= 0 or remaining_qty % step != 0:
-                    raise RuntimeError(f"{pos.symbol}: final reduce quantity is not positive/aligned to qtyStep")
+                    raise RuntimeError(f"{pos.symbol}: final reduce quantity is not positive/aligned to current qtyStep")
                 if remaining_qty < min_qty or remaining_qty * Decimal(str(exit_price)) < min_notional:
                     raise RuntimeError(
-                        f"{pos.symbol}: final reduce quantity violates archived minOrderQty/minNotionalValue; "
+                        f"{pos.symbol}: final reduce quantity violates current minOrderQty/minNotionalValue; "
+                        "cannot claim exchange-valid close"
+                    )
+                if max_qty is None or remaining_qty > max_qty:
+                    raise RuntimeError(
+                        f"{pos.symbol}: final reduce quantity exceeds or cannot verify current {max_name}; "
                         "cannot claim exchange-valid close"
                     )
             rem_gross = float(remaining_qty) * sign * (exit_price - pos.entry_price)
@@ -3090,7 +3118,6 @@ class UnifiedQuantEngine:
         entry_notional = float(position_qty * Decimal(str(pos.entry_price)))
         f, s = self._leg_cost(entry_notional, entry_maker)
         fees += f; slip += s
-        maker_exits = (pos.order_type == "limit") if pos.maker_exits is None else pos.maker_exits
         tp1_maker = maker_exits if pos.tp1_maker is None else pos.tp1_maker
         if pos.tp1_hit:
             tp1_qty = (Decimal(str(pos.tp1_contract_qty)) if pos.exchange_sized
@@ -3098,11 +3125,6 @@ class UnifiedQuantEngine:
             tp1_notional = float(tp1_qty * Decimal(str(pos.tp1_price)))
             f, s = self._leg_cost(tp1_notional, tp1_maker)
             fees += f; slip += s
-        final_maker = (
-            maker_exits and exit_reason == "take_profit"
-            if final_exit_maker is None
-            else bool(final_exit_maker) and exit_reason == "take_profit"
-        )
         final_notional = float(remaining_qty * Decimal(str(exit_price)))
         if exit_reason == "liquidation":
             # Bybit documents no liquidation fee for perpetual/futures; takeover

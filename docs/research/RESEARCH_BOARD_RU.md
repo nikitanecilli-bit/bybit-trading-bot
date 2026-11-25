@@ -315,3 +315,12 @@
 - Draft PR #17: https://github.com/nikitanecilli-bit/bybit-trading-bot/pull/17; base — `research/market-regime-v1-main`, не `main`. PR не объединён.
 - Это подтверждает только качество реализации и synthetic/offline regression. **Ни одного реального Bybit snapshot или market archive не собрано; ни один data gate не переведён в ACCEPTED.** Исторические lifecycle/spec/risk/fees limitations сохраняются.
 - Решение: оставить PR draft до отдельного review. Не запускать архивные workflows, PnL, backtest, sweeps или event studies без отдельного разрешения и прохождения текущих data gates.
+
+
+### Дополнение 2026-11-25 — полнота page-to-raw evidence
+
+- При повторном аудите выяснилось, что одних SHA-256 проверок недостаточно: manifest должен доказывать, что каждая страница API связана ровно с одним raw response, нет осиротевших ответов, а page inventory совпадает с page observations нормализованного снимка.
+- Усилен `validate_evidence_manifest`: обязательные raw records/pages, уникальность request IDs и page keys, one-to-one page↔response coverage, проверка page index/status inventory, path containment, body/output hash и byte count.
+- Добавлены offline regression cases на потерянную страницу, orphan response и подмену normalized output.
+- Последний GitHub Actions run [45581283920 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45581283920), code SHA `32a1f6a11a2ec1d40653f3d08242ca8b24635bf1`: все шесть групп тестов прошли.
+- PR #17 остаётся Draft, открыт и не объединён; review comments пока отсутствуют. Ни один collector не запускался, реальные данные не собирались, gates не менялись.

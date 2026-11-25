@@ -7,6 +7,7 @@ on:
     paths:
       - scripts/preliminary_bybit_btc_h1_backtest.py
       - scripts/preliminary_bybit_initial_stop_sensitivity.py
+      - scripts/preliminary_bybit_entry_quality_diagnostics.py
       - scripts/download_bybit_btcusdt_public_history.py
       - .github/workflows/preliminary-bybit-initial-stop-sensitivity.yml
 
@@ -40,10 +41,14 @@ jobs:
         run: python scripts/download_bybit_btcusdt_public_history.py
       - name: Run initial stop ATR sensitivity
         run: python scripts/preliminary_bybit_initial_stop_sensitivity.py
-      - name: Upload stop sensitivity results
+      - name: Run pre-entry BTC signal diagnostics
+        run: python scripts/preliminary_bybit_entry_quality_diagnostics.py
+      - name: Upload sensitivity and entry diagnostics
         uses: actions/upload-artifact@v4
         with:
           name: preliminary-bybit-initial-stop-sensitivity
-          path: stop_sensitivity/
+          path: |
+            stop_sensitivity/
+            entry_diagnostics/
           if-no-files-found: error
           retention-days: 90

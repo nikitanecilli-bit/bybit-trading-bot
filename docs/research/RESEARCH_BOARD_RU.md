@@ -374,3 +374,11 @@
 - No confirmed D4 listing/delisting/suspension notice naming one of the 47 surfaced in the bounded query sample. Search misses are not evidence of absence. TradFi/stock and Spot notices were excluded from Linear counts.
 - D4/D5/D6 remain PARTIAL / NOT ACCEPTED. No announcement crawl/raw capture, market API call, data collection, workflow dispatch, PnL or backtest was run. Only an already-existing E11 result artifact was inspected for its manifest.
 - Next step: specify archive pagination and symbol/category reconciliation before any automated collection. This remains a design/read-only task; automated crawling and raw capture require separate authorization.
+
+
+### 2026-11-25 — Bybit announcement archive pagination inspected (acceptance ledger Section 53)
+
+- Official public archive pages show 20 items/page and observed totals: New crypto/listings 25 pages, Delistings 11, Maintenance Updates 19, Latest Bybit News 11. These routes overlap and mix product categories; page totals are not unique-event counts.
+- This provides a finite design for a symbol/category reconciliation inventory. Listings require filtering mixed Spot/Derivatives/Options/TradFi; delistings and maintenance pages require separating token events from Linear perpetual lifecycle; D5/D6 notices are spread across Latest Bybit News and Maintenance Updates.
+- Wrote a minimal fail-closed pagination/dedup/category/event-time protocol in Section 53. It was not executed. No crawler, raw HTML capture, API request or data collection was run.
+- Next decision: separate authorization is required before implementing or dispatching a read-only announcement-page crawler. Until then D4/D5/D6 remain PARTIAL / NOT ACCEPTED.

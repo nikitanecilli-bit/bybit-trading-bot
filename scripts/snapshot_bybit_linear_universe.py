@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from scripts.bybit_raw_evidence import write_evidence_manifest
+from scripts.bybit_raw_evidence import assert_snapshot_paths_available, finalize_snapshot_evidence
 
 from scripts.snapshot_bybit_instruments import (
     DEFAULT_BASE_URL, _request_page, _snapshot_timestamp, _validate_base_url,
@@ -208,6 +208,8 @@ def main() -> None:
     collection_pages: list[dict[str, Any]] = []
     output_root = Path(args.output_dir) / "linear"
     pending_dir = output_root / "raw_evidence" / "pending"
+    if pending_dir.exists():
+        raise FileExistsError(f"unfinished raw evidence capture exists: {pending_dir}")
 
     def fetch_page(status: str | None, cursor: str | None):
         status_filter = status or "default"
@@ -243,21 +245,10 @@ def main() -> None:
     fetched = datetime.fromisoformat(snapshot["fetched_at"].replace("Z", "+00:00"))
     stamp = fetched.astimezone(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     output = output_root / f"{stamp}.json"
+    assert_snapshot_paths_available(output_root, stamp)
     write_snapshot(snapshot, output)
-    evidence_dir = output_root / "raw_evidence" / stamp
-    if pending_dir.exists():
-        evidence_dir.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(pending_dir, evidence_dir)
-    for record in raw_records:
-        record["body_file"] = str(Path("raw_evidence") / stamp / record["body_file"]).replace(os.sep, "/")
-        record["audit_file"] = str(Path("raw_evidence") / stamp / record["audit_file"]).replace(os.sep, "/")
-        (output_root / record["audit_file"]).write_text(
-            json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-            encoding="utf-8",
-        )
-    evidence_manifest = output_root / f"{stamp}.evidence.json"
-    write_evidence_manifest(
-        evidence_manifest, source="Bybit V5 GET /v5/market/instruments-info",
+    evidence_manifest = finalize_snapshot_evidence(
+        output_root, stamp, source="Bybit V5 GET /v5/market/instruments-info",
         category="linear", normalized_output=output, records=raw_records,
         collection_pages=collection_pages,
     )

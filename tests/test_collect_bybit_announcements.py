@@ -40,7 +40,18 @@ class AnnouncementCollectorTests(unittest.TestCase):
         self.assertEqual(payload["published_at"], "2026-11-20T09:00:00Z")
         self.assertEqual(payload["category_keys"], ["latest_bybit_news"])
         self.assertIn("BTCUSDT tick size", payload["content_text"])
+        self.assertEqual(payload["content_source"], "content_html")
         self.assertNotIn("TradFi", payload["content_text"])
+    def test_article_payload_falls_back_to_rich_content_json(self):
+        body = b'''<html><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"articleDetail":{"title":"Risk tiers for BTCUSDT","date":"2026-11-20T09:00:00Z","content_html":"","content":{"json":{"type":"doc","children":[{"type":"p","children":[{"text":"BTCUSDT risk tier "},{"text":"changes at 08:00 UTC"}]},{"type":"table","children":[{"type":"tr","children":[{"type":"td","children":[{"text":"100000"}]}]}]}]}}}}}}</script></html>'''
+        payload = extract_article_payload(body)
+        self.assertEqual(payload["content_source"], "content.json")
+        self.assertIn("BTCUSDT risk tier changes at 08:00 UTC 100000", payload["content_text"])
+    def test_empty_article_body_remains_empty(self):
+        body = b'''<html><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"articleDetail":{"title":"No body","content_html":"","content":{"json":{"type":"doc","children":[{"type":"p","children":[{"text":""}]}]}}}}}}</script></html>'''
+        payload = extract_article_payload(body)
+        self.assertEqual(payload["content_text"], "")
+        self.assertEqual(payload["content_source"], "none")
     def test_symbol_set_is_47_and_host_is_official(self):
         from scripts.collect_bybit_announcements import SYMBOLS
         self.assertEqual(len(SYMBOLS), 47)

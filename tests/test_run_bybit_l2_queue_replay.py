@@ -542,3 +542,45 @@ if __name__ == "__main__":
         globals()[name]()
         print(f"PASS {name}")
     print(f"{len(test_names)}/{len(test_names)} tests passed")
+
+
+def test_orderbook_inspector_summarizes_ts_minus_cts_offsets_and_six_hour_segments():
+    first = event("snapshot", 1_000, 1, 1, "5")
+    first["ts"] = 1_007
+    second = event("delta", 1_000 + 6 * 3_600_000, 2, 2, "6")
+    second["ts"] = second["cts"] - 3
+    third = event("delta", 1_000 + 12 * 3_600_000, 3, 3, "7")
+    third["ts"] = third["cts"] + 11
+
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = Path(tmp) / "clock_offsets.zip"
+        write_book_archive(archive, [first, second, third])
+        with zipfile.ZipFile(archive) as zf:
+            report = book_inspector.inspect_member(zf, "events.data")
+
+    overall = report["ts_minus_cts_offset_ms"]
+    assert overall["count"] == 3
+    assert overall["min_ms"] == -3
+    assert overall["max_ms"] == 11
+    assert overall["median_ms"] == 7
+    assert overall["positive_count"] == 2
+    assert overall["zero_count"] == 0
+    assert overall["negative_count"] == 1
+    segments = report["ts_minus_cts_by_six_hour_segment_ms"]
+    assert set(segments) == {"0", "1", "2"}
+    assert segments["0"]["median_ms"] == 7
+    assert segments["1"]["median_ms"] == -3
+    assert segments["2"]["median_ms"] == 11
+
+
+def test_orderbook_inspector_reports_empty_offset_summary_when_cts_missing():
+    raw = event("snapshot", 1_000, 1, 1, "5")
+    raw.pop("cts")
+    with tempfile.TemporaryDirectory() as tmp:
+        archive = Path(tmp) / "missing_cts.zip"
+        write_book_archive(archive, [raw])
+        with zipfile.ZipFile(archive) as zf:
+            report = book_inspector.inspect_member(zf, "events.data")
+    assert report["missing_cts_count"] == 1
+    assert report["ts_minus_cts_offset_ms"]["count"] == 0
+    assert report["ts_minus_cts_offset_ms"]["median_ms"] is None

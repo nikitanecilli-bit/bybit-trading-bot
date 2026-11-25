@@ -1,4 +1,5 @@
 name: Bybit multi-month independent trade validation
+# Four monthly days, all 24 hours; public historical files only, no PnL.
 
 on:
   push:

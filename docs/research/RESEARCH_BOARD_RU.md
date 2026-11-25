@@ -343,3 +343,5 @@
 - Цикл исправлен в commit `8cc45cb20ed19e25238a3e6fb96df44ba37b5791`; дополнительная проверка ограничения путей CSV до корня архива внесена в `83ad558cc822f3abc8f005e7affa6a0c2fbaccd8`.
 - Повторный CI для текущего HEAD пока не подтверждён. До его успешного завершения semantic reconstruction нельзя считать прошедшей тесты.
 - Изменения остаются в Draft PR #17; base `research/market-regime-v1-main`, `main` не затронут. Никаких реальных данных, API-запросов, backtest или PnL не выполнялось.
+
+- Повторный полный offline CI [45583520435 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45583520435), code SHA `ab5dc2d5e039fee731862147fb1801a8e6dc7f33`: semantic raw-to-CSV reconstruction, raw-evidence, instrument, universe, risk-limit и market-history test groups прошли. Последующие коммиты `649a46d...` и обновление Research Board меняли только документацию. Это подтверждает тесты синтетических fixtures, но не полноту исторических ответов API и не реальные data gates.

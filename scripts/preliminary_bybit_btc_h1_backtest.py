@@ -70,12 +70,20 @@ def backtest(rows, fold, arm, cost_mult):
     lo,hi={1:(.50,.65),2:(.65,.80),3:(.80,1.00)}[fold]
     start_idx=int(n*lo); end_idx=max(start_idx+1,int(n*hi))
     score_start=rows[start_idx][0]; score_end=rows[min(end_idx-1,n-1)][0]
-    closes=[r[4] for r in rows]
     volumes=[r[5] for r in rows]
-    ema50=ema(closes,50); ema200=ema(closes,200)
+    ema50=[None]*len(rows); ema200=[None]*len(rows)
+    seg_start=0
+    for k in range(1,len(rows)+1):
+        if k==len(rows) or rows[k][0]-rows[k-1][0]!=BAR_MS:
+            local_close=[r[4] for r in rows[seg_start:k]]
+            e50=ema(local_close,50); e200=ema(local_close,200)
+            ema50[seg_start:k]=e50; ema200[seg_start:k]=e200
+            seg_start=k
     equity=START_CAPITAL; peak=equity; max_dd=0.0
     trades=[]; pos=None; segment_start=0; i=0
     while i<len(rows):
+        if i==end_idx and pos:
+            _close_position(pos,rows[i-1][4],rows[i-1][0]+BAR_MS,"fold_end",cost_mult,trades); equity+=trades[-1]["net_pnl"]; pos=None
         if i>0 and rows[i][0]-rows[i-1][0]!=BAR_MS:
             if pos:
                 _close_position(pos, rows[i-1][4], rows[i-1][0]+BAR_MS, "data_gap", cost_mult, trades)
@@ -122,7 +130,7 @@ def backtest(rows, fold, arm, cost_mult):
                 if use_ema:
                     signal=signal and ema50[i] is not None and ema200[i] is not None and ema200[i-5] is not None and ema50[i]>ema200[i] and ema200[i]>ema200[i-5] and c>ema200[i]
                 if signal:
-                    en=rows[i+1][1]*(1+TAKER_FEE*cost_mult+SLIPPAGE*cost_mult)
+                    en=rows[i+1][1]
                     stop=en-2.5*a
                     risk_per_unit=en-stop
                     qty=(equity*RISK_FRACTION)/risk_per_unit if risk_per_unit>0 else 0
@@ -157,17 +165,14 @@ def backtest(rows, fold, arm, cost_mult):
 
 def _partial_exit(pos, raw_px, fraction, mult):
     q=pos["remaining"]*fraction
-    px=raw_px*(1-TAKER_FEE*mult-SLIPPAGE*mult)
-    pos["gross"]+=(px-pos["entry"])*q
-    pos["fees"]+=(pos["entry"]+raw_px)*q*TAKER_FEE*mult
-    pos["fees"]+=(pos["entry"]+raw_px)*q*SLIPPAGE*mult
+    pos["gross"]+=(raw_px-pos["entry"])*q
+    pos["fees"]+=(pos["entry"]+raw_px)*q*(TAKER_FEE+SLIPPAGE)*mult
     pos["remaining"]-=q
 
 def _close_position(pos, raw_px, ts, reason, mult, out):
     q=pos["remaining"]
     if q>0:
-        px=raw_px*(1-TAKER_FEE*mult-SLIPPAGE*mult)
-        pos["gross"]+=(px-pos["entry"])*q
+        pos["gross"]+=(raw_px-pos["entry"])*q
         pos["fees"]+=(pos["entry"]+raw_px)*q*(TAKER_FEE+SLIPPAGE)*mult
         pos["remaining"]=0
     net=pos["gross"]-pos["fees"]

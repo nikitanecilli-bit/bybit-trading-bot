@@ -49,7 +49,10 @@ def collect(path, name, params, row_key, timestamp_index, limit=1000, time_keys=
     raw_path = OUT / f"{name}.raw.jsonl.gz"
     with gzip.open(raw_path, "wt", encoding="utf-8") as raw:
         while cursor >= START_MS:
-            p = dict(params, startTime=START_MS, endTime=cursor, limit=limit)
+            p = dict(params)
+            p[time_keys[0]] = START_MS
+            p[time_keys[1]] = cursor
+            p["limit"] = limit
             payload = request(path, p)
             raw.write(json.dumps(payload, separators=(",",":")) + "\n")
             batch = payload.get("result", {}).get(row_key, [])
@@ -80,7 +83,7 @@ results=[]
 results.append(collect("/v5/market/kline","trade_h1",
     {"category":CATEGORY,"symbol":SYMBOL,"interval":INTERVAL},"list",0,1000,("start","end")))
 results.append(collect("/v5/market/mark-price-kline","mark_h1",
-    {"category":CATEGORY,"symbol":SYMBOL,"interval":INTERVAL},"list",0,1000))
+    {"category":CATEGORY,"symbol":SYMBOL,"interval":INTERVAL},"list",0,1000,("start","end")))
 results.append(collect("/v5/market/funding/history","funding",
     {"category":CATEGORY,"symbol":SYMBOL},"list",2,200))
 

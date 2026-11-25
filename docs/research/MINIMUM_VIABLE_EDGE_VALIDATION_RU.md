@@ -58,7 +58,9 @@
 
 ### Tardis.dev — вторичный cross-check
 
-Один полный день BTCUSDT (2026-11-01) скачан и прошёл gzip/CSV schema scan. Trades: 360 226 строк; L2: 11 612 155 строк. Однако normalized L2 CSV сохраняет Bybit system ts, но не matching-engine cts и sequence IDs; поэтому для queue replay он уступает CryptoHFTData. Полный raw replay API Tardis требует платного доступа; покупка подписки этим разрешением не одобрена.
+Один полный день BTCUSDT (2026-11-01) скачан и прошёл gzip/CSV schema scan. Trades: 360 226 строк; L2: 11 612 155 строк. Дополнительно выполнено сравнение всех 24 часовых CryptoHFTData trade files с Tardis daily trades по (trade_time, aggressor side, price, quantity): 360 226 из 360 226 Tardis trades найдены в CryptoHFTData; пропусков относительно Tardis — 0; в CryptoHFTData одна дополнительная запись в 18:00 UTC (2026-11-01 18:11:26.056, Buy, 77929.70, qty 0.007), с уникальным trade ID и без совпадения у Tardis. Причина дополнительной записи не установлена; в остальных 23 часах exact multiset match 100%. Отчёт: Actions run 45626273387, artifact 15027427890.
+
+Однако normalized L2 CSV сохраняет Bybit system ts, но не matching-engine cts и sequence IDs; поэтому для queue replay он уступает CryptoHFTData. Полный raw replay API Tardis требует платного доступа; покупка подписки этим разрешением не одобрена.
 
 Решение: CryptoHFTData — основной кандидат для следующего ограниченного backfill и проверки; Tardis — вторичная независимая сверка там, где есть доступные бесплатные samples. Ни один источник пока не принят для market-PnL validation.
 

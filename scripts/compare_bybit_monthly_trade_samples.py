@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import gzip
+from datetime import timedelta
 import hashlib
 import json
 import sys
@@ -126,7 +127,8 @@ def main() -> int:
         "provider_b": "CryptoHFTData",
         "symbol": SYMBOL,
         "dates": list(DATES),
-        "hours_utc": list(HOURS),
+        "event_hours_utc": list(HOURS),
+        "receive_partitions": "target date 00-23 plus next day 00; grouped by trade_time UTC",
         "scope": "all 24 hours per monthly sample day; exact trade multiset comparison; no PnL",
         "raw_archives_uploaded": False,
         "days": {},
@@ -156,84 +158,94 @@ def main() -> int:
                 failed = True
                 continue
 
-            for hour in HOURS:
-                item = {}
-                hour_tardis_rows = sum(tardis_by_hour[hour].values())
-                total["tardis_rows"] += hour_tardis_rows
+
+            candidate_by_event_hour = {hour: Counter() for hour in HOURS}
+            file_diagnostics = {}
+            receive_partitions = [(date, hour) for hour in HOURS]
+            next_day = (datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                        + timedelta(days=1)).strftime("%Y-%m-%d")
+            receive_partitions.append((next_day, "00"))
+
+            for receive_date, receive_hour in receive_partitions:
+                partition_key = f"{receive_date}T{receive_hour}"
                 try:
                     if request_count:
                         time.sleep(1.05)
                     request_count += 1
-                    parquet_path = root / f"chd_{date}_{hour}.parquet"
-                    item["download"] = download(chd_url(date, hour), parquet_path,
-                                                 MAX_CHD_BYTES)
+                    parquet_path = root / f"chd_{receive_date}_{receive_hour}.parquet"
+                    download_meta = download(chd_url(receive_date, receive_hour), parquet_path, MAX_CHD_BYTES)
                     normalized_path, container = normalize_parquet(parquet_path)
                     table = pq.read_table(normalized_path)
-                    expected = ["received_time", "event_time", "symbol", "trade_id",
-                                "price", "quantity", "trade_time", "is_buyer_maker",
-                                "order_type"]
+                    expected = ["received_time", "event_time", "symbol", "trade_id", "price", "quantity", "trade_time", "is_buyer_maker", "order_type"]
                     if table.schema.names != expected:
                         raise ValueError(f"CryptoHFTData schema mismatch: {table.schema.names!r}")
                     d = table.to_pydict()
-                    candidate = Counter()
                     ids = [str(x) for x in d["trade_id"] if x is not None]
-                    id_to_keys = {}
                     order_types = Counter()
+                    id_to_keys = {}
+                    event_rows_in_target_day = 0
+                    lag_ms = []
                     for i in range(len(d["trade_id"])):
                         if d["symbol"][i] != SYMBOL:
-                            raise ValueError(f"unexpected symbol in {date} {hour}")
+                            raise ValueError(f"unexpected symbol in {partition_key}")
+                        trade_ts = int(d["trade_time"][i])
+                        trade_dt = datetime.fromtimestamp(trade_ts / 1000, tz=timezone.utc)
+                        if trade_dt.strftime("%Y-%m-%d") != date:
+                            continue
+                        event_hour = trade_dt.strftime("%H")
                         side = "sell" if d["is_buyer_maker"][i] else "buy"
-                        key = (d["trade_time"][i], side, dec(d["price"][i]),
-                               dec(d["quantity"][i]))
-                        candidate[key] += 1
+                        key = (trade_ts, side, dec(d["price"][i]), dec(d["quantity"][i]))
+                        candidate_by_event_hour[event_hour][key] += 1
+                        event_rows_in_target_day += 1
                         order_types[str(d["order_type"][i])] += 1
                         trade_id = d["trade_id"][i]
                         if trade_id is not None:
                             id_to_keys.setdefault(str(trade_id), set()).add(key)
-                    duplicate_id_conflicts = sum(
-                        1 for payloads in id_to_keys.values() if len(payloads) > 1
-                    )
-                    item["container"] = container
-                    item["parquet_rows"] = table.num_rows
-                    item["trade_id_integrity"] = {
-                        "null_ids": len(d["trade_id"]) - len(ids),
-                        "unique_ids": len(set(ids)),
-                        "duplicate_rows": len(ids) - len(set(ids)),
-                        "conflicting_ids_with_multiple_trade_payloads": duplicate_id_conflicts,
-                        "sample_unique_ids": list(dict.fromkeys(ids))[:5],
+                        received_ts = int(d["received_time"][i])
+                        lag_ms.append(received_ts // 1_000_000 - trade_ts)
+                    sorted_lag = sorted(lag_ms)
+                    file_diagnostics[partition_key] = {
+                        "status": "DOWNLOADED",
+                        "download": download_meta,
+                        "container": container,
+                        "parquet_rows": table.num_rows,
+                        "target_day_event_rows": event_rows_in_target_day,
+                        "trade_id_integrity": {
+                            "null_ids": len(d["trade_id"]) - len(ids),
+                            "unique_ids": len(set(ids)),
+                            "duplicate_rows": len(ids) - len(set(ids)),
+                            "zero_id_rows": sum(1 for x in ids if x == "0"),
+                            "conflicting_ids_with_multiple_trade_payloads": sum(1 for payloads in id_to_keys.values() if len(payloads) > 1),
+                        },
+                        "order_type_counts": dict(order_types),
+                        "receive_minus_trade_ms": {
+                            "min": min(lag_ms) if lag_ms else None,
+                            "median": sorted_lag[len(sorted_lag)//2] if sorted_lag else None,
+                            "max": max(lag_ms) if lag_ms else None,
+                            "negative_rows": sum(1 for x in lag_ms if x < 0),
+                        },
                     }
-                    item["order_type_counts"] = dict(order_types)
-                    item["comparison"] = multiset_diff(tardis_by_hour[hour], candidate)
-                    item["status"] = "COMPARED"
-                    total["cryptohftdata_rows"] += item["comparison"]["cryptohftdata_rows"]
-                    total["matched_rows"] += item["comparison"]["matched_rows"]
-                    total["missing_from_cryptohftdata"] += item["comparison"]["missing_from_cryptohftdata"]
-                    total["extra_in_cryptohftdata"] += item["comparison"]["extra_in_cryptohftdata"]
                 except urllib.error.HTTPError as exc:
-                    item["status"] = "MISSING_OR_FAILED"
-                    item["error"] = f"HTTP {exc.code}: {exc.reason}"
-                    total["missing_hour_files"] += 1
-                    total["missing_from_cryptohftdata"] += hour_tardis_rows
+                    file_diagnostics[partition_key] = {"status": "HTTP_ERROR", "http_status": exc.code, "error": f"HTTP {exc.code}: {exc.reason}"}
                 except Exception as exc:
-                    item["status"] = "DOWNLOAD_OR_DECODE_FAILED"
-                    item["error"] = f"{type(exc).__name__}: {exc}"
-                    total.setdefault("failed_hour_checks", 0)
-                    total["failed_hour_checks"] += 1
-                day_report["hours"][hour] = item
-            operational_gaps = any(
-                v["status"] != "COMPARED" for v in day_report["hours"].values()
-            )
-            data_mismatches = any(
-                v.get("comparison", {}).get("missing_from_cryptohftdata", 0)
-                or v.get("comparison", {}).get("extra_in_cryptohftdata", 0)
-                for v in day_report["hours"].values()
-            )
+                    file_diagnostics[partition_key] = {"status": "DOWNLOAD_OR_DECODE_FAILED", "error": f"{type(exc).__name__}: {exc}"}
+
+            day_hour_comparisons = {}
+            for event_hour in HOURS:
+                comparison = multiset_diff(tardis_by_hour[event_hour], candidate_by_event_hour[event_hour])
+                day_hour_comparisons[event_hour] = comparison
+                for key in ("tardis_rows", "cryptohftdata_rows", "matched_rows", "missing_from_cryptohftdata", "extra_in_cryptohftdata"):
+                    total[key] += comparison[key]
+            day_report["receive_partitions"] = file_diagnostics
+            day_report["event_hour_comparisons"] = day_hour_comparisons
+            day_report["cryptohftdata_event_rows"] = sum(sum(x.values()) for x in candidate_by_event_hour.values())
             day_report["status"] = (
-                "DOWNLOAD_OR_DECODE_GAPS" if operational_gaps
-                else "COMPARED_WITH_MISMATCH" if data_mismatches
+                "OPERATIONAL_GAPS" if any(v["status"] != "DOWNLOADED" for v in file_diagnostics.values())
+                else "MISMATCH_REVIEW_REQUIRED" if any(v["missing_from_cryptohftdata"] or v["extra_in_cryptohftdata"] for v in day_hour_comparisons.values())
                 else "EXACT_MATCH"
             )
             report["days"][date] = day_report
+
 
     report["totals"] = total
     report["comparison_status"] = (
@@ -249,7 +261,7 @@ def main() -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))
-    return 1 if failed or total.get('failed_hour_checks', 0) else 0
+    return 1 if failed or any(day.get('status') == 'OPERATIONAL_GAPS' for day in report['days'].values()) else 0
 
 
 if __name__ == "__main__":

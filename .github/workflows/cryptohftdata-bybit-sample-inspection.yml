@@ -1,5 +1,6 @@
 name: CryptoHFTData Bybit one-hour sample inspection
 # One-hour public sample only; raw Parquet is not retained as a public artifact.
+# Includes matching-engine timestamp comparison between Bybit publicTrade.T and orderbook.cts.
 
 on:
   push:

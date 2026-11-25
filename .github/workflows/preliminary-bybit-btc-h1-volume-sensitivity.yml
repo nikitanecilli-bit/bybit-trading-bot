@@ -1,0 +1,42 @@
+name: Preliminary Bybit BTC H1 volume sensitivity
+
+on:
+  push:
+    branches:
+      - research/h1-volume-lookback-provenance-fix
+    paths:
+      - scripts/preliminary_bybit_btc_h1_volume_sensitivity.py
+      - scripts/preliminary_bybit_btc_h1_backtest.py
+      - .github/workflows/preliminary-bybit-btc-h1-volume-sensitivity.yml
+
+permissions:
+  contents: read
+
+jobs:
+  sensitivity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/h1-volume-lookback-provenance-fix
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download official Bybit BTCUSDT H1 history
+        env:
+          START_DATE: "2020-04-01"
+          END_DATE: "2025-11-04"
+        run: python scripts/download_bybit_btcusdt_public_history.py
+      - name: Run volume-threshold sensitivity
+        working-directory: scripts
+        run: |
+          cp preliminary_bybit_btc_h1_backtest.py .
+          python preliminary_bybit_btc_h1_volume_sensitivity.py
+      - name: Upload sensitivity results
+        uses: actions/upload-artifact@v4
+        with:
+          name: preliminary-bybit-btc-h1-volume-sensitivity
+          path: scripts/volume_sensitivity/
+          if-no-files-found: error
+          retention-days: 90

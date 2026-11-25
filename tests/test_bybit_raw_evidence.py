@@ -72,7 +72,7 @@ class RawEvidenceTests(unittest.TestCase):
                     "page_index": 1,
                     "raw_response_request_id": record["request_id"],
                     "raw_response_body_sha256": record["body_sha256"],
-                }],
+                }], capture_dir=root / "raw_evidence" / "capture-test",
             )
             self.assertTrue(validate_evidence_manifest(manifest)["ok"])
             (root / record["body_file"]).write_bytes(body + b" ")
@@ -89,7 +89,7 @@ class RawEvidenceTests(unittest.TestCase):
                 body, base_url="https://api.bybit.com",
                 endpoint="/v5/market/risk-limit", params={"category": "linear"},
                 http_status=200, response_headers={},
-                evidence_dir=root / "raw_evidence" / "pending", records=records,
+                evidence_dir=root / "raw_evidence" / "capture-test", records=records,
             )
             output = root / "2026-11-25T08-00-00Z.json"
             output.write_text('{"tiers":[]}', encoding="utf-8")

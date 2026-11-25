@@ -27,7 +27,7 @@ This is a semantic page-inventory check, not final data acceptance:
 
 Two offline tests cover a valid three-stream manifest, deliberate tampering of row counts/page references/timestamp bounds, and alteration of a normalized CSV value while leaving the raw pages intact.
 
-The workflow definition compiles and runs the new tests. The available GitHub run lookup did not return a run for the latest commit, so CI success for these newest changes remains unverified.
+The workflow definition compiles and runs the new tests. GitHub Actions run [45583224115](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45583224115) executed the new semantic tests and FAILED: both tests exposed a `NameError` in the reconstruction loop (`row` referenced outside its intended loop). The failure was reproduced from the job log; it was not hidden or marked as success. The loop has now been corrected in commit `8cc45cb20ed19e25238a3e6fb96df44ba37b5791`; a fresh CI run is required before claiming the fix passes.
 
 No exchange API calls, data collection, archive generation, PnL, backtest, parameter sweep, or event study were performed.
 

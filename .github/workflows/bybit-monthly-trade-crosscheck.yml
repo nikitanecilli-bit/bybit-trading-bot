@@ -1,0 +1,32 @@
+name: Bybit multi-month independent trade validation
+
+on:
+  push:
+    branches:
+      - research/market-regime-v1-main
+    paths:
+      - "scripts/compare_bybit_monthly_trade_samples.py"
+      - ".github/workflows/bybit-monthly-trade-crosscheck.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install Parquet reader
+        run: python -m pip install --quiet pyarrow
+      - name: Compare four monthly sample days across all UTC hours
+        run: python scripts/compare_bybit_monthly_trade_samples.py /tmp/bybit_monthly_trade_crosscheck.json
+      - name: Upload compact comparison report only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bybit-monthly-trade-crosscheck
+          path: /tmp/bybit_monthly_trade_crosscheck.json
+          if-no-files-found: warn

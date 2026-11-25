@@ -304,3 +304,131 @@
 - Старый run_bybit_h1_long_only_holdout.py не подходит: Donchian(20), 11 символов отобраны на Binance train, отдельный капитал на символ, funding upper-bound, Last-price exits и явное пересечение календарного периода с прежним Binance study. Bybit data files, которых он требует, в repo отсутствуют.
 - Существующий Bybit archive workflow требует self-hosted по умолчанию и предупреждает о блокировке hosted US egress. Self-hosted/collector запрещены; workflow не запускать и не менять.
 - Статус: **BLOCKED BY DATA + INDEPENDENCE**. Ни старые folds, ни другой venue на том же календарном периоде не создают независимый holdout. Подробности: acceptance ledger Section 49 и Minimum Viable Validation Section 6A.
+
+
+## 2026-11-25 — Bybit raw-response provenance strengthened (no data collection)
+
+- На отдельной ветке `research/bybit-raw-response-evidence-v1` усилены **уже существующие** Bybit collectors; новый market-data collector не создавался.
+- Для исторических Funding/OHLCV/Mark Price responses и трёх snapshot streams (instruments-info, linear universe, risk-limit) добавлена фиксация исходных HTTP response bodies, request identity/params, UTC retrieval time, HTTP status, selected headers, SHA-256 и byte length.
+- Snapshot evidence manifest связывает каждую collection page с raw response request ID/body hash и итоговым normalized snapshot hash. Общий validator проверяет raw body, audit JSON, page-to-response links и normalized output; dated outputs fail closed при попытке перезаписи.
+- Offline regression workflow [45580464884](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45580464884) — SUCCESS на code SHA `c926b4065d89cd3c2e3a968749dbb8483da9ff98`: raw evidence tests, instrument snapshot tests, linear universe tests, risk-limit tests и market-history collector tests прошли.
+- Draft PR #17: https://github.com/nikitanecilli-bit/bybit-trading-bot/pull/17; base — `research/market-regime-v1-main`, не `main`. PR не объединён.
+- Это подтверждает только качество реализации и synthetic/offline regression. **Ни одного реального Bybit snapshot или market archive не собрано; ни один data gate не переведён в ACCEPTED.** Исторические lifecycle/spec/risk/fees limitations сохраняются.
+- Решение: оставить PR draft до отдельного review. Не запускать архивные workflows, PnL, backtest, sweeps или event studies без отдельного разрешения и прохождения текущих data gates.
+
+
+### Дополнение 2026-11-25 — полнота page-to-raw evidence
+
+- При повторном аудите выяснилось, что одних SHA-256 проверок недостаточно: manifest должен доказывать, что каждая страница API связана ровно с одним raw response, нет осиротевших ответов, а page inventory совпадает с page observations нормализованного снимка.
+- Усилен `validate_evidence_manifest`: обязательные raw records/pages, уникальность request IDs и page keys, one-to-one page↔response coverage, проверка page index/status inventory, path containment, body/output hash и byte count.
+- Добавлены offline regression cases на потерянную страницу, orphan response и подмену normalized output.
+- Последний GitHub Actions run [45581283920 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45581283920), code SHA `32a1f6a11a2ec1d40653f3d08242ca8b24635bf1`: все шесть групп тестов прошли.
+- PR #17 остаётся Draft, открыт и не объединён; review comments пока отсутствуют. Ни один collector не запускался, реальные данные не собирались, gates не менялись.
+
+
+### Дополнение 2026-11-25 — archive-level evidence chain завершена
+
+- Та же проверка полноты распространена на исторический архиватор D1/D2/D3: Funding, trade OHLCV и Mark Price.
+- Теперь валидатор требует все три потока страниц, уникальные raw request IDs, one-to-one page↔response links без orphan/duplicate, соответствие audit path и body hash, а также наличие всех трёх нормализованных CSV с совпадающими SHA-256 и row counts.
+- Добавлены synthetic offline tests на потерянную страницу, orphan response и подмену нормализованного CSV. Обновлённые archive tests также проверяют повторный запуск после прерванной Mark-загрузки.
+- GitHub Actions [45581812910 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45581812910), code SHA `c8df338b2b4605c307af02ccd92b5ccdd30a8090`: все шесть test groups прошли.
+- PR #17 всё ещё Draft; изменения остаются изолированными в `research/bybit-raw-response-evidence-v1`. Последующие изменения документации не меняли протестированный код.
+- Сбор реальных данных, PnL/backtest и изменение data gates не выполнялись. Статус проекта по независимому holdout остаётся **BLOCKED BY DATA + INDEPENDENCE**.
+
+
+### Дополнение 2026-11-25 — raw-to-CSV semantic reconstruction: CI failure and correction
+
+- Новый semantic validator теперь восстанавливает ожидаемые строки Funding/OHLCV/Mark Price из исходных raw JSON pages и сравнивает значения и количество строк с нормализованными CSV; проверка выполняется офлайн.
+- Первый CI run [45583224115](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45583224115) завершился FAILURE: тесты выявили ошибку NameError в цикле реконструкции. Ошибка была подтверждена по логам, а не скрыта.
+- Цикл исправлен в commit `8cc45cb20ed19e25238a3e6fb96df44ba37b5791`; дополнительная проверка ограничения путей CSV до корня архива внесена в `83ad558cc822f3abc8f005e7affa6a0c2fbaccd8`.
+- Повторный CI для текущего HEAD пока не подтверждён. До его успешного завершения semantic reconstruction нельзя считать прошедшей тесты.
+- Изменения остаются в Draft PR #17; base `research/market-regime-v1-main`, `main` не затронут. Никаких реальных данных, API-запросов, backtest или PnL не выполнялось.
+
+- Повторный полный offline CI [45583520435 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45583520435), code SHA `ab5dc2d5e039fee731862147fb1801a8e6dc7f33`: semantic raw-to-CSV reconstruction, raw-evidence, instrument, universe, risk-limit и market-history test groups прошли. Последующие коммиты `649a46d...` и обновление Research Board меняли только документацию. Это подтверждает тесты синтетических fixtures, но не полноту исторических ответов API и не реальные data gates.
+
+
+### 2026-11-25 — official Bybit public history endpoints re-audited (acceptance ledger Section 50)
+
+- D1 OHLCV and D2 Mark Price historical candle REST endpoints are documented with start/end windows and up to 1,000 records/page; maximum historical retention/completeness is not guaranteed in the docs.
+- D3 Funding History is documented with up to 200 settlements/page and symbol-specific intervals; historical interval/formula effective-time history is not supplied by the endpoint schema.
+- D4 instruments-info and D5 specs are current-state endpoints; the docs explicitly note selected order-size fields are adjusted twice monthly, without supplying the complete past effective-time values. D6 risk-limit is a current paginated table (15 Linear symbols/page), not a historical tier archive.
+- D7: official docs link to a historical public-trades download page. Its accessible catalog page does not expose verifiable file inventory/date coverage in text view; this is a lead only, not accepted data or L2 evidence.
+- D8 fee-group endpoint describes Pro/Market Maker group fees and explicitly excludes retail from that grouped structure; updateTime is not a historical fee series.
+- No API calls, market downloads, collectors, workflows or PnL were run. No gate status changed. The ledger now distinguishes potentially retrievable D1–D3 from the historical PIT blockers D4–D6 and the limited D7/D8 evidence.
+- Independent holdout remains unavailable: CryptoFetch data through 2026-10-27 were already used; the later OKX slice is too short and cross-venue/calendar overlap is not independent temporal replication. Current status: **BLOCKED BY DATA + INDEPENDENCE**.
+
+
+### 2026-11-25 — official announcement event path for D4–D6 (acceptance ledger Section 51)
+
+- Found primary Bybit listing notices with launch/open time and initial specs (e.g. CPUSDT: tick size, max leverage, capped funding rate, 4h interval); delisting notices with exact UTC end time (SC, ASP, TMX, AGI and multi-symbol migration notices); and temporary contract adjustment notices with trading halt/resume windows and skipped funding during halt.
+- Found dated tick-size changes (Nov 20, Oct 12, Aug 11), dated max-order-size before/after tables (Nov 20, Nov 5, Nov 9), and risk-limit notices that either give before/after maximum leverage or only list affected symbols/effective time.
+- This materially improves the evidence path: D4 listing/delisting and selected halt events; D5 selected tick size, max order size, initial listing parameters and corporate-action contract-size changes; D6 selected dated leverage/risk notices.
+- Important limitation: announcements are not a complete historical spec/tier database. Many D6 notices do not include full tier ladders; D5 fields such as qtyStep/minNotional and all changes are not guaranteed; targeted search is not archive completeness.
+- Decision: D4/D5/D6 remain PARTIAL / NOT ACCEPTED. No notices downloaded or normalized into data; no API calls, collectors, workflows or PnL were run. Proposed next step is a bounded offline announcement inventory against the frozen 47-symbol Linear universe, subject to separately confirmed authorization for any automated collection.
+
+
+### 2026-11-25 — bounded Bybit announcement coverage spot check (acceptance ledger Section 52)
+
+- Recovered the exact E11 universe manifest from existing workflow artifact `13105661683`: 47 included proxy symbols, with AEROUSDT/GRAMUSDT/HYPEUSDT excluded for insufficient fold bars. This denominator is Binance-style and survivor-biased, not a Bybit PIT universe.
+- Manual indexed search of official announcements surfaced D5 tick/order-size events for 11/47 symbols (23.4%) and D6 risk-limit events for 19/47 (40.4%); 24/47 had at least one D5/D6 hit in the sampled notices. These are positive-hit counts only, **not archive-completeness percentages**.
+- No confirmed D4 listing/delisting/suspension notice naming one of the 47 surfaced in the bounded query sample. Search misses are not evidence of absence. TradFi/stock and Spot notices were excluded from Linear counts.
+- D4/D5/D6 remain PARTIAL / NOT ACCEPTED. No announcement crawl/raw capture, market API call, data collection, workflow dispatch, PnL or backtest was run. Only an already-existing E11 result artifact was inspected for its manifest.
+- Next step: specify archive pagination and symbol/category reconciliation before any automated collection. This remains a design/read-only task; automated crawling and raw capture require separate authorization.
+
+
+### 2026-11-25 — Bybit announcement archive pagination inspected (acceptance ledger Section 53)
+
+- Official public archive pages show 20 items/page and observed totals: New crypto/listings 25 pages, Delistings 11, Maintenance Updates 19, Latest Bybit News 11. These routes overlap and mix product categories; page totals are not unique-event counts.
+- This provides a finite design for a symbol/category reconciliation inventory. Listings require filtering mixed Spot/Derivatives/Options/TradFi; delistings and maintenance pages require separating token events from Linear perpetual lifecycle; D5/D6 notices are spread across Latest Bybit News and Maintenance Updates.
+- Wrote a minimal fail-closed pagination/dedup/category/event-time protocol in Section 53. It was not executed. No crawler, raw HTML capture, API request or data collection was run.
+- Next decision: separate authorization is required before implementing or dispatching a read-only announcement-page crawler. Until then D4/D5/D6 remain PARTIAL / NOT ACCEPTED.
+
+
+### 2026-11-25 — public announcement inventory collector implemented (acceptance ledger Section 54)
+
+- Added a read-only GitHub-hosted workflow and collector restricted to official `announcements.bybit.com` HTTPS pages, four selected categories and linked articles. Captures raw HTML bytes, response metadata, retrieval timestamps and SHA-256; minimum one-second request spacing; no credentials, market/account APIs, proxy, trading or alternate host.
+- Offline tests passed. Strengthened the collector to fail closed unless pagination matches the observed category totals (25/11/19/11) and to keep TradFi, inverse and ambiguous perpetual product categories separate from explicit Linear candidates.
+- Strict collection run `45585129324` is in progress; initial run `45584843911` is also in progress and is not accepted. No inventory artifact yet; no completeness claims. D4/D5/D6 remain PARTIAL / NOT ACCEPTED.
+
+
+### 2026-11-25 — corrected collector against actual Bybit HTML (acceptance ledger Section 55)
+
+- Important: initial workflow `45584843911` reported success but its artifact contained only page 1 from each category (80 articles) and falsely set complete=true. It missed Bybit's numeric pagination `li[title]` markup. Explicitly INVALID / NOT ACCEPTED; do not use its counts.
+- Fixed pagination parsing using actual numeric list-item titles and actual `/en/article/...` paths. Added structured article extraction from `__NEXT_DATA__.articleDetail` so classifier ignores site navigation/footer text.
+- Latest strict run `45585668574`: offline tests passed; collection in progress at last check. Intermediate runs/failures documented in Section 55; only latest code SHA can be evaluated for acceptance.
+- D4/D5/D6 remain PARTIAL / NOT ACCEPTED. No market/account API, trades, PnL or backtests.
+
+
+### 2026-11-25 — diagnostic re-audit of invalid 80-article artifact (Section 56)
+
+- Independently extracted article text from raw HTML `__NEXT_DATA__.articleDetail`. The old inventory's 80/80 TradFi + DELIST labels were contaminated by page chrome and are false positives.
+- Body-only diagnostic reclassification found one target-symbol article among those first 80: a funding-rate formula update dated 2026-11-19, matching ADA/ARB/ATOM/AVAX/LTC/NEAR USDT tickers. Product type remains unknown; candidate event only.
+- This invalid first-page sample is parser QA only, not event coverage evidence. No D4/D5/D6 acceptance.
+
+
+### 2026-11-25 — dual-format announcement body extraction corrected; risk notices inventoried (Sections 57–58)
+
+- Re-audited the 1,275-article artifact and corrected a false alarm: Bybit stores body text in either `content_html` or Contentstack rich-text `content.json`. Counts: 721 HTML bodies, 554 rich-JSON bodies, 0 empty in both. The five previously flagged risk-limit articles were not missing; their rich-JSON bodies were present. The old five-gap claim is withdrawn and documented as a correction.
+- Updated collector and semantic validator to use HTML first, rich JSON fallback, track extraction source/character count, ignore script/style text, and require non-empty article text for `complete=true`.
+- Added regression coverage for rich JSON fallback, truly empty bodies, HTML parsing, script/style exclusion and byte-hash mismatch. An initial test fixture failed because it embedded a literal closing script tag inside JSON; escaped the fixture correctly. Check the latest CI run before treating the current branch head as green.
+- Offline review of the existing archive identified 63 risk-limit / position-tier / max-leverage candidates; 9 official notices intersect the 47-symbol proxy universe and cover 32 distinct proxy symbols. Event dates, effective times, buffer ends where stated, source links and raw body hashes are in `BYBIT_RISK_LIMIT_NOTICE_EVENT_INVENTORY_PARTIAL_2026-11-25_RU.md`.
+- This improves D6 event-date evidence but does not recover full tier thresholds / maintenance-margin rates. D4/D5/D6 remain PARTIAL / NOT ACCEPTED. No new public crawl, market API, private/account API, orders, PnL or backtests were run.
+
+
+### 2026-11-25 — expanded dated tick-size and max-order-size history (Section 59)
+
+- Re-read official tables across both Bybit article formats (rendered HTML and rich-text JSON) from the existing 1,275-article capture.
+- Found 7 tick-size notices intersecting the 47-symbol proxy: 19 symbol/event rows across 14 symbols.
+- Found 8 maximum market/limit order-size notices intersecting the proxy: 29 symbol/event rows across 31 symbols.
+- Two January maximum-order-size notices conflict internally: titles/publication point to 2026, body text states 2025 effective dates. Preserved but quarantined; no silent date correction.
+- Detailed tables, effective timestamps, source URLs and raw body hashes: `BYBIT_DATED_PERPETUAL_PARAMETER_EVENTS_EXPANDED_PARTIAL_2026-11-25_RU.md`. The earlier parameter-event document is marked superseded.
+- D5 remains NOT ACCEPTED: this is partial historical parameter evidence, not a complete instrument-specification history. D6 remains NOT ACCEPTED: maximum order sizes and leverage notices are not risk-tier ladders. No trading, PnL or backtests.
+
+
+### 2026-11-25 — Bybit risk-limit mechanics vs engine gap audit (Section 60)
+
+- Official Help Center rules specify effective position value as max(long position + long open orders, short position + short open orders), excluding Reduce-only and Close-on-Trigger orders; Mark Price can move a position between tiers in real time. Official V5 public GET risk-limit schema includes riskLimitValue, IMR, MMR, maxLeverage and mmDeduction.
+- The engine already has dated tier snapshots, Decimal tier selection, single-position Mark-Price MM and liquidation components.
+- Confirmed missing: aggregate position + active-order risk value, order classification, aggregate cap enforcement, the 10-day risk-parameter change buffer state machine, and cross/portfolio account-level margin.
+- Full gap audit: `BYBIT_RISK_LIMIT_MODEL_VS_OFFICIAL_RULES_GAP_AUDIT_2026-11-25_RU.md`. This is a research/backtest simulator gap analysis, not a live execution finding.
+- No code change, public API request, private/account API, orders, PnL or backtests were run.

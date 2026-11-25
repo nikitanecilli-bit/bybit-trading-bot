@@ -1,0 +1,314 @@
+"""Content-addressed evidence helpers for public Bybit GET snapshots."""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+def _atomic_write(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def capture_response(
+    raw_body: bytes, *, base_url: str, endpoint: str, params: dict[str, Any],
+    http_status: int, response_headers: dict[str, Any],
+    evidence_dir: str | Path, records: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Persist exact response bytes and an immutable audit record."""
+    if not isinstance(raw_body, bytes):
+        raise TypeError("raw response body must be bytes")
+    root = Path(evidence_dir)
+    digest = hashlib.sha256(raw_body).hexdigest()
+    body_relative = f"bodies/{digest}.json"
+    request = {
+        "method": "GET", "base_url": base_url.rstrip("/"),
+        "endpoint": endpoint, "params": params,
+    }
+    identity = hashlib.sha256(
+        json.dumps(request, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        + digest.encode("ascii")
+    ).hexdigest()
+    retrieved = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    request_id = identity
+    audit_relative = f"requests/{request_id}.json"
+    record = {
+        "schema_version": 1, "request_id": request_id, "request": request,
+        "retrieved_at_utc": retrieved, "http_status": int(http_status),
+        "response_headers": response_headers, "body_bytes": len(raw_body),
+        "body_sha256": digest, "body_file": body_relative,
+        "audit_file": audit_relative,
+    }
+    body_path = root / body_relative
+    if body_path.exists() and hashlib.sha256(body_path.read_bytes()).hexdigest() != digest:
+        raise RuntimeError("existing raw response body failed its content-addressed hash")
+    if not body_path.exists():
+        _atomic_write(body_path, raw_body)
+    audit_path = root / audit_relative
+    if audit_path.exists():
+        try:
+            previous = json.loads(audit_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError("existing raw response audit record is invalid") from exc
+        if previous != record:
+            request_id = hashlib.sha256(
+                (identity + retrieved).encode("utf-8")
+            ).hexdigest()
+            record["request_id"] = request_id
+            record["audit_file"] = f"requests/{request_id}.json"
+            audit_path = root / record["audit_file"]
+    _atomic_write(
+        audit_path,
+        (json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8"),
+    )
+    records.append(record)
+    return record
+
+
+def write_evidence_manifest(
+    manifest_path: str | Path, *, source: str, category: str,
+    normalized_output: str | Path, records: list[dict[str, Any]],
+    collection_pages: list[dict[str, Any]],
+) -> dict[str, Any]:
+    path = Path(manifest_path)
+    output = Path(normalized_output)
+    if not output.is_file():
+        raise FileNotFoundError(output)
+    manifest = {
+        "schema_version": 1,
+        "source": source,
+        "category": category,
+        "normalized_output": {
+            "path": os.path.relpath(output, path.parent).replace(os.sep, "/"),
+            "sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+            "bytes": output.stat().st_size,
+        },
+        "collection_pages": collection_pages,
+        "records": records,
+    }
+    _atomic_write(
+        path,
+        (json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8"),
+    )
+    report = validate_evidence_manifest(path)
+    if not report["ok"]:
+        raise RuntimeError(f"raw evidence validation failed: {report['errors']}")
+    return manifest
+
+
+
+def assert_snapshot_paths_available(output_root: str | Path, stamp: str) -> None:
+    """Fail closed rather than overwrite a dated snapshot or its evidence."""
+    root = Path(output_root)
+    candidates = (
+        root / f"{stamp}.json",
+        root / f"{stamp}.evidence.json",
+        root / "raw_evidence" / stamp,
+    )
+    existing = [str(path) for path in candidates if path.exists()]
+    if existing:
+        raise FileExistsError(
+            "dated snapshot/evidence path already exists; refusing to overwrite: "
+            + ", ".join(existing)
+        )
+
+
+def finalize_snapshot_evidence(
+    output_root: str | Path, stamp: str, *, source: str, category: str,
+    normalized_output: str | Path, records: list[dict[str, Any]],
+    collection_pages: list[dict[str, Any]], capture_dir: str | Path,
+) -> Path:
+    """Move one unique capture into its dated directory, rebase audit paths, and seal manifest."""
+    root = Path(output_root)
+    capture = Path(capture_dir)
+    dated = root / "raw_evidence" / stamp
+    manifest_path = root / f"{stamp}.evidence.json"
+    if dated.exists() or manifest_path.exists():
+        raise FileExistsError("dated raw evidence already exists; refusing to overwrite")
+    if records and not capture.is_dir():
+        raise FileNotFoundError("raw response capture directory is missing")
+    if capture.exists():
+        dated.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(capture, dated)
+    for record in records:
+        record["body_file"] = str(Path("raw_evidence") / stamp / record["body_file"]).replace(os.sep, "/")
+        record["audit_file"] = str(Path("raw_evidence") / stamp / record["audit_file"]).replace(os.sep, "/")
+        audit_path = root / record["audit_file"]
+        _atomic_write(
+            audit_path,
+            (json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8"),
+        )
+    write_evidence_manifest(
+        manifest_path, source=source, category=category,
+        normalized_output=normalized_output, records=records,
+        collection_pages=collection_pages,
+    )
+    return manifest_path
+
+
+def validate_evidence_manifest(manifest_path: str | Path) -> dict[str, Any]:
+    """Verify raw files, page-to-response coverage, and normalized page inventory."""
+    path = Path(manifest_path)
+    errors: list[str] = []
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"ok": False, "errors": ["manifest_missing_or_invalid"], "records": 0}
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != 1:
+        return {"ok": False, "errors": ["manifest_schema_invalid"], "records": 0}
+    records = manifest.get("records")
+    pages = manifest.get("collection_pages")
+    if not isinstance(records, list) or not records:
+        errors.append("records_missing")
+        records = []
+    if not isinstance(pages, list) or not pages:
+        errors.append("collection_pages_missing")
+        pages = []
+
+    root = path.parent.resolve()
+    records_by_id: dict[str, dict[str, Any]] = {}
+    for record in records:
+        if not isinstance(record, dict):
+            errors.append("record_invalid")
+            continue
+        request_id = record.get("request_id")
+        if not isinstance(request_id, str) or not request_id:
+            errors.append("request_id_missing")
+            continue
+        if request_id in records_by_id:
+            errors.append("duplicate_request_id")
+        records_by_id[request_id] = record
+        if type(record.get("http_status")) is not int or record["http_status"] != 200:
+            errors.append("http_status_not_200")
+        request = record.get("request")
+        if not isinstance(request, dict) or request.get("method") != "GET":
+            errors.append("request_identity_invalid")
+        digest = record.get("body_sha256")
+        if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+            errors.append("body_hash_invalid")
+        if type(record.get("body_bytes")) is not int or record["body_bytes"] < 0:
+            errors.append("body_size_invalid")
+        for key in ("body_file", "audit_file"):
+            relative = record.get(key)
+            if not isinstance(relative, str) or not relative:
+                errors.append(f"{key}_missing")
+                continue
+            target = (root / relative).resolve()
+            try:
+                target.relative_to(root)
+            except ValueError:
+                errors.append(f"{key}_escapes_manifest_root")
+                continue
+            if not target.is_file():
+                errors.append(f"{key}_not_found")
+                continue
+            if key == "body_file":
+                body = target.read_bytes()
+                if hashlib.sha256(body).hexdigest() != digest:
+                    errors.append("raw_body_hash_mismatch")
+                if len(body) != record.get("body_bytes"):
+                    errors.append("raw_body_size_mismatch")
+            else:
+                try:
+                    audit = json.loads(target.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    errors.append("audit_record_invalid")
+                    continue
+                if audit != record:
+                    errors.append("audit_record_content_mismatch")
+
+    referenced_ids: list[str] = []
+    page_keys: list[tuple[str | None, int | None]] = []
+    for page in pages:
+        if not isinstance(page, dict):
+            errors.append("collection_page_invalid")
+            continue
+        request_id = page.get("raw_response_request_id")
+        body_hash = page.get("raw_response_body_sha256")
+        if not isinstance(request_id, str) or not request_id:
+            errors.append("collection_page_request_id_missing")
+            continue
+        referenced_ids.append(request_id)
+        record = records_by_id.get(request_id)
+        if record is None:
+            errors.append("collection_page_raw_record_missing")
+        elif record.get("body_sha256") != body_hash:
+            errors.append("collection_page_raw_hash_mismatch")
+        page_index = page.get("page_index")
+        if type(page_index) is not int or page_index < 1:
+            errors.append("collection_page_index_invalid")
+            page_index = None
+        status = page.get("status_filter")
+        if status is not None and (not isinstance(status, str) or not status):
+            errors.append("collection_page_status_invalid")
+            status = None
+        page_keys.append((status, page_index))
+
+    if len(referenced_ids) != len(set(referenced_ids)):
+        errors.append("raw_response_referenced_more_than_once")
+    if set(referenced_ids) != set(records_by_id):
+        errors.append("raw_response_record_unreferenced")
+    if len(page_keys) != len(set(page_keys)):
+        errors.append("collection_page_key_duplicate")
+
+    output = manifest.get("normalized_output")
+    if not isinstance(output, dict) or not isinstance(output.get("path"), str):
+        errors.append("normalized_output_missing")
+    else:
+        target = (root / output["path"]).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError:
+            errors.append("normalized_output_escapes_manifest_root")
+        else:
+            if not target.is_file():
+                errors.append("normalized_output_not_found")
+            else:
+                output_bytes = target.read_bytes()
+                if hashlib.sha256(output_bytes).hexdigest() != output.get("sha256"):
+                    errors.append("normalized_output_hash_mismatch")
+                if len(output_bytes) != output.get("bytes"):
+                    errors.append("normalized_output_size_mismatch")
+                try:
+                    snapshot = json.loads(output_bytes.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    errors.append("normalized_output_invalid_json")
+                else:
+                    observations = snapshot.get("page_observations") if isinstance(snapshot, dict) else None
+                    if not isinstance(observations, list) or not observations:
+                        errors.append("normalized_page_observations_missing")
+                    elif len(observations) != len(pages):
+                        errors.append("normalized_page_count_mismatch")
+                    else:
+                        observation_keys = []
+                        for item in observations:
+                            if not isinstance(item, dict):
+                                errors.append("normalized_page_observation_invalid")
+                                continue
+                            idx = item.get("page_index")
+                            status = item.get("status_filter")
+                            if type(idx) is not int or idx < 1:
+                                errors.append("normalized_page_index_invalid")
+                                idx = None
+                            if status is not None and (not isinstance(status, str) or not status):
+                                errors.append("normalized_page_status_invalid")
+                                status = None
+                            observation_keys.append((status, idx))
+                        if observation_keys != page_keys:
+                            errors.append("normalized_page_inventory_mismatch")
+
+    return {"ok": not errors, "errors": errors, "records": len(records)}

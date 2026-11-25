@@ -15,10 +15,158 @@ from scripts.archive_bybit_market_history import (
     FUNDING_WINDOW_MS, fetch_funding_history, fetch_mark_klines, fetch_trade_klines,
     normalize_symbol, parse_funding_rows, parse_mark_rows, parse_trade_rows, validate_base_url,
     clip_range_to_lifecycle, load_universe_lifecycle, validate_archive_range, archive_symbol,
+    _request_json, validate_raw_response_manifest,
 )
 
 
+def _append_fake_raw_response(raw_evidence_dir, raw_records, endpoint):
+    root = Path(raw_evidence_dir)
+    body = json.dumps({"endpoint": endpoint, "fixture": True}).encode("utf-8")
+    digest = hashlib.sha256(body).hexdigest()
+    body_file = f"bodies/{digest}.json"
+    request_id = hashlib.sha256(endpoint.encode("utf-8") + body).hexdigest()
+    record = {
+        "schema_version": 1, "request_id": request_id,
+        "request": {"method": "GET", "base_url": "https://api.bybit.com",
+                    "endpoint": endpoint, "params": {"fixture": True}},
+        "retrieved_at_utc": "2026-11-25T00:00:00Z", "http_status": 200,
+        "response_headers": {}, "body_bytes": len(body), "body_sha256": digest,
+        "body_file": body_file, "audit_file": f"requests/{request_id}.json",
+    }
+    body_path = root / body_file
+    body_path.parent.mkdir(parents=True, exist_ok=True)
+    body_path.write_bytes(body)
+    audit_path = root / record["audit_file"]
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    audit_path.write_text(json.dumps(record, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    raw_records.append(record)
+
+
 class BybitMarketHistoryTests(unittest.TestCase):
+    def test_raw_response_capture_and_manifest_detect_tampering(self):
+        body = (
+            b'{"retCode":0,"retMsg":"OK","result":{"list":[["3600000","1","2","1","2","3","6"]]}}'
+        )
+
+        class FakeResponse:
+            status = 200
+            headers = {
+                "Date": "Tue, 25 Nov 2026 00:00:00 GMT",
+                "Content-Type": "application/json",
+                "Content-Length": str(len(body)),
+            }
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return body
+
+        class FakeOpener:
+            def open(self, request, timeout):
+                self.request = request
+                return FakeResponse()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            archive_root = Path(tmp) / "archive"
+            raw_root = archive_root / "raw_responses" / "BTCUSDT"
+            records = []
+            with patch(
+                "scripts.archive_bybit_market_history.urllib.request.build_opener",
+                return_value=FakeOpener(),
+            ):
+                result = _request_json(
+                    "https://api.bybit.com", "/v5/market/kline",
+                    {"category": "linear", "symbol": "BTCUSDT", "interval": "60"},
+                    raw_evidence_dir=raw_root, raw_records=records,
+                )
+            self.assertEqual(result["list"][0][0], "3600000")
+            self.assertEqual(len(records), 1)
+            trade_record = records[0]
+            body_path = raw_root / trade_record["body_file"]
+            self.assertEqual(body_path.read_bytes(), body)
+            self.assertEqual(hashlib.sha256(body_path.read_bytes()).hexdigest(), trade_record["body_sha256"])
+
+            _append_fake_raw_response(raw_root, records, "/v5/market/funding/history")
+            funding_record = records[-1]
+            _append_fake_raw_response(raw_root, records, "/v5/market/mark-price-kline")
+            mark_record = records[-1]
+
+            output_files = {
+                "funding_csv": (archive_root / "funding" / "BTCUSDT.csv",
+                                "symbol,funding_timestamp_ms,funding_rate\nBTCUSDT,3600000,0.0001\n"),
+                "trade_kline_csv": (archive_root / "kline" / "BTCUSDT.csv",
+                                    "symbol,timestamp_ms,open,high,low,close,volume,turnover\nBTCUSDT,3600000,1,2,1,2,3,6\n"),
+                "mark_price_csv": (archive_root / "mark_price" / "BTCUSDT.csv",
+                                   "symbol,timestamp_ms,open,high,low,close\nBTCUSDT,3600000,1,2,1,2\n"),
+            }
+            normalized_outputs = {}
+            for key, (path, content) in output_files.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+                normalized_outputs[key] = {
+                    "path": os.path.relpath(path, raw_root).replace(os.sep, "/"),
+                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                    "rows": 1,
+                }
+
+            def page(record):
+                return {
+                    "request_start_ms": 3_600_000,
+                    "request_end_ms": 3_600_000,
+                    "response_rows": 1,
+                    "first_ts": 3_600_000,
+                    "last_ts": 3_600_000,
+                    "raw_response_request_id": record["request_id"],
+                    "raw_response_body_sha256": record["body_sha256"],
+                    "raw_response_audit_file": record["audit_file"],
+                }
+
+            manifest_path = raw_root / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "schema_version": 1,
+                "source": "Bybit V5 public GET raw responses",
+                "symbol": "BTCUSDT",
+                "category": "linear",
+                "interval": "60",
+                "normalized_outputs": normalized_outputs,
+                "collection_pages": {
+                    "funding": [{**page(funding_record), "complete": True, "saturated": False}],
+                    "trade_kline": [page(trade_record)],
+                    "mark_price": [page(mark_record)],
+                },
+                "records": records,
+            }), encoding="utf-8")
+            self.assertTrue(validate_raw_response_manifest(manifest_path)["ok"])
+            original_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+            broken_manifest = dict(original_manifest)
+            broken_manifest["collection_pages"] = dict(original_manifest["collection_pages"])
+            broken_manifest["collection_pages"]["funding"] = []
+            manifest_path.write_text(json.dumps(broken_manifest), encoding="utf-8")
+            report = validate_raw_response_manifest(manifest_path)
+            self.assertFalse(report["ok"])
+            self.assertIn("funding_pages_missing", report["errors"])
+            self.assertIn("raw_response_record_unreferenced", report["errors"])
+
+            manifest_path.write_text(json.dumps(original_manifest), encoding="utf-8")
+            output_files["funding_csv"][0].write_text("tampered\n", encoding="utf-8")
+            report = validate_raw_response_manifest(manifest_path)
+            self.assertFalse(report["ok"])
+            self.assertIn("funding_csv_hash_mismatch", report["errors"])
+
+            output_files["funding_csv"][0].write_text(
+                "symbol,funding_timestamp_ms,funding_rate\nBTCUSDT,3600000,0.0001\n",
+                encoding="utf-8",
+            )
+            body_path.write_bytes(body + b" ")
+            report = validate_raw_response_manifest(manifest_path)
+            self.assertFalse(report["ok"])
+            self.assertIn("raw_body_hash_mismatch", report["errors"])
+
     def test_funding_fetches_bounded_windows_and_sorts_events(self):
         start, end = 10_000, 10_000 + FUNDING_WINDOW_MS + 10_000
         calls = []
@@ -70,12 +218,17 @@ class BybitMarketHistoryTests(unittest.TestCase):
             funding_requests = []
             mark_requests = []
 
-            def fake_funding(symbol, start_ms, end_ms, *, base_url, pause, audit_pages):
+            def fake_funding(symbol, start_ms, end_ms, *, base_url, pause, audit_pages,
+                             raw_evidence_dir=None, raw_records=None):
                 funding_requests.append((start_ms, end_ms))
+                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/funding/history")
                 audit_pages.append({
                     "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
                     "response_rows": 2, "first_ts": start_ms, "last_ts": end_ms - 1,
                     "complete": True, "saturated": False,
+                    "raw_response_request_id": raw_records[-1]["request_id"],
+                    "raw_response_body_sha256": raw_records[-1]["body_sha256"],
+                    "raw_response_audit_file": raw_records[-1]["audit_file"],
                 })
                 return [
                     {
@@ -88,8 +241,17 @@ class BybitMarketHistoryTests(unittest.TestCase):
                     },
                 ]
 
-            def fake_marks(symbol, start_ms, end_ms, interval, *, base_url, pause):
+            def fake_marks(symbol, start_ms, end_ms, interval, *, base_url, pause,
+                           raw_evidence_dir=None, raw_records=None, audit_pages=None):
                 mark_requests.append((start_ms, end_ms, interval))
+                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/mark-price-kline")
+                audit_pages.append({
+                    "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
+                    "response_rows": 2, "first_ts": hour, "last_ts": hour * 2,
+                    "raw_response_request_id": raw_records[-1]["request_id"],
+                    "raw_response_body_sha256": raw_records[-1]["body_sha256"],
+                    "raw_response_audit_file": raw_records[-1]["audit_file"],
+                })
                 return [
                     {
                         "symbol": symbol, "timestamp_ms": hour,
@@ -100,6 +262,18 @@ class BybitMarketHistoryTests(unittest.TestCase):
                         "open": "101", "high": "103", "low": "100", "close": "102",
                     },
                 ]
+
+            def fake_trade(symbol, start_ms, end_ms, interval, *, base_url, pause,
+                           raw_evidence_dir=None, raw_records=None, audit_pages=None):
+                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/kline")
+                audit_pages.append({
+                    "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
+                    "response_rows": 1, "first_ts": hour, "last_ts": hour,
+                    "raw_response_request_id": raw_records[-1]["request_id"],
+                    "raw_response_body_sha256": raw_records[-1]["body_sha256"],
+                    "raw_response_audit_file": raw_records[-1]["audit_file"],
+                })
+                return [candle]
 
             candle = {
                 "symbol": "BTCUSDT", "timestamp_ms": hour,
@@ -126,7 +300,7 @@ class BybitMarketHistoryTests(unittest.TestCase):
 
             with (
                 patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=fake_funding),
-                patch("scripts.archive_bybit_market_history.fetch_trade_klines", return_value=[candle]),
+                patch("scripts.archive_bybit_market_history.fetch_trade_klines", side_effect=fake_trade),
                 patch("scripts.archive_bybit_market_history.fetch_mark_klines", side_effect=fake_marks),
             ):
                 result = archive_symbol(
@@ -138,6 +312,14 @@ class BybitMarketHistoryTests(unittest.TestCase):
             self.assertEqual(mark_requests, [(hour, hour * 3, "60")])
             self.assertEqual(result["trade_candles"], 1)
             self.assertEqual(result["mark_candles"], 2)
+            self.assertTrue(result["raw_response_manifest_valid"])
+            self.assertEqual(result["raw_response_count"], 3)
+            raw_report = validate_raw_response_manifest(result["raw_response_manifest_file"])
+            self.assertTrue(raw_report["ok"], raw_report["errors"])
+            raw_manifest = json.loads(Path(result["raw_response_manifest_file"]).read_text(encoding="utf-8"))
+            self.assertEqual(len(raw_manifest["collection_pages"]["funding"]), 1)
+            self.assertEqual(len(raw_manifest["collection_pages"]["trade_kline"]), 1)
+            self.assertEqual(len(raw_manifest["collection_pages"]["mark_price"]), 1)
             funding_path = Path(result["funding_file"])
             manifest_path = Path(result["funding_manifest_file"])
             self.assertTrue(funding_path.is_file())
@@ -169,11 +351,16 @@ class BybitMarketHistoryTests(unittest.TestCase):
     def test_archive_symbol_cleans_partial_outputs_when_terminal_mark_is_unavailable(self):
         hour = 3_600_000
         with tempfile.TemporaryDirectory() as tmp:
-            def fake_funding(symbol, start_ms, end_ms, *, base_url, pause, audit_pages):
+            def fake_funding(symbol, start_ms, end_ms, *, base_url, pause, audit_pages,
+                             raw_evidence_dir=None, raw_records=None):
+                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/funding/history")
                 audit_pages.append({
                     "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
                     "response_rows": 2, "first_ts": start_ms, "last_ts": end_ms - 1,
                     "complete": True, "saturated": False,
+                    "raw_response_request_id": raw_records[-1]["request_id"],
+                    "raw_response_body_sha256": raw_records[-1]["body_sha256"],
+                    "raw_response_audit_file": raw_records[-1]["audit_file"],
                 })
                 return [
                     {"symbol": symbol, "funding_timestamp_ms": start_ms, "funding_rate": "0.001"},
@@ -185,6 +372,18 @@ class BybitMarketHistoryTests(unittest.TestCase):
                 "open": "100", "high": "102", "low": "99", "close": "101",
                 "volume": "10", "turnover": "1010",
             }
+            def fake_trade(symbol, start_ms, end_ms, interval, *, base_url, pause,
+                           raw_evidence_dir=None, raw_records=None, audit_pages=None):
+                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/kline")
+                audit_pages.append({
+                    "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
+                    "response_rows": 1, "first_ts": hour, "last_ts": hour,
+                    "raw_response_request_id": raw_records[-1]["request_id"],
+                    "raw_response_body_sha256": raw_records[-1]["body_sha256"],
+                    "raw_response_audit_file": raw_records[-1]["audit_file"],
+                })
+                return [candle]
+
             marks = [
                 {
                     "symbol": "BTCUSDT", "timestamp_ms": hour,
@@ -215,7 +414,7 @@ class BybitMarketHistoryTests(unittest.TestCase):
 
             with (
                 patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=fake_funding),
-                patch("scripts.archive_bybit_market_history.fetch_trade_klines", return_value=[candle]),
+                patch("scripts.archive_bybit_market_history.fetch_trade_klines", side_effect=fake_trade),
                 patch(
                     "scripts.archive_bybit_market_history.fetch_mark_klines",
                     side_effect=RuntimeError("terminal Mark candle is not closed"),
@@ -235,10 +434,22 @@ class BybitMarketHistoryTests(unittest.TestCase):
             self.assertFalse(schedule_path.exists())
 
             # A retry in the same root can reuse content-addressed snapshots.
+            def fake_retry_marks(symbol, start_ms, end_ms, interval, *, base_url, pause,
+                                 raw_evidence_dir=None, raw_records=None, audit_pages=None):
+                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/mark-price-kline")
+                audit_pages.append({
+                    "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
+                    "response_rows": len(marks), "first_ts": hour, "last_ts": hour * 2,
+                    "raw_response_request_id": raw_records[-1]["request_id"],
+                    "raw_response_body_sha256": raw_records[-1]["body_sha256"],
+                    "raw_response_audit_file": raw_records[-1]["audit_file"],
+                })
+                return marks
+
             with (
                 patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=fake_funding),
-                patch("scripts.archive_bybit_market_history.fetch_trade_klines", return_value=[candle]),
-                patch("scripts.archive_bybit_market_history.fetch_mark_klines", return_value=marks),
+                patch("scripts.archive_bybit_market_history.fetch_trade_klines", side_effect=fake_trade),
+                patch("scripts.archive_bybit_market_history.fetch_mark_klines", side_effect=fake_retry_marks),
             ):
                 result = archive_symbol(
                     "BTCUSDT", hour, hour * 2, tmp, "60", pause=0,

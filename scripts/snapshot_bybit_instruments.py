@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from scripts.bybit_raw_evidence import capture_response, assert_snapshot_paths_available, finalize_snapshot_evidence
+
 DEFAULT_BASE_URL = "https://api.bybit.com"
 ENDPOINT = "/v5/market/instruments-info"
 SCHEMA_VERSION = 1
@@ -58,7 +60,9 @@ def _check_ret_code(payload: Any) -> None:
 
 
 def _request_page(base_url: str, category: str, cursor: str | None,
-                  timeout: float = 20.0, status: str | None = None
+                  timeout: float = 20.0, status: str | None = None,
+                  raw_evidence_dir: str | Path | None = None,
+                  raw_records: list[dict[str, Any]] | None = None
                   ) -> tuple[list[dict[str, Any]], str | None]:
     _validate_base_url(base_url)
     params: dict[str, Any] = {"category": category, "limit": 1000}
@@ -75,7 +79,22 @@ def _request_page(base_url: str, category: str, cursor: str | None,
     try:
         opener = urllib.request.build_opener(_NoRedirectHandler())
         with opener.open(request, timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            raw_body = response.read()
+            if raw_evidence_dir is not None:
+                params = {"category": category, "limit": 1000}
+                if status is not None:
+                    params["status"] = status
+                if cursor:
+                    params["cursor"] = cursor
+                capture_response(
+                    raw_body, base_url=base_url, endpoint=ENDPOINT, params=params,
+                    http_status=int(getattr(response, "status", 200)),
+                    response_headers={name: response.headers.get(name)
+                                      for name in ("Date", "Content-Type", "Content-Length", "Server")
+                                      if response.headers.get(name) is not None},
+                    evidence_dir=raw_evidence_dir, records=raw_records if raw_records is not None else [],
+                )
+            payload = json.loads(raw_body.decode("utf-8"))
     except urllib.error.HTTPError as exc:
         raise RuntimeError(f"Bybit instruments-info HTTP status {exc.code}; body suppressed") from exc
     except (urllib.error.URLError, TimeoutError) as exc:
@@ -336,13 +355,30 @@ def main() -> None:
 
     page_observations: list[dict[str, Any]] = []
     page_counts: dict[str, int] = {}
+    raw_records: list[dict[str, Any]] = []
+    collection_pages: list[dict[str, Any]] = []
+    collection_started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    output_root = Path(args.output_dir) / args.category
+    capture_id = collection_started_at.replace(":", "-").replace(".", "-")
+    capture_dir = output_root / "raw_evidence" / f"capture-{capture_id}"
+    if capture_dir.exists():
+        raise FileExistsError(f"raw evidence capture path already exists: {capture_dir}")
 
     def fetch(cursor: str | None, status: str):
         page_counts[status] = page_counts.get(status, 0) + 1
         request_started_at = _snapshot_timestamp(None)
+        before = len(raw_records)
         page, next_cursor = _request_page(
-            args.base_url, args.category, cursor, status=status
+            args.base_url, args.category, cursor, status=status,
+            raw_evidence_dir=capture_dir,
+            raw_records=raw_records,
         )
+        record = raw_records[-1] if len(raw_records) > before else None
+        collection_pages.append({
+            "status_filter": status, "page_index": page_counts[status],
+            "request_cursor": cursor, "raw_response_request_id": record.get("request_id") if record else None,
+            "raw_response_body_sha256": record.get("body_sha256") if record else None,
+        })
         request_completed_at = _snapshot_timestamp(None)
         page_observations.append(build_page_observation(
             status, page_counts[status], request_started_at,
@@ -352,7 +388,6 @@ def main() -> None:
             time.sleep(args.pause)
         return page, next_cursor
 
-    collection_started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     rows = fetch_all_instruments(args.category, fetch)
     snapshot = build_snapshot(
         rows, args.category, collection_started_at=collection_started_at,
@@ -360,9 +395,15 @@ def main() -> None:
     )
     fetched = datetime.fromisoformat(snapshot["fetched_at"].replace("Z", "+00:00"))
     stamp = fetched.astimezone(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-    output = Path(args.output_dir) / args.category / f"{stamp}.json"
+    output = output_root / f"{stamp}.json"
+    assert_snapshot_paths_available(output_root, stamp)
     write_snapshot(snapshot, output)
-    print(f"Saved {len(rows)} {args.category} instruments to {output}")
+    evidence_manifest = finalize_snapshot_evidence(
+        output_root, stamp, source="Bybit V5 GET /v5/market/instruments-info",
+        category=args.category, normalized_output=output, records=raw_records,
+        collection_pages=collection_pages, capture_dir=capture_dir,
+    )
+    print(f"Saved {len(rows)} {args.category} instruments to {output}; evidence: {evidence_manifest}")
 
 
 if __name__ == "__main__":

@@ -51,12 +51,19 @@ class Anchors(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.links = []
+        self.page_titles = set()
         self._href = None
         self._text = []
 
     def handle_starttag(self, tag, attrs):
+        values = dict(attrs)
+        if tag.lower() == "li":
+            classes = values.get("class", "")
+            title = values.get("title", "")
+            if "ant-pagination-item" in classes and title.isdigit():
+                self.page_titles.add(int(title))
         if tag.lower() == "a":
-            self._href = dict(attrs).get("href")
+            self._href = values.get("href")
             self._text = []
 
     def handle_data(self, data):
@@ -132,7 +139,7 @@ def article_slug(url):
 def parse_page(body, category_url):
     parser = Anchors()
     parser.feed(body.decode("utf-8", errors="replace"))
-    page_numbers = {1}
+    page_numbers = {1} | parser.page_titles
     articles = {}
     for href, label in parser.links:
         if not href:
@@ -144,7 +151,7 @@ def parse_page(body, category_url):
             if "page" in q and q["page"][0].isdigit() and (not q.get("category") or q["category"][0] in CATEGORIES):
                 page_numbers.add(int(q["page"][0]))
             path = p.path
-            if re.match(r"^/en/article/[^/]+/?$", path):
+            if re.match(r"^/(?:en/)?article/[^/]+/?$", path):
                 clean = canonical_url(full)
                 if label:
                     articles[clean] = label

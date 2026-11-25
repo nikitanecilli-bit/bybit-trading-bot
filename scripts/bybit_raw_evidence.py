@@ -150,7 +150,7 @@ def finalize_snapshot_evidence(
         audit_path = root / record["audit_file"]
         _atomic_write(
             audit_path,
-            (json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\\n").encode("utf-8"),
+            (json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8"),
         )
     write_evidence_manifest(
         manifest_path, source=source, category=category,

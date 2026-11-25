@@ -334,3 +334,12 @@
 - GitHub Actions [45581812910 — SUCCESS](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45581812910), code SHA `c8df338b2b4605c307af02ccd92b5ccdd30a8090`: все шесть test groups прошли.
 - PR #17 всё ещё Draft; изменения остаются изолированными в `research/bybit-raw-response-evidence-v1`. Последующие изменения документации не меняли протестированный код.
 - Сбор реальных данных, PnL/backtest и изменение data gates не выполнялись. Статус проекта по независимому holdout остаётся **BLOCKED BY DATA + INDEPENDENCE**.
+
+
+### Дополнение 2026-11-25 — raw-to-CSV semantic reconstruction: CI failure and correction
+
+- Новый semantic validator теперь восстанавливает ожидаемые строки Funding/OHLCV/Mark Price из исходных raw JSON pages и сравнивает значения и количество строк с нормализованными CSV; проверка выполняется офлайн.
+- Первый CI run [45583224115](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45583224115) завершился FAILURE: тесты выявили ошибку NameError в цикле реконструкции. Ошибка была подтверждена по логам, а не скрыта.
+- Цикл исправлен в commit `8cc45cb20ed19e25238a3e6fb96df44ba37b5791`; дополнительная проверка ограничения путей CSV до корня архива внесена в `83ad558cc822f3abc8f005e7affa6a0c2fbaccd8`.
+- Повторный CI для текущего HEAD пока не подтверждён. До его успешного завершения semantic reconstruction нельзя считать прошедшей тесты.
+- Изменения остаются в Draft PR #17; base `research/market-regime-v1-main`, `main` не затронут. Никаких реальных данных, API-запросов, backtest или PnL не выполнялось.

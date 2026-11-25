@@ -205,6 +205,9 @@ class BybitMarketHistoryTests(unittest.TestCase):
                     "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
                     "response_rows": 2, "first_ts": start_ms, "last_ts": end_ms - 1,
                     "complete": True, "saturated": False,
+                    "raw_response_request_id": raw_records[-1]["request_id"],
+                    "raw_response_body_sha256": raw_records[-1]["body_sha256"],
+                    "raw_response_audit_file": raw_records[-1]["audit_file"],
                 })
                 return [
                     {
@@ -334,6 +337,9 @@ class BybitMarketHistoryTests(unittest.TestCase):
                     "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
                     "response_rows": 2, "first_ts": start_ms, "last_ts": end_ms - 1,
                     "complete": True, "saturated": False,
+                    "raw_response_request_id": raw_records[-1]["request_id"],
+                    "raw_response_body_sha256": raw_records[-1]["body_sha256"],
+                    "raw_response_audit_file": raw_records[-1]["audit_file"],
                 })
                 return [
                     {"symbol": symbol, "funding_timestamp_ms": start_ms, "funding_rate": "0.001"},
@@ -348,6 +354,13 @@ class BybitMarketHistoryTests(unittest.TestCase):
             def fake_trade(symbol, start_ms, end_ms, interval, *, base_url, pause,
                            raw_evidence_dir=None, raw_records=None, audit_pages=None):
                 _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/kline")
+                audit_pages.append({
+                    "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
+                    "response_rows": 1, "first_ts": hour, "last_ts": hour,
+                    "raw_response_request_id": raw_records[-1]["request_id"],
+                    "raw_response_body_sha256": raw_records[-1]["body_sha256"],
+                    "raw_response_audit_file": raw_records[-1]["audit_file"],
+                })
                 return [candle]
 
             marks = [
@@ -400,10 +413,22 @@ class BybitMarketHistoryTests(unittest.TestCase):
             self.assertFalse(schedule_path.exists())
 
             # A retry in the same root can reuse content-addressed snapshots.
+            def fake_retry_marks(symbol, start_ms, end_ms, interval, *, base_url, pause,
+                                 raw_evidence_dir=None, raw_records=None, audit_pages=None):
+                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/mark-price-kline")
+                audit_pages.append({
+                    "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
+                    "response_rows": len(marks), "first_ts": hour, "last_ts": hour * 2,
+                    "raw_response_request_id": raw_records[-1]["request_id"],
+                    "raw_response_body_sha256": raw_records[-1]["body_sha256"],
+                    "raw_response_audit_file": raw_records[-1]["audit_file"],
+                })
+                return marks
+
             with (
                 patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=fake_funding),
-                patch("scripts.archive_bybit_market_history.fetch_trade_klines", return_value=[candle]),
-                patch("scripts.archive_bybit_market_history.fetch_mark_klines", return_value=marks),
+                patch("scripts.archive_bybit_market_history.fetch_trade_klines", side_effect=fake_trade),
+                patch("scripts.archive_bybit_market_history.fetch_mark_klines", side_effect=fake_retry_marks),
             ):
                 result = archive_symbol(
                     "BTCUSDT", hour, hour * 2, tmp, "60", pause=0,

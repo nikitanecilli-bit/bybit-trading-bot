@@ -120,10 +120,20 @@ def validate_evidence_manifest(manifest_path: str | Path) -> dict[str, Any]:
     if manifest.get("schema_version") != 1 or not isinstance(manifest.get("records"), list):
         return {"ok": False, "errors": ["manifest_schema_invalid"], "records": 0}
     root = path.parent.resolve()
+    records_by_id: dict[str, dict[str, Any]] = {}
     for record in manifest["records"]:
         if not isinstance(record, dict):
             errors.append("record_invalid")
             continue
+        request_id = record.get("request_id")
+        if not isinstance(request_id, str) or not request_id:
+            errors.append("request_id_missing")
+        else:
+            records_by_id[request_id] = record
+        if record.get("http_status") != 200:
+            errors.append("http_status_not_200")
+        if not isinstance(record.get("request"), dict) or record["request"].get("method") != "GET":
+            errors.append("request_identity_invalid")
         for key in ("body_file", "audit_file"):
             relative = record.get(key)
             if not isinstance(relative, str) or not relative:
@@ -152,13 +162,35 @@ def validate_evidence_manifest(manifest_path: str | Path) -> dict[str, Any]:
                     continue
                 if audit != record:
                     errors.append("audit_record_content_mismatch")
+    pages = manifest.get("collection_pages")
+    if not isinstance(pages, list):
+        errors.append("collection_pages_missing")
+    else:
+        for page in pages:
+            if not isinstance(page, dict):
+                errors.append("collection_page_invalid")
+                continue
+            request_id = page.get("raw_response_request_id")
+            body_hash = page.get("raw_response_body_sha256")
+            record = records_by_id.get(request_id) if isinstance(request_id, str) else None
+            if record is None:
+                errors.append("collection_page_raw_record_missing")
+            elif record.get("body_sha256") != body_hash:
+                errors.append("collection_page_raw_hash_mismatch")
     output = manifest.get("normalized_output")
     if not isinstance(output, dict) or not isinstance(output.get("path"), str):
         errors.append("normalized_output_missing")
     else:
         target = (root / output["path"]).resolve()
-        if not target.is_file():
-            errors.append("normalized_output_not_found")
-        elif hashlib.sha256(target.read_bytes()).hexdigest() != output.get("sha256"):
-            errors.append("normalized_output_hash_mismatch")
+        try:
+            target.relative_to(root)
+        except ValueError:
+            errors.append("normalized_output_escapes_manifest_root")
+        else:
+            if not target.is_file():
+                errors.append("normalized_output_not_found")
+            elif hashlib.sha256(target.read_bytes()).hexdigest() != output.get("sha256"):
+                errors.append("normalized_output_hash_mismatch")
+            elif target.stat().st_size != output.get("bytes"):
+                errors.append("normalized_output_size_mismatch")
     return {"ok": not errors, "errors": errors, "records": len(manifest["records"])}

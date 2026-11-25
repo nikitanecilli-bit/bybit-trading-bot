@@ -8,7 +8,9 @@ the page inventory. It is offline and never calls an exchange API.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +39,44 @@ def _timestamp(stream: str, row: Any) -> int:
     if result <= 0:
         raise ValueError("timestamp_not_positive")
     return result
+
+
+def _decimal_text(value: Any) -> str:
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValueError("numeric_field_invalid") from None
+    if not number.is_finite():
+        raise ValueError("numeric_field_non_finite")
+    return str(number)
+
+
+def _normalized_row(stream: str, row: Any, symbol: str) -> dict[str, str]:
+    if stream == "funding":
+        if not isinstance(row, dict) or str(row.get("symbol", "")).upper() != symbol.upper():
+            raise ValueError("funding_row_symbol_mismatch")
+        return {"symbol": symbol.upper(),
+                "funding_timestamp_ms": str(_timestamp(stream, row)),
+                "funding_rate": _decimal_text(row.get("fundingRate"))}
+    if not isinstance(row, list):
+        raise ValueError("kline_row_not_array")
+    required = 7 if stream == "trade_kline" else 5
+    if len(row) < required:
+        raise ValueError("kline_row_too_short")
+    result = {"symbol": symbol.upper(), "timestamp_ms": str(_timestamp(stream, row)),
+              "open": _decimal_text(row[1]), "high": _decimal_text(row[2]),
+              "low": _decimal_text(row[3]), "close": _decimal_text(row[4])}
+    if stream == "trade_kline":
+        result["volume"] = _decimal_text(row[5])
+        result["turnover"] = _decimal_text(row[6])
+    return result
+
+
+def _compare_normalized_csv(path: Path, expected: list[dict[str, str]]) -> bool:
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        actual = list(csv.DictReader(handle))
+    expected_sorted = sorted(expected, key=lambda row: int(row.get("funding_timestamp_ms", row.get("timestamp_ms", "0"))))
+    return actual == expected_sorted
 
 
 def validate_semantics(manifest_path: str | Path) -> dict[str, Any]:
@@ -70,6 +110,7 @@ def validate_semantics(manifest_path: str | Path) -> dict[str, Any]:
         by_id[record["request_id"]] = record
 
     used: list[str] = []
+    reconstructed: dict[str, list[dict[str, str]]] = {key: [] for key in STREAM_ENDPOINTS}
     checked = 0
     for stream, endpoint in STREAM_ENDPOINTS.items():
         pages = streams.get(stream)
@@ -126,6 +167,7 @@ def validate_semantics(manifest_path: str | Path) -> dict[str, Any]:
                 continue
             try:
                 timestamps = [_timestamp(stream, row) for row in rows]
+                reconstructed[stream].extend(_normalized_row(stream, row, symbol))
             except ValueError as exc:
                 errors.append(f"{stream}_{exc}")
                 continue
@@ -149,6 +191,27 @@ def validate_semantics(manifest_path: str | Path) -> dict[str, Any]:
         errors.append("response_referenced_multiple_times")
     if set(used) != set(by_id):
         errors.append("unreferenced_or_missing_response_record")
+
+    output_map = {"funding": "funding_csv", "trade_kline": "trade_kline_csv",
+                  "mark_price": "mark_price_csv"}
+    normalized = manifest.get("normalized_outputs")
+    if not isinstance(normalized, dict):
+        errors.append("normalized_outputs_missing")
+    else:
+        for stream, output_key in output_map.items():
+            item = normalized.get(output_key)
+            if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+                errors.append(f"{stream}_normalized_output_missing")
+                continue
+            csv_path = (path.parent / item["path"]).resolve()
+            try:
+                csv_path.relative_to(path.parent.parent.parent.resolve())
+                if not csv_path.is_file():
+                    raise OSError("missing")
+                if not _compare_normalized_csv(csv_path, reconstructed[stream]):
+                    errors.append(f"{stream}_normalized_csv_content_mismatch")
+            except (OSError, ValueError):
+                errors.append(f"{stream}_normalized_csv_unreadable")
     return {"ok": not errors, "errors": errors, "pages_checked": checked}
 
 

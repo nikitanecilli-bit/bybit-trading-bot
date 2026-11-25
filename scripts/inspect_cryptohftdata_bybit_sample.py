@@ -7,6 +7,7 @@ are retained. This is a data-quality check, not a strategy backtest.
 from __future__ import annotations
 
 import hashlib
+from bisect import bisect_left
 import json
 import sys
 import tempfile
@@ -360,6 +361,7 @@ def main() -> int:
     validators = {"trades": validate_trades, "orderbook": validate_orderbook,
                   "mark_price": validate_mark_price}
     failed = False
+    loaded_tables = {}
     with tempfile.TemporaryDirectory(prefix="cryptohftdata-bybit-") as tmp:
         for dataset, validator in validators.items():
             item = {"url": file_url(dataset)}
@@ -367,6 +369,7 @@ def main() -> int:
                 path = Path(tmp) / f"{dataset}.parquet"
                 item["download"] = download(item["url"], path)
                 parquet, table = load_table(path, dataset)
+                loaded_tables[dataset] = table
                 item["parquet"] = {
                     "rows_from_metadata": parquet.metadata.num_rows,
                     "row_groups": parquet.metadata.num_row_groups,
@@ -392,6 +395,53 @@ def main() -> int:
             "ranges_overlap": max(trades["trade_time_min"], book["transaction_time_min"])
                               <= min(trades["trade_time_max"], book["transaction_time_max"]),
             "note": "Bybit docs state orderbook cts is matching-engine time correlated with publicTrade T; this range overlap is not an event-by-event identity proof.",
+        }
+
+    if "trades" in loaded_tables and "orderbook" in loaded_tables:
+        trade_values = loaded_tables["trades"].column("trade_time").to_pylist()
+        book_values = loaded_tables["orderbook"].column("transaction_time").to_pylist()
+        trade_times = sorted(set(trade_values))
+        book_times = sorted(set(x for x in book_values if x is not None))
+        book_time_set = set(book_times)
+        exact_trade_rows = sum(1 for x in trade_values if x in book_time_set)
+        nearest_ms = []
+        for value in trade_times:
+            idx = bisect_left(book_times, value)
+            candidates = []
+            if idx < len(book_times):
+                candidates.append(abs(book_times[idx] - value))
+            if idx > 0:
+                candidates.append(abs(book_times[idx - 1] - value))
+            if candidates:
+                nearest_ms.append(min(candidates))
+        ordered_nearest = sorted(nearest_ms)
+        def nearest_pct(p):
+            return ordered_nearest[max(0, (len(ordered_nearest) * p + 99) // 100 - 1)]
+        report["cross_feed_matching_engine_time"] = {
+            "trade_time_field": "publicTrade.T",
+            "book_time_field": "orderbook.cts",
+            "unit": "milliseconds",
+            "unique_trade_time_values": len(trade_times),
+            "unique_book_transaction_time_values": len(book_times),
+            "trade_rows_with_exact_shared_millisecond": exact_trade_rows,
+            "trade_rows_with_exact_shared_millisecond_pct": round(
+                exact_trade_rows / max(1, len(trade_values)) * 100, 3
+            ),
+            "unique_trade_times_with_exact_book_timestamp": sum(
+                1 for x in trade_times if x in book_time_set
+            ),
+            "nearest_book_timestamp_distance_ms": {
+                "count": len(ordered_nearest),
+                "median": median(ordered_nearest) if ordered_nearest else None,
+                "p95": nearest_pct(95) if ordered_nearest else None,
+                "p99": nearest_pct(99) if ordered_nearest else None,
+                "max": max(ordered_nearest) if ordered_nearest else None,
+            },
+            "interpretation": (
+                "Timestamp-basis diagnostic only. Exact millisecond equality does not "
+                "prove a particular trade caused a particular book update or establish "
+                "cross-channel message ordering."
+            ),
         }
     output = Path(sys.argv[1] if len(sys.argv) > 1 else "cryptohftdata_bybit_sample_inspection.json")
     output.parent.mkdir(parents=True, exist_ok=True)

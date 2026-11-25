@@ -389,3 +389,11 @@
 - Added a read-only GitHub-hosted workflow and collector restricted to official `announcements.bybit.com` HTTPS pages, four selected categories and linked articles. Captures raw HTML bytes, response metadata, retrieval timestamps and SHA-256; minimum one-second request spacing; no credentials, market/account APIs, proxy, trading or alternate host.
 - Offline tests passed. Strengthened the collector to fail closed unless pagination matches the observed category totals (25/11/19/11) and to keep TradFi, inverse and ambiguous perpetual product categories separate from explicit Linear candidates.
 - Strict collection run `45585129324` is in progress; initial run `45584843911` is also in progress and is not accepted. No inventory artifact yet; no completeness claims. D4/D5/D6 remain PARTIAL / NOT ACCEPTED.
+
+
+### 2026-11-25 — corrected collector against actual Bybit HTML (acceptance ledger Section 55)
+
+- Important: initial workflow `45584843911` reported success but its artifact contained only page 1 from each category (80 articles) and falsely set complete=true. It missed Bybit's numeric pagination `li[title]` markup. Explicitly INVALID / NOT ACCEPTED; do not use its counts.
+- Fixed pagination parsing using actual numeric list-item titles and actual `/en/article/...` paths. Added structured article extraction from `__NEXT_DATA__.articleDetail` so classifier ignores site navigation/footer text.
+- Latest strict run `45585668574`: offline tests passed; collection in progress at last check. Intermediate runs/failures documented in Section 55; only latest code SHA can be evaluated for acceptance.
+- D4/D5/D6 remain PARTIAL / NOT ACCEPTED. No market/account API, trades, PnL or backtests.

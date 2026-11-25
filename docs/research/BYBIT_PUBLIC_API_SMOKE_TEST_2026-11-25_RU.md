@@ -5,30 +5,43 @@
 GitHub Actions run: https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45577858899
 
 Branch: `research/bybit-public-api-smoke-test`  
-Commit: `bd7ddd8911c641342ac8511e7e466bde8adc496a`  
-Runner: GitHub-hosted `ubuntu-latest`, Azure region `eastus3`  
 Workflow: `.github/workflows/bybit-public-api-smoke-test.yml`
 
-All three public GET requests to `https://api.bybit.com` returned HTTP 403:
+### Cloud-runner test
+
+The GitHub-hosted `ubuntu-latest` runner in Azure region `eastus3` received HTTP 403 for all three public GET requests:
 
 - `/v5/market/kline?category=linear&symbol=BTCUSDT&interval=60&limit=3`
 - `/v5/market/mark-price-kline?category=linear&symbol=BTCUSDT&interval=60&limit=3`
 - `/v5/market/funding/history?category=linear&symbol=BTCUSDT&limit=3`
 
-Response body from CloudFront:
+CloudFront response:
 
 ```text
 The Amazon CloudFront distribution is configured to block access from your country
 ```
 
-## Interpretation
+This establishes a geography-based denial for that cloud-runner network location only. It does not establish a block on Russian residential IPs or Russian residents.
 
-This is a geography-based denial from the network location of the GitHub-hosted runner. The runner was in Azure East US 3. It does **not** establish that Bybit blocks Russian residential IP addresses or Russian residents.
+### User-network browser test
 
-The test only establishes that these three public endpoints were not reachable from this particular cloud-runner geography at the time of the test. No API keys, private endpoints, account endpoints, or orders were used.
+On 2026-11-25, the user opened all three public URLs from their own network/browser and supplied the JSON responses in the conversation. Each returned `retCode: 0`, `retMsg: "OK"`.
 
-## Next evidence required
+| Endpoint | User-supplied result | Fields returned |
+|---|---|---|
+| `/v5/market/kline` | PASS | BTCUSDT Linear H1 OHLCV, 3 candles |
+| `/v5/market/mark-price-kline` | PASS | BTCUSDT Linear H1 Mark Price, 3 candles |
+| `/v5/market/funding/history` | PASS | BTCUSDT Linear funding rate, 3 events |
 
-To answer the user's actual question, test the same public market-data URL from an ordinary internet connection physically located in Russia, without VPN, proxy, mirror, or other location-masking mechanism. A successful browser response would establish public market-data reachability from that connection only; it would not prove account KYC eligibility, derivatives permissions, or private trading API access.
+The supplied funding records include rates `0.00000255`, `0.00003905`, and `0.00003371` with their event timestamps.
 
-Do not attempt to bypass the CloudFront restriction by routing the GitHub runner through another region.
+**Evidence classification:** user-supplied browser responses, not independently captured or hashed by the repository workflow. The exact physical country/network route was not independently verified. Therefore record this as successful reachability from the user's tested connection, not as proof of Russian-resident eligibility.
+
+## Interpretation and limits
+
+- The three public market-data endpoints are reachable from the network used for the user's browser test.
+- This does not establish account KYC eligibility, availability of BTCUSDT Perpetual to a particular account, private/account API access, or permission to trade.
+- It does not validate historical completeness, pagination, timestamp continuity, raw-data provenance, or any research data gate. Three-row smoke tests are connectivity checks only.
+- The GitHub-hosted runner's HTTP 403 remains a separate result for its Azure East US 3 network location.
+
+No API keys, private endpoints, account endpoints, orders, proxies, mirrors, VPN-based routing, or location-masking mechanisms were used. No archives were collected and no PnL/backtest was run.

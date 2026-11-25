@@ -1,5 +1,5 @@
 name: Bybit independent trade archive cross-check
-# Compares all 24 UTC hours of one day across independent public feeds; no trading or PnL.
+# Compares all 24 UTC hours; records unmatched examples and trade-ID duplicates; no PnL.
 
 on:
   push:

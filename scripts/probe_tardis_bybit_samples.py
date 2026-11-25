@@ -12,8 +12,11 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-DATE = "2026-11-01"
-SYMBOLS = ("AAVEUSDT", "BTCUSDT")
+SAMPLES = (
+    ("2026-11-01", "BTCUSDT"),
+    ("2026-11-01", "BTCUSD"),
+    ("2020-01-01", "BTCUSD"),  # exact historical sample linked from Tardis docs
+)
 DATASETS = ("trades", "incremental_book_L2")
 BASE = "https://datasets.tardis.dev/v1/bybit"
 
@@ -53,15 +56,15 @@ def request_once(url: str, method: str) -> dict:
 
 def main() -> int:
     results = []
-    for symbol in SYMBOLS:
+    for date, symbol in SAMPLES:
         for dataset in DATASETS:
-            year, month, day = DATE.split("-")
+            year, month, day = date.split("-")
             url = f"{BASE}/{dataset}/{year}/{month}/{day}/{symbol}.csv.gz"
             head = request_once(url, "HEAD")
             ranged = request_once(url, "GET") if head.get("status") == 200 else {
                 "status": "skipped_after_head_failure", "bytes_read": 0
             }
-            results.append({"symbol": symbol, "dataset": dataset, "url": url,
+            results.append({"date": date, "symbol": symbol, "dataset": dataset, "url": url,
                             "head": head, "range_get": ranged})
     pairs = {}
     for item in results:
@@ -72,11 +75,11 @@ def main() -> int:
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "provider": "Tardis.dev",
-        "date": DATE,
+        "samples": [{"date": date, "symbol": symbol} for date, symbol in SAMPLES],
         "scope": "HEAD + one-byte Range GET; no archive body downloaded",
         "results": results,
         "symbols_with_both_feeds": sorted(
-            symbol for symbol, feeds in pairs.items()
+            sample for sample, feeds in pairs.items()
             if all(feeds.get(dataset, False) for dataset in DATASETS)
         ),
     }

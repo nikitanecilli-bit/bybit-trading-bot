@@ -113,6 +113,7 @@ def scan_dataset(path: Path, dataset: str) -> dict:
     ts_min = ts_max = local_min = local_max = None
     previous_ts = previous_local = None
     event_time_regressions = local_time_regressions = 0
+    first_event_time_regression = None
     offset_sum = offset_min = offset_max = None
     offset_sample: list[int] = []
     side_counts = Counter()
@@ -150,6 +151,14 @@ def scan_dataset(path: Path, dataset: str) -> dict:
                 local_max = local_ts
             if previous_ts is not None and ts < previous_ts:
                 event_time_regressions += 1
+                if first_event_time_regression is None:
+                    first_event_time_regression = {
+                        "row_number": row_no,
+                        "previous_event_timestamp_us": previous_ts,
+                        "current_event_timestamp_us": ts,
+                        "regression_us": previous_ts - ts,
+                        "local_timestamp_us": local_ts,
+                    }
             if previous_local is not None and local_ts < previous_local:
                 local_time_regressions += 1
             previous_ts, previous_local = ts, local_ts
@@ -208,6 +217,7 @@ def scan_dataset(path: Path, dataset: str) -> dict:
         "local_timestamp_min": local_min,
         "local_timestamp_max": local_max,
         "event_timestamp_regressions_in_capture_order": event_time_regressions,
+        "first_event_timestamp_regression": first_event_time_regression,
         "local_timestamp_regressions": local_time_regressions,
         "local_minus_event_offset": offset_summary(
             offset_sample, rows, offset_min, offset_max, offset_sum or 0

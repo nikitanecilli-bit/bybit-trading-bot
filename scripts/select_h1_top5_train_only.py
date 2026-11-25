@@ -368,7 +368,7 @@ def select_train_only(
         "mark_price": _directory_file_manifest(mark_price_dir, {".csv"}),
         "instrument_specs": _directory_file_manifest(instrument_specs_dir, {".json"}),
         "risk_tiers": _directory_file_manifest(risk_tiers_dir, {".json"}),
-        "universe_snapshot": _file_manifest_record(universe_snapshot_path),
+        "universe_snapshot": [_file_manifest_record(universe_snapshot_path)],
     }
     code_files = [
         _file_manifest_record(ROOT / path)

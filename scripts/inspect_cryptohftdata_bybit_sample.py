@@ -191,7 +191,7 @@ def validate_orderbook(table) -> dict:
     def flush_group(key, rows):
         nonlocal best_bid, best_ask, has_snapshot, crossed, empty_sides
         nonlocal first_cross, snapshot_ids, previous_final_id, previous_last_id
-        nonlocal final_id_gaps, final_id_regressions, prev_id_mismatches, final_id_jumps
+        nonlocal final_id_gaps, final_id_regressions, prev_id_mismatches, final_id_jumps, pre_snapshot_updates
         if key is None:
             return
         event_type = key[1]

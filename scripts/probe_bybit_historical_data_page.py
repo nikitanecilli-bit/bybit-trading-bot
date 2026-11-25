@@ -62,7 +62,22 @@ for path in ("/static/data-core/data-core.latest.min.js",):
         core_probe.append({"path":path,"status":st,"bytes":len(data),"matches":hits[:300]})
     except Exception as e:
         core_probe.append({"path":path,"error":repr(e)})
-result={"url":URL,"http_status":status,"html_bytes":len(raw),"html_sha256":hashlib.sha256(raw).hexdigest(),"scripts":p.scripts,"page_scripts":page_scripts,"links":p.links[:120],"bundles":bundles,"api_probe":api_probe,"core_probe":core_probe}
+shared_script_hits=[]
+for path in p.scripts:
+    if not path.endswith(".js") or "history-data-" in path or "monitor" in path:
+        continue
+    try:
+        st,data,_=get(BASE+path)
+        js=data.decode("utf-8",errors="replace")
+        snippets=[]
+        for term in ("api.bybit.com","api2.bybit.com","api.bytick.com","baseURL","10831:","ml:function","ml:"):
+            pos=js.find(term)
+            if pos>=0: snippets.append({"term":term,"context":js[max(0,pos-250):pos+650]})
+        if snippets:
+            shared_script_hits.append({"path":path,"status":st,"bytes":len(data),"snippets":snippets})
+    except Exception as e:
+        shared_script_hits.append({"path":path,"error":repr(e)})
+result={"url":URL,"http_status":status,"html_bytes":len(raw),"html_sha256":hashlib.sha256(raw).hexdigest(),"scripts":p.scripts,"page_scripts":page_scripts,"links":p.links[:120],"bundles":bundles,"api_probe":api_probe,"core_probe":core_probe,"shared_script_hits":shared_script_hits}
 Path("bybit_history_page_probe").mkdir(exist_ok=True)
 Path("bybit_history_page_probe/result.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
 print(json.dumps(result,indent=2))

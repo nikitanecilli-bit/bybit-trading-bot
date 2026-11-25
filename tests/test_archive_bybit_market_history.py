@@ -193,11 +193,6 @@ class BybitMarketHistoryTests(unittest.TestCase):
                 _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/kline")
                 return [candle]
 
-            def fake_trade(symbol, start_ms, end_ms, interval, *, base_url, pause,
-                           raw_evidence_dir=None, raw_records=None, audit_pages=None):
-                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/kline")
-                return [candle]
-
             candle = {
                 "symbol": "BTCUSDT", "timestamp_ms": hour,
                 "open": "100", "high": "102", "low": "99", "close": "101",
@@ -235,6 +230,14 @@ class BybitMarketHistoryTests(unittest.TestCase):
             self.assertEqual(mark_requests, [(hour, hour * 3, "60")])
             self.assertEqual(result["trade_candles"], 1)
             self.assertEqual(result["mark_candles"], 2)
+            self.assertTrue(result["raw_response_manifest_valid"])
+            self.assertEqual(result["raw_response_count"], 3)
+            raw_report = validate_raw_response_manifest(result["raw_response_manifest_file"])
+            self.assertTrue(raw_report["ok"], raw_report["errors"])
+            raw_manifest = json.loads(Path(result["raw_response_manifest_file"]).read_text(encoding="utf-8"))
+            self.assertEqual(len(raw_manifest["collection_pages"]["funding"]), 1)
+            self.assertEqual(len(raw_manifest["collection_pages"]["trade_kline"]), 1)
+            self.assertEqual(len(raw_manifest["collection_pages"]["mark_price"]), 1)
             funding_path = Path(result["funding_file"])
             manifest_path = Path(result["funding_manifest_file"])
             self.assertTrue(funding_path.is_file())
@@ -284,6 +287,11 @@ class BybitMarketHistoryTests(unittest.TestCase):
                 "open": "100", "high": "102", "low": "99", "close": "101",
                 "volume": "10", "turnover": "1010",
             }
+            def fake_trade(symbol, start_ms, end_ms, interval, *, base_url, pause,
+                           raw_evidence_dir=None, raw_records=None, audit_pages=None):
+                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/kline")
+                return [candle]
+
             marks = [
                 {
                     "symbol": "BTCUSDT", "timestamp_ms": hour,

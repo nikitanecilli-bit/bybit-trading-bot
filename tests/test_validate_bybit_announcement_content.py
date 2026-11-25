@@ -10,7 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.validate_bybit_announcement_content import validate_inventory
 
 
-def article_html(content_html: str) -> bytes:
+def article_html(content_html: str = "", rich_json=None) -> bytes:
+    content = {"json": rich_json} if rich_json is not None else {"json": None}
     payload = {
         "props": {
             "pageProps": {
@@ -19,6 +20,7 @@ def article_html(content_html: str) -> bytes:
                     "date": "2026-11-20T08:00:00Z",
                     "categoryConnection": {"edges": []},
                     "content_html": content_html,
+                    "content": content,
                 }
             }
         }
@@ -49,15 +51,25 @@ class ContentValidationTests(unittest.TestCase):
         (root / "inventory.json").write_text(json.dumps(inventory), encoding="utf-8")
         return root
 
-    def test_nonempty_content_is_semantically_complete(self):
+    def test_nonempty_html_content_is_semantically_complete(self):
         root = self.run_fixture(article_html("<p>BTCUSDT risk limit changed.</p>"))
         inventory, failures = validate_inventory(root)
         self.assertEqual(failures, [])
         self.assertTrue(inventory["complete"])
         self.assertEqual(inventory["content_validation"]["nonempty_article_bodies"], 1)
 
+    def test_rich_json_fallback_is_semantically_complete(self):
+        rich = {"type": "doc", "children": [
+            {"type": "p", "children": [{"text": "BTCUSDT risk limit "}, {"text": "changed at 08:00 UTC."}]}
+        ]}
+        root = self.run_fixture(article_html("", rich))
+        inventory, failures = validate_inventory(root)
+        self.assertEqual(failures, [])
+        self.assertTrue(inventory["complete"])
+        self.assertEqual(inventory["content_validation"]["nonempty_article_bodies"], 1)
+
     def test_empty_content_fails_closed_even_when_raw_body_is_valid(self):
-        root = self.run_fixture(article_html(""))
+        root = self.run_fixture(article_html())
         inventory, failures = validate_inventory(root)
         self.assertFalse(inventory["complete"])
         self.assertEqual(inventory["content_validation"]["failed_article_bodies"], 1)

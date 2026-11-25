@@ -58,6 +58,12 @@
 
 Tardis также проверен на однодневном BTCUSDT sample 2026-11-01: trades и L2 CSV прошли gzip/CSV проверку. Но его нормализованный L2 CSV не содержит Bybit `cts`/sequence IDs; для точного queue replay он уступает CryptoHFTData и остаётся вторичным источником.
 
+Дополнительная проверка двух доступных Tardis daily samples (BTCUSDT, 2025-07-01 и 2026-11-01) выявила разницу качества по эпохам:
+- 2026-11-01: 360 226 Tardis trades сопоставились с CryptoHFTData; 0 missing, 1 extra (уникальный trade ID, причина пока не установлена). Этот день пригоден как sample для дальнейших data checks, но не как доказательство полной исторической полноты.
+- 2025-07-01: CryptoHFTData отдал все 24 часовых файла в Zstandard-wrapped Parquet; loader научен декодировать этот контейнер. Однако trade_id во всех проверенных файлах вырожден в одно значение 0 (например, 144 819 строк в часе 10 при одном unique ID); order_type=Market. В целом Tardis: 1 116 359 строк, CryptoHFTData: 2 683 702; 538 missing и 1 567 882 extra по multiset. Причина повторов не установлена, безопасная дедупликация невозможна. Июльский sample NOT ACCEPTED для replay.
+- Ранний четырёхдатный отчёт ошибочно засчитывал Zstandard-контейнеры и лимит размера как пропуски данных; он отозван. Новый валидатор различает download/decode failure и реальные trade mismatches. Отчёт Actions run #45628449819; методика/детали — Minimum Viable Edge Validation.
+
+
 **Это подтверждает доступность и базовую корректность отдельных файлов, но не полную пригодность источника для backtest.** В Bybit trades у CryptoHFTData задокументированы reconnect gaps до примерно 3 минут около 02:00–02:50 UTC; Bybit orderbook имеет известные пропуски часов 2025-11-26 10 — 2025-12-26 19 и 2026-04-13 15 — 2026-04-14 21. Funding rate/next funding time в mark stream — это опубликованное состояние будущего funding, а не settled funding ledger. PIT universe и effective-time instrument/risk-tier history также не закрыты.
 
 

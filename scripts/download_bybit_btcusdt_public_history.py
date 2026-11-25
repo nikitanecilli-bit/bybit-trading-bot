@@ -1,107 +1,104 @@
 #!/usr/bin/env python3
-"""Bounded, public-only Bybit BTCUSDT H1/Mark/funding history downloader.
-
-Raw API page responses are retained as gzip JSONL alongside normalized CSVs.
-No credentials, private endpoints, account data, or trading actions.
-"""
+"""Download Bybit's own public BTCUSDT H1 archive (CSV.GZ), no credentials."""
 from __future__ import annotations
-import csv, gzip, hashlib, json, os, sys, time, urllib.parse, urllib.request
-from datetime import datetime, timezone
+import csv, gzip, hashlib, io, json, os, time, urllib.error, urllib.request
+from datetime import date, datetime, timezone
 from pathlib import Path
 
-# Official Bybit mainnet hosts; US-based runners may be restricted.
-BASE_CANDIDATES = ["https://api.bybit.com", "https://api.bytick.com", "https://api.bybit.eu"]
-BASE = None
-CATEGORY = "linear"
 SYMBOL = "BTCUSDT"
-INTERVAL = "60"
-START_MS = int(datetime.fromisoformat(os.getenv("START_UTC", "2020-01-01").replace("Z","+00:00")).replace(tzinfo=timezone.utc).timestamp()*1000)
-END_MS = int(datetime.now(timezone.utc).timestamp()*1000)
+START = date.fromisoformat(os.getenv("START_DATE", "2020-01-01"))
+END = datetime.now(timezone.utc).date()
 OUT = Path(os.getenv("OUT_DIR", "bybit_btcusdt_initial"))
 OUT.mkdir(parents=True, exist_ok=True)
 
-def request(path, params):
-    global BASE
-    hosts = [BASE] if BASE else BASE_CANDIDATES
-    last = None
-    for host in hosts:
-        url = host + path + "?" + urllib.parse.urlencode(params)
-        for attempt in range(3):
-            try:
-                req = urllib.request.Request(url, headers={"User-Agent":"bybit-btcusdt-research/1.0"})
-                with urllib.request.urlopen(req, timeout=35) as r:
-                    payload = json.loads(r.read())
-                if payload.get("retCode") != 0:
-                    raise RuntimeError(f"Bybit retCode={payload.get('retCode')} retMsg={payload.get('retMsg')}")
-                BASE = host
-                return payload
-            except Exception as e:
-                last = e
-                if isinstance(e, urllib.error.HTTPError) and e.code == 403:
-                    break
-                time.sleep(min(2 ** attempt, 8))
-    raise RuntimeError(f"Request failed on official Bybit hosts {hosts}: {last}")
+def months_between(start, end):
+    y, m = start.year, start.month
+    while (y, m) <= (end.year, end.month):
+        yield y, m
+        m += 1
+        if m == 13:
+            y, m = y + 1, 1
 
-def collect(path, name, params, row_key, timestamp_index, limit=1000, time_keys=("startTime","endTime")):
-    cursor = END_MS
-    pages = 0
-    rows = {}
-    raw_path = OUT / f"{name}.raw.jsonl.gz"
-    with gzip.open(raw_path, "wt", encoding="utf-8") as raw:
-        while cursor >= START_MS:
-            p = dict(params)
-            p[time_keys[0]] = START_MS
-            p[time_keys[1]] = cursor
-            p["limit"] = limit
-            payload = request(path, p)
-            raw.write(json.dumps(payload, separators=(",",":")) + "\n")
-            batch = payload.get("result", {}).get(row_key, [])
-            if not batch:
-                break
-            oldest = min(int(x[timestamp_index]) for x in batch)
-            for x in batch:
-                ts = int(x[timestamp_index])
-                if START_MS <= ts <= END_MS:
-                    rows[ts] = x
-            pages += 1
-            if oldest <= START_MS or oldest >= cursor:
-                break
-            cursor = oldest - 1
-            time.sleep(0.12)
-    ordered = [rows[k] for k in sorted(rows)]
-    csv_path = OUT / f"{name}.csv"
-    if name in ("trade_h1", "mark_h1"):
-        headers = ["start_ms","open","high","low","close","volume","turnover","confirm"]
-    else:
-        headers = ["symbol","funding_rate","funding_time_ms"]
-    with csv_path.open("w", newline="", encoding="utf-8") as f:
-        w=csv.writer(f); w.writerow(headers); w.writerows(ordered)
-    return {"name":name,"pages":pages,"rows":len(ordered),"first_ts":min(rows) if rows else None,
-            "last_ts":max(rows) if rows else None,"csv":csv_path.name,"raw":raw_path.name}
+def month_end(y, m):
+    if m == 12:
+        return date(y, 12, 31)
+    return date(y, m + 1, 1).fromordinal(date(y, m + 1, 1).toordinal() - 1)
 
-results=[]
-results.append(collect("/v5/market/kline","trade_h1",
-    {"category":CATEGORY,"symbol":SYMBOL,"interval":INTERVAL},"list",0,1000,("start","end")))
-results.append(collect("/v5/market/mark-price-kline","mark_h1",
-    {"category":CATEGORY,"symbol":SYMBOL,"interval":INTERVAL},"list",0,1000,("start","end")))
-results.append(collect("/v5/market/funding/history","funding",
-    {"category":CATEGORY,"symbol":SYMBOL},"list",2,200))
+def fetch_month(y, m):
+    start = date(y, m, 1)
+    end = month_end(y, m)
+    url = (f"https://public.bybit.com/kline_for_metatrader4/{SYMBOL}/{y}/"
+           f"{SYMBOL}_60_{start.isoformat()}_{end.isoformat()}.csv.gz")
+    req = urllib.request.Request(url, headers={"User-Agent":"bybit-btcusdt-research/1.0"})
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as response:
+                raw = response.read()
+            payload = gzip.decompress(raw) if raw[:2] == bytes([31,139]) else raw
+            return url, payload
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return url, None
+            if e.code not in (429, 500, 502, 503, 504):
+                raise
+            time.sleep(2 ** attempt)
+        except Exception:
+            if attempt == 3:
+                raise
+            time.sleep(2 ** attempt)
+    raise RuntimeError(f"Unable to download {url}")
 
-# Capture current contract metadata for context only; not treated as historical specs.
-for name,path,params in [
-    ("instrument_info","/v5/market/instruments-info",{"category":CATEGORY,"symbol":SYMBOL}),
-    ("risk_limit_current","/v5/market/risk-limit",{"category":CATEGORY,"symbol":SYMBOL}),
-]:
-    payload=request(path,params)
-    (OUT/f"{name}.json").write_text(json.dumps(payload,indent=2),encoding="utf-8")
-    results.append({"name":name,"retCode":payload.get("retCode")})
+rows = {}
+months_ok, months_missing, raw_files = [], [], []
+for y, m in months_between(START, END):
+    label = f"{y:04d}-{m:02d}"
+    url, payload = fetch_month(y, m)
+    if payload is None:
+        months_missing.append(label)
+        continue
+    raw_path = OUT / f"{SYMBOL}_H1_{label}.csv"
+    raw_path.write_bytes(payload)
+    raw_files.append(raw_path)
+    count = 0
+    for line in payload.decode("utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        parts = next(csv.reader([line]))
+        if len(parts) < 6:
+            continue
+        try:
+            dt = datetime.strptime(parts[0].strip(), "%Y.%m.%d %H:%M").replace(tzinfo=timezone.utc)
+            ts = int(dt.timestamp() * 1000)
+            if ts < int(datetime.combine(START, datetime.min.time(), tzinfo=timezone.utc).timestamp()*1000):
+                continue
+            if ts > int(datetime.combine(END, datetime.min.time(), tzinfo=timezone.utc).timestamp()*1000):
+                continue
+            rows[ts] = [ts, *[p.strip() for p in parts[1:6]]]
+            count += 1
+        except (ValueError, IndexError):
+            continue
+    months_ok.append({"month":label,"rows_in_file":count,"bytes":len(payload),"url":url})
+    time.sleep(0.1)
 
-manifest={"source":"Bybit public V5 REST API","category":CATEGORY,"symbol":SYMBOL,
-          "start_ms":START_MS,"end_ms":END_MS,"start_utc":datetime.fromtimestamp(START_MS/1000,timezone.utc).isoformat(),
-          "end_utc":datetime.fromtimestamp(END_MS/1000,timezone.utc).isoformat(),"results":results}
+ordered = [rows[k] for k in sorted(rows)]
+csv_path = OUT / "trade_h1.csv"
+with csv_path.open("w", newline="", encoding="utf-8") as f:
+    w = csv.writer(f)
+    w.writerow(["start_ms","open","high","low","close","volume"])
+    w.writerows(ordered)
+
+manifest = {
+    "source":"Bybit official public archive: public.bybit.com/kline_for_metatrader4",
+    "category":"linear","symbol":SYMBOL,"interval":"60",
+    "requested_start":START.isoformat(),"requested_end":END.isoformat(),
+    "rows":len(ordered),
+    "first_utc":datetime.fromtimestamp(ordered[0][0]/1000,timezone.utc).isoformat() if ordered else None,
+    "last_utc":datetime.fromtimestamp(ordered[-1][0]/1000,timezone.utc).isoformat() if ordered else None,
+    "months_downloaded":months_ok,"months_missing":months_missing,
+    "csv":csv_path.name
+}
 for p in sorted(OUT.iterdir()):
-    if p.is_file() and p.name!="manifest.json":
-        h=hashlib.sha256(p.read_bytes()).hexdigest()
-        manifest.setdefault("sha256",{})[p.name]=h
+    if p.is_file() and p.name != "manifest.json":
+        manifest.setdefault("sha256",{})[p.name] = hashlib.sha256(p.read_bytes()).hexdigest()
 (OUT/"manifest.json").write_text(json.dumps(manifest,indent=2),encoding="utf-8")
 print(json.dumps(manifest,indent=2))

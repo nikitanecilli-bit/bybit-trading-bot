@@ -1,3 +1,5 @@
+> **Superseded:** This was the initial partial extraction. The expanded review found additional official notices and more symbol/event rows. Use [BYBIT_DATED_PERPETUAL_PARAMETER_EVENTS_EXPANDED_PARTIAL_2026-11-25_RU.md](BYBIT_DATED_PERPETUAL_PARAMETER_EVENTS_EXPANDED_PARTIAL_2026-11-25_RU.md) as the current broader inventory. This document remains as an audit trail for the first extraction; its D5 NOT ACCEPTED decision still applies.
+
 # Bybit Dated Perpetual Parameter Events — Partial Manual Extraction
 
 **Date of review:** 2026-11-25  

@@ -324,3 +324,5 @@
 - Full audit: [OKX_PUBLIC_DATA_ARCHIVE_QA_2026-11-25_RU.md](OKX_PUBLIC_DATA_ARCHIVE_QA_2026-11-25_RU.md).
 
 - Follow-up official-doc review: OKX's standard Funding History API is limited to three months, but the official historical-data portal advertises perpetual Funding from March 2022 and the official API changelog records a separate public historical-market-data query capability with funding module support. This is a promising D3 lead, not yet retrieved or accepted; using it requires a separate scope decision. Current `upcChg` means upcoming instrument changes, not a past effective-time history. Account fee endpoint requires authentication and remains out of scope. No further API calls/downloads were made.
+
+- Повторяемость подтверждена вторым cloud run [45574106964](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45574106964): все четыре нормализованных файла побайтно идентичны первому захвату; в каждом архиве проверены 180 raw-файлов, хеши и размеры совпали. Workflow теперь fail-closed и хранит artifacts 90 дней. Это подтверждает повторяемость capture pipeline, но не полноту Funding или историчность спецификаций.

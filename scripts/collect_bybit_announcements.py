@@ -15,7 +15,6 @@ import time
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse, urlunparse, parse_qs, urlencode
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from collections import defaultdict
@@ -28,7 +27,6 @@ CATEGORIES = {
     "maintenance_updates": "maintenance_updates",
     "latest_bybit_news": "latest_bybit_news",
 }
-# Last observed official-site pagination totals on 2026-11-25. Fail closed if they change.
 EXPECTED_PAGES = {"new_crypto": 25, "delistings": 11, "maintenance_updates": 19, "latest_bybit_news": 11}
 SYMBOLS = (
     "AAVEUSDT ADAUSDT ALGOUSDT APTUSDT ARBUSDT ASTERUSDT ATOMUSDT AVAXUSDT "
@@ -84,6 +82,23 @@ class VisibleText(HTMLParser):
         text = " ".join(data.split())
         if text:
             self.parts.append(text)
+
+def rich_content_text(value):
+    """Extract ordered text nodes from Bybit's Contentstack rich-text JSON."""
+    parts = []
+    def visit(node):
+        if isinstance(node, dict):
+            text = node.get("text")
+            if isinstance(text, str) and text.strip():
+                parts.append(" ".join(text.split()))
+            for key, child in node.items():
+                if key != "text":
+                    visit(child)
+        elif isinstance(node, list):
+            for child in node:
+                visit(child)
+    visit(value)
+    return " ".join(parts)
 
 def utc_now():
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -150,8 +165,7 @@ def parse_page(body, category_url):
             q = parse_qs(p.query)
             if "page" in q and q["page"][0].isdigit() and (not q.get("category") or q["category"][0] in CATEGORIES):
                 page_numbers.add(int(q["page"][0]))
-            path = p.path
-            if re.match(r"^/(?:en/)?article/[^/]+/?$", path):
+            if re.match(r"^/(?:en/)?article/[^/]+/?$", p.path):
                 clean = canonical_url(full)
                 if label:
                     articles[clean] = label
@@ -173,6 +187,12 @@ def extract_article_payload(body):
     content_parser = VisibleText()
     content_parser.feed(content_html)
     content_text = " ".join(content_parser.parts)
+    content_source = "content_html"
+    if not content_text.strip():
+        rich = detail.get("content") or {}
+        rich_json = rich.get("json") if isinstance(rich, dict) else None
+        content_text = rich_content_text(rich_json)
+        content_source = "content.json" if content_text.strip() else "none"
     category_keys = []
     connection = detail.get("categoryConnection") or {}
     for edge in connection.get("edges") or []:
@@ -185,6 +205,7 @@ def extract_article_payload(body):
         "published_at": detail.get("date"),
         "category_keys": sorted(set(category_keys)),
         "content_text": content_text,
+        "content_source": content_source,
     }
 
 def classify(title, text, category):
@@ -300,12 +321,13 @@ def main():
             record = {"title": article_title, "url": url, "symbols": matched,
                       "published_at": payload["published_at"],
                       "category_keys": payload["category_keys"],
-                      "content_extraction": "next_data_articleDetail.content_html",
+                      "content_extraction": payload["content_source"],
+                      "content_text_chars": len(text),
                       "product_class_candidate": product, "event_type_candidate": event, **cap}
             article_records.append(record)
             for symbol in matched:
                 symbol_hits[symbol].append({
-                    "url": url, "title": title, "product_class_candidate": product,
+                    "url": url, "title": article_title, "product_class_candidate": product,
                     "event_type_candidate": event, "body_sha256": cap["body_sha256"],
                 })
         except Exception as exc:

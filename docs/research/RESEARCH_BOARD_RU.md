@@ -432,3 +432,11 @@
 - Confirmed missing: aggregate position + active-order risk value, order classification, aggregate cap enforcement, the 10-day risk-parameter change buffer state machine, and cross/portfolio account-level margin.
 - Full gap audit: `BYBIT_RISK_LIMIT_MODEL_VS_OFFICIAL_RULES_GAP_AUDIT_2026-11-25_RU.md`. This is a research/backtest simulator gap analysis, not a live execution finding.
 - No code change, public API request, private/account API, orders, PnL or backtests were run.
+
+
+### 2026-11-25 — lifecycle scan against 47-symbol proxy (Section 61)
+
+- Re-scanned all 1,275 captured article bodies using both HTML and rich-text JSON extraction.
+- Exact and separator-normalized symbol search found zero confirmed listing/delisting candidate articles matching the 47-symbol proxy.
+- This does not establish zero Bybit lifecycle events: the proxy is not a Bybit point-in-time universe and the four-category archive is not proven exhaustive. D4 remains NOT ACCEPTED.
+- Report: `BYBIT_LIFECYCLE_EVENT_SCAN_47_PROXY_PARTIAL_2026-11-25_RU.md`. Next requirement is a Bybit-specific historical universe before lifecycle matching.

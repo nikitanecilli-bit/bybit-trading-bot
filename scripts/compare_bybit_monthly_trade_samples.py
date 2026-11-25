@@ -98,6 +98,8 @@ def main() -> int:
 
             for hour in HOURS:
                 item = {}
+                hour_tardis_rows = sum(tardis_by_hour[hour].values())
+                total["tardis_rows"] += hour_tardis_rows
                 try:
                     if request_count:
                         time.sleep(1.05)
@@ -125,10 +127,6 @@ def main() -> int:
                     item["trade_id_duplicates"] = len(ids) - len(set(ids))
                     item["comparison"] = multiset_diff(tardis_by_hour[hour], candidate)
                     item["status"] = "COMPARED"
-                    for key in ("tardis_rows", "cryptohftdata_rows", "matched_rows",
-                                "missing_from_cryptohftdata", "extra_in_cryptohftdata"):
-                        pass
-                    total["tardis_rows"] += item["comparison"]["tardis_rows"]
                     total["cryptohftdata_rows"] += item["comparison"]["cryptohftdata_rows"]
                     total["matched_rows"] += item["comparison"]["matched_rows"]
                     total["missing_from_cryptohftdata"] += item["comparison"]["missing_from_cryptohftdata"]
@@ -137,6 +135,7 @@ def main() -> int:
                     item["status"] = "MISSING_OR_FAILED"
                     item["error"] = f"{type(exc).__name__}: {exc}"
                     total["missing_hour_files"] += 1
+                    total["missing_from_cryptohftdata"] += hour_tardis_rows
                 day_report["hours"][hour] = item
             day_report["status"] = (
                 "COMPARED_WITH_GAPS" if any(v["status"] != "COMPARED"

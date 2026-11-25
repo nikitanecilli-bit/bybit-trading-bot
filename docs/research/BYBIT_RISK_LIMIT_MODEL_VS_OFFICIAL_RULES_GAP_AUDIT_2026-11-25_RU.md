@@ -96,3 +96,8 @@ The existing liquidation module is explicitly position-level isolated margin. It
 **Cross/portfolio account-level margin: OUT OF SCOPE / NOT IMPLEMENTED.**
 
 Do not describe the current engine as a complete Bybit risk manager or live-ready. It is a research/backtest simulator with useful tier-aware single-position components. No live execution capability is implied.
+
+
+## 6. Network-scope restriction
+
+The existing snapshot collector accepts a configurable `--base-url` and its host allowlist contains several official regional Bybit API domains. This project must **not** use alternate regional domains as a way to work around an HTTP 403 or geographic restriction. For this research, use only the configured default `https://api.bybit.com`; if that host blocks the GitHub runner, record the block and stop. Do not retry via `api.bytick.com`, regional domains, proxies, VPNs, mirrors or self-hosted runners. The code's broader allowlist is not authorization to route around an access restriction.

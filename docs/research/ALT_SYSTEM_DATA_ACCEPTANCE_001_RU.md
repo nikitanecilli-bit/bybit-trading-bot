@@ -2081,3 +2081,24 @@ These are page totals visible at the time of inspection, not a stable API contra
 ### 53.3. Decision
 
 The public site is paginated enough to make a bounded inventory tractable in principle, but the current search did not execute this protocol and does not establish archive completeness. The next concrete decision is whether to authorize a read-only, automated crawl of only these public announcement category pages and linked public article pages, with no Bybit market API calls, no account endpoints, no orders and no raw market-data downloads. Without that separate authorization, do not implement or dispatch a crawler. D4/D5/D6 remain PARTIAL / NOT ACCEPTED.
+
+
+## 54. Read-only public announcement inventory collector (implementation and execution, 2026-11-25)
+
+### 54.1. Scope and controls
+
+Added `scripts/collect_bybit_announcements.py`, offline tests `tests/test_collect_bybit_announcements.py`, and workflow `.github/workflows/bybit-announcement-archive-inventory.yml` on the research branch. The workflow uses GitHub-hosted `ubuntu-latest`, not self-hosted runners. The collector is restricted to HTTPS host `announcements.bybit.com`; redirects to any other host are rejected. It issues GET requests only to the four agreed public archive categories and linked article pages. It has no credentials, cookies, API keys, market/account endpoints, trading actions, proxy or alternate host. Minimum request delay is 1 second in the workflow; each response is capped at 8 MiB; timeouts and page/article failures are recorded. Output must be a new/empty directory, preventing accidental overwrite.
+
+For every captured HTML page it records canonical URL, retrieval timestamp UTC, HTTP status, selected response headers, byte count, SHA-256 and relative file path. Inventory JSON links category page captures, unique article captures, symbol matches and failure records. The collector is a discovery/inventory aid: its regex classification fields are explicitly candidates and must be manually reviewed before an event is promoted into the D4/D5/D6 ledger.
+
+### 54.2. Fail-closed improvements
+
+The archive pagination totals observed on 2026-11-25 are encoded as baselines (25, 11, 19, 11 pages for the four selected categories). A mismatch between parsed pagination and that observed baseline aborts that category rather than allowing a false completeness claim. Linear candidates require explicit USDT/USDC perpetual or Linear wording; inverse, TradFi and generic ambiguous perpetuals are separated. This is still not a guarantee that the site exposes every archive item: pagination baselines must be revalidated against the live site, and full-page inventory must be independently reconciled.
+
+### 54.3. CI and collection status at documentation time
+
+The offline parser/safety tests passed in the initial workflow attempts, including the corrected run. A first collection workflow run `45584843911` (code SHA `3188d6d96b12201b822e53d41ef6331d5a76df8c`) remained in progress at last check, with the live collection step active and no artifact available yet. A second run `45585129324` was triggered after fail-closed pagination/product classification improvements (code SHA `bfb5c21ca2748f198856f011cddff2b7579f98b4`); its offline tests passed and its collection step was also in progress at last check. Neither run had produced a completed inventory artifact at that point. The earlier run used the initial collector revision and must not be treated as accepted evidence; the second run is the intended strict run.
+
+### 54.4. Acceptance boundary
+
+No archive completeness claim, event-study input, backtest or PnL is accepted from an in-progress workflow. Even after a successful run, inventory completion only means the selected pages/articles were retrievable under this protocol; it does not prove the announcements site itself is historically exhaustive or that regex candidate classifications are correct. D4/D5/D6 remain PARTIAL / NOT ACCEPTED until captured records are reviewed, reconciled to a genuine Bybit Linear point-in-time universe, and effective-time fields are evidenced. The workflow does not query Bybit market APIs or collect market data.

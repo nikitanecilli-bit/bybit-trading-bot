@@ -176,7 +176,7 @@ def extract_events(root: Path) -> tuple[dict, list[dict]]:
             event["symbol"], event["event_type"], event["published_at_utc"] or ""
         )),
         "failures": failures,
-        "complete": not failures,
+        "extraction_complete": not failures,\n        "historical_universe_complete": False,
     }
     return output, failures
 
@@ -190,7 +190,7 @@ def main() -> int:
     target = Path(args.output)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(output, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(output["summary"] | {"complete": output["complete"]}, ensure_ascii=False), flush=True)
+    print(json.dumps(output["summary"] | {"extraction_complete": output["extraction_complete"], "historical_universe_complete": False}, ensure_ascii=False), flush=True)
     return 0 if not failures else 2
 
 

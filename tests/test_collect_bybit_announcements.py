@@ -47,6 +47,13 @@ class AnnouncementCollectorTests(unittest.TestCase):
         payload = extract_article_payload(body)
         self.assertEqual(payload["content_source"], "content.json")
         self.assertIn("BTCUSDT risk tier changes at 08:00 UTC 100000", payload["content_text"])
+    def test_html_extractor_ignores_style_and_script_text(self):
+        body = b'''<html><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"articleDetail":{"title":"HTML body","content_html":"<style>td { color: red; }</style><p>Only article text.</p><script>noise()</script>"}}}}</script></html>'''
+        payload = extract_article_payload(body)
+        self.assertIn("Only article text.", payload["content_text"])
+        self.assertNotIn("color: red", payload["content_text"])
+        self.assertNotIn("noise()", payload["content_text"])
+
     def test_empty_article_body_remains_empty(self):
         body = b'''<html><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"articleDetail":{"title":"No body","content_html":"","content":{"json":{"type":"doc","children":[{"type":"p","children":[{"text":""}]}]}}}}}}</script></html>'''
         payload = extract_article_payload(body)

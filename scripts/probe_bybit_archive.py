@@ -22,3 +22,5 @@ print("decoded_bytes:", len(decoded))
 print("first_lines:")
 for line in text.splitlines()[:6]:
     print(line)
+
+# Probe run is intentionally small to verify archive reachability and file format.

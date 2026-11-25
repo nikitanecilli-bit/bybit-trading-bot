@@ -76,7 +76,7 @@ Captured body SHA-256: `233e01289ff4a39e7062ed8b9f23a8242062df7a6470ec1983098571
 
 ## 3. Interpretation and restrictions
 
-- These 18 symbol/event rows (12 tick-size rows + 7 order-size rows; CAKEUSDT and MORPHOUSDT occur in both tick-size events) are a **partial dated parameter history** from four official announcements.
+- These **19 symbol/event rows** (12 tick-size rows + 7 order-size rows; CAKEUSDT and MORPHOUSDT occur in both tick-size events) are a **partial dated parameter history** from four official announcements.
 - `effective_from` is taken from the announcement's stated UTC effective time, not inferred from the publication timestamp.
 - The captured source HTML hashes identify the exact raw bodies used for transcription.
 - This is not a complete historical specification database and does not establish historical qty step, min quantity, min notional, max leverage, fee schedule, or all order constraints.

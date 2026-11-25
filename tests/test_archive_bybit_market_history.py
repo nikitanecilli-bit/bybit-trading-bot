@@ -97,11 +97,11 @@ class BybitMarketHistoryTests(unittest.TestCase):
 
             output_files = {
                 "funding_csv": (archive_root / "funding" / "BTCUSDT.csv",
-                                "symbol,funding_timestamp_ms,funding_rate\\nBTCUSDT,3600000,0.0001\\n"),
+                                "symbol,funding_timestamp_ms,funding_rate\nBTCUSDT,3600000,0.0001\n"),
                 "trade_kline_csv": (archive_root / "kline" / "BTCUSDT.csv",
-                                    "symbol,timestamp_ms,open,high,low,close,volume,turnover\\nBTCUSDT,3600000,1,2,1,2,3,6\\n"),
+                                    "symbol,timestamp_ms,open,high,low,close,volume,turnover\nBTCUSDT,3600000,1,2,1,2,3,6\n"),
                 "mark_price_csv": (archive_root / "mark_price" / "BTCUSDT.csv",
-                                   "symbol,timestamp_ms,open,high,low,close\\nBTCUSDT,3600000,1,2,1,2\\n"),
+                                   "symbol,timestamp_ms,open,high,low,close\nBTCUSDT,3600000,1,2,1,2\n"),
             }
             normalized_outputs = {}
             for key, (path, content) in output_files.items():

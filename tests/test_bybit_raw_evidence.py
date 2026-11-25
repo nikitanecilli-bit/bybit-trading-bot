@@ -110,6 +110,42 @@ class RawEvidenceTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 assert_snapshot_paths_available(root, "2026-11-25T08-00-00Z")
 
+    def test_missing_page_link_and_orphan_response_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "snapshot.json"
+            output.write_text(json.dumps({
+                "page_observations": [{"page_index": 1}, {"page_index": 2}],
+            }), encoding="utf-8")
+            records = []
+            pages = []
+            for index in (1, 2):
+                record = capture_response(
+                    json.dumps({"page": index}).encode(),
+                    base_url="https://api.bybit.com",
+                    endpoint="/v5/market/risk-limit",
+                    params={"category": "linear", "cursor": str(index)},
+                    http_status=200, response_headers={},
+                    evidence_dir=root / "raw", records=records,
+                )
+                pages.append({
+                    "page_index": index,
+                    "raw_response_request_id": record["request_id"],
+                    "raw_response_body_sha256": record["body_sha256"],
+                })
+            manifest_path = root / "evidence.json"
+            write_evidence_manifest(
+                manifest_path, source="fixture", category="linear",
+                normalized_output=output, records=records, collection_pages=pages,
+            )
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["collection_pages"] = manifest["collection_pages"][:1]
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            report = validate_evidence_manifest(manifest_path)
+            self.assertFalse(report["ok"])
+            self.assertIn("raw_response_record_unreferenced", report["errors"])
+            self.assertIn("normalized_page_count_mismatch", report["errors"])
+
     def test_normalized_output_tampering_is_detected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

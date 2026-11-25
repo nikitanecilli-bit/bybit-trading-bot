@@ -1208,6 +1208,36 @@ def test_finalize_rejects_missing_open_position_marks():
 
 
 
+def _exchange_close_spec(max_market_qty="1000", max_order_qty="1000"):
+    from bybit_instrument_specs import InstrumentSpec
+
+    return InstrumentSpec.from_snapshot({"instrument": {
+        "symbol": "BTCUSDT", "category": "linear", "status": "Trading",
+        "priceFilter": {"minPrice": "0.05", "maxPrice": "1000000", "tickSize": "0.05"},
+        "lotSizeFilter": {
+            "qtyStep": "0.1", "minOrderQty": "0.1",
+            "maxOrderQty": max_order_qty, "maxMktOrderQty": max_market_qty,
+            "minNotionalValue": "5",
+        },
+        "leverageFilter": {
+            "minLeverage": "1", "maxLeverage": "50", "leverageStep": "0.01",
+        },
+    }})
+
+
+def _attach_exchange_close_spec(engine, *, max_market_qty="1000", max_order_qty="1000"):
+    spec = _exchange_close_spec(max_market_qty, max_order_qty)
+
+    class History:
+        def get_spec(self, symbol, as_of_ts, *, max_age_ms, require_trading=True):
+            assert symbol == "BTCUSDT"
+            assert as_of_ts > 0
+            return spec
+
+    engine.instrument_spec_history = History()
+    engine.max_instrument_spec_age_ms = 30 * 24 * 60 * 60 * 1000
+
+
 def _exchange_sized_position(qty="1.0"):
     pos = make_position(size=100.0)
     pos.exchange_sized = True
@@ -1241,6 +1271,7 @@ def test_exchange_sized_tp1_is_skipped_when_split_violates_exchange_minimums():
 
 def test_exchange_sized_final_close_uses_exact_remaining_contract_qty_for_pnl():
     e = make_engine()
+    _attach_exchange_close_spec(e)
     pos = _exchange_sized_position()
     assert engine_mod.UnifiedQuantEngine._apply_tp1(pos, 1_800_003_600_000)
     e.open_positions["BTCUSDT"] = pos
@@ -1256,8 +1287,23 @@ def test_exchange_sized_final_close_uses_exact_remaining_contract_qty_for_pnl():
     assert "BTCUSDT" not in e.open_positions
 
 
+def test_exchange_sized_close_rejects_quantity_above_current_market_order_cap():
+    e = make_engine()
+    _attach_exchange_close_spec(e, max_market_qty="800", max_order_qty="1000")
+    pos = _exchange_sized_position(qty="801.0")
+    e.open_positions["BTCUSDT"] = pos
+    e._last_mark_prices["BTCUSDT"] = 100.0
+    try:
+        e._close_position(pos, 100.0, "stop_loss", 1_800_003_600_000, 0.0, 0.0)
+    except RuntimeError as exc:
+        assert "maxMktOrderQty" in str(exc)
+    else:
+        raise AssertionError("market close must reject quantity above current maxMktOrderQty")
+
+
 def test_exchange_sized_close_rejects_unquantized_final_leg():
     e = make_engine()
+    _attach_exchange_close_spec(e)
     pos = _exchange_sized_position()
     pos.remaining_contract_qty = "0.05"
     e.open_positions["BTCUSDT"] = pos

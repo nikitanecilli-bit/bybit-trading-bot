@@ -151,7 +151,7 @@ def test_explore_mode_uses_only_frozen_train_selected_top_five():
         design = resolve_validation_design(env)
     assert [fold[0] for fold in design["folds"]] == [1, 2]
     assert design["volume_thresholds"] == [1.2, 1.6, 2.0, 2.5]
-    assert design["breakout_atr_thresholds"] == [0.0, 0.10, 0.25]
+    assert design["breakout_atr_thresholds"] == [0.0]
     assert design["cost_multipliers"] == [1.0, 1.5, 2.0]
     assert design["selection"]["symbols"] == ["BNBUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
 
@@ -162,13 +162,13 @@ def test_confirm_mode_requires_one_frozen_predeclared_config_and_selection_manif
         env.update({
             "H1_VALIDATION_MODE": "confirm",
             "H1_FROZEN_MIN_VOLUME_RATIO": "1.6",
-            "H1_FROZEN_MIN_BREAKOUT_ATR": "0.10",
+            "H1_FROZEN_MIN_BREAKOUT_ATR": "0.0",
             "H1_FROZEN_STRATEGY_MODE": "d20_baseline",
         })
         design = resolve_validation_design(env)
     assert [fold[0] for fold in design["folds"]] == [3]
     assert design["volume_thresholds"] == [1.6]
-    assert design["breakout_atr_thresholds"] == [0.10]
+    assert design["breakout_atr_thresholds"] == [0.0]
     assert design["cost_multipliers"] == [1.0, 1.5, 2.0]
     assert design["frozen_config"]["symbols"] == ["BNBUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
     assert design["frozen_config"]["selection_manifest_sha256"] == design["selection"]["sha256"]

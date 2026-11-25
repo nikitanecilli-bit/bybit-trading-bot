@@ -100,6 +100,7 @@ def load_tardis_day(path: Path) -> tuple[dict[str, Counter], int, dict]:
     by_hour = {hour: Counter() for hour in HOURS}
     unknown_sides = 0
     ids = []
+    total_rows = 0
     expected = ["exchange", "symbol", "timestamp", "local_timestamp",
                 "id", "side", "price", "amount"]
     with gzip.open(path, "rt", encoding="utf-8", newline="") as stream:
@@ -107,6 +108,7 @@ def load_tardis_day(path: Path) -> tuple[dict[str, Counter], int, dict]:
         if reader.fieldnames != expected:
             raise ValueError(f"Tardis header mismatch: {reader.fieldnames!r}")
         for row_no, row in enumerate(reader, 2):
+            total_rows += 1
             if None in row or row["exchange"] != "bybit" or row["symbol"] != SYMBOL:
                 raise ValueError(f"invalid Tardis row {row_no}")
             ts_us = int(row["timestamp"])
@@ -120,7 +122,7 @@ def load_tardis_day(path: Path) -> tuple[dict[str, Counter], int, dict]:
             by_hour[hour][(ts_us // 1000, side, dec(row["price"]), dec(row["amount"]))] += 1
     id_diagnostics = {
         "rows_with_nonempty_id": len(ids),
-        "empty_id_rows": sum(sum(counter.values()) for counter in by_hour.values()) - len(ids),
+        "empty_id_rows": total_rows - len(ids),
         "unique_ids": len(set(ids)),
         "duplicate_id_rows": len(ids) - len(set(ids)),
     }

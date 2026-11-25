@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from scripts.bybit_raw_evidence import capture_response, write_evidence_manifest
+from scripts.bybit_raw_evidence import capture_response, assert_snapshot_paths_available, finalize_snapshot_evidence
 
 DEFAULT_BASE_URL = "https://api.bybit.com"
 ENDPOINT = "/v5/market/instruments-info"
@@ -359,6 +359,9 @@ def main() -> None:
     collection_pages: list[dict[str, Any]] = []
     collection_started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     output_root = Path(args.output_dir) / args.category
+    pending_dir = output_root / "raw_evidence" / "pending"
+    if pending_dir.exists():
+        raise FileExistsError(f"unfinished raw evidence capture exists: {pending_dir}")
 
     def fetch(cursor: str | None, status: str):
         page_counts[status] = page_counts.get(status, 0) + 1
@@ -366,7 +369,7 @@ def main() -> None:
         before = len(raw_records)
         page, next_cursor = _request_page(
             args.base_url, args.category, cursor, status=status,
-            raw_evidence_dir=output_root / "raw_evidence" / "pending",
+            raw_evidence_dir=pending_dir,
             raw_records=raw_records,
         )
         record = raw_records[-1] if len(raw_records) > before else None
@@ -393,26 +396,10 @@ def main() -> None:
     fetched = datetime.fromisoformat(snapshot["fetched_at"].replace("Z", "+00:00"))
     stamp = fetched.astimezone(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     output = output_root / f"{stamp}.json"
+    assert_snapshot_paths_available(output_root, stamp)
     write_snapshot(snapshot, output)
-    evidence_dir = output_root / "raw_evidence" / stamp
-    pending_dir = output_root / "raw_evidence" / "pending"
-    if pending_dir.exists():
-        evidence_dir.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(pending_dir, evidence_dir)
-    evidence_manifest = evidence_dir / "manifest.json"
-    # Rebase raw file paths after moving the pending capture directory.
-    for record in raw_records:
-        record["body_file"] = str(Path("raw_evidence") / stamp / record["body_file"]).replace(os.sep, "/")
-        record["audit_file"] = str(Path("raw_evidence") / stamp / record["audit_file"]).replace(os.sep, "/")
-        audit_path = output_root / record["audit_file"]
-        audit_path.write_text(
-            json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-            encoding="utf-8",
-        )
-    # Keep manifest at category root so its paths can safely resolve from that root.
-    evidence_manifest = output_root / f"{stamp}.evidence.json"
-    write_evidence_manifest(
-        evidence_manifest, source="Bybit V5 GET /v5/market/instruments-info",
+    evidence_manifest = finalize_snapshot_evidence(
+        output_root, stamp, source="Bybit V5 GET /v5/market/instruments-info",
         category=args.category, normalized_output=output, records=raw_records,
         collection_pages=collection_pages,
     )

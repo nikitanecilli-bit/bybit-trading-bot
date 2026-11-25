@@ -8,6 +8,8 @@ on:
       - 'scripts/validate_bybit_announcement_content.py'
       - 'tests/test_collect_bybit_announcements.py'
       - 'tests/test_validate_bybit_announcement_content.py'
+      - 'scripts/extract_bybit_lifecycle_events.py'
+      - 'tests/test_extract_bybit_lifecycle_events.py'
       - '.github/workflows/bybit-announcement-archive-inventory.yml'
   workflow_dispatch:
 
@@ -34,6 +36,8 @@ jobs:
         run: |
           python tests/test_collect_bybit_announcements.py
           python tests/test_validate_bybit_announcement_content.py
+          python -m py_compile scripts/extract_bybit_lifecycle_events.py
+          python tests/test_extract_bybit_lifecycle_events.py
       # Full public crawl requires workflow_dispatch or an explicit [full-archive] push commit marker.
       - name: Collect public Bybit announcement pages only
         if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[full-archive]'))

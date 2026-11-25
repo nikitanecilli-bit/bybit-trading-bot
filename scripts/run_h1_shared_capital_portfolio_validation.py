@@ -1380,7 +1380,7 @@ def build_validation_manifest(
             "Hashes identify exact files but do not independently attest remote origin."
         ),
         "universe": {
-            "selection_mode": design["selection"].get("selection_mode", "top5"),
+            "selection_mode": (design.get("selection") or {}).get("selection_mode", "top5"),
             "allowlist": allowlist,
             "selected_symbols": selected_symbols,
             "selected_symbol_count": len(selected_symbols),

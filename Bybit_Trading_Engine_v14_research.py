@@ -2780,6 +2780,10 @@ class UnifiedQuantEngine:
                         ),
                     )
                 instrument_spec.validate_leverage(Decimal(str(self.cfg.leverage_val)))
+                if instrument_spec.max_market_order_qty is None:
+                    raise ValueError(
+                        "maxMktOrderQty is missing; cannot guarantee a single-order market close"
+                    )
                 exchange_order = size_to_exchange_constraints(
                     instrument_spec, size_usdt, fill, risk_usdt,
                     order_type=effective_order_type,

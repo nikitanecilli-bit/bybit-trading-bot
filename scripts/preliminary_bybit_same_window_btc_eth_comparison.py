@@ -21,7 +21,7 @@ def main():
         rows=base.load()
         gaps=sum(rows[i][0]-rows[i-1][0]!=base.BAR_MS for i in range(1,len(rows)))
         first=next((r[0] for r in rows if r[0]>=DATE_RANGE[0]),None)
-        last=next((r[0] for r in rows if r[0]<=DATE_RANGE[1]),None)
+        last=next((r[0] for r in reversed(rows) if r[0]<=DATE_RANGE[1]),None)
         if first is None or last is None: raise SystemExit(f"{symbol}: requested range not covered")
         print("DATA "+json.dumps({"symbol":symbol,"bars_total":len(rows),"gaps_total":gaps,
           "window_first_utc":base.utc(first),"window_last_utc":base.utc(last)},sort_keys=True))

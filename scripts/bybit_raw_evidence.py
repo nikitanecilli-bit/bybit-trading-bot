@@ -118,7 +118,6 @@ def assert_snapshot_paths_available(output_root: str | Path, stamp: str) -> None
         root / f"{stamp}.json",
         root / f"{stamp}.evidence.json",
         root / "raw_evidence" / stamp,
-        root / "raw_evidence" / "pending",
     )
     existing = [str(path) for path in candidates if path.exists()]
     if existing:

@@ -21,7 +21,7 @@ from pathlib import Path
 
 DATE = "2026-11-01"
 SYMBOL = "BTCUSDT"
-HOURS = ("01", "02", "03", "12")
+HOURS = tuple(f"{hour:02d}" for hour in range(24))
 TARDIS_URL = f"https://datasets.tardis.dev/v1/bybit/trades/2026/11/01/{SYMBOL}.csv.gz"
 CHD_BASE = "https://api.cryptohftdata.com/download"
 MAX_FILE_BYTES = 50 * 1024 * 1024

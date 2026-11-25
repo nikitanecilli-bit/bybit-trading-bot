@@ -1,0 +1,52 @@
+name: Preliminary Bybit BTC H1 backtest
+
+on:
+  push:
+    branches:
+      - research/h1-volume-lookback-provenance-fix
+    paths:
+      - scripts/preliminary_bybit_btc_h1_backtest.py
+      - .github/workflows/preliminary-bybit-btc-h1-backtest.yml
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/h1-volume-lookback-provenance-fix
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download existing Bybit-only H1 archive artifact
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request, zipfile
+          artifact_id = 15036563599
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/nikitanecilli-bit/bybit-trading-bot/actions/artifacts/{artifact_id}/zip",
+              headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}", "Accept": "application/vnd.github+json"}
+          )
+          with urllib.request.urlopen(req, timeout=60) as response:
+              payload = response.read()
+          with open("/tmp/bybit_h1.zip","wb") as f: f.write(payload)
+          with zipfile.ZipFile("/tmp/bybit_h1.zip") as z:
+              z.extractall(".")
+          PY
+          test -s bybit_btcusdt_initial/trade_h1.csv
+      - name: Run preliminary Bybit-only H1 replay
+        run: python scripts/preliminary_bybit_btc_h1_backtest.py
+      - name: Upload preliminary backtest outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: preliminary-bybit-btc-h1-backtest
+          path: preliminary_backtest/
+          if-no-files-found: error
+          retention-days: 90

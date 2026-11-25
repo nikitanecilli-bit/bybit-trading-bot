@@ -365,3 +365,12 @@
 - This materially improves the evidence path: D4 listing/delisting and selected halt events; D5 selected tick size, max order size, initial listing parameters and corporate-action contract-size changes; D6 selected dated leverage/risk notices.
 - Important limitation: announcements are not a complete historical spec/tier database. Many D6 notices do not include full tier ladders; D5 fields such as qtyStep/minNotional and all changes are not guaranteed; targeted search is not archive completeness.
 - Decision: D4/D5/D6 remain PARTIAL / NOT ACCEPTED. No notices downloaded or normalized into data; no API calls, collectors, workflows or PnL were run. Proposed next step is a bounded offline announcement inventory against the frozen 47-symbol Linear universe, subject to separately confirmed authorization for any automated collection.
+
+
+### 2026-11-25 — bounded Bybit announcement coverage spot check (acceptance ledger Section 52)
+
+- Recovered the exact E11 universe manifest from existing workflow artifact `13105661683`: 47 included proxy symbols, with AEROUSDT/GRAMUSDT/HYPEUSDT excluded for insufficient fold bars. This denominator is Binance-style and survivor-biased, not a Bybit PIT universe.
+- Manual indexed search of official announcements surfaced D5 tick/order-size events for 11/47 symbols (23.4%) and D6 risk-limit events for 19/47 (40.4%); 24/47 had at least one D5/D6 hit in the sampled notices. These are positive-hit counts only, **not archive-completeness percentages**.
+- No confirmed D4 listing/delisting/suspension notice naming one of the 47 surfaced in the bounded query sample. Search misses are not evidence of absence. TradFi/stock and Spot notices were excluded from Linear counts.
+- D4/D5/D6 remain PARTIAL / NOT ACCEPTED. No announcement crawl/raw capture, market API call, data collection, workflow dispatch, PnL or backtest was run. Only an already-existing E11 result artifact was inspected for its manifest.
+- Next step: specify archive pagination and symbol/category reconciliation before any automated collection. This remains a design/read-only task; automated crawling and raw capture require separate authorization.

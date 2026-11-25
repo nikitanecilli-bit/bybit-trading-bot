@@ -1,0 +1,30 @@
+name: CryptoHFTData Bybit sample probe
+
+on:
+  push:
+    branches:
+      - research/market-regime-v1-main
+    paths:
+      - "scripts/probe_cryptohftdata_bybit_sample.py"
+      - ".github/workflows/cryptohftdata-bybit-sample-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Probe public hourly Bybit files without downloading bodies
+        run: python scripts/probe_cryptohftdata_bybit_sample.py /tmp/cryptohftdata_bybit_probe.json
+      - name: Upload probe report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cryptohftdata-bybit-sample-probe
+          path: /tmp/cryptohftdata_bybit_probe.json
+          if-no-files-found: warn

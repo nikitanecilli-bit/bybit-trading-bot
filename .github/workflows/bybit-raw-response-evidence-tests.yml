@@ -1,0 +1,28 @@
+name: Bybit raw response evidence tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/bybit-raw-response-evidence-v1]
+    paths:
+      - 'scripts/archive_bybit_market_history.py'
+      - 'tests/test_archive_bybit_market_history.py'
+      - '.github/workflows/bybit-raw-response-evidence-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-evidence-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile collector and tests
+        run: python -m py_compile scripts/archive_bybit_market_history.py tests/test_archive_bybit_market_history.py
+      - name: Run offline collector and raw-evidence tests
+        run: python tests/test_archive_bybit_market_history.py

@@ -1,0 +1,30 @@
+name: Tardis Bybit historical sample probe
+
+on:
+  push:
+    branches:
+      - research/market-regime-v1-main
+    paths:
+      - "scripts/probe_tardis_bybit_samples.py"
+      - ".github/workflows/tardis-bybit-sample-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Probe public monthly Bybit samples without downloading bodies
+        run: python scripts/probe_tardis_bybit_samples.py /tmp/tardis_bybit_probe.json
+      - name: Upload probe report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tardis-bybit-sample-probe
+          path: /tmp/tardis_bybit_probe.json
+          if-no-files-found: warn

@@ -3,7 +3,7 @@
 from __future__ import annotations
 import csv, gzip, hashlib, json, urllib.request
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -62,8 +62,10 @@ with gzip.open(mt4_path, "rt", encoding="utf-8", newline="") as f:
         if len(row) < 6:
             continue
         dt = datetime.strptime(row[0].strip(), "%Y.%m.%d %H:%M").replace(tzinfo=timezone.utc)
-        ts = int(dt.timestamp()*1000)
-        if DATE <= dt.strftime("%Y-%m-%d") < "2025-07-02":
+        # MT4 archive labels are UTC+3; normalize to UTC before matching.
+        utc_dt = dt - timedelta(hours=3)
+        ts = int(utc_dt.replace(tzinfo=timezone.utc).timestamp()*1000)
+        if DATE <= utc_dt.strftime("%Y-%m-%d") < "2025-07-02":
             mt4[ts] = tuple(Decimal(x.strip()) for x in row[1:6])
 
 comparisons = []
@@ -79,8 +81,10 @@ for ts in sorted(set(bars) & set(mt4)):
         "mt4_ohlc":[str(x) for x in mt4_ohlc],
         "max_abs_price_diff":str(max(diffs)),
         "exact_ohlc_match":all(d==0 for d in diffs),
+        "within_one_tick":max(diffs) <= Decimal("0.10"),
         "official_base_volume":str(b["volume"]),
         "mt4_volume":str(m[4]),
+        "volume_diff":str(abs(b["volume"]-m[4])),
     })
 
 result = {
@@ -90,6 +94,8 @@ result = {
     "linear_trade_hours":len(bars),"mt4_hours_on_date":sum(1 for t in mt4 if datetime.fromtimestamp(t/1000,timezone.utc).strftime("%Y-%m-%d")==DATE),
     "overlap_hours":len(comparisons),
     "exact_ohlc_hours":sum(1 for x in comparisons if x["exact_ohlc_match"]),
+    "within_one_tick_hours":sum(1 for x in comparisons if x["within_one_tick"]),
+    "max_volume_diff":max((Decimal(x["volume_diff"]) for x in comparisons),default=Decimal("0")).__str__(),
     "max_abs_price_diff":max((Decimal(x["max_abs_price_diff"]) for x in comparisons),default=Decimal("0")).__str__(),
     "comparisons":comparisons,
 }

@@ -1,13 +1,7 @@
 name: Bybit official trade archive cross-check
-# Two bounded daily samples (BTCUSDT). Public market data only; no credentials, account data, orders or PnL.
+# Manually dispatched bounded sample. Public market data only; no credentials, account data, orders or PnL.
 
 on:
-  push:
-    branches:
-      - research/market-regime-v1-main
-    paths:
-      - "scripts/compare_bybit_official_trade_archive.py"
-      - ".github/workflows/bybit-official-trade-archive-crosscheck.yml"
   workflow_dispatch:
 
 permissions:

@@ -8,7 +8,7 @@ from scripts.collect_bybit_announcements import canonical_url, parse_page, class
 
 class AnnouncementCollectorTests(unittest.TestCase):
     def test_page_parser_extracts_article_and_page_numbers(self):
-        html = b'''<a href="/article/listing-foo/">FooUSDT Perpetual listing</a>
+        html = b'''<a href="/en/article/listing-foo/?category=new_crypto">FooUSDT Perpetual listing</a>
         <ul class="ant-pagination">
         <li title="1" class="ant-pagination-item ant-pagination-item-1"><a>1</a></li>
         <li title="5" class="ant-pagination-item ant-pagination-item-5"><a>5</a></li>
@@ -16,7 +16,7 @@ class AnnouncementCollectorTests(unittest.TestCase):
         </ul>'''
         pages, articles = parse_page(html, page_url("new_crypto", 1))
         self.assertEqual(pages, 25)
-        self.assertIn("https://announcements.bybit.com/article/listing-foo", articles)
+        self.assertIn("https://announcements.bybit.com/en/article/listing-foo", articles)
     def test_canonical_url_rejects_external_hosts(self):
         with self.assertRaises(ValueError):
             canonical_url("https://example.com/en/article/not-bybit")

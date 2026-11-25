@@ -1,32 +1,87 @@
 #!/usr/bin/env python3
 """Cross-check four monthly Bybit BTCUSDT trade days across two providers.
 
-Tardis offers first-of-month sample days. CryptoHFTData hourly downloads are
-paced below its anonymous 60-files/minute limit. Raw files stay temporary.
+CryptoHFTData historical objects may be outer Zstandard-wrapped Parquet, while
+newer objects may be raw Parquet. The loader detects both formats. Hourly
+requests are paced below the anonymous 60-files/minute limit.
 """
 from __future__ import annotations
 
 import csv
 import gzip
+import hashlib
 import json
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections import Counter
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import zstandard
 
-from compare_bybit_trade_archives import dec, download, multiset_diff
+from compare_bybit_trade_archives import dec, multiset_diff
 
 DATES = ("2025-07-01", "2025-12-01", "2026-04-01", "2026-11-01")
 HOURS = tuple(f"{hour:02d}" for hour in range(24))
 SYMBOL = "BTCUSDT"
-CHD_BASE = "https://api.cryptohftdata.com/download"
+CHD_BASE = "https://api.cryptohftdata.com/v1/download"
 TARDIS_BASE = "https://datasets.tardis.dev/v1/bybit/trades"
+MAX_TARDIS_BYTES = 250 * 1024 * 1024
+MAX_CHD_BYTES = 50 * 1024 * 1024
+
+
+def file_url(base: str, file_path: str) -> str:
+    return base + "?" + urllib.parse.urlencode({"file": file_path})
+
+
+def download(url: str, path: Path, max_bytes: int) -> dict:
+    request = urllib.request.Request(url, headers={"User-Agent": "bybit-monthly-crosscheck/1.0"})
+    digest = hashlib.sha256()
+    total = 0
+    with urllib.request.urlopen(request, timeout=180) as response, path.open("wb") as out:
+        if response.status != 200:
+            raise RuntimeError(f"unexpected HTTP status {response.status}")
+        expected = response.headers.get("Content-Length")
+        content_type = response.headers.get("Content-Type")
+        final_url = response.geturl()
+        while True:
+            chunk = response.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise RuntimeError(f"file exceeds safety limit {max_bytes} bytes")
+            out.write(chunk)
+            digest.update(chunk)
+    if expected is not None and total != int(expected):
+        raise RuntimeError(f"size mismatch expected={expected} actual={total}")
+    return {"bytes": total, "sha256": digest.hexdigest(),
+            "content_type": content_type, "final_url": final_url}
+
+
+def normalize_parquet(path: Path) -> tuple[Path, str]:
+    with path.open("rb") as stream:
+        magic = stream.read(4)
+    if magic == b"PAR1":
+        return path, "raw_parquet"
+    if magic == b"\x28\xb5\x2f\xfd":
+        decoded = path.with_name(path.stem + ".decoded.parquet")
+        with path.open("rb") as source, decoded.open("wb") as target:
+            zstandard.ZstdDecompressor().copy_stream(source, target)
+        with decoded.open("rb") as stream:
+            prefix = stream.read(4)
+            stream.seek(-4, 2)
+            suffix = stream.read(4)
+        if prefix != b"PAR1" or suffix != b"PAR1":
+            raise ValueError("Zstandard payload is not a complete Parquet file")
+        return decoded, "zstd_wrapped_parquet"
+    raise ValueError(f"unknown Parquet container magic: {magic.hex()}")
 
 
 def tardis_url(date: str) -> str:
@@ -36,7 +91,7 @@ def tardis_url(date: str) -> str:
 
 def chd_url(date: str, hour: str) -> str:
     file_path = f"bybit/{date}/{hour}/{SYMBOL}_trades.parquet"
-    return CHD_BASE + "?" + urllib.parse.urlencode({"file": file_path})
+    return file_url(CHD_BASE, file_path)
 
 
 def load_tardis_day(path: Path) -> tuple[dict[str, Counter], int]:
@@ -85,7 +140,9 @@ def main() -> int:
             day_report = {"hours": {}}
             tardis_path = root / f"tardis_{date}.csv.gz"
             try:
-                day_report["tardis_download"] = download(tardis_url(date), tardis_path)
+                day_report["tardis_download"] = download(
+                    tardis_url(date), tardis_path, MAX_TARDIS_BYTES
+                )
                 tardis_by_hour, unknown_sides = load_tardis_day(tardis_path)
                 day_report["tardis_unknown_side_rows"] = unknown_sides
                 day_report["tardis_rows"] = sum(sum(c.values()) for c in tardis_by_hour.values())
@@ -104,10 +161,11 @@ def main() -> int:
                     if request_count:
                         time.sleep(1.05)
                     request_count += 1
-                    url = chd_url(date, hour)
                     parquet_path = root / f"chd_{date}_{hour}.parquet"
-                    item["download"] = download(url, parquet_path)
-                    table = pq.read_table(parquet_path)
+                    item["download"] = download(chd_url(date, hour), parquet_path,
+                                                 MAX_CHD_BYTES)
+                    normalized_path, container = normalize_parquet(parquet_path)
+                    table = pq.read_table(normalized_path)
                     expected = ["received_time", "event_time", "symbol", "trade_id",
                                 "price", "quantity", "trade_time", "is_buyer_maker",
                                 "order_type"]
@@ -123,7 +181,8 @@ def main() -> int:
                         key = (d["trade_time"][i], side, dec(d["price"][i]),
                                dec(d["quantity"][i]))
                         candidate[key] += 1
-                    item["crypto_rows"] = table.num_rows
+                    item["container"] = container
+                    item["parquet_rows"] = table.num_rows
                     item["trade_id_duplicates"] = len(ids) - len(set(ids))
                     item["comparison"] = multiset_diff(tardis_by_hour[hour], candidate)
                     item["status"] = "COMPARED"
@@ -131,6 +190,11 @@ def main() -> int:
                     total["matched_rows"] += item["comparison"]["matched_rows"]
                     total["missing_from_cryptohftdata"] += item["comparison"]["missing_from_cryptohftdata"]
                     total["extra_in_cryptohftdata"] += item["comparison"]["extra_in_cryptohftdata"]
+                except urllib.error.HTTPError as exc:
+                    item["status"] = "MISSING_OR_FAILED"
+                    item["error"] = f"HTTP {exc.code}: {exc.reason}"
+                    total["missing_hour_files"] += 1
+                    total["missing_from_cryptohftdata"] += hour_tardis_rows
                 except Exception as exc:
                     item["status"] = "MISSING_OR_FAILED"
                     item["error"] = f"{type(exc).__name__}: {exc}"

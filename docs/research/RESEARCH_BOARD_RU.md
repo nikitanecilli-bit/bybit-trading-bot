@@ -404,3 +404,12 @@
 - Independently extracted article text from raw HTML `__NEXT_DATA__.articleDetail`. The old inventory's 80/80 TradFi + DELIST labels were contaminated by page chrome and are false positives.
 - Body-only diagnostic reclassification found one target-symbol article among those first 80: a funding-rate formula update dated 2026-11-19, matching ADA/ARB/ATOM/AVAX/LTC/NEAR USDT tickers. Product type remains unknown; candidate event only.
 - This invalid first-page sample is parser QA only, not event coverage evidence. No D4/D5/D6 acceptance.
+
+
+### 2026-11-25 — dual-format announcement body extraction corrected; risk notices inventoried (Sections 57–58)
+
+- Re-audited the 1,275-article artifact and corrected a false alarm: Bybit stores body text in either `content_html` or Contentstack rich-text `content.json`. Counts: 721 HTML bodies, 554 rich-JSON bodies, 0 empty in both. The five previously flagged risk-limit articles were not missing; their rich-JSON bodies were present. The old five-gap claim is withdrawn and documented as a correction.
+- Updated collector and semantic validator to use HTML first, rich JSON fallback, track extraction source/character count, ignore script/style text, and require non-empty article text for `complete=true`.
+- Added regression coverage for rich JSON fallback, truly empty bodies, HTML parsing, script/style exclusion and byte-hash mismatch. An initial test fixture failed because it embedded a literal closing script tag inside JSON; escaped the fixture correctly. Check the latest CI run before treating the current branch head as green.
+- Offline review of the existing archive identified 63 risk-limit / position-tier / max-leverage candidates; 9 official notices intersect the 47-symbol proxy universe and cover 32 distinct proxy symbols. Event dates, effective times, buffer ends where stated, source links and raw body hashes are in `BYBIT_RISK_LIMIT_NOTICE_EVENT_INVENTORY_PARTIAL_2026-11-25_RU.md`.
+- This improves D6 event-date evidence but does not recover full tier thresholds / maintenance-margin rates. D4/D5/D6 remain PARTIAL / NOT ACCEPTED. No new public crawl, market API, private/account API, orders, PnL or backtests were run.

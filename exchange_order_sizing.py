@@ -28,6 +28,7 @@ def size_to_exchange_constraints(
     order_type: Literal["market", "limit"],
     side: Literal["buy", "sell"],
     price_is_execution: bool = False,
+    position_qty_cap: Decimal | str | float | None = None,
 ) -> ExchangeSizedOrder:
     """Floor quantity to qtyStep and reject all min/max exchange constraints.
 
@@ -59,6 +60,11 @@ def size_to_exchange_constraints(
         else ref
     )
     raw_qty = target / price
+    if position_qty_cap is not None:
+        cap = Decimal(str(position_qty_cap))
+        if not cap.is_finite() or cap <= 0:
+            raise ValueError("position_qty_cap must be finite and > 0")
+        raw_qty = min(raw_qty, cap)
     qty = spec.validate_order(raw_qty, price, order_type=order_type)
     notional = qty * price
     adjusted_risk = risk * notional / target

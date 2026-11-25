@@ -413,3 +413,13 @@
 - Added regression coverage for rich JSON fallback, truly empty bodies, HTML parsing, script/style exclusion and byte-hash mismatch. An initial test fixture failed because it embedded a literal closing script tag inside JSON; escaped the fixture correctly. Check the latest CI run before treating the current branch head as green.
 - Offline review of the existing archive identified 63 risk-limit / position-tier / max-leverage candidates; 9 official notices intersect the 47-symbol proxy universe and cover 32 distinct proxy symbols. Event dates, effective times, buffer ends where stated, source links and raw body hashes are in `BYBIT_RISK_LIMIT_NOTICE_EVENT_INVENTORY_PARTIAL_2026-11-25_RU.md`.
 - This improves D6 event-date evidence but does not recover full tier thresholds / maintenance-margin rates. D4/D5/D6 remain PARTIAL / NOT ACCEPTED. No new public crawl, market API, private/account API, orders, PnL or backtests were run.
+
+
+### 2026-11-25 — expanded dated tick-size and max-order-size history (Section 59)
+
+- Re-read official tables across both Bybit article formats (rendered HTML and rich-text JSON) from the existing 1,275-article capture.
+- Found 7 tick-size notices intersecting the 47-symbol proxy: 19 symbol/event rows across 14 symbols.
+- Found 8 maximum market/limit order-size notices intersecting the proxy: 29 symbol/event rows across 31 symbols.
+- Two January maximum-order-size notices conflict internally: titles/publication point to 2026, body text states 2025 effective dates. Preserved but quarantined; no silent date correction.
+- Detailed tables, effective timestamps, source URLs and raw body hashes: `BYBIT_DATED_PERPETUAL_PARAMETER_EVENTS_EXPANDED_PARTIAL_2026-11-25_RU.md`. The earlier parameter-event document is marked superseded.
+- D5 remains NOT ACCEPTED: this is partial historical parameter evidence, not a complete instrument-specification history. D6 remains NOT ACCEPTED: maximum order sizes and leverage notices are not risk-tier ladders. No trading, PnL or backtests.

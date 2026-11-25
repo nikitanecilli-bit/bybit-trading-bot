@@ -109,7 +109,8 @@ def backtest(rows, fold, arm, cost_mult, date_range=None):
             # Conservative OHLC ordering: stop is assumed before profit targets.
             if l<=stop:
                 px=min(o,stop) if o<stop else stop
-                _close_position(pos,px,ts,"stop_or_trail",cost_mult,trades); equity+=trades[-1]["net_pnl"]; pos=None
+                stop_reason = "trailing_stop" if pos["tp1"] else "initial_stop"
+                _close_position(pos,px,ts,stop_reason,cost_mult,trades); equity+=trades[-1]["net_pnl"]; pos=None
             else:
                 if not pos["tp1"] and h>=pos["tp1_price"]:
                     _partial_exit(pos,pos["tp1_price"],0.5,cost_mult)

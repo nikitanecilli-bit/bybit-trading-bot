@@ -255,7 +255,7 @@ def test_paired_donchian48_comparison_requires_three_exact_arms():
     base = {
         "fold": 1, "min_volume_ratio": 1.6, "min_breakout_atr": 0.1,
         "cost_multiplier": 2.0, "timeframe": "1h",
-        "symbol_list": "BTCUSDT;ETHUSDT", "symbols": 2,
+        "symbol_list": "BTCUSDT", "symbols": 1,
         "common_h1_bars": 4000, "test_start_ts": 1_000_000,
         "test_end_ts": 2_000_000, "shared_starting_capital": 10_000.0,
         "max_concurrent_positions": 5,
@@ -282,7 +282,7 @@ def test_paired_donchian48_rejects_missing_shared_invariant():
     base = {
         "fold": 1, "min_volume_ratio": 1.6, "min_breakout_atr": 0.1,
         "cost_multiplier": 2.0, "timeframe": "1h",
-        "symbol_list": "BTCUSDT;ETHUSDT", "symbols": 2,
+        "symbol_list": "BTCUSDT", "symbols": 1,
         "common_h1_bars": 4000, "test_end_ts": 2_000_000,
         "shared_starting_capital": 10_000.0, "max_concurrent_positions": 5,
         "volume_lookback_period": 20,
@@ -304,7 +304,7 @@ def test_paired_donchian48_rejects_missing_or_invalid_arm_metadata():
     base = {
         "fold": 1, "min_volume_ratio": 1.6, "min_breakout_atr": 0.1,
         "cost_multiplier": 2.0, "timeframe": "1h",
-        "symbol_list": "BTCUSDT;ETHUSDT", "symbols": 2,
+        "symbol_list": "BTCUSDT", "symbols": 1,
         "common_h1_bars": 4000, "test_start_ts": 1_000_000,
         "test_end_ts": 2_000_000, "shared_starting_capital": 10_000.0,
         "max_concurrent_positions": 5,
@@ -331,11 +331,11 @@ def test_paired_donchian48_rejects_missing_or_invalid_arm_metadata():
             raise AssertionError("missing or invalid arm metadata must fail closed")
 
 
-def test_donchian48_keeps_volume_baseline_fixed_at_20_bars():
+def test_donchian_arms_use_their_own_volume_lookback():
     cfg = em.BotConfig()
     cfg.timeframe = "1h"
     cfg.donchian_period = 48
-    cfg.volume_lookback_period = 20
+    cfg.volume_lookback_period = 48
     cfg.atr_period = 14
     cfg.min_volume_ratio = 1.6
     cfg.active_trading_pool = ["BTCUSDT"]
@@ -360,25 +360,27 @@ def test_donchian48_keeps_volume_baseline_fixed_at_20_bars():
         history, 20, volume_period=20,
     )
     hi48, lo48, avg48 = em.QuantStrategyCore.compute_donchian_and_volume(
-        history, 48, volume_period=20,
+        history, 48, volume_period=48,
     )
     assert (hi20, lo20) != (hi48, lo48)
-    assert avg20 == avg48 == 100.0
+    assert avg20 == 100.0
+    assert avg48 > avg20
 
     signals = []
     for period in (20, 48):
         cfg.donchian_period = period
+        cfg.volume_lookback_period = period
         signal = em.QuantStrategyCore.evaluate_signal("BTCUSDT", candles, cfg)
-        assert signal is not None
         signals.append(signal)
-    assert signals[0]["vol_ratio"] == signals[1]["vol_ratio"] == 3.0
+    assert signals[0] is not None
+    assert signals[1] is None
 
 
 def test_paired_donchian48_rejects_changed_volume_lookback():
     base = {
         "fold": 1, "min_volume_ratio": 1.6, "min_breakout_atr": 0.1,
         "cost_multiplier": 2.0, "timeframe": "1h",
-        "symbol_list": "BTCUSDT;ETHUSDT", "symbols": 2,
+        "symbol_list": "BTCUSDT", "symbols": 1,
         "common_h1_bars": 4000, "test_start_ts": 1_000_000,
         "test_end_ts": 2_000_000, "shared_starting_capital": 10_000.0,
         "max_concurrent_positions": 5, "volume_lookback_period": 20,
@@ -401,7 +403,7 @@ def test_three_arm_donchian48_manifest_pairs_ema_only_within_d48():
     base = {
         "fold": 1, "min_volume_ratio": 1.6, "min_breakout_atr": 0.1,
         "cost_multiplier": 2.0, "timeframe": "1h",
-        "symbol_list": "BTCUSDT;ETHUSDT", "symbols": 2,
+        "symbol_list": "BTCUSDT", "symbols": 1,
         "common_h1_bars": 4000, "test_start_ts": 1_000_000,
         "test_end_ts": 2_000_000, "shared_starting_capital": 10_000.0,
         "max_concurrent_positions": 5, "volume_lookback_period": 20,
@@ -440,7 +442,7 @@ if __name__ == "__main__":
         test_paired_donchian48_comparison_requires_three_exact_arms,
         test_paired_donchian48_rejects_missing_shared_invariant,
         test_paired_donchian48_rejects_missing_or_invalid_arm_metadata,
-        test_donchian48_keeps_volume_baseline_fixed_at_20_bars,
+        test_donchian_arms_use_their_own_volume_lookback,
         test_paired_donchian48_rejects_changed_volume_lookback,
         test_three_arm_donchian48_manifest_pairs_ema_only_within_d48,
     ]

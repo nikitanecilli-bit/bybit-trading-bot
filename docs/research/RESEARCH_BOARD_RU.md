@@ -58,7 +58,12 @@
 
 Tardis также проверен на однодневном BTCUSDT sample 2026-11-01: trades и L2 CSV прошли gzip/CSV проверку. Но его нормализованный L2 CSV не содержит Bybit `cts`/sequence IDs; для точного queue replay он уступает CryptoHFTData и остаётся вторичным источником.
 
-Первичная сверка с официальным архивом Bybit (run #45635501728, artifact #15032354048):
+Первичная сверка с официальным архивом Bybit, четыре даты (run #45636437695, artifact #15034026218):
+- 2025-07-01: Bybit 1 116 387; CHD 2 683 702; 521 missing / 1 567 836 extra; все 2 683 702 CHD trade_id=0, 0/1 115 866 ID совпали. REJECTED.
+- 2025-08-01: Bybit 2 360 261; CHD 2 360 132; 129 missing / 0 extra; все CHD IDs нулевые, 0 ID совпали. NOT ACCEPTED.
+- 2025-09-01: Bybit 1 606 155; CHD 1 606 086; 69 missing / 0 extra; все CHD IDs нулевые, 0 ID совпали. NOT ACCEPTED.
+- 2026-11-01: Bybit и CHD ровно 360 227; payload и все hashed IDs совпали. PASS только для этой даты.
+Вывод: нулевой trade_id установлен в трёх проверенных месяцах 2025, но не в ноябре 2026. Не делать payload dedup; 2025 sample закрыт для L2 replay. Требуется помесячно локализовать границу изменения качества.
 - 2025-07-01: Bybit public archive — 1 116 387 строк, 1 116 387 уникальных trdMatchID; CryptoHFTData — 2 683 702 строк, 1 115 866 совпало, 521 missing, 1 567 836 extra. Все CryptoHFTData trade_id=0; 0 из 1 115 866 сравнимых hashed IDs совпали с официальным UUID hash. Официальный файл SHA-256 9400f7fd7e378728cfbace7dadb8a507c9cba36a4a9a20cc658ce2a6187f8ea9. Июльский CHD trades REJECTED для replay.
 - 2026-11-01: Bybit — 360 227 уникальных trdMatchID; CryptoHFTData — 360 227, payload и все 360 227 hashed IDs совпали. Официальный SHA-256 debe50b76c47cd7bc5f8e82ee349619138486ca49893cfac057fccb9e5c59cc6. Положительный контроль только для этой даты.
 Event-time cross-check четырёх дневных окон Tardis/CryptoHFTData (соседние receive-hour partitions, группировка по trade_time UTC), run #45632069094:

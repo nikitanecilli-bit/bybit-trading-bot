@@ -15,10 +15,70 @@ from scripts.archive_bybit_market_history import (
     FUNDING_WINDOW_MS, fetch_funding_history, fetch_mark_klines, fetch_trade_klines,
     normalize_symbol, parse_funding_rows, parse_mark_rows, parse_trade_rows, validate_base_url,
     clip_range_to_lifecycle, load_universe_lifecycle, validate_archive_range, archive_symbol,
+    _request_json, validate_raw_response_manifest,
 )
 
 
 class BybitMarketHistoryTests(unittest.TestCase):
+    def test_raw_response_capture_and_manifest_detect_tampering(self):
+        body = (
+            b'{"retCode":0,"retMsg":"OK","result":{"list":[["3600000","1","2","1","2","3","6"]]}}'
+        )
+
+        class FakeResponse:
+            status = 200
+            headers = {
+                "Date": "Tue, 25 Nov 2026 00:00:00 GMT",
+                "Content-Type": "application/json",
+                "Content-Length": str(len(body)),
+            }
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return body
+
+        class FakeOpener:
+            def open(self, request, timeout):
+                self.request = request
+                return FakeResponse()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            records = []
+            with patch(
+                "scripts.archive_bybit_market_history.urllib.request.build_opener",
+                return_value=FakeOpener(),
+            ):
+                result = _request_json(
+                    "https://api.bybit.com", "/v5/market/kline",
+                    {"category": "linear", "symbol": "BTCUSDT", "interval": "60"},
+                    raw_evidence_dir=tmp, raw_records=records,
+                )
+            self.assertEqual(result["list"][0][0], "3600000")
+            self.assertEqual(len(records), 1)
+            record = records[0]
+            body_path = Path(tmp) / record["body_file"]
+            self.assertEqual(body_path.read_bytes(), body)
+            self.assertEqual(
+                hashlib.sha256(body_path.read_bytes()).hexdigest(),
+                record["body_sha256"],
+            )
+            manifest_path = Path(tmp) / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "schema_version": 1,
+                "source": "Bybit V5 public GET raw responses",
+                "records": records,
+            }), encoding="utf-8")
+            self.assertTrue(validate_raw_response_manifest(manifest_path)["ok"])
+            body_path.write_bytes(body + b" ")
+            report = validate_raw_response_manifest(manifest_path)
+            self.assertFalse(report["ok"])
+            self.assertIn("raw_body_hash_mismatch", report["errors"])
+
     def test_funding_fetches_bounded_windows_and_sorts_events(self):
         start, end = 10_000, 10_000 + FUNDING_WINDOW_MS + 10_000
         calls = []
@@ -70,7 +130,8 @@ class BybitMarketHistoryTests(unittest.TestCase):
             funding_requests = []
             mark_requests = []
 
-            def fake_funding(symbol, start_ms, end_ms, *, base_url, pause, audit_pages):
+            def fake_funding(symbol, start_ms, end_ms, *, base_url, pause, audit_pages,
+                             raw_evidence_dir=None, raw_records=None):
                 funding_requests.append((start_ms, end_ms))
                 audit_pages.append({
                     "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
@@ -88,7 +149,8 @@ class BybitMarketHistoryTests(unittest.TestCase):
                     },
                 ]
 
-            def fake_marks(symbol, start_ms, end_ms, interval, *, base_url, pause):
+            def fake_marks(symbol, start_ms, end_ms, interval, *, base_url, pause,
+                           raw_evidence_dir=None, raw_records=None, audit_pages=None):
                 mark_requests.append((start_ms, end_ms, interval))
                 return [
                     {
@@ -169,7 +231,8 @@ class BybitMarketHistoryTests(unittest.TestCase):
     def test_archive_symbol_cleans_partial_outputs_when_terminal_mark_is_unavailable(self):
         hour = 3_600_000
         with tempfile.TemporaryDirectory() as tmp:
-            def fake_funding(symbol, start_ms, end_ms, *, base_url, pause, audit_pages):
+            def fake_funding(symbol, start_ms, end_ms, *, base_url, pause, audit_pages,
+                             raw_evidence_dir=None, raw_records=None):
                 audit_pages.append({
                     "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
                     "response_rows": 2, "first_ts": start_ms, "last_ts": end_ms - 1,

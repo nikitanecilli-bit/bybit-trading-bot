@@ -264,7 +264,7 @@ def test_paired_donchian48_comparison_requires_three_exact_arms():
     }
     rows = []
     for period, ema, net in ((20, False, -100.0), (48, False, -60.0), (48, True, -30.0)):
-        row = dict(base, donchian_period=period, ema50_200_gate=ema, net_pnl=net)
+        row = dict(base, donchian_period=period, ema50_200_gate=ema, volume_lookback_period=period, net_pnl=net)
         rows.append(row)
     result = build_paired_donchian48_comparison(rows, enabled=True)
     assert result["pair_count"] == 1
@@ -289,7 +289,7 @@ def test_paired_donchian48_rejects_missing_shared_invariant():
         "net_pnl": -100.0, "trades": 40,
     }
     rows = [
-        dict(base, donchian_period=period, ema50_200_gate=ema)
+        dict(base, donchian_period=period, ema50_200_gate=ema, volume_lookback_period=period)
         for period, ema in ((20, False), (48, False), (48, True))
     ]
     try:
@@ -411,9 +411,9 @@ def test_three_arm_donchian48_manifest_pairs_ema_only_within_d48():
         "profit_factor": 0.8, "expectancy_r": -0.1,
     }
     rows = [
-        dict(base, donchian_period=20, ema50_200_gate=False, net_pnl=-100.0),
-        dict(base, donchian_period=48, ema50_200_gate=False, net_pnl=-60.0),
-        dict(base, donchian_period=48, ema50_200_gate=True, net_pnl=-30.0),
+        dict(base, donchian_period=20, ema50_200_gate=False, volume_lookback_period=20, net_pnl=-100.0),
+        dict(base, donchian_period=48, ema50_200_gate=False, volume_lookback_period=48, net_pnl=-60.0),
+        dict(base, donchian_period=48, ema50_200_gate=True, volume_lookback_period=48, net_pnl=-30.0),
     ]
     summaries = build_paired_h1_comparison_summaries(rows, {
         "ema50_200_gate_enabled": True,

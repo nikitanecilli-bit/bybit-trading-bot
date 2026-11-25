@@ -48,7 +48,11 @@ def download(day: date, depth: int):
                 if attempt == 3:
                     raise
                 time.sleep(2 ** attempt)
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    hasher = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(4 * 1024 * 1024), b""):
+            hasher.update(chunk)
+    digest = hasher.hexdigest()
     return url, path, digest
 
 def inspect(day: date):
@@ -87,6 +91,8 @@ def inspect(day: date):
                 except Exception:
                     malformed += 1
                     continue
+                if typ not in ("snapshot", "delta"):
+                    raise RuntimeError(f"Unexpected record type: {typ!r}")
                 counts[typ] += 1
                 if first_type is None:
                     first_type = typ

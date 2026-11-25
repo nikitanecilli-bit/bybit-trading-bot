@@ -19,6 +19,29 @@ from scripts.archive_bybit_market_history import (
 )
 
 
+def _append_fake_raw_response(raw_evidence_dir, raw_records, endpoint):
+    root = Path(raw_evidence_dir)
+    body = json.dumps({"endpoint": endpoint, "fixture": True}).encode("utf-8")
+    digest = hashlib.sha256(body).hexdigest()
+    body_file = f"bodies/{digest}.json"
+    request_id = hashlib.sha256(endpoint.encode("utf-8") + body).hexdigest()
+    record = {
+        "schema_version": 1, "request_id": request_id,
+        "request": {"method": "GET", "base_url": "https://api.bybit.com",
+                    "endpoint": endpoint, "params": {"fixture": True}},
+        "retrieved_at_utc": "2026-11-25T00:00:00Z", "http_status": 200,
+        "response_headers": {}, "body_bytes": len(body), "body_sha256": digest,
+        "body_file": body_file, "audit_file": f"requests/{request_id}.json",
+    }
+    body_path = root / body_file
+    body_path.parent.mkdir(parents=True, exist_ok=True)
+    body_path.write_bytes(body)
+    audit_path = root / record["audit_file"]
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    audit_path.write_text(json.dumps(record, sort_keys=True, indent=2) + "\\n", encoding="utf-8")
+    raw_records.append(record)
+
+
 class BybitMarketHistoryTests(unittest.TestCase):
     def test_raw_response_capture_and_manifest_detect_tampering(self):
         body = (
@@ -133,6 +156,7 @@ class BybitMarketHistoryTests(unittest.TestCase):
             def fake_funding(symbol, start_ms, end_ms, *, base_url, pause, audit_pages,
                              raw_evidence_dir=None, raw_records=None):
                 funding_requests.append((start_ms, end_ms))
+                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/funding/history")
                 audit_pages.append({
                     "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
                     "response_rows": 2, "first_ts": start_ms, "last_ts": end_ms - 1,
@@ -152,6 +176,7 @@ class BybitMarketHistoryTests(unittest.TestCase):
             def fake_marks(symbol, start_ms, end_ms, interval, *, base_url, pause,
                            raw_evidence_dir=None, raw_records=None, audit_pages=None):
                 mark_requests.append((start_ms, end_ms, interval))
+                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/mark-price-kline")
                 return [
                     {
                         "symbol": symbol, "timestamp_ms": hour,
@@ -162,6 +187,16 @@ class BybitMarketHistoryTests(unittest.TestCase):
                         "open": "101", "high": "103", "low": "100", "close": "102",
                     },
                 ]
+
+            def fake_trade(symbol, start_ms, end_ms, interval, *, base_url, pause,
+                           raw_evidence_dir=None, raw_records=None, audit_pages=None):
+                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/kline")
+                return [candle]
+
+            def fake_trade(symbol, start_ms, end_ms, interval, *, base_url, pause,
+                           raw_evidence_dir=None, raw_records=None, audit_pages=None):
+                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/kline")
+                return [candle]
 
             candle = {
                 "symbol": "BTCUSDT", "timestamp_ms": hour,
@@ -188,7 +223,7 @@ class BybitMarketHistoryTests(unittest.TestCase):
 
             with (
                 patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=fake_funding),
-                patch("scripts.archive_bybit_market_history.fetch_trade_klines", return_value=[candle]),
+                patch("scripts.archive_bybit_market_history.fetch_trade_klines", side_effect=fake_trade),
                 patch("scripts.archive_bybit_market_history.fetch_mark_klines", side_effect=fake_marks),
             ):
                 result = archive_symbol(
@@ -233,6 +268,7 @@ class BybitMarketHistoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             def fake_funding(symbol, start_ms, end_ms, *, base_url, pause, audit_pages,
                              raw_evidence_dir=None, raw_records=None):
+                _append_fake_raw_response(raw_evidence_dir, raw_records, "/v5/market/funding/history")
                 audit_pages.append({
                     "request_start_ms": start_ms, "request_end_ms": end_ms - 1,
                     "response_rows": 2, "first_ts": start_ms, "last_ts": end_ms - 1,
@@ -278,7 +314,7 @@ class BybitMarketHistoryTests(unittest.TestCase):
 
             with (
                 patch("scripts.archive_bybit_market_history.fetch_funding_history", side_effect=fake_funding),
-                patch("scripts.archive_bybit_market_history.fetch_trade_klines", return_value=[candle]),
+                patch("scripts.archive_bybit_market_history.fetch_trade_klines", side_effect=fake_trade),
                 patch(
                     "scripts.archive_bybit_market_history.fetch_mark_klines",
                     side_effect=RuntimeError("terminal Mark candle is not closed"),

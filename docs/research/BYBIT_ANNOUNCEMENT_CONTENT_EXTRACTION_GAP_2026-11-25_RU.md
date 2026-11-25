@@ -1,42 +1,54 @@
-# Bybit Announcement Inventory — Content Extraction Gap
+# Bybit Announcement Content QA — Correction and Resolution
 
-**Date:** 2026-11-25  
-**Workflow run:** [45586354775](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45586354775)  
-**Artifact:** `bybit-public-announcement-inventory`  
-**Scope:** Independent QA of the downloaded artifact, not a new crawl.
+**Review date:** 2026-11-25  
+**Source workflow:** [45586354775](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45586354775)  
+**Artifact:** `bybit-public-announcement-inventory` (1,275 article pages; artifact SHA-256 `2145c610aa4a5b963981fc7eee08f6f218ae4d067e80327cc40ed59ea6b694fe`)
 
-## Finding
+## Correction to the earlier five-article finding
 
-The inventory has 1,275 article records and 1,275 captured article HTML bodies, but **five articles have an empty `articleDetail.content_html` field** in the embedded `__NEXT_DATA__` payload. Their raw HTML pages are present and their byte hashes/sizes match the manifest; therefore this is a content-extraction gap, not a missing or corrupted download.
+The earlier version of this report incorrectly treated an empty `articleDetail.content_html` field as proof that an article had no body. That conclusion was wrong.
 
-Corrected interpretation:
-- 1,270/1,275 article payloads contain non-empty visible article text.
-- 5/1,275 have no visible article text in `content_html`.
-- All 1,275 have a publication timestamp.
-- The collector currently labels all records with `content_extraction=next_data_articleDetail.content_html` even when the field is empty, and its `complete` condition checks page capture/failures but not non-empty article text. Therefore the workflow's `complete=true` is too permissive for semantic completeness.
-- All five gaps are risk-limit announcement candidates. Their symbol matches are title-derived only and must not be used to establish the content, values, or effective terms of the risk change.
+Bybit stores article content in two formats:
+1. rendered HTML in `articleDetail.content_html`;
+2. Contentstack rich-text JSON in `articleDetail.content.json`.
 
-## Affected articles
+Independent inspection of all 1,275 captured article payloads found:
 
-| Published timestamp | Title | Title-matched proxy symbols | Raw body SHA-256 |
-|---|---|---|---|
-| 2026-06-29T11:53:30+08:00 | Risk limit adjustment for selected Perpetual Contracts HBARUSDT,ROSEUSDT...(Jun 30, 2026) | HBARUSDT | `60fb043647255f4dacca93eb1cabf0fe376c76097c9632572ea0d7984dbce55a` |
-| 2026-01-21T22:06:30+08:00 | Risk limit adjustment for selected Perpetual Contracts ONTUSDT,QNTUSDT...(Jan 23, 2026) | QNTUSDT | `68cf36088690ac689f010377dea366e8c6dd3f987a5da6e687d9223d1fdacf73` |
-| 2026-06-11T15:00:50+08:00 | Risk limit adjustment for selected Perpetual Contracts PAXGUSDT,GALAUSDT...(Jun 12, 2026) | PAXGUSDT | `464a8b90878e3b5df0a10805d4ed1fcb6e62d4e655c2eb1d969e9d7263780079` |
-| 2026-04-27T19:12:10+08:00 | Risk limit adjustment for selected Perpetual Contracts POLUSDT,ALGOUSDT...(Apr 28, 2026) | ALGOUSDT, POLUSDT | `facbc01dceadfc70c7f63cbefb7dd4483f35ea357805105271cdbbc7f20397da` |
-| 2026-04-01T20:20:10+08:00 | Risk limit adjustment for selected Perpetual Contracts XRPUSDT,XAGUSDT...(Apr 2, 2026) | XRPUSDT | `1e1cd8d11a9d55faf7f80a4b8cec8aff2c845f3a39eae0ea4fb0c2886a0aec61` |
+| Content source | Articles |
+|---|---:|
+| Non-empty `content_html` | 721 |
+| Empty `content_html`, non-empty `content.json` | 554 |
+| Empty in both formats | 0 |
+| **Total with visible article text** | **1,275 / 1,275** |
 
-The exact source pages are preserved in the artifact under the corresponding `articles/*.html` paths. The original article HTML itself does not contain a populated `content_html` value in its structured payload.
+The five risk-limit articles listed in the previous version all contain their full body text in `content.json`; their raw-body SHA-256 values remain valid. They are not missing articles and must not be reported as content-extraction failures.
 
-## Required correction
+The earlier claim that five pages had no visible text, and the proposed treatment of those five as unresolved gaps, is superseded by this correction.
 
-1. Change `extract_article_payload` to reject empty/whitespace-only `content_html` or content with no visible text.
-2. Let the existing per-article exception path record these as extraction failures. Keep the raw HTML capture even when extraction fails.
-3. Add a regression test for an empty `content_html` payload.
-4. Define semantic completeness as: all category pages captured, every unique article HTML captured, every article payload parsed, and every article has non-empty visible content. A run with any empty article body must be `complete=false`.
-5. Re-run the offline tests and bounded public crawl. Do not silently drop these five records or infer their contents from titles/current market API.
-6. Keep D6 (dated risk-limit tiers) **NOT ACCEPTED** until these and other candidate articles are recovered and the actual tier values/effective times are independently checked.
+## Corrective implementation
+
+The collector now:
+- prefers `content_html` when it contains visible text;
+- falls back to recursively extracting ordered text nodes from `content.json`;
+- records which source was used and the extracted text length;
+- ignores script/style text when parsing HTML;
+- includes non-empty article text in the collector's own `complete` condition.
+
+The semantic validator uses the same extractor. It continues to fail closed for a genuinely empty article, missing body, unsafe path, parse failure, or raw-byte hash/size mismatch.
+
+Regression tests cover HTML extraction, rich-text JSON fallback, truly empty content, and raw-byte hash mismatch.
+
+## What this does and does not prove
+
+- The existing artifact has 1,275/1,275 article pages captured and byte-integrity metadata in its manifest.
+- The independent content-format audit found visible text for all 1,275 pages using the two supported payload fields.
+- This is not a new crawl. The corrected extractor still needs to be exercised by the next manual full-archive run.
+- Archive-page pagination counts are the observed 2026-11-25 baseline, not proof that Bybit exposes every historical announcement.
+- The 47-symbol set remains a proxy universe, not a verified historical Bybit universe.
 
 ## Gate impact
 
-This finding does not invalidate the raw-byte integrity result or the 66 category-page / 1,275 article-page download counts. It narrows what can be claimed: the artifact is byte-complete against its manifest, but not semantically complete for article content. The five affected candidate articles cannot support D6 evidence in their current form.
+The five-page extraction-gap finding is **RESOLVED / WITHDRAWN**. This correction does not change the separate research gates:
+- **D4 — NOT ACCEPTED:** historical listing/delisting lifecycle is not yet complete.
+- **D5 — NOT ACCEPTED:** dated instrument parameter history remains partial.
+- **D6 — NOT ACCEPTED:** risk-limit notices provide dated change events and affected-symbol evidence, but not a complete historical tier ladder with notional thresholds and maintenance-margin rates.

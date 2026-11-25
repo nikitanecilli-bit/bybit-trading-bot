@@ -206,7 +206,7 @@ def validate_semantics(manifest_path: str | Path) -> dict[str, Any]:
                 continue
             csv_path = (path.parent / item["path"]).resolve()
             try:
-                csv_path.relative_to(path.parent.parent.resolve())
+                csv_path.relative_to(path.parent.parent.parent.resolve())
                 if not csv_path.is_file():
                     raise OSError("missing")
                 if not _compare_normalized_csv(csv_path, reconstructed[stream]):

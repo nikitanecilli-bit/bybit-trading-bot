@@ -12,7 +12,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scripts.bybit_raw_evidence import (
-    capture_response, validate_evidence_manifest, write_evidence_manifest,
+    assert_snapshot_paths_available, capture_response, finalize_snapshot_evidence,
+    validate_evidence_manifest, write_evidence_manifest,
 )
 from scripts.snapshot_bybit_instruments import _request_page as instrument_request
 from scripts.snapshot_bybit_risk_limits import _request_page as risk_request
@@ -78,6 +79,36 @@ class RawEvidenceTests(unittest.TestCase):
             report = validate_evidence_manifest(manifest)
             self.assertFalse(report["ok"])
             self.assertIn("raw_body_hash_mismatch", report["errors"])
+
+    def test_finalize_snapshot_rebases_paths_and_refuses_overwrite(self):
+        body = b'{"retCode":0,"result":{"list":[]}}'
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            records = []
+            record = capture_response(
+                body, base_url="https://api.bybit.com",
+                endpoint="/v5/market/risk-limit", params={"category": "linear"},
+                http_status=200, response_headers={},
+                evidence_dir=root / "raw_evidence" / "pending", records=records,
+            )
+            output = root / "2026-11-25T08-00-00Z.json"
+            output.write_text('{"tiers":[]}', encoding="utf-8")
+            assert_snapshot_paths_available(root, "2026-11-25T08-00-00Z")
+            manifest = finalize_snapshot_evidence(
+                root, "2026-11-25T08-00-00Z", source="fixture",
+                category="linear", normalized_output=output, records=records,
+                collection_pages=[{
+                    "page_index": 1,
+                    "raw_response_request_id": record["request_id"],
+                    "raw_response_body_sha256": record["body_sha256"],
+                }],
+            )
+            report = validate_evidence_manifest(manifest)
+            self.assertTrue(report["ok"], report["errors"])
+            self.assertTrue((root / records[0]["body_file"]).is_file())
+            self.assertTrue((root / records[0]["audit_file"]).is_file())
+            with self.assertRaises(FileExistsError):
+                assert_snapshot_paths_available(root, "2026-11-25T08-00-00Z")
 
     def test_normalized_output_tampering_is_detected(self):
         with tempfile.TemporaryDirectory() as tmp:

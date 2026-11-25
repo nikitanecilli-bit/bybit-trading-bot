@@ -8,7 +8,7 @@ Artifact: preliminary-bybit-initial-stop-sensitivity (54 configurations)
 Official Bybit public H1 archives only. Fixed Arm C: Donchian 48, EMA50 > EMA200, EMA200 rising over 5 bars, close > EMA200, volume ratio 1.6. Tested initial stops 2.5 / 3.0 / 3.5 ATR(14), folds 50–65%, 65–80%, 80–100%, cost multipliers 1.0 / 1.5 / 2.0. Position quantity is recalculated from each fold's current equity to target 1% nominal initial risk. TP1=2R on 50%, TP2=5R on remainder, 3 ATR trailing after TP1, time exit 32 bars. One position at a time.
 
 ## Aggregate results
-Net PnL below is the arithmetic sum of the three independent fold PnLs (each fold starts with 10,000 USDT); it is not a compounded portfolio return.
+Net PnL below is the arithmetic sum of the three independent fold PnLs (each fold starts with 10,000 USDT); it is not a compounded portfolio return. Compounded returns below are calculated by chaining the three reported fold returns, as a comparison aid only; folds remain separate historical slices.
 
 ### BTCUSDT
 | Stop | Trades | Net 1x | Net 1.5x | Net 2x | Positive folds 1x | Worst fold 1x |
@@ -16,6 +16,13 @@ Net PnL below is the arithmetic sum of the three independent fold PnLs (each fol
 | 2.5 ATR | 151 | +1,385.98 | +510.01 | -337.59 | 2/3 | -0.45% |
 | 3.0 ATR | 149 | +1,686.02 | +954.20 | +241.87 | 2/3 | -0.51% |
 | 3.5 ATR | 143 | +1,781.51 | +1,169.16 | +570.50 | 3/3 | +0.46% |
+
+Compounded fold return:
+| Stop | 1x | 1.5x | 2x |
+|---|---:|---:|---:|
+| 2.5 ATR | +14.22% | +4.74% | -3.94% |
+| 3.0 ATR | +17.48% | +9.38% | +1.82% |
+| 3.5 ATR | +18.60% | +11.77% | +5.32% |
 
 At 2x costs, BTC fold returns:
 - 2.5 ATR: +6.20%, -0.28%, -9.29%.
@@ -28,6 +35,13 @@ At 2x costs, BTC fold returns:
 | 2.5 ATR | 112 | +756.47 | +303.71 | -142.54 | 2/3 | -3.75% |
 | 3.0 ATR | 108 | +723.10 | +358.37 | -2.10 | 2/3 | -1.99% |
 | 3.5 ATR | 108 | +483.70 | +173.65 | -133.31 | 2/3 | -1.12% |
+
+Compounded fold return:
+| Stop | 1x | 1.5x | 2x |
+|---|---:|---:|---:|
+| 2.5 ATR | +7.45% | +2.80% | -1.65% |
+| 3.0 ATR | +7.19% | +3.43% | -0.19% |
+| 3.5 ATR | +4.81% | +1.64% | -1.42% |
 
 ETH does not validate a wider stop as a general asset-independent improvement. At 1.5x and 2x costs, the 3.0 ATR aggregate is marginally best, but it is not consistently profitable across folds.
 

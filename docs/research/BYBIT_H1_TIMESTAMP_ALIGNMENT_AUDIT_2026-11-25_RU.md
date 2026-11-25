@@ -49,3 +49,18 @@ Absence of an RPI column is recorded as missing metadata, not interpreted as pro
 ## Consequence for strategy research
 
 Do not use the old raw MT4 archive timestamps as UTC. Use only the normalized loader output. Re-run any analysis that joins candles to trades, book updates, funding, or fixed calendar windows. Index-based OHLCV return statistics are expected to be largely unchanged, but their reported UTC boundaries and any time-of-day/session analysis require corrected data.
+
+
+## Post-correction revalidation
+
+The corrected loader was then re-run against the same 12 daily trade samples:
+- Best alignment after normalization: 0 hours.
+- Matched hourly buckets: 288.
+- Median absolute volume difference: 0%.
+- p95 absolute difference: 0.30278938%.
+- Maximum absolute difference: 3.12529891%.
+- Per-day best alignment: 0 hours on all 12 dates, including December samples.
+
+This confirms the loader now writes timestamps on the UTC clock and does not need a seasonal timezone rule.
+
+The 2025-11-02 sample includes an RPI column. No rows in the sampled file were marked as RPI by the parser. Older sampled files do not contain that column, so absence of the flag is treated as unavailable metadata, not as evidence of zero RPI activity.

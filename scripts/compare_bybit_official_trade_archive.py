@@ -212,6 +212,8 @@ def compare_ids(reference: dict, candidate: dict) -> dict:
 
 
 def main() -> int:
+    if fnv1a_bybit_id("caa63c3c-3c80-540f-8364-ea18a6824a70") != 2580710057459900140:
+        raise RuntimeError("CryptoHFTData documented FNV-1a example does not match")
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "symbol": SYMBOL,

@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv, json, math, os
 from pathlib import Path
 from datetime import datetime, timezone
+from bisect import bisect_left, bisect_right
 
 DATA = Path(os.getenv("BYBIT_H1_CSV", "bybit_btcusdt_initial/trade_h1.csv"))
 OUT = Path("preliminary_backtest")
@@ -62,13 +63,20 @@ def atr_at(rows, i, period=14):
         tr.append(max(rows[j][2]-rows[j][3],abs(rows[j][2]-prev),abs(rows[j][3]-prev)))
     return sum(tr)/period
 
-def backtest(rows, fold, arm, cost_mult):
+def backtest(rows, fold, arm, cost_mult, date_range=None):
     period, use_ema, arm_name=arm
     # Folds are indexed over the complete chronological archive. Segment breaks
     # are respected; indicators only use bars from the current contiguous segment.
     n=len(rows)
-    lo,hi={1:(.50,.65),2:(.65,.80),3:(.80,1.00)}[fold]
-    start_idx=int(n*lo); end_idx=max(start_idx+1,int(n*hi))
+    if date_range is None:
+        lo,hi={1:(.50,.65),2:(.65,.80),3:(.80,1.00)}[fold]
+        start_idx=int(n*lo); end_idx=max(start_idx+1,int(n*hi))
+    else:
+        timestamps=[r[0] for r in rows]
+        start_idx=bisect_left(timestamps,date_range[0])
+        end_idx=bisect_right(timestamps,date_range[1])
+        if start_idx>=end_idx:
+            raise ValueError(f"No rows in requested date range: {date_range}")
     score_start=rows[start_idx][0]; score_end=rows[min(end_idx-1,n-1)][0]
     volumes=[r[5] for r in rows]
     ema50=[None]*len(rows); ema200=[None]*len(rows)

@@ -1,4 +1,5 @@
 name: CryptoHFTData Bybit one-hour sample inspection
+# One-hour public sample only; raw Parquet is not retained as a public artifact.
 
 on:
   push:

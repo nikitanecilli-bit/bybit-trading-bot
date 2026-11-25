@@ -63,7 +63,7 @@ def atr_at(rows, i, period=14):
         tr.append(max(rows[j][2]-rows[j][3],abs(rows[j][2]-prev),abs(rows[j][3]-prev)))
     return sum(tr)/period
 
-def backtest(rows, fold, arm, cost_mult, date_range=None):
+def backtest(rows, fold, arm, cost_mult, date_range=None, stop_atr=2.5):
     period, use_ema, arm_name=arm
     # Folds are indexed over the complete chronological archive. Segment breaks
     # are respected; indicators only use bars from the current contiguous segment.
@@ -140,7 +140,7 @@ def backtest(rows, fold, arm, cost_mult, date_range=None):
                     signal=signal and ema50[i] is not None and ema200[i] is not None and ema200[i-5] is not None and ema50[i]>ema200[i] and ema200[i]>ema200[i-5] and c>ema200[i]
                 if signal:
                     en=rows[i+1][1]
-                    stop=en-2.5*a
+                    stop=en-stop_atr*a
                     risk_per_unit=en-stop
                     qty=(equity*RISK_FRACTION)/risk_per_unit if risk_per_unit>0 else 0
                     if qty>0:
@@ -163,7 +163,7 @@ def backtest(rows, fold, arm, cost_mult, date_range=None):
     for t in trades:
         eq+=t["net_pnl"]; peak=max(peak,eq); maxdd=max(maxdd,(peak-eq)/peak*100 if peak else 0)
     return {"fold":fold,"arm":arm_name,"donchian":period,"ema_gate":use_ema,"volume_lookback":period,
-            "volume_threshold":VOL_THRESHOLD,"cost_multiplier":cost_mult,"start_utc":utc(score_start),
+            "volume_threshold":VOL_THRESHOLD,"stop_atr":stop_atr,"cost_multiplier":cost_mult,"start_utc":utc(score_start),
             "end_utc":utc(score_end),"bars_in_fold":end_idx-start_idx,"trades":len(trades),
             "wins":wins,"win_rate_pct":round(wins/len(trades)*100,2) if trades else 0,
             "gross_pnl_usdt":round(gross,2),"costs_usdt":round(costs,2),"net_pnl_usdt":round(net,2),

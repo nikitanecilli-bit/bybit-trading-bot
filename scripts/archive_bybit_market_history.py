@@ -90,31 +90,62 @@ def _atomic_write_bytes(path: Path, content: bytes) -> None:
 
 
 def validate_raw_response_manifest(manifest_path: str | Path) -> dict[str, Any]:
-    """Verify the immutable raw response bodies and their request audit records."""
+    """Verify raw bodies, one-to-one page links, and normalized archive outputs."""
     manifest_path = Path(manifest_path)
     errors: list[str] = []
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {"ok": False, "errors": ["manifest_missing_or_invalid"], "records": 0}
-    if manifest.get("schema_version") != 1 or manifest.get("source") != "Bybit V5 public GET raw responses":
-        errors.append("manifest_identity_invalid")
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != 1 or manifest.get("source") != "Bybit V5 public GET raw responses":
+        return {"ok": False, "errors": ["manifest_identity_invalid"], "records": 0}
+
     records = manifest.get("records")
+    pages_by_stream = manifest.get("collection_pages")
+    normalized = manifest.get("normalized_outputs")
     if not isinstance(records, list) or not records:
-        return {"ok": False, "errors": errors + ["records_missing"], "records": 0}
-    root = manifest_path.parent.resolve()
+        errors.append("records_missing")
+        records = []
+    required_streams = ("funding", "trade_kline", "mark_price")
+    if not isinstance(pages_by_stream, dict) or set(pages_by_stream) != set(required_streams):
+        errors.append("collection_streams_invalid")
+        pages_by_stream = {}
+    if not isinstance(normalized, dict) or set(normalized) != {"funding_csv", "trade_kline_csv", "mark_price_csv"}:
+        errors.append("normalized_outputs_invalid")
+        normalized = {}
+
+    raw_root = manifest_path.parent.resolve()
+    archive_root = raw_root.parent.parent
+    records_by_id: dict[str, dict[str, Any]] = {}
     for record in records:
         if not isinstance(record, dict):
             errors.append("record_invalid")
             continue
+        request_id = record.get("request_id")
+        if not isinstance(request_id, str) or not request_id:
+            errors.append("request_id_missing")
+            continue
+        if request_id in records_by_id:
+            errors.append("duplicate_request_id")
+        records_by_id[request_id] = record
+        request = record.get("request")
+        if not isinstance(request, dict) or request.get("method") != "GET":
+            errors.append("request_identity_invalid")
+        if type(record.get("http_status")) is not int or record["http_status"] != 200:
+            errors.append("http_status_not_200")
+        digest = record.get("body_sha256")
+        if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+            errors.append("body_hash_invalid")
+        if type(record.get("body_bytes")) is not int or record["body_bytes"] < 0:
+            errors.append("body_size_invalid")
         for key in ("body_file", "audit_file"):
             relative = record.get(key)
             if not isinstance(relative, str) or not relative:
                 errors.append(f"{key}_missing")
                 continue
-            target = (root / relative).resolve()
+            target = (raw_root / relative).resolve()
             try:
-                target.relative_to(root)
+                target.relative_to(raw_root)
             except ValueError:
                 errors.append(f"{key}_escapes_manifest_root")
                 continue
@@ -122,8 +153,11 @@ def validate_raw_response_manifest(manifest_path: str | Path) -> dict[str, Any]:
                 errors.append(f"{key}_not_found")
                 continue
             if key == "body_file":
-                if hashlib.sha256(target.read_bytes()).hexdigest() != record.get("body_sha256"):
+                body = target.read_bytes()
+                if hashlib.sha256(body).hexdigest() != digest:
                     errors.append("raw_body_hash_mismatch")
+                if len(body) != record.get("body_bytes"):
+                    errors.append("raw_body_size_mismatch")
             else:
                 try:
                     audit = json.loads(target.read_text(encoding="utf-8"))
@@ -132,6 +166,71 @@ def validate_raw_response_manifest(manifest_path: str | Path) -> dict[str, Any]:
                     continue
                 if audit != record:
                     errors.append("audit_record_content_mismatch")
+
+    referenced: list[str] = []
+    for stream in required_streams:
+        pages = pages_by_stream.get(stream)
+        if not isinstance(pages, list) or not pages:
+            errors.append(f"{stream}_pages_missing")
+            continue
+        for page in pages:
+            if not isinstance(page, dict):
+                errors.append("collection_page_invalid")
+                continue
+            request_id = page.get("raw_response_request_id")
+            body_hash = page.get("raw_response_body_sha256")
+            audit_file = page.get("raw_response_audit_file")
+            if not isinstance(request_id, str) or not request_id:
+                errors.append("collection_page_request_id_missing")
+                continue
+            referenced.append(request_id)
+            record = records_by_id.get(request_id)
+            if record is None:
+                errors.append("collection_page_raw_record_missing")
+                continue
+            if record.get("body_sha256") != body_hash:
+                errors.append("collection_page_raw_hash_mismatch")
+            if audit_file != record.get("audit_file"):
+                errors.append("collection_page_audit_path_mismatch")
+            for field in ("request_start_ms", "request_end_ms", "response_rows"):
+                value = page.get(field)
+                if type(value) is not int or value < 0:
+                    errors.append(f"collection_page_{field}_invalid")
+            if type(page.get("request_start_ms")) is int and type(page.get("request_end_ms")) is int:
+                if page["request_end_ms"] < page["request_start_ms"]:
+                    errors.append("collection_page_time_range_invalid")
+            if stream == "funding":
+                if type(page.get("complete")) is not bool or type(page.get("saturated")) is not bool:
+                    errors.append("funding_page_saturation_metadata_invalid")
+
+    if len(referenced) != len(set(referenced)):
+        errors.append("raw_response_referenced_more_than_once")
+    if set(referenced) != set(records_by_id):
+        errors.append("raw_response_record_unreferenced")
+
+    for key, item in normalized.items():
+        if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+            errors.append(f"{key}_path_missing")
+            continue
+        target = (raw_root / item["path"]).resolve()
+        try:
+            target.relative_to(archive_root.resolve())
+        except ValueError:
+            errors.append(f"{key}_escapes_archive_root")
+            continue
+        if not target.is_file():
+            errors.append(f"{key}_not_found")
+            continue
+        if hashlib.sha256(target.read_bytes()).hexdigest() != item.get("sha256"):
+            errors.append(f"{key}_hash_mismatch")
+        if type(item.get("rows")) is not int or item["rows"] < 1:
+            errors.append(f"{key}_row_count_invalid")
+        else:
+            with target.open("r", encoding="utf-8", newline="") as handle:
+                actual_rows = max(0, sum(1 for _ in csv.reader(handle)) - 1)
+            if actual_rows != item["rows"]:
+                errors.append(f"{key}_row_count_mismatch")
+
     return {"ok": not errors, "errors": errors, "records": len(records)}
 
 

@@ -2780,16 +2780,24 @@ class UnifiedQuantEngine:
                         ),
                     )
                 instrument_spec.validate_leverage(Decimal(str(self.cfg.leverage_val)))
-                if instrument_spec.max_market_order_qty is None:
+                if (instrument_spec.max_order_qty is None
+                        or instrument_spec.max_market_order_qty is None):
                     raise ValueError(
-                        "maxMktOrderQty is missing; cannot guarantee a single-order market close"
+                        "maxOrderQty/maxMktOrderQty is missing; cannot guarantee planned reduce orders"
                     )
+                # The position may exit through either a maker limit target or a
+                # market stop/time/kill-switch. Keep the whole position below both
+                # per-order caps so every planned reduce leg fits without slicing.
+                reduce_order_qty_cap = min(
+                    instrument_spec.max_order_qty,
+                    instrument_spec.max_market_order_qty,
+                )
                 exchange_order = size_to_exchange_constraints(
                     instrument_spec, size_usdt, fill, risk_usdt,
                     order_type=effective_order_type,
                     side="buy" if is_long else "sell",
                     price_is_execution=True,
-                    position_qty_cap=instrument_spec.max_market_order_qty,
+                    position_qty_cap=reduce_order_qty_cap,
                 )
             except ValueError as exc:
                 logger.warning(

@@ -73,6 +73,21 @@ def inspect(day: date):
     top_level_keys = data_keys = None
     cts_top_level_count = cts_data_count = 0
     zip_names = []
+    bid_book, ask_book = {}, {}
+    replay_initialized = False
+    replay_deltas = replay_snapshots = 0
+    bid_inserts = ask_inserts = bid_updates = ask_updates = 0
+    bid_deletes = ask_deletes = 0
+    delete_missing_bid = delete_missing_ask = 0
+    invalid_levels = crossed_samples = 0
+    max_bid_levels_seen = max_ask_levels_seen = 0
+    min_spread = None
+    max_spread_bps = 0.0
+    previous_ts = None
+    non_monotonic_ts = 0
+    max_record_gap_ms = 0
+    gaps_over_500ms = 0
+    replay_checks = 0
 
     with zipfile.ZipFile(path) as zf:
         bad = zf.testzip()
@@ -99,6 +114,15 @@ def inspect(day: date):
                 if typ not in ("snapshot", "delta"):
                     raise RuntimeError(f"Unexpected record type: {typ!r}")
                 counts[typ] += 1
+                if previous_ts is not None:
+                    gap = ts - previous_ts
+                    if gap < 0:
+                        non_monotonic_ts += 1
+                    else:
+                        max_record_gap_ms = max(max_record_gap_ms, gap)
+                        if gap > 500:
+                            gaps_over_500ms += 1
+                previous_ts = ts
                 if top_level_keys is None:
                     top_level_keys = sorted(obj.keys())
                     data_keys = sorted(data.keys())
@@ -135,9 +159,33 @@ def inspect(day: date):
                     max_bid_depth = max(max_bid_depth, len(bids))
                     max_ask_depth = max(max_ask_depth, len(asks))
                     snapshot_levels.append((len(bids), len(asks)))
+                    bid_book, ask_book = {}, {}
+                    for p_raw, q_raw in bids:
+                        p, q = float(p_raw), float(q_raw)
+                        if p <= 0 or q <= 0:
+                            invalid_levels += 1
+                        bid_book[p] = q
+                    for p_raw, q_raw in asks:
+                        p, q = float(p_raw), float(q_raw)
+                        if p <= 0 or q <= 0:
+                            invalid_levels += 1
+                        ask_book[p] = q
+                    replay_initialized = True
+                    replay_snapshots += 1
+                    max_bid_levels_seen = max(max_bid_levels_seen, len(bid_book))
+                    max_ask_levels_seen = max(max_ask_levels_seen, len(ask_book))
+                    if bid_book and ask_book:
+                        best_bid, best_ask = max(bid_book), min(ask_book)
+                        spread = best_ask - best_bid
+                        min_spread = spread if min_spread is None else min(min_spread, spread)
+                        if best_bid >= best_ask:
+                            crossed_samples += 1
                     prev_u = u
                     prev_seq = seq
                 elif typ == "delta":
+                    if not replay_initialized:
+                        raise RuntimeError("Delta received before initial snapshot")
+                    replay_deltas += 1
                     if sample_delta is None:
                         sample_delta = {"top_level_keys": sorted(obj.keys()), "data_keys": sorted(data.keys()), "bids_first3": bids[:3], "asks_first3": asks[:3], "u": u, "seq": seq}
                     if u is not None:
@@ -152,14 +200,45 @@ def inspect(day: date):
                         if prev_seq is not None and seq <= prev_seq:
                             seq_non_increasing += 1
                         prev_seq = seq
+                    for side_name, levels, book in (("bid", bids, bid_book), ("ask", asks, ask_book)):
+                        for p_raw, q_raw in levels:
+                            p, q = float(p_raw), float(q_raw)
+                            if p <= 0 or q < 0:
+                                invalid_levels += 1
+                                continue
+                            if q == 0:
+                                if p in book:
+                                    del book[p]
+                                    if side_name == "bid": bid_deletes += 1
+                                    else: ask_deletes += 1
+                                else:
+                                    if side_name == "bid": delete_missing_bid += 1
+                                    else: delete_missing_ask += 1
+                            elif p in book:
+                                book[p] = q
+                                if side_name == "bid": bid_updates += 1
+                                else: ask_updates += 1
+                            else:
+                                book[p] = q
+                                if side_name == "bid": bid_inserts += 1
+                                else: ask_inserts += 1
+                    max_bid_levels_seen = max(max_bid_levels_seen, len(bid_book))
+                    max_ask_levels_seen = max(max_ask_levels_seen, len(ask_book))
+                    if replay_deltas % 1000 == 0 and bid_book and ask_book:
+                        best_bid, best_ask = max(bid_book), min(ask_book)
+                        spread = best_ask - best_bid
+                        min_spread = spread if min_spread is None else min(min_spread, spread)
+                        if best_bid >= best_ask:
+                            crossed_samples += 1
+                        replay_checks += 1
 
     total = sum(counts.values())
     if total == 0 or counts["snapshot"] == 0:
         raise RuntimeError(f"No usable orderbook snapshot/delta records in {path}")
-    if malformed or topic_mismatch or symbol_mismatch:
+    if malformed or topic_mismatch or symbol_mismatch or invalid_levels or crossed_samples or non_monotonic_ts:
         raise RuntimeError(
             f"Integrity checks failed: malformed={malformed}, topic_mismatch={topic_mismatch}, "
-            f"symbol_mismatch={symbol_mismatch}, outside_day={outside_day}"
+            f"symbol_mismatch={symbol_mismatch}, invalid_levels={invalid_levels}, crossed_checks={crossed_samples}, non_monotonic_ts={non_monotonic_ts}, outside_day={outside_day}"
         )
     return {
         "date": day.isoformat(), "symbol": SYMBOL, "depth": depth, "url": url,
@@ -172,6 +251,19 @@ def inspect(day: date):
         "last_cts_utc": datetime.fromtimestamp(last_cts/1000, timezone.utc).isoformat() if last_cts else None,
         "max_snapshot_bid_levels": max_bid_depth, "max_snapshot_ask_levels": max_ask_depth,
         "snapshot_count": len(snapshot_levels),
+        "replay": {
+            "snapshots_replayed": replay_snapshots, "deltas_replayed": replay_deltas,
+            "bid_inserts": bid_inserts, "ask_inserts": ask_inserts,
+            "bid_updates": bid_updates, "ask_updates": ask_updates,
+            "bid_deletes": bid_deletes, "ask_deletes": ask_deletes,
+            "delete_missing_bid": delete_missing_bid, "delete_missing_ask": delete_missing_ask,
+            "invalid_levels": invalid_levels, "crossed_book_checks": crossed_samples,
+            "periodic_checks": replay_checks,
+            "max_bid_levels_seen": max_bid_levels_seen, "max_ask_levels_seen": max_ask_levels_seen,
+            "minimum_sampled_spread": min_spread,
+            "record_timestamp_non_monotonic": non_monotonic_ts,
+            "max_record_gap_ms": max_record_gap_ms, "gaps_over_500ms": gaps_over_500ms
+        },
         "delta_u_non_increasing_count": u_non_increasing,
         "delta_seq_non_increasing_count": seq_non_increasing,
         "delta_u_min": min_u, "delta_u_max": max_u,

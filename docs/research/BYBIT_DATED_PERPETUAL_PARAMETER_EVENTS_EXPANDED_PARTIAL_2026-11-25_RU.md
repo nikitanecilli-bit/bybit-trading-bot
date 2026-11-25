@@ -104,7 +104,7 @@ Raw body SHA-256: `7783748c07f10d7bd9a7e07ce927ed74c5e7b1f52445066bcfe7feaf2f58c
 
 All values below are maximum quantities in coins. These are not `qtyStep`, minimum order quantity, minimum notional, or risk-limit tiers.
 
-### Effective 2026-01-20 — quarantined date conflict
+### Date conflict: title 2026-01-20; article body 2025-01-20
 
 Published: `2026-01-19T08:49:55Z`  
 [Official notice](https://announcements.bybit.com/en/article/changes-of-max-order-size-for-usdt-perpetual-contracts-jan-20-2026-blteec5937787d92295/)  
@@ -116,7 +116,7 @@ The title and publication timestamp indicate a 2026 notice, but the article body
 |---|---:|---:|---:|---:|
 | WLFIUSDT | 160,000 | 2,400,000 | 450,000 | 12,000,000 |
 
-### Effective date conflict: article says 2025, title says 2026
+### Date conflict: title 2026-01-23; article body 2025-01-23
 
 Published: `2026-01-22T07:07:12Z`  
 [Official notice](https://announcements.bybit.com/en/article/changes-of-max-order-size-for-usdt-perpetual-contracts-jan-23-2026-bltb03cc69400553b65/)  
@@ -203,7 +203,7 @@ Raw body SHA-256: `1e7111c8de041b6aa6ae282d0f8f23c822ae2c4a5fdae56f61612fec97b34
 
 Published: `2026-11-04T08:01:56Z`  
 [Official notice](https://announcements.bybit.com/en/article/changes-of-max-order-size-for-usdt-perpetual-contracts-nov-5-2026--artff0e2f730786/)  
-Raw body SHA-256: `233e01289ff4a39e7062ed8b9f23a8242062df7a6470ec1988571fc09ece1`
+Raw body SHA-256: `233e01289ff4a39e7062ed8b9f23a8242062df7a6470ec1983098571fc09ece1`
 
 | Symbol | Market max before | Market max after | Limit max before | Limit max after |
 |---|---:|---:|---:|---:|

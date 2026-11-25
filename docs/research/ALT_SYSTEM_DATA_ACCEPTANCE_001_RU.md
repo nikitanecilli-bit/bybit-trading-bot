@@ -2049,3 +2049,35 @@ The batched symbol searches for listing, delisting and trading-suspension terms 
 The 24/47 union is not a “51.1% archive completeness” metric. It only describes distinct sample symbols named by at least one selected D5/D6 notice. A systematic archive inventory still requires official archive pagination/category reconciliation, symbol-by-symbol event ledger, exact source URLs and publication/effective timestamps, and a complete denominator that is genuinely Bybit Linear rather than a survivor-biased proxy sample.
 
 **Decision:** no D4/D5/D6 gate is accepted or upgraded. No market data, Bybit API endpoints, automated collectors, raw announcement pages, PnL, backtests, sweeps or event studies were run. Only the already-existing E11 result artifact was read to recover its manifest; public announcement pages/search results were inspected without raw capture. The next useful step is to design the archive-pagination and reconciliation protocol, but automated crawling/raw capture remains outside the present authorization scope.
+
+
+## 53. Official announcement archive pagination and reconciliation design (2026-11-25)
+
+### 53.1. Public archive structure observed
+
+The official Bybit announcement site exposes category pages with 20 items per page. On the pages opened on 2026-11-25, the visible pagination totals were:
+
+| Archive route | Pages observed | Approx. listed items at 20/page | Intended event use |
+|---|---:|---:|---|
+| [New crypto / listings](https://announcements.bybit.com/en/?category=new_crypto) | 25 | up to 500 | D4 listing/open events; page contains mixed Spot, Derivatives, Options and TradFi entries, so product filter/category parsing is mandatory |
+| [Delistings](https://announcements.bybit.com/en/?category=delistings) | 11 | up to 220 | D4 delisting/last-trade events; mixed token and contract delistings must be separated |
+| [Maintenance Updates](https://announcements.bybit.com/en/?category=maintenance_updates) | 19 | up to 380 | D4 temporary suspensions/resumes and contract adjustments; also useful for corporate actions |
+| [Latest Bybit News](https://announcements.bybit.com/en/?category=latest_bybit_news) | 11 | up to 220 | D5 tick/order-size and some D6 risk notices; category is mixed and needs event-type parsing |
+
+These are page totals visible at the time of inspection, not a stable API contract or a verified historical archive inventory. Some event families appear under more than one category, and a category can include unrelated product types. Therefore the counts cannot simply be added as unique notice counts. A broad mixed archive route showed 98 pages but was not used as the event-family denominator because it mixes unrelated announcement categories.
+
+### 53.2. Minimal reconciliation protocol (design only; not executed)
+
+1. Freeze the target window and target universe version before reviewing pages. Preserve the E11 47-symbol proxy sample as a clearly labelled comparison set; do not rename it Bybit PIT universe.
+2. Enumerate every page for the four relevant archive routes above, record page number, observed total pages, retrieval time and visible item count. Recheck pagination at the end because the archive is dynamic.
+3. Deduplicate notices by canonical announcement URL / article slug across categories. Preserve category membership as a set rather than dropping duplicates.
+4. Extract candidate symbols from title and article body, then classify product category explicitly: Linear crypto perpetual, Inverse, Spot, Options, TradFi/stock, token-only, or unknown. Only matching Linear crypto-perpetual events count for this research scope.
+5. Classify event type: LIST/OPEN, DELIST/LAST_TRADE, HALT, RESUME, TICK_CHANGE, ORDER_SIZE_CHANGE, CONTRACT_SIZE_CHANGE, RISK_LIMIT_CHANGE, FUNDING_RULE_CHANGE, or OTHER. Do not treat a network deposit/withdrawal suspension as a trading halt.
+6. Store publication time and effective time separately. For ranges/windows, store both start and end. Keep before/after values and units exactly as announced; do not infer missing values from current Instruments Info or Risk Limit endpoints.
+7. Reconcile each symbol against all pages and categories. Use explicit statuses: `hit`, `no_hit_after_complete_inventory`, `not_in_scope_product_type`, `ambiguous_symbol_or_product`, `page_not_retrieved`, `article_unavailable`. Never collapse a failed/missing page into a no-hit result.
+8. Independently check that page enumeration is complete: expected page numbers are contiguous, last-page item count is plausible, duplicate URLs are accounted for, and the visible total-page count is unchanged or rechecked. A search-engine query can help discover articles but cannot replace page enumeration.
+9. Only after a separate authorization for automated collection/raw capture: preserve exact HTML response bytes, canonical URL, retrieval timestamp, HTTP metadata where available, and SHA-256; then parse into the event ledger. Until then, this remains a design and manual read-only research protocol.
+
+### 53.3. Decision
+
+The public site is paginated enough to make a bounded inventory tractable in principle, but the current search did not execute this protocol and does not establish archive completeness. The next concrete decision is whether to authorize a read-only, automated crawl of only these public announcement category pages and linked public article pages, with no Bybit market API calls, no account endpoints, no orders and no raw market-data downloads. Without that separate authorization, do not implement or dispatch a crawler. D4/D5/D6 remain PARTIAL / NOT ACCEPTED.

@@ -1238,6 +1238,27 @@ def _attach_exchange_close_spec(engine, *, max_market_qty="1000", max_order_qty=
     engine.max_instrument_spec_age_ms = 30 * 24 * 60 * 60 * 1000
 
 
+def test_limit_entry_is_capped_by_tighter_limit_and_market_reduce_constraints():
+    e = make_engine()
+    _attach_exchange_close_spec(e, max_market_qty="8", max_order_qty="4")
+    e.pending["BTCUSDT"] = {
+        "direction": "long", "entry_price": 100.0, "order_type": "limit",
+        "strategy": "reduce-cap-entry-test", "stop_dist": 5.0,
+        "signal_ts": 1_799_996_400_000,
+    }
+    bar = engine_mod.Candle(
+        ts=1_800_000_000_000, open=100.0, high=101.0,
+        low=99.0, close=100.5, volume=10.0,
+    )
+    e._prepare_pending_entry_risk_budgets()
+    assert e._try_fill_pending("BTCUSDT", bar)
+    position = e.open_positions["BTCUSDT"]
+    assert position.exchange_sized
+    assert position.order_type == "limit"
+    assert position.contract_qty == "4.0"
+    assert position.remaining_contract_qty == "4.0"
+
+
 def _exchange_sized_position(qty="1.0"):
     pos = make_position(size=100.0)
     pos.exchange_sized = True

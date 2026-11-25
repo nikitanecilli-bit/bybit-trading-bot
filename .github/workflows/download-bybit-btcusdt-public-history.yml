@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: research/market-regime-v1-main
-      - name: Download Bybit BTCUSDT H1, Mark and funding history
+      - name: Download Bybit BTCUSDT H1 trade candles from official public archive
         run: python scripts/download_bybit_btcusdt_public_history.py
       - name: Upload raw responses, normalized data and manifest
         if: always()

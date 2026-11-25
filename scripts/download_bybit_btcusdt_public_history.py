@@ -69,9 +69,11 @@ for y, m in months_between(START, END):
         if len(parts) < 6:
             continue
         try:
-            # Archive timestamps align directly with Bybit UTC H1 candles; do not apply an MT4 offset.
-            dt_utc = datetime.strptime(parts[0].strip(), "%Y.%m.%d %H:%M").replace(tzinfo=timezone.utc)
-            ts = int(dt_utc.timestamp() * 1000)
+            # kline_for_metatrader4 timestamps are server-clock labels, not UTC.
+            # Cross-check against Bybit public BTCUSDT trades across 2020-2025
+            # found a stable +3h archive offset in both summer and winter samples.
+            server_time = datetime.strptime(parts[0].strip(), "%Y.%m.%d %H:%M").replace(tzinfo=timezone.utc)
+            ts = int((server_time - timedelta(hours=3)).timestamp() * 1000)
             if ts < int(datetime.combine(START, datetime.min.time(), tzinfo=timezone.utc).timestamp()*1000):
                 continue
             if ts > int(datetime.combine(END, datetime.min.time(), tzinfo=timezone.utc).timestamp()*1000):
@@ -92,6 +94,9 @@ with csv_path.open("w", newline="", encoding="utf-8") as f:
 
 manifest = {
     "source":"Bybit official public archive: public.bybit.com/kline_for_metatrader4",
+    "source_timestamp_offset_hours": 3,
+    "timestamp_normalization":"source server-clock timestamps minus 3 hours, validated against official public trade volumes in summer and winter samples across 2020-2025",
+    "normalized_timestamp_timezone":"UTC",
     "category":"linear","symbol":SYMBOL,"interval":"60",
     "requested_start":START.isoformat(),"requested_end":END.isoformat(),
     "rows":len(ordered),

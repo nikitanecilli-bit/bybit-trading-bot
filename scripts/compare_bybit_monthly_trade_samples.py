@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-check four monthly Bybit BTCUSDT trade days across two providers.
+"""Cross-check two available monthly Bybit BTCUSDT trade days across two providers.
 
 CryptoHFTData historical objects may be outer Zstandard-wrapped Parquet, while
 newer objects may be raw Parquet. The loader detects both formats. Hourly
@@ -34,7 +34,7 @@ SYMBOL = "BTCUSDT"
 CHD_BASE = "https://api.cryptohftdata.com/v1/download"
 TARDIS_BASE = "https://datasets.tardis.dev/v1/bybit/trades"
 MAX_TARDIS_BYTES = 250 * 1024 * 1024
-MAX_CHD_BYTES = 50 * 1024 * 1024
+MAX_CHD_BYTES = 200 * 1024 * 1024
 
 
 def file_url(base: str, file_path: str) -> str:
@@ -86,66 +86,6 @@ def normalize_parquet(path: Path) -> tuple[Path, str]:
 
 
 
-MAX_COMPRESSED_BYTES = 200 * 1024 * 1024
-
-
-def download_parquet(url: str, raw_path: Path, decoded_path: Path) -> dict:
-    """Download Parquet, handling historical whole-file Zstandard wrapping."""
-    request = urllib.request.Request(
-        url, headers={"User-Agent": "bybit-monthly-trade-crosscheck/1.0"}
-    )
-    digest = hashlib.sha256()
-    total = 0
-    headers = {}
-    with urllib.request.urlopen(request, timeout=180) as response, raw_path.open("wb") as out:
-        if response.status != 200:
-            raise RuntimeError(f"unexpected HTTP status {response.status}")
-        headers = dict(response.headers.items())
-        expected_length = response.headers.get("Content-Length")
-        while True:
-            chunk = response.read(1024 * 1024)
-            if not chunk:
-                break
-            total += len(chunk)
-            if total > MAX_COMPRESSED_BYTES:
-                raise RuntimeError(
-                    f"compressed file exceeds {MAX_COMPRESSED_BYTES} byte safety limit"
-                )
-            out.write(chunk)
-            digest.update(chunk)
-    if expected_length is not None and total != int(expected_length):
-        raise RuntimeError(f"download size mismatch expected={expected_length} actual={total}")
-
-    with raw_path.open("rb") as source:
-        prefix = source.read(4)
-    if prefix == b'PAR1':
-        raw_path.replace(decoded_path)
-        encoding = "plain_parquet"
-    elif prefix == bytes.fromhex('28b52ffd'):
-        with raw_path.open("rb") as source, decoded_path.open("wb") as target:
-            zstd.ZstdDecompressor().copy_stream(source, target)
-        encoding = "zstandard_wrapped_parquet"
-    else:
-        preview = raw_path.read_bytes()[:256].decode("utf-8", errors="replace")
-        raise ValueError(
-            f"download is neither Parquet nor Zstandard-wrapped Parquet; "
-            f"content_type={headers.get("Content-Type")!r}; preview={preview!r}"
-        )
-
-    size = decoded_path.stat().st_size
-    with decoded_path.open("rb") as stream:
-        first = stream.read(4)
-        stream.seek(-4, 2)
-        last = stream.read(4)
-    if first != b'PAR1' or last != b'PAR1':
-        raise ValueError("decoded file failed Parquet header/footer magic validation")
-    return {
-        "compressed_bytes": total,
-        "compressed_sha256": digest.hexdigest(),
-        "decoded_bytes": size,
-        "encoding": encoding,
-        "content_type": headers.get("Content-Type"),
-    }
 
 def tardis_url(date: str) -> str:
     year, month, day = date.split("-")

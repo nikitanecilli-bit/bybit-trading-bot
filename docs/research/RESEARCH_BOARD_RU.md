@@ -382,3 +382,10 @@
 - This provides a finite design for a symbol/category reconciliation inventory. Listings require filtering mixed Spot/Derivatives/Options/TradFi; delistings and maintenance pages require separating token events from Linear perpetual lifecycle; D5/D6 notices are spread across Latest Bybit News and Maintenance Updates.
 - Wrote a minimal fail-closed pagination/dedup/category/event-time protocol in Section 53. It was not executed. No crawler, raw HTML capture, API request or data collection was run.
 - Next decision: separate authorization is required before implementing or dispatching a read-only announcement-page crawler. Until then D4/D5/D6 remain PARTIAL / NOT ACCEPTED.
+
+
+### 2026-11-25 — public announcement inventory collector implemented (acceptance ledger Section 54)
+
+- Added a read-only GitHub-hosted workflow and collector restricted to official `announcements.bybit.com` HTTPS pages, four selected categories and linked articles. Captures raw HTML bytes, response metadata, retrieval timestamps and SHA-256; minimum one-second request spacing; no credentials, market/account APIs, proxy, trading or alternate host.
+- Offline tests passed. Strengthened the collector to fail closed unless pagination matches the observed category totals (25/11/19/11) and to keep TradFi, inverse and ambiguous perpetual product categories separate from explicit Linear candidates.
+- Strict collection run `45585129324` is in progress; initial run `45584843911` is also in progress and is not accepted. No inventory artifact yet; no completeness claims. D4/D5/D6 remain PARTIAL / NOT ACCEPTED.

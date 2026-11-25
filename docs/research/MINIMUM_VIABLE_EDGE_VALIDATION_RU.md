@@ -195,3 +195,24 @@ Decision: **BLOCKED BY DATA COVERAGE + INDEPENDENCE + EXECUTION CONTRACT**. Publ
 5. Не менять H-B lifecycle и не подбирать новые параметры на уже использованных folds.
 
 **Следующий допустимый результат:** frozen candidate + воспроизводимый, покрытый по времени Bybit-native sample с проверенными gap exclusions, settled funding, dated specs/risk и заранее заданными ACCEPT / REJECT / INCONCLUSIVE criteria. До этого статус остаётся BLOCKED; не создавать работу ради видимости движения.
+
+## 6B. Статический аудит соответствия Donchian(48)+EMA preregistration (2026-11-25)
+
+Проверены preregistration, shared-capital runner, engine, funding accounting и liquidation model. Рыночный PnL не запускался.
+
+**Обнаружены три design mismatch:**
+
+1. **Volume lookback.** В preregistration сказано, что volume ratio рассчитывается по тем же 48 предыдущим свечам, что и Donchian(48). В runner `VOLUME_LOOKBACK_PERIOD = 20`, и это значение передаётся в engine для всех трёх arms. Фактически D48 использует 48 свечей для канала и 20 для среднего объёма. Это меняет набор сигналов.
+
+2. **Дополнительный breakout-ATR фильтр.** Runner перебирает `BREAKOUT_ATR_THRESHOLDS = [0.0, 0.10, 0.25]`; при ненулевом пороге требует дополнительное превышение Donchian high на долю ATR. Explore подбирает эту размерность, Confirm требует frozen значение через `H1_FROZEN_MIN_BREAKOUT_ATR`. В тексте preregistration этот фильтр и диапазон выбора явно не определены. Это дополнительная степень свободы.
+
+3. **Невозможность single-symbol запуска текущим runner.** Selection manifest требует ровно пять символов и точное совпадение allowlist; загрузчик также отклоняет набор менее чем из двух символов. Минимальный single-instrument маршрут из этого документа нельзя реализовать простым сокращением списка. Для него нужен отдельный дизайн/preregistration, не ослабление проверок.
+
+**Подтверждённая execution-схема:** `maker_entry_and_tp1=True` вместе с `maker_tp1_and_target=False` означает maker-proxy entry и taker TP1/final exits. OHLC penetration остаётся optimistic fill proxy, не доказанным maker fill.
+
+**Оставшиеся accounting/risk ограничения:**
+- Funding helper использует Mark H1 candle open как proxy settlement mark; это не гарантированно точная биржевая settlement mark price.
+- Liquidation model — position-level isolated approximation без account-level aggregation, partial-liquidation ladder, AMR и точного exchange rounding.
+- Комиссии/проскальзывание считаются по входной, TP1 и финальной ногам; сами ставки остаются сценарными предположениями, не историей фактического исполнения.
+
+**Решение:** текущая реализация не READY для PnL. Не менять frozen runner молча. До любого будущего теста нужно выбрать: (A) буквальная preregistration — volume lookback 48, breakout-ATR фильтра нет; либо (B) отдельная новая гипотеза, отражающая фактический runner — lookback 20 и явно preregistered breakout-ATR выбор. Single-symbol маршрут также требует отдельного дизайна. Этот аудит не запускал PnL, sweeps или сбор данных.

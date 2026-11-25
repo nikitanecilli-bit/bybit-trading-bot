@@ -586,3 +586,6 @@ PR: https://github.com/nikitanecilli-bit/bybit-trading-bot/pull/18
 GitHub Actions `45653543436` — **SUCCESS** на commit `4426df7dfd3a58fd8f705694f8fd65bb69eca961`. Прошли compile/deterministic checks, audit step, multi-bar lifecycle, H1 selector, runner execution proxy gate, EMA gate, validation manifest и связанные проверки.
 
 **Фактический market PnL не запускался.** Доступный BTC H1 archive всё ещё содержит пропуски и не покрывает все необходимые исторические Bybit data/accounting inputs. PnL gate закрыт.
+
+
+Дополнительная проверка тестового запуска: новые regression tests были включены в ручной список тестов `test_h1_runner_execution_gate.py` (проект запускает этот файл напрямую, а не через auto-discovery). Это важно: до включения в список функции тестов были написаны, но не исполнялись. В CI run `45653889966` тесты `test_aligned_h1_datasets_accepts_one_symbol_only_with_frozen_allowlist` и `test_unrestricted_h1_datasets_still_requires_multiple_symbols` действительно исполнены; run завершился **SUCCESS** на commit `4f874a7b1a6651a8b57c65114e0b0efc3f8a39ea`.

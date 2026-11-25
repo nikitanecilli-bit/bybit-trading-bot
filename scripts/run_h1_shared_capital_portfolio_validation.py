@@ -29,6 +29,7 @@ from multibar_limit_wait import evaluate_limit_wait, prepare_signal_for_next_bar
 FOLDS = [(1, 0.50, 0.65), (2, 0.65, 0.80), (3, 0.80, 1.00)]
 VOL_THRESHOLDS = [1.2, 1.6, 2.0, 2.5]
 BREAKOUT_ATR_THRESHOLDS = [0.0]  # no additional breakout-distance filter in preregistered signal
+VOLUME_LOOKBACK_PERIOD = 20  # Legacy Top-5 selector uses fixed D20 screening; portfolio arms resolve their own lookback.
 # Volume lookback is resolved per strategy arm; there is no global shared value.
 ENTRY_OFFSET_BPS = 20.0
 ENTRY_PENETRATION_BPS = 5.0

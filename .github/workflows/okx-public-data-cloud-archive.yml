@@ -34,6 +34,7 @@ jobs:
             rc=$?
             echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
             echo "Downloader exited with code $rc; preserving diagnostic output."
+            exit "$rc"
           fi
 
       - name: Upload archive and manifest
@@ -43,7 +44,7 @@ jobs:
           name: okx-btc-usdt-swap-public-archive
           path: data/archives/okx/BTC-USDT-SWAP/
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 90
 
       - name: Report collection status
         if: always()

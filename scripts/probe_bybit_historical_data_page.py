@@ -49,7 +49,20 @@ for path in ("/quote/public/support/download/list-products","/quote/public/suppo
     except Exception as e:
         api_probe.append({"path":path,"error":repr(e)})
 
-result={"url":URL,"http_status":status,"html_bytes":len(raw),"html_sha256":hashlib.sha256(raw).hexdigest(),"scripts":p.scripts,"page_scripts":page_scripts,"links":p.links[:120],"bundles":bundles,"api_probe":api_probe}
+core_probe=[]
+for path in ("/static/data-core/data-core.latest.min.js",):
+    try:
+        st,data,_=get(BASE+path)
+        js=data.decode("utf-8",errors="replace")
+        hits=[]
+        for m in re.finditer(r'"([^"]{1,300})"',js):
+            v=m.group(1)
+            if re.search(r'api\\.bybit|api2|baseURL|quote/public|api\\.bytick|api\\.bybit',v,re.I) and v not in hits:
+                hits.append(v)
+        core_probe.append({"path":path,"status":st,"bytes":len(data),"matches":hits[:300]})
+    except Exception as e:
+        core_probe.append({"path":path,"error":repr(e)})
+result={"url":URL,"http_status":status,"html_bytes":len(raw),"html_sha256":hashlib.sha256(raw).hexdigest(),"scripts":p.scripts,"page_scripts":page_scripts,"links":p.links[:120],"bundles":bundles,"api_probe":api_probe,"core_probe":core_probe}
 Path("bybit_history_page_probe").mkdir(exist_ok=True)
 Path("bybit_history_page_probe/result.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
 print(json.dumps(result,indent=2))

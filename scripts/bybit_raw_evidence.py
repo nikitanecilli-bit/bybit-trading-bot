@@ -130,20 +130,20 @@ def assert_snapshot_paths_available(output_root: str | Path, stamp: str) -> None
 def finalize_snapshot_evidence(
     output_root: str | Path, stamp: str, *, source: str, category: str,
     normalized_output: str | Path, records: list[dict[str, Any]],
-    collection_pages: list[dict[str, Any]],
+    collection_pages: list[dict[str, Any]], capture_dir: str | Path,
 ) -> Path:
-    """Move one capture into its dated directory, rebase audit paths, and seal manifest."""
+    """Move one unique capture into its dated directory, rebase audit paths, and seal manifest."""
     root = Path(output_root)
-    pending = root / "raw_evidence" / "pending"
+    capture = Path(capture_dir)
     dated = root / "raw_evidence" / stamp
     manifest_path = root / f"{stamp}.evidence.json"
     if dated.exists() or manifest_path.exists():
         raise FileExistsError("dated raw evidence already exists; refusing to overwrite")
-    if records and not pending.is_dir():
+    if records and not capture.is_dir():
         raise FileNotFoundError("raw response capture directory is missing")
-    if pending.exists():
+    if capture.exists():
         dated.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(pending, dated)
+        os.replace(capture, dated)
     for record in records:
         record["body_file"] = str(Path("raw_evidence") / stamp / record["body_file"]).replace(os.sep, "/")
         record["audit_file"] = str(Path("raw_evidence") / stamp / record["audit_file"]).replace(os.sep, "/")

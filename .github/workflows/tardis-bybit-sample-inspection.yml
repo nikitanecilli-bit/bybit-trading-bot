@@ -1,5 +1,6 @@
 name: Tardis Bybit one-day sample inspection
 # Bounded public-data sample only; raw data stays in the ephemeral runner.
+# Full scan validates gzip CRC, CSV schema, timestamp ordering, and L2 book semantics.
 
 on:
   push:

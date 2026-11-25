@@ -552,3 +552,21 @@ Artifact `bybit-btcusdt-public-history` из GitHub Actions run `45645008915` (a
 **Оставшийся блокер:** main path по-прежнему требует Top-5 selection manifest и старую multi-symbol provenance схему. Проверка BTCUSDT в paired summary сама по себе не создаёт работающий BTC-only runner. Нужны отдельная BTCUSDT preregistration/selection manifest схема, отдельный single-symbol route и тесты; до этого runner не запускать.
 
 **PnL gate остаётся закрыт:** официальный H1 archive имеет 4 gaps / 1,928 пропущенных баров, заканчивается 2025-11-03 и не закрывает Mark/Funding и полные исторические instrument/risk данные. Никакой PnL replay, paper или live trading не запускались.
+
+
+## 6F. Отдельный BTCUSDT-only manifest route (2026-11-25)
+
+Реализован отдельный маршрут подготовки BTCUSDT-only данных, не меняющий исходный Top-5 protocol:
+
+- Добавлен manifest protocol `h1-btc-single-symbol-v1`; он требует ровно BTCUSDT и отдельный lifecycle snapshot.
+- Добавлен `scripts/create_h1_btc_single_symbol_manifest.py`. Builder не запускает PnL; он проверяет непрерывную H1 сетку, минимум 3,000 train bars, BTCUSDT lifecycle на cutoff и фиксирует SHA-256 input/replay files.
+- Runner теперь различает `H1_SELECTION_MODE=top5` и `btc_single`. Для BTC route replay provenance не включает Top-5 selector; Top-5 режим сохраняет прежний протокол.
+- Workflow получил выбор режима и отдельную подготовку BTC manifest. Исправлена форма lifecycle snapshot provenance; funding audit sidecars учитываются согласованно.
+- Исправлена совместимость старого Top-5 D20 selector с per-arm volume lookback: D20 selector явно использует 20, а portfolio arms продолжают разрешать 20/48 по Donchian period.
+- Исходная preregistration Top-5 не переписана. Новый отдельный протокол: `BTC_ONLY_H1_DONCHIAN48_EMA_PREREGISTRATION_RU.md`.
+
+GitHub Actions `45652703809` — **SUCCESS** на code commit `8a4f1b90b7a95cbfc19bcb81a1798c5477f8469d`. H1 selector, runner execution gate, EMA/Donchian tests и validation manifest tests прошли. Это только инженерная проверка.
+
+PR: https://github.com/nikitanecilli-bit/bybit-trading-bot/pull/18
+
+**PnL gate остаётся закрыт:** доступный H1 архив имеет gaps и заканчивается 2025-11-03; funding/mark history и полные датированные instrument/risk данные не подтверждены. Ни market PnL, ни paper/live trading не запускались. Математическое преимущество не доказано.

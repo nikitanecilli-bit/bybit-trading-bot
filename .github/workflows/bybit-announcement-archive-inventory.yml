@@ -14,7 +14,7 @@ on:
 permissions:
   contents: read
 
-# Prevent duplicate full-archive crawls from overlapping commits.
+# Prevent duplicate full-archive crawls from overlapping manual dispatches.
 concurrency:
   group: bybit-announcement-inventory-${{ github.ref }}
   cancel-in-progress: true
@@ -34,7 +34,9 @@ jobs:
         run: |
           python tests/test_collect_bybit_announcements.py
           python tests/test_validate_bybit_announcement_content.py
+      # Full public crawl is intentionally manual: a push should run fast offline tests only.
       - name: Collect public Bybit announcement pages only
+        if: github.event_name == 'workflow_dispatch'
         run: |
           python scripts/collect_bybit_announcements.py \
             --output announcement_inventory \
@@ -42,9 +44,10 @@ jobs:
             --timeout 25 \
             --max-pages-per-category 100
       - name: Validate non-empty article content and raw-body integrity
+        if: github.event_name == 'workflow_dispatch'
         run: python scripts/validate_bybit_announcement_content.py --output announcement_inventory
       - name: Upload raw HTML and inventory evidence
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: bybit-public-announcement-inventory

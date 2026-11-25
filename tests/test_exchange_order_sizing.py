@@ -50,6 +50,15 @@ class ExchangeSizingTests(unittest.TestCase):
         self.assertLessEqual(order.notional_usdt, Decimal("1000"))
         self.assertLessEqual(order.risk_usdt, Decimal("10"))
 
+    def test_limit_entry_can_be_capped_to_single_market_close_quantity(self):
+        order = size_to_exchange_constraints(
+            self.spec, "90000", "100", "100",
+            order_type="limit", side="buy", position_qty_cap="800",
+        )
+        self.assertEqual(order.qty, Decimal("800"))
+        self.assertEqual(order.notional_usdt, Decimal("80000"))
+        self.assertLessEqual(order.risk_usdt, Decimal("100"))
+
     def test_execution_price_is_not_rounded_to_a_different_limit_quote(self):
         order = size_to_exchange_constraints(
             self.spec, "1000", "100.05", "10",

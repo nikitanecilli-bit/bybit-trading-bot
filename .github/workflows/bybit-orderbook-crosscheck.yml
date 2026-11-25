@@ -1,0 +1,24 @@
+name: Bybit independent L2 archive cross-check
+on:
+  push:
+    branches: [research/market-regime-v1-main]
+    paths:
+      - "scripts/compare_bybit_orderbook_archives.py"
+      - ".github/workflows/bybit-orderbook-crosscheck.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: python -m pip install --quiet pyarrow
+      - run: python scripts/compare_bybit_orderbook_archives.py /tmp/bybit_orderbook_crosscheck.json
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bybit-independent-l2-crosscheck
+          path: /tmp/bybit_orderbook_crosscheck.json
+          if-no-files-found: warn

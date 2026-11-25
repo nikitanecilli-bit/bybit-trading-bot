@@ -1,5 +1,7 @@
 """Deterministic tests for opt-in full-history EMA50/200 H1 gating."""
 from pathlib import Path
+import json
+import tempfile
 import sys
 from types import SimpleNamespace
 

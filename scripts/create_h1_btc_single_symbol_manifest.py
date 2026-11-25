@@ -91,7 +91,7 @@ def build_manifest(*, kline_dir, funding_dir, mark_price_dir, instrument_specs_d
     }
     target = Path(output)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(manifest, indent=2, ensure_ascii=False, allow_nan=False) + "\\n", encoding="utf-8")
+    target.write_text(json.dumps(manifest, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8")
     return target
 
 

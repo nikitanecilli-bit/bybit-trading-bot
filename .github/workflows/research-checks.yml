@@ -3,7 +3,7 @@ name: Research engine checks
 
 on:
   pull_request:
-    branches: [research/market-regime-v1-main]
+    branches: [research/market-regime-v1-main, research/h1-volume-lookback-provenance-fix]
   workflow_dispatch:
   push:
     branches: [research/market-regime-v1-main]

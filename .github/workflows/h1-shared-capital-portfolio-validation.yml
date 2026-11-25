@@ -77,7 +77,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile
-        run: python -m py_compile Bybit_Trading_Engine_v14_research.py scripts/run_uploaded_dataset_backtests.py scripts/run_h1_shared_capital_portfolio_validation.py
+        run: python -m py_compile Bybit_Trading_Engine_v14_research.py scripts/run_uploaded_dataset_backtests.py scripts/run_h1_shared_capital_portfolio_validation.py scripts/create_h1_btc_single_symbol_manifest.py
       - name: Require official Bybit H1 trade-kline archive
         env:
           KLINE_DIR: ${{ inputs.kline_dir }}

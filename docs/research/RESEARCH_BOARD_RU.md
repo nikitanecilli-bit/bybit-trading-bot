@@ -312,3 +312,13 @@
 - Старый run_bybit_h1_long_only_holdout.py не подходит: Donchian(20), 11 символов отобраны на Binance train, отдельный капитал на символ, funding upper-bound, Last-price exits и явное пересечение календарного периода с прежним Binance study. Bybit data files, которых он требует, в repo отсутствуют.
 - Существующий Bybit archive workflow требует self-hosted по умолчанию и предупреждает о блокировке hosted US egress. Self-hosted/collector запрещены; workflow не запускать и не менять.
 - Статус: **BLOCKED BY DATA + INDEPENDENCE**. Ни старые folds, ни другой venue на том же календарном периоде не создают независимый holdout. Подробности: acceptance ledger Section 49 и Minimum Viable Validation Section 6A.
+
+
+### 2026-11-25 — OKX BTC-USDT-SWAP public archive: cloud capture and QA passed for H1
+
+- Added a narrowly scoped GitHub-hosted workflow and completed a read-only public-data capture from official OKX endpoints; run [45572813249](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45572813249) completed successfully.
+- Captured 365 days / 8,760 hourly rows each for OKX trade OHLCV and Mark Price. Both normalized grids are continuous, unique, fully closed, OHLC-valid, and timestamp-aligned. 88 raw pages per series; all raw/normalized SHA-256 checks passed.
+- Funding returned 278 normalized events from 2026-08-24 16:00 UTC to 2026-11-25 00:00 UTC (three-month endpoint retention; observed 8h intervals only). D3 remains PARTIAL / NOT ACCEPTED; do not infer a permanent 8h schedule.
+- Current contract snapshot confirms linear BTC-USDT-SWAP, ctVal 0.01 BTC, USDT settlement, tick 0.1, lot/min 0.01. This is not historical effective-time evidence; D5 remains open. D4/D6/D8 remain unaccepted.
+- This establishes an OKX public H1 data source for one instrument, not Bybit execution evidence and not an independent calendar-time holdout. No PnL/backtest was run or authorized.
+- Full audit: [OKX_PUBLIC_DATA_ARCHIVE_QA_2026-11-25_RU.md](OKX_PUBLIC_DATA_ARCHIVE_QA_2026-11-25_RU.md).

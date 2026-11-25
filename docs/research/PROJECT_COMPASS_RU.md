@@ -570,3 +570,19 @@ GitHub Actions `45652703809` — **SUCCESS** на code commit `8a4f1b90b7a95cbfc
 PR: https://github.com/nikitanecilli-bit/bybit-trading-bot/pull/18
 
 **PnL gate остаётся закрыт:** доступный H1 архив имеет gaps и заканчивается 2025-11-03; funding/mark history и полные датированные instrument/risk данные не подтверждены. Ни market PnL, ни paper/live trading не запускались. Математическое преимущество не доказано.
+
+
+## 6G. BTC-only runner end-to-end gate correction (2026-11-25)
+
+При проверке single-symbol пути после предыдущего CI был найден дефект: общий H1 alignment loader всё ещё требовал минимум две монеты даже при явно заданном frozen allowlist `BTCUSDT`. Это означало, что manifest мог быть подготовлен, но runner не мог принять один инструмент.
+
+Исправлено в commit `4426df7dfd3a58fd8f705694f8fd65bb69eca961`:
+
+- Минимум 1 инструмент разрешён только при явном `H1_SYMBOL_ALLOWLIST`; без allowlist прежнее требование multi-symbol сохраняется.
+- Добавлены тесты: BTCUSDT-only allowlist проходит загрузчик; unrestricted режим по-прежнему отказывает с одной монетой.
+- BTC manifest builder теперь до фиксации selection manifest запускает те же строгие проверки funding/mark coverage, Bybit funding query + dated settlement schedule evidence и непрерывности instrument/risk snapshot history, что используются перед PnL replay.
+- Builder по-прежнему не запускает PnL.
+
+GitHub Actions `45653543436` — **SUCCESS** на commit `4426df7dfd3a58fd8f705694f8fd65bb69eca961`. Прошли compile/deterministic checks, audit step, multi-bar lifecycle, H1 selector, runner execution proxy gate, EMA gate, validation manifest и связанные проверки.
+
+**Фактический market PnL не запускался.** Доступный BTC H1 archive всё ещё содержит пропуски и не покрывает все необходимые исторические Bybit data/accounting inputs. PnL gate закрыт.

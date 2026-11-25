@@ -69,3 +69,15 @@ Manifest создаётся отдельным builder `scripts/create_h1_btc_si
 Maker fill по OHLC остаётся оптимистичным proxy; очередь, partial fills, spread и adverse selection полностью не моделируются. Текущая модель ликвидации и исторических exchange rules также имеет ограничения, описанные в основном preregistration. Эти ограничения должны быть явно отражены в итоговом выводе; они не дают права называть симуляцию фактической исполнимой доходностью.
 
 **Текущий статус:** single-symbol manifest route реализован и проходит инженерные тесты. Market-PnL replay не выполнялся; Bybit data/accounting gates остаются закрытыми.
+
+
+## 8.1. Строгий preflight single-symbol manifest
+
+До создания manifest builder обязан проверить не только наличие файлов, но и:
+
+- Funding CSV и query-provenance audit manifest, включая SHA-256, полноту запросов и dated settlement schedule evidence.
+- Полное совпадение Mark Price H1 timestamp grid с Bybit trade-kline grid и наличие settlement marks.
+- Непрерывность и актуальность датированных Bybit instrument-spec и risk-tier snapshots на всём архивном интервале (максимальный возраст snapshot задаётся проверкой).
+- BTCUSDT lifecycle на train cutoff по официальному Bybit universe snapshot.
+
+Если любой gate не проходит, builder отказывает в создании manifest. Создание manifest не запускает PnL.

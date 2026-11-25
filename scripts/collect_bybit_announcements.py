@@ -28,6 +28,8 @@ CATEGORIES = {
     "maintenance_updates": "maintenance_updates",
     "latest_bybit_news": "latest_bybit_news",
 }
+# Last observed official-site pagination totals on 2026-11-25. Fail closed if they change.
+EXPECTED_PAGES = {"new_crypto": 25, "delistings": 11, "maintenance_updates": 19, "latest_bybit_news": 11}
 SYMBOLS = (
     "AAVEUSDT ADAUSDT ALGOUSDT APTUSDT ARBUSDT ASTERUSDT ATOMUSDT AVAXUSDT "
     "BCHUSDT BNBUSDT BTCUSDT CAKEUSDT DASHUSDT DOGEUSDT DOTUSDT ENAUSDT "
@@ -152,8 +154,12 @@ def classify(title, text, category):
     sample = (title + " " + text[:12000]).lower()
     if re.search(r"\btradfi\b|\bstock\b|\bpre-ipo\b", sample):
         product = "tradfi_candidate"
-    elif re.search(r"\b(usdt|usdc)\s+perpetual\b|\bperpetual contract\b|\blinear contract\b", sample):
+    elif re.search(r"\b(usdt|usdc)\s+perpetual\b|\blinear contract\b", sample):
         product = "linear_candidate"
+    elif re.search(r"\binverse perpetual\b|\bxbtusd\b", sample):
+        product = "inverse_candidate"
+    elif re.search(r"\bperpetual contract\b", sample):
+        product = "perpetual_product_unknown"
     elif re.search(r"\bspot\b|\btrading pair\b", sample):
         product = "spot_or_token_candidate"
     else:
@@ -195,6 +201,7 @@ def main():
         "schema_version": 1, "source": BASE, "started_at_utc": utc_now(),
         "scope": {"categories": list(CATEGORIES), "symbols": SYMBOLS,
                   "max_pages_per_category": args.max_pages_per_category,
+                  "expected_pages_from_2026_11_25_observation": EXPECTED_PAGES,
                   "delay_seconds_minimum": args.delay,
                   "article_pages": "all unique article links found in selected archive pages"},
         "categories": {}, "article_count_unique": 0, "failures": [],
@@ -208,6 +215,8 @@ def main():
             page_capture = write_capture(root, Path("archive_pages") / category / "page-001.html",
                                           body, url=final_url, status=status, headers=headers, retrieved=retrieved)
             total_pages, found = parse_page(body, first_url)
+            if total_pages != EXPECTED_PAGES[category]:
+                raise RuntimeError(f"pagination changed or was not fully exposed: parsed {total_pages}, expected observed baseline {EXPECTED_PAGES[category]}; refusing to claim complete inventory")
             if total_pages > args.max_pages_per_category:
                 raise RuntimeError(f"archive reports {total_pages} pages; configured safety cap is {args.max_pages_per_category}")
             pages = [{"page": 1, **page_capture, "article_links_found": len(found)}]

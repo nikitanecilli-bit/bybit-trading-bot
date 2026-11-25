@@ -82,7 +82,7 @@ def normalize_parquet(path: Path) -> tuple[Path, str]:
         magic = stream.read(4)
     if magic == b"PAR1":
         return path, "raw_parquet"
-    if magic == b"\\x28\\xb5\\x2f\\xfd":
+    if magic == bytes((0x28, 0xB5, 0x2F, 0xFD)):
         decoded = path.with_name(path.stem + ".decoded.parquet")
         with path.open("rb") as source, decoded.open("wb") as target:
             zstandard.ZstdDecompressor().copy_stream(source, target)
@@ -260,7 +260,7 @@ def main() -> int:
                 day["error"] = f"{type(exc).__name__}: {exc}"
             report["dates"][date] = day
     output = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/bybit_official_trade_crosscheck.json")
-    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+    output.write_text(json.dumps(report, indent=2, sort_keys=True) + chr(10), encoding="utf-8")
     print(json.dumps(report, indent=2, sort_keys=True))
     return 1 if any(day["status"] != "EXACT_PAYLOAD_AND_ID_MATCH" for day in report["dates"].values()) else 0
 

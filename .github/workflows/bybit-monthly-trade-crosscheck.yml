@@ -1,5 +1,5 @@
 name: Bybit independent trade sample cross-check
-# Four sampled daily windows; joins adjacent receive-hour partitions by exchange trade_time; no PnL.
+# Five sampled daily windows; joins adjacent receive-hour partitions by exchange trade_time; no PnL.
 
 on:
   push:

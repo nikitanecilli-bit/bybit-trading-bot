@@ -2175,3 +2175,15 @@ Using the corrected dual-format article extraction, reviewed official announceme
 - All rows are linked to official announcements and exact captured raw-body SHA-256 values in `BYBIT_DATED_PERPETUAL_PARAMETER_EVENTS_EXPANDED_PARTIAL_2026-11-25_RU.md`.
 
 Maximum order quantities are in coins and must not be confused with qtyStep, minimum quantity/notional or risk tiers. This improves D5 evidence but does not establish a complete historical specification database. D5 remains NOT ACCEPTED. D6 remains NOT ACCEPTED because these tables do not contain complete historical risk-limit tier ladders or maintenance-margin rates. The 47-symbol universe remains a proxy, not a Bybit point-in-time universe. No new market API calls, account API calls, orders, PnL or backtests were used.
+
+
+## 60. Bybit official risk-limit rules compared with current engine (2026-11-25)
+
+Official Bybit documentation and V5 API schema were compared with the research engine:
+- Bybit's effective position value is the maximum of long-side position + long open orders versus short-side position + short open orders; Reduce-only and Close-on-Trigger orders are excluded. For linear USDT/USDC contracts, values use Mark Price. Mark Price changes can move a position into another tier in real time.
+- The public V5 `GET /v5/market/risk-limit` response schema includes risk limit value, IMR, MMR, max leverage and maintenance-margin deduction. It is a current snapshot endpoint, not a historical archive.
+- Current engine foundations: Decimal tier parsing, dated snapshot selection, tier-aware single-entry sizing, and single-position Mark-Price maintenance-margin/liquidation calculations.
+- Confirmed gaps: no full side-specific aggregation of all open positions and active orders; no full order classification by Reduce-only/Close-on-Trigger; no aggregate cap enforcement; no 10-day risk-parameter adjustment buffer state machine; no cross/portfolio account-level margin model.
+- Detailed audit and recommended implementation sequence: `BYBIT_RISK_LIMIT_MODEL_VS_OFFICIAL_RULES_GAP_AUDIT_2026-11-25_RU.md`.
+
+Decision: risk-tier calculation is a PARTIAL foundation, not a complete Bybit risk manager. Aggregate position/order risk, buffer lifecycle and account-level margin remain NOT IMPLEMENTED. No code change, public API call, account API call, order, PnL or backtest was performed for this audit.

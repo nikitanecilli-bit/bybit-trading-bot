@@ -161,29 +161,47 @@ def finalize_snapshot_evidence(
 
 
 def validate_evidence_manifest(manifest_path: str | Path) -> dict[str, Any]:
+    """Verify raw files, page-to-response coverage, and normalized page inventory."""
     path = Path(manifest_path)
     errors: list[str] = []
     try:
         manifest = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {"ok": False, "errors": ["manifest_missing_or_invalid"], "records": 0}
-    if manifest.get("schema_version") != 1 or not isinstance(manifest.get("records"), list):
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != 1:
         return {"ok": False, "errors": ["manifest_schema_invalid"], "records": 0}
+    records = manifest.get("records")
+    pages = manifest.get("collection_pages")
+    if not isinstance(records, list) or not records:
+        errors.append("records_missing")
+        records = []
+    if not isinstance(pages, list) or not pages:
+        errors.append("collection_pages_missing")
+        pages = []
+
     root = path.parent.resolve()
     records_by_id: dict[str, dict[str, Any]] = {}
-    for record in manifest["records"]:
+    for record in records:
         if not isinstance(record, dict):
             errors.append("record_invalid")
             continue
         request_id = record.get("request_id")
         if not isinstance(request_id, str) or not request_id:
             errors.append("request_id_missing")
-        else:
-            records_by_id[request_id] = record
-        if record.get("http_status") != 200:
+            continue
+        if request_id in records_by_id:
+            errors.append("duplicate_request_id")
+        records_by_id[request_id] = record
+        if type(record.get("http_status")) is not int or record["http_status"] != 200:
             errors.append("http_status_not_200")
-        if not isinstance(record.get("request"), dict) or record["request"].get("method") != "GET":
+        request = record.get("request")
+        if not isinstance(request, dict) or request.get("method") != "GET":
             errors.append("request_identity_invalid")
+        digest = record.get("body_sha256")
+        if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+            errors.append("body_hash_invalid")
+        if type(record.get("body_bytes")) is not int or record["body_bytes"] < 0:
+            errors.append("body_size_invalid")
         for key in ("body_file", "audit_file"):
             relative = record.get(key)
             if not isinstance(relative, str) or not relative:
@@ -200,7 +218,7 @@ def validate_evidence_manifest(manifest_path: str | Path) -> dict[str, Any]:
                 continue
             if key == "body_file":
                 body = target.read_bytes()
-                if hashlib.sha256(body).hexdigest() != record.get("body_sha256"):
+                if hashlib.sha256(body).hexdigest() != digest:
                     errors.append("raw_body_hash_mismatch")
                 if len(body) != record.get("body_bytes"):
                     errors.append("raw_body_size_mismatch")
@@ -212,21 +230,41 @@ def validate_evidence_manifest(manifest_path: str | Path) -> dict[str, Any]:
                     continue
                 if audit != record:
                     errors.append("audit_record_content_mismatch")
-    pages = manifest.get("collection_pages")
-    if not isinstance(pages, list):
-        errors.append("collection_pages_missing")
-    else:
-        for page in pages:
-            if not isinstance(page, dict):
-                errors.append("collection_page_invalid")
-                continue
-            request_id = page.get("raw_response_request_id")
-            body_hash = page.get("raw_response_body_sha256")
-            record = records_by_id.get(request_id) if isinstance(request_id, str) else None
-            if record is None:
-                errors.append("collection_page_raw_record_missing")
-            elif record.get("body_sha256") != body_hash:
-                errors.append("collection_page_raw_hash_mismatch")
+
+    referenced_ids: list[str] = []
+    page_keys: list[tuple[str | None, int | None]] = []
+    for page in pages:
+        if not isinstance(page, dict):
+            errors.append("collection_page_invalid")
+            continue
+        request_id = page.get("raw_response_request_id")
+        body_hash = page.get("raw_response_body_sha256")
+        if not isinstance(request_id, str) or not request_id:
+            errors.append("collection_page_request_id_missing")
+            continue
+        referenced_ids.append(request_id)
+        record = records_by_id.get(request_id)
+        if record is None:
+            errors.append("collection_page_raw_record_missing")
+        elif record.get("body_sha256") != body_hash:
+            errors.append("collection_page_raw_hash_mismatch")
+        page_index = page.get("page_index")
+        if type(page_index) is not int or page_index < 1:
+            errors.append("collection_page_index_invalid")
+            page_index = None
+        status = page.get("status_filter")
+        if status is not None and (not isinstance(status, str) or not status):
+            errors.append("collection_page_status_invalid")
+            status = None
+        page_keys.append((status, page_index))
+
+    if len(referenced_ids) != len(set(referenced_ids)):
+        errors.append("raw_response_referenced_more_than_once")
+    if set(referenced_ids) != set(records_by_id):
+        errors.append("raw_response_record_unreferenced")
+    if len(page_keys) != len(set(page_keys)):
+        errors.append("collection_page_key_duplicate")
+
     output = manifest.get("normalized_output")
     if not isinstance(output, dict) or not isinstance(output.get("path"), str):
         errors.append("normalized_output_missing")
@@ -239,8 +277,38 @@ def validate_evidence_manifest(manifest_path: str | Path) -> dict[str, Any]:
         else:
             if not target.is_file():
                 errors.append("normalized_output_not_found")
-            elif hashlib.sha256(target.read_bytes()).hexdigest() != output.get("sha256"):
-                errors.append("normalized_output_hash_mismatch")
-            elif target.stat().st_size != output.get("bytes"):
-                errors.append("normalized_output_size_mismatch")
-    return {"ok": not errors, "errors": errors, "records": len(manifest["records"])}
+            else:
+                output_bytes = target.read_bytes()
+                if hashlib.sha256(output_bytes).hexdigest() != output.get("sha256"):
+                    errors.append("normalized_output_hash_mismatch")
+                if len(output_bytes) != output.get("bytes"):
+                    errors.append("normalized_output_size_mismatch")
+                try:
+                    snapshot = json.loads(output_bytes.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    errors.append("normalized_output_invalid_json")
+                else:
+                    observations = snapshot.get("page_observations") if isinstance(snapshot, dict) else None
+                    if not isinstance(observations, list) or not observations:
+                        errors.append("normalized_page_observations_missing")
+                    elif len(observations) != len(pages):
+                        errors.append("normalized_page_count_mismatch")
+                    else:
+                        observation_keys = []
+                        for item in observations:
+                            if not isinstance(item, dict):
+                                errors.append("normalized_page_observation_invalid")
+                                continue
+                            idx = item.get("page_index")
+                            status = item.get("status_filter")
+                            if type(idx) is not int or idx < 1:
+                                errors.append("normalized_page_index_invalid")
+                                idx = None
+                            if status is not None and (not isinstance(status, str) or not status):
+                                errors.append("normalized_page_status_invalid")
+                                status = None
+                            observation_keys.append((status, idx))
+                        if observation_keys != page_keys:
+                            errors.append("normalized_page_inventory_mismatch")
+
+    return {"ok": not errors, "errors": errors, "records": len(records)}

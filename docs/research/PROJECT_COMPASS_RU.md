@@ -2,7 +2,7 @@
 
 > Назначение: компактная путеводная карта для пользователя и AI-агента. Она сохраняет смысл проекта, накопленные решения, доказательства, запреты и ближайшую точку продолжения между чатами.
 >
-> Последняя содержательная сверка: 2026-11-24. Рабочая база: `research/market-regime-v1-main`. PROJECT COMPASS и обязательная инструкция чтения уже включены в эту ветку через PR #15 (squash commit `f92a21118573990398ffd9727c9e6f8ba0ec299b`). `main` не изменялся.
+> Последняя содержательная сверка: 2026-11-25. Рабочая база: `research/market-regime-v1-main`. PROJECT COMPASS и обязательная инструкция чтения уже включены в эту ветку через PR #15 (squash commit `f92a21118573990398ffd9727c9e6f8ba0ec299b`). `main` не изменялся.
 >
 > **Правило чтения:** перед любой новой задачей по проекту прочитать этот документ, затем проверить актуальные файлы/коммиты/CI в GitHub. Этот документ — карта смысла и решений, но не замена исходному коду, Experiment Ledger, аудитам и свежим GitHub-данным.
 
@@ -16,9 +16,11 @@
 
 ### Текущее главное ограничение
 
-Нет ни одного пути, который одновременно содержит **полностью специфицированную торговую гипотезу** и **принятую независимую доказательную базу** для честной проверки net edge на условиях Bybit. H-B имеет только signal/entry mechanics без полного lifecycle; H1 baseline имеет более полный lifecycle, но прежние folds уже использованы и их net-PnL непригоден для доказательства. Одновременно отсутствуют реальные Bybit market archives и полный effective-time evidence для funding/specs/risk.
+Нет ни одного пути, который одновременно содержит **полностью специфицированную торговую гипотезу** и **принятую независимую доказательную базу** для честной проверки net edge на условиях Bybit. H-B имеет только signal/entry mechanics без полного lifecycle; H1 baseline имеет более полный lifecycle, но прежние folds уже использованы и их net-PnL непригоден для доказательства.
 
-Следовательно, ближайшая работа — найти минимальный кандидат + независимый data period, не создавая новые стратегии и не ослабляя data gates. Read-only review показал, что H1 Donchian(48)+EMA50/200 — наиболее близкий существующий кандидат: у него есть signal и lifecycle, но текущий runner навязывает maker OHLC fill proxy. Наиболее дешёвый возможный путь — отдельная preregistered taker-only single-symbol execution profile поверх существующего engine. Это пока только design direction: сначала доказать наличие независимых Bybit-native данных; runner и PnL не создавать/не запускать до этого. Read-only аудит внешнего Veldra adapter не выявил преимущества над нашим существующим downloader/tooling; портировать или менять runtime нецелесообразно. Текущее ограничение — принятие реальных исторических данных и разрешение на их получение, а не отсутствие загрузчика. Узкий single-instrument H1 pilot может снять требование к широкому cross-sectional universe, но не отменяет проверки lifecycle выбранного контракта, OHLCV, Mark (если нужен для trigger/risk), funding completeness, dated specs и fees. Подробный scope и границы вывода: [Minimum Viable Edge Validation](MINIMUM_VIABLE_EDGE_VALIDATION_RU.md). Это рабочий диагноз, который пересматривается по новым фактам.
+**Изменение 2026-11-25:** пользователь разрешил получать публичные независимые исторические рыночные данные. Доступ к источнику теперь доказан: CryptoHFTData BTCUSDT, 2026-11-01 12:00 UTC — три файла trades/orderbook/mark_price скачаны и прошли базовую проверку. Tardis BTCUSDT 2026-11-01 — однодневный trades/L2 sample также скачан и проверен. Это снимает блокер разрешения и первичной доступности, но не означает, что полная история или источники приняты для PnL.
+
+Следующее ограничение — получить достаточный непрерывный независимый период и закрыть пробелы по reconnect/missing hours, settled funding, dated specs/risk, fees и PIT universe; параллельно зафиксировать один candidate и реалистичный execution contract. H1 Donchian(48)+EMA50/200 остаётся наиболее близким по lifecycle кандидатом, но текущий runner навязывает maker OHLC fill proxy. Отдельная preregistered taker-only single-symbol profile остаётся design direction, не утверждённой стратегией. Runner и PnL не создавать/не запускать до закрытия data/method gates. Узкий single-instrument H1 pilot может снять cross-sectional universe requirement, но не отменяет проверки lifecycle выбранного контракта, OHLCV, Mark, funding completeness, dated specs и fees. Подробный scope: [Minimum Viable Edge Validation](MINIMUM_VIABLE_EDGE_VALIDATION_RU.md).
 
 
 
@@ -128,24 +130,25 @@ H-B прошла только узкую синтетическую провер
 **Решение: H-B SYNTHETIC MECHANICS COMPLETE / FROZEN.** Не добавлять lifecycle, manager, sizing, exits, новые H-B filters или новые strategy families. Продолжение возможно только при появлении легитимного независимого пути market validation, который укладывается в разрешения пользователя и data/provenance gates. До этого — read-only аудит уже имеющихся данных и документационная гигиена.
 ## 5. Данные и ограничения, которые блокируют рыночные выводы
 
-В provenance-аудитах были выявлены пробелы:
-- Bybit-native H1 trade OHLCV — отсутствует/не подтверждён в исследовательском пакете;
-- mark-price history — отсутствует/не подтверждён;
-- funding settlements/history — отсутствуют/не подтверждены;
+В provenance-аудитах и новом sample validation выявлены следующие пробелы:
+- Bybit-native trades/L2/mark теперь доступны и проверены на одном часу, но непрерывный H1 period и полный historical coverage ещё не приняты;
+- trades имеют documented reconnect gaps до примерно 3 минут около 02:00–02:50 UTC; provider backfill пока не опубликован;
+- известные Bybit orderbook missing hours: 2025-11-26 10 — 2025-12-26 19 и 2026-04-13 15 — 2026-04-14 21 UTC;
+- у provider есть unresolved note о REST depth snapshots, опубликованных как orderbook resets с update IDs от другого depth stream; snapshot/sequence transitions требуют проверки;
+- mark-price sample после 2026-09 release имеет полное состояние, но funding_rate/next_funding_time — не settled funding cashflow ledger;
 - point-in-time universe, включая delisted/suspended инструменты — частичный/неподтверждённый;
 - dated instrument specifications и risk tiers — частичные/неподтверждённые;
-- representative L2 order book/trades — отсутствуют (имелся лишь ограниченный диагностический пример);
 - dated account/symbol fee assumptions — не подтверждены.
 
-GitHub-hosted runner ранее получал HTTP 403 от Bybit. В предыдущем scope были установлены ограничения: не обходить блокер запуском collectors, не скачивать новые архивы и не подключать account/private API без отдельного пересмотра разрешений и протокола данных.
+Tardis sample также доступен, но normalized L2 CSV не сохраняет Bybit matching-engine cts и sequence IDs; поэтому для queue replay он вторичный источник. Paid raw replay API не включён в текущее разрешение.
 
 **До снятия data/method gates:**
-- не запускать новые market-PnL backtests, parameter sweeps или replay;
-- не подключать Bybit private/account API, ключи или live;
-- не запускать paper/live trading;
-- не выдавать Binance proxy или OHLC fill за Bybit-native доказательство.
+- не запускать новые market-PnL backtests, parameter sweeps или strategy replay;
+- не подключать Bybit private/account API, ключи или trading endpoints;
+- не запускать paper/live trading и не размещать реальные ордера;
+- не выдавать Binance proxy, Tardis normalized L2 или OHLC fill за доказательство точного Bybit execution.
 
-Допустимы безопасные статические аудиты, чтение уже сохранённых артефактов, проверка provenance, deterministic synthetic tests и точечные исправления подтверждённых дефектов — если они не обходят действующие gates.
+Разрешены публичные исторические downloads/samples/backfills в ограниченном scope, их provenance/coverage/schema/hash validation и необходимые scripts/workflows. Платные подписки/API keys требуют отдельного согласования. Также разрешены безопасные статические аудиты, deterministic synthetic tests и точечные исправления подтверждённых дефектов.
 
 ## 6. Архитектурные и методологические принципы
 
@@ -199,19 +202,32 @@ GitHub-hosted runner ранее получал HTTP 403 от Bybit. В пред�
 
 Попытка переноса/восстановления репозитория `tradernijita-stack/Trader` в ноябре 2026 — отдельная операция с репозиторием. Источник исследовательской истории и текущей рабочей кодовой базы, который здесь рассматривается, — `nikitanecilli-bit/bybit-trading-bot`. Не путать два репозитория и не считать перенос успешным без проверки.
 
-## 10. Текущая точка на 2026-11-24
+## 10. Текущая точка на 2026-11-25
 
 - **Цель:** доказать или опровергнуть устойчивый net edge после реалистичных издержек и независимой проверки. Доказанного edge нет.
 - **H-A:** проверенная конфигурация отклонена; не тюнить на использованных folds.
 - **H-C:** mechanics behind default-OFF flag; проверенная proxy-конфигурация не показала прибыльного преимущества; не продолжать tuning на использованном окне.
 - **Базовая H1/E01–E13:** deferred/no edge. Исторические proxy результаты не являются актуальным доказательством; есть survivorship/PIT и execution gaps.
 - **H-B:** synthetic signal + frozen regime adapter + next-open geometry complete/frozen. Final bounded Research CI #45466778550 passed 13 + 6 + 8 tests. Synthetic gross R/R fixture 0.4. Это не market PnL и не edge. Никакого engine lifecycle/exit/persistence/sizing integration.
-- **Данные:** в текущем Git tree — шесть CryptoFetch ZIP (67 CSV members), Binance-style OHLCV proxy. В read-only archive artifact #13187466159: 67/67 структурно валидны, 64 eligible, 3 пусты, нет malformed/gaps/conflicting overlap и нет потери timestamps в longest-file pair comparisons. Это подтверждает целостность этих архивов, но не Bybit provenance или полноту рынка.
-- **Критические пробелы:** нет подтверждённого Bybit-native trade OHLCV, mark-price history, funding completeness, dated instrument/risk-tier snapshots и полноценного PIT tradable universe. Старые audit documents подробно описывают эти блокеры.
-- **Разрешения:** никаких Bybit/API keys/private endpoints, runner setup, новых биржевых архивов/collectors, market-PnL backtests/sweeps/event studies, paper/live или реальных ордеров до выполнения последовательных historical и paper/forward gates. Live требует отдельного разрешения.
+- **Данные:** шесть старых CryptoFetch ZIP остаются Binance-style proxy. Дополнительно CryptoHFTData BTCUSDT 2026-11-01 12:00 UTC: trades 25 700 rows; L2 655 729 rows/105 736 updates; mark_price 5 728 rows. Все три Parquet файла скачаны, schema и базовые инварианты проверены; L2 book восстановлен без crossed states. SHA-256 и отчёт — Actions run #45625276612 / artifact #15028337972. Tardis BTCUSDT 2026-11-01 trades/L2 daily sample также скачан и прошёл gzip/CSV scan, но normalized L2 не содержит cts/sequence IDs.
+- **Критические пробелы:** нет принятого полного independent period, H1 bars coverage, settled funding ledger, dated instrument/risk-tier history, PIT tradable universe и account/symbol fee assumptions. У CryptoHFTData известны reconnect gaps и missing orderbook hours; см. Board и Minimum Viable Edge Validation.
+- **Разрешения:** пользователь разрешил публичные исторические downloads/samples/backfills и их проверку. Не разрешены private/account API, paid subscriptions, paper/live trading, реальные ордера. Market-PnL backtests/sweeps/event studies остаются заблокированы до приёмки выборки и preregistration.
 - **Рабочая ветка:** research/market-regime-v1-main; HEAD при последней сверке 1e08da2cff4b07159b80664da79c70110b2f80ad. Последний принятый code/test CI #45466778550 относится к 84d1da812d1958cbb32f3789895c7d4b56e45488; последующие commits в цепочке документируют freeze.
 - **PR:** #15 (Compass) и #16 (H-B signal contract) merged в research branch; PR #13 закрыт как superseded by PR #15; старый context-recovery protocol не является параллельным источником инструкций. main не изменялась.
-- **Следующий безопасный режим:** read-only audit уже имеющихся datasets/provenance и документационная гигиена. Если никакой допустимый путь к независимой market validation не существует, оставить проект BLOCKED, а не строить новые слои.
+- **Следующий безопасный режим:** ограниченный CryptoHFTData backfill одного заранее выбранного инструмента после фиксации candidate/execution contract; сначала соседние часы, reconnect/missing-hour audit и settled funding/spec gates. Market PnL пока не запускать.
+
+
+### 2026-11-25 — разрешение и первый реальный Bybit historical sample
+- Пользователь явно разрешил поиск и получение публичных независимых исторических рыночных данных. Это не включает private/account API, paid subscriptions, paper/live trading или реальные ордера.
+- CryptoHFTData BTCUSDT 2026-11-01 12:00 UTC: скачаны trades (459,261 bytes), orderbook (6,209,377 bytes), mark_price (95,633 bytes). Все три Parquet schema совпали с ожидаемыми; gzip/Parquet decode завершён.
+- Trades: 25,700 rows, 25,700 unique IDs, 0 null/duplicate IDs, 0 timestamp regressions.
+- Orderbook: 655,729 rows, 1 snapshot, 105,736 update messages, 0 crossed message states, итоговая книга 50 bid/50 ask; final_update_id/last_update_id не регрессировали и не имели скачков в этом sample. prev_final_update_id отсутствует; transaction_time отсутствовал только на 100 snapshot rows.
+- Mark Price: 5,728 rows; mark_price/index_price/funding_rate/next_funding_time не null. Это не settled funding ledger.
+- Cross-feed timestamp check: Bybit publicTrade.T и orderbook.cts на общей миллисекундной шкале; 4.482% trade rows имеют точное совпадение миллисекунды с book update, nearest book timestamp median 5ms / p95 14ms / p99 18ms / max 75ms. Не трактовать это как причинную связь или гарантированный порядок доставки.
+- Report artifact: Actions run #45625276612, artifact #15028337972; сырые файлы не загружались в публичный artifact.
+- Tardis BTCUSDT 2026-11-01 full-day trades/L2 sample тоже скачан и прошёл gzip/CSV validation. Его normalized L2 schema теряет cts/sequence IDs; использовать только как secondary cross-check, не как основной queue replay input.
+- Решение: data access permission + one-hour sample gate пройдены. Full data coverage, reconnect gaps, missing hours, settled funding, dated specs/risk, PIT universe, fees и candidate execution contract остаются блокирующими. Ни market-PnL backtest, ни parameter sweep не запускались.
+
 ## Журнал изменений карты
 
 ### 2026-11-24 — первый глобальный контекстный аудит

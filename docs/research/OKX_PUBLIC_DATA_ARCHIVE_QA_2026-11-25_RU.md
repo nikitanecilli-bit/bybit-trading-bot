@@ -90,3 +90,17 @@ The immediate data constraint has shifted: H1 candles and Mark Price are availab
 - a genuinely independent validation period and venue/execution alignment for the intended deployment venue.
 
 Next work should be a read-only documentation/evidence review of OKX historical-data and contract-rule coverage, without expanding the collector to more instruments or endpoints until the gap and value are clear. No PnL/backtest/sweep/event study should begin without a separate explicit authorization.
+
+
+## Follow-up documentation review (no additional API calls)
+
+A read-only review of current official OKX documentation found a possible route to improve Funding coverage, but it has **not** been used in this pilot:
+
+- The standard `GET /api/v5/public/funding-rate-history` endpoint is explicitly documented as returning up to three months. It exposes `formulaType` (`noRate` / `withRate`), `fundingRate`, `realizedRate`, `fundingTime`, and `method`. OKX says the settlement interval can vary and instructs users to compare `fundingTime` and `nextFundingTime` rather than assume an 8-hour cadence. See [official API guide, Funding rate history](https://app.okx.com/docs-v5/en/#rest-api-public-data-get-funding-rate-history).
+- The official [Historical market data portal](https://www.okx.com/historical-data) advertises perpetual Funding history from March 2022 onwards.
+- OKX's official API changelog records a separate public historical-market-data query capability, including funding-rate data and daily/monthly aggregation; its query-window limit was later reduced to 10 days for daily and 10 months for monthly. This appears to be a promising candidate for a longer Funding archive, but the exact request/response contract and completeness rules still need to be confirmed from authoritative endpoint documentation before use. See [official API changelog](https://www.okx.com/docs-v5/log_en/).
+- Current public instrument metadata includes `upcChg`, but the official schema describes it as **upcoming changes**, not a complete history of past effective-time changes. It therefore does not close D5.
+- The documented account trading-fee endpoint is `GET /api/v5/account/trade-fee` and requires authentication. It is outside this public-only scope and is not used. Public fee tables/announcements may support conservative assumptions, but do not establish this user's account-specific historical tier.
+- No further endpoints, downloads, archives, or account APIs were called during this review.
+
+**Scope boundary:** retrieving the longer historical Funding archive would be a new collection step beyond the already completed narrow pilot. It is not silently enabled by this report. The candidate is documented for a separate explicit decision. No PnL/backtest/sweep/event study is started.

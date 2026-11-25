@@ -83,7 +83,7 @@ def canonical_url(url):
     p = urlparse(urljoin(BASE, url))
     if p.scheme != "https" or p.hostname != HOST:
         raise ValueError("non-official URL rejected")
-    path = re.sub(r"/+", "/", p.path)
+    path = re.sub(r"/+", "/", p.path).rstrip("/")
     return urlunparse(("https", HOST, path, "", "", ""))
 
 def request_bytes(opener, url, delay, timeout):
@@ -150,10 +150,10 @@ def parse_page(body, category_url):
 
 def classify(title, text, category):
     sample = (title + " " + text[:12000]).lower()
-    if re.search(r"\b(usdt|usdc)\s+perpetual\b|\bperpetual contract\b|\blinear contract\b", sample):
-        product = "linear_candidate"
-    elif re.search(r"\btradfi\b|\bstock\b|\bpre-ipo\b", sample):
+    if re.search(r"\btradfi\b|\bstock\b|\bpre-ipo\b", sample):
         product = "tradfi_candidate"
+    elif re.search(r"\b(usdt|usdc)\s+perpetual\b|\bperpetual contract\b|\blinear contract\b", sample):
+        product = "linear_candidate"
     elif re.search(r"\bspot\b|\btrading pair\b", sample):
         product = "spot_or_token_candidate"
     else:

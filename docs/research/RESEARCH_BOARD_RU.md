@@ -397,3 +397,10 @@
 - Fixed pagination parsing using actual numeric list-item titles and actual `/en/article/...` paths. Added structured article extraction from `__NEXT_DATA__.articleDetail` so classifier ignores site navigation/footer text.
 - Latest strict run `45585668574`: offline tests passed; collection in progress at last check. Intermediate runs/failures documented in Section 55; only latest code SHA can be evaluated for acceptance.
 - D4/D5/D6 remain PARTIAL / NOT ACCEPTED. No market/account API, trades, PnL or backtests.
+
+
+### 2026-11-25 — diagnostic re-audit of invalid 80-article artifact (Section 56)
+
+- Independently extracted article text from raw HTML `__NEXT_DATA__.articleDetail`. The old inventory's 80/80 TradFi + DELIST labels were contaminated by page chrome and are false positives.
+- Body-only diagnostic reclassification found one target-symbol article among those first 80: a funding-rate formula update dated 2026-11-19, matching ADA/ARB/ATOM/AVAX/LTC/NEAR USDT tickers. Product type remains unknown; candidate event only.
+- This invalid first-page sample is parser QA only, not event coverage evidence. No D4/D5/D6 acceptance.

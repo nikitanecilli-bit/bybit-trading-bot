@@ -23,6 +23,13 @@ class AnnouncementCollectorTests(unittest.TestCase):
         self.assertEqual(event, "RISK_LIMIT_CHANGE")
         product, event = classify("Stock split", "TradFi Perpetual contract split", "x")
         self.assertEqual(product, "tradfi_candidate")
+        product, _ = classify("Generic perpetual listing", "Perpetual contract", "x")
+        self.assertEqual(product, "perpetual_product_unknown")
+        product, _ = classify("Inverse perpetual listing", "Inverse perpetual contract", "x")
+        self.assertEqual(product, "inverse_candidate")
+    def test_archive_page_baseline_is_explicit(self):
+        from scripts.collect_bybit_announcements import EXPECTED_PAGES
+        self.assertEqual(EXPECTED_PAGES, {"new_crypto": 25, "delistings": 11, "maintenance_updates": 19, "latest_bybit_news": 11})
     def test_symbol_set_is_47_and_host_is_official(self):
         from scripts.collect_bybit_announcements import SYMBOLS
         self.assertEqual(len(SYMBOLS), 47)

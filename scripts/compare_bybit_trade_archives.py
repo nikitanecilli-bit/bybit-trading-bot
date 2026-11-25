@@ -100,12 +100,12 @@ def main() -> int:
                     if previous_local is not None and local_us < previous_local:
                         tardis_timestamp_regressions += 1
                     previous_local = local_us
+                    hour = datetime.fromtimestamp(ts_us // 1_000_000, tz=timezone.utc).strftime("%H")
+                    if hour not in tardis_by_hour:
+                        continue
                     side = row["side"].lower()
                     if side not in ("buy", "sell"):
                         tardis_unknown_side += 1
-                        continue
-                    hour = datetime.fromtimestamp(ts_us // 1_000_000, tz=timezone.utc).strftime("%H")
-                    if hour not in tardis_by_hour:
                         continue
                     key = (ts_us // 1000, side, dec(row["price"]), dec(row["amount"]))
                     tardis_by_hour[hour][key] += 1

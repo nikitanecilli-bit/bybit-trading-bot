@@ -2129,3 +2129,10 @@ The first article classifier used all visible page text, including global naviga
 ### 55.5. Acceptance rule
 
 Only an artifact produced by the latest code revision, with all four category page sequences complete, all discovered article pages captured, zero retrieval/parsing failures, and manually reviewed article classifications can support an event ledger. Any run with a different code SHA, incomplete page inventory, parser mismatch, or candidate-only classifications remains diagnostic. D4/D5/D6 stay PARTIAL / NOT ACCEPTED. No market data, account API, trading, PnL or backtest was involved.
+
+
+## 56. Diagnostic re-audit of the invalid first-page artifact (2026-11-25)
+
+The invalid first-page artifact from run `45584843911` was additionally re-audited directly from its captured raw HTML. It contains 80 article bodies and the original inventory claimed all 80 were `tradfi_candidate` and `DELIST`. This was a false positive pattern caused by classifying all visible page text, which included global site chrome. The raw HTML's embedded `__NEXT_DATA__.props.pageProps.articleDetail` was parsed independently; the article's own `title`, `date` and `content_html` were then used for a diagnostic reclassification. Under the corrected article-body-only rules, the 80-page sample no longer produced the universal TradFi/DELIST classifications. Only one article in this sample matched any of the 47 target symbols: “Update to Funding Rate Calculation Formula for Perpetual Contracts”, published `2026-11-19T00:00:00.000Z`, matching ADAUSDT, ARBUSDT, ATOMUSDT, AVAXUSDT, LTCUSDT and NEARUSDT. Its product classification remains `unknown`; event candidate is `FUNDING_RULE_CHANGE`.
+
+This is strictly a parser/classifier diagnostic on an artifact already marked INVALID / NOT ACCEPTED. It does not contribute to historical event coverage, universe completeness, D4/D5/D6 acceptance or backtest data. It demonstrates why the initial artifact must not be used and why the corrected full crawl must preserve raw HTML and structured article text separately. Symbol hits are candidates only; manual article review and exact contract/product confirmation remain mandatory.

@@ -1,4 +1,5 @@
 name: Bybit independent trade archive cross-check
+# Compares independent public feeds only; no trading or PnL is performed.
 
 on:
   push:

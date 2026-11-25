@@ -12,6 +12,11 @@ on:
 permissions:
   contents: read
 
+# Prevent duplicate full-archive crawls from overlapping commits.
+concurrency:
+  group: bybit-announcement-inventory-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   public-announcement-inventory:
     runs-on: ubuntu-latest

@@ -1994,3 +1994,58 @@ Official announcements are a credible route to improve D4 and selected D5/D6 fie
 However, this is a source-capability review, not an accepted historical dataset. The current search was targeted and sampled, not a full systematic crawl; no notices were downloaded into the repository, no event records were generated, no API or archive collector was run, and no gate status changes to ACCEPTED.
 
 **Next permissible research step:** design a bounded offline announcement inventory for the frozen 47-symbol Linear universe, beginning with D4 listing/delisting and D5 tick-size/order-size events, then D6 risk notices. Before any automated collection or raw archive capture, confirm that its network/source-access scope is separately authorized. Until then, keep all D4–D6 gates PARTIAL / NOT ACCEPTED.
+
+
+## 52. Bounded announcement-to-universe coverage spot check (2026-11-25)
+
+### 52.1. Exact denominator recovered from the original E11 artifact
+
+The original existing GitHub Actions artifact E11, run `41361376448`, artifact `13105661683` (`e11-h1-shared-capital-portfolio.zip`), was read to recover `e11_h1_shared_capital_universe_manifest.csv`. This was an already-existing research-result artifact, not a market-data archive. The manifest contains 50 rows: 47 included symbols and three exclusions (AEROUSDT, GRAMUSDT, HYPEUSDT), each excluded because one or more folds had fewer than 100 bars.
+
+The exact 47 included symbols are:
+
+`AAVEUSDT, ADAUSDT, ALGOUSDT, APTUSDT, ARBUSDT, ASTERUSDT, ATOMUSDT, AVAXUSDT, BCHUSDT, BNBUSDT, BTCUSDT, CAKEUSDT, DASHUSDT, DOGEUSDT, DOTUSDT, ENAUSDT, ETCUSDT, ETHUSDT, GMXUSDT, HBARUSDT, ICPUSDT, JSTUSDT, LINKUSDT, LTCUSDT, MINAUSDT, MORPHOUSDT, NEARUSDT, ONDOUSDT, PAXGUSDT, PEPEUSDT, POLUSDT, PUMPUSDT, QNTUSDT, RAYUSDT, RENDERUSDT, SHIBUSDT, SKYUSDT, SOLUSDT, SUIUSDT, TAOUSDT, TRXUSDT, UNIUSDT, WLDUSDT, WLFIUSDT, XLMUSDT, XRPUSDT, ZECUSDT`.
+
+**Denominator warning:** this is the E11/E13 Binance-style proxy sample selected for common fold history, not a Bybit Linear historical universe. It is fixed and survivor-biased. The three exclusions are not evidence that those contracts did not exist on Bybit; conversely, matching tickers do not prove continuous Bybit listing/tradability.
+
+### 52.2. Search method and boundary
+
+A bounded, manual, indexed-web search was run against official `announcements.bybit.com` pages for the exact 47-symbol set. Queries covered listing/delisting/suspension terms and the D5/D6 event families. Several specific dated notices were opened/read. This was **not** a page-by-page crawl of the official archive, not a full-pagination inventory, and not a raw HTML capture. Search-engine misses are recorded only as “no hit surfaced in this sample”; they are not recorded as “no event existed”. Product category was checked before counting an event; Spot, TradFi/stock and unrelated loan-program notices are not treated as Linear crypto-perpetual evidence.
+
+### 52.3. D5 — dated spec-change hits in the sampled notices
+
+- Tick-size notices surfaced hits for **10 / 47** symbols: Aug 11, 2026 — ATOMUSDT, CAKEUSDT, MORPHOUSDT, NEARUSDT, RENDERUSDT, TRXUSDT, XLMUSDT; Oct 12, 2026 — PAXGUSDT, BNBUSDT, BCHUSDT, CAKEUSDT, MORPHOUSDT. The union is 10 symbols.
+- Max-order-size notices surfaced one matching symbol in the sampled notices: Nov 5, 2026 — WLDUSDT. The reviewed Nov 9 and Nov 20, 2026 tables had no symbol from the 47-symbol sample.
+- Combined D5 hit set in this bounded sample: **11 / 47 (23.4%)**. This is a lower-bound count of positive matches in selected notices, not a coverage estimate for the full Bybit archive. No evidence was established for all qtyStep, minQty, minNotional, price bounds, contract multiplier or every historical change.
+
+Primary sources: [Aug 11 tick-size notice](https://announcements.bybit.com/en/article/change-tick-size-for-usdt-perpetual-contract-aug-11-2026--art4f47b6648755/); [Oct 12 tick-size notice](https://announcements.bybit.com/en/article/change-tick-size-for-usdt-perpetual-contract-oct-12-2026--art5c4a8b8eef37/); [Nov 5 max-order-size notice](https://announcements.bybit.com/en/article/changes-of-max-order-size-for-usdt-perpetual-contracts-nov-5-2026--artff0e2f730786/); [Nov 9 max-order-size notice](https://announcements.bybit.com/en/article/changes-of-max-order-size-for-usdt-perpetual-contracts-nov-9-2026--art30ea1bf8d3b1/); [Nov 20 max-order-size notice](https://announcements.bybit.com/en/article/changes-of-max-order-size-for-usdt-perpetual-contracts-nov-20-2026--arte1da2b0316fa/); [Nov 20 tick-size notice](https://announcements.bybit.com/en/article/change-tick-size-for-usdt-perpetual-contract-nov-20-2026--art2a243e629ca8/); [Jun 5 tick-size notice](https://announcements.bybit.com/en/article/change-tick-size-for-usdt-perpetual-contract-jun-5-2026-blt539f4749d220f97b/).
+
+### 52.4. D6 — risk-limit hits in the sampled notices
+
+The sampled Linear-perpetual risk-limit notices surfaced hits for **19 / 47** unique symbols:
+
+- Apr 28, 2026: POLUSDT, ALGOUSDT, ICPUSDT, ONDOUSDT, MINAUSDT.
+- Jun 12, 2026: PAXGUSDT.
+- Jul 8, 2026: RENDERUSDT, CAKEUSDT, DASHUSDT.
+- Sep 4, 2026: AVAXUSDT, XLMUSDT, LTCUSDT, BCHUSDT, UNIUSDT, DOTUSDT, ETCUSDT, ICPUSDT, ALGOUSDT, DASHUSDT, QNTUSDT, JSTUSDT, NEARUSDT.
+
+The union is **19 / 47 (40.4%)**. This counts symbols named in dated risk-limit notices, not full tier-history coverage. Where a notice provides only a change to maximum leverage or an affected-symbol list, it does not reconstruct every tier, maintenance-margin rate, position-value boundary, or account-applied tier. Sep 11 and Aug 21 examples returned by the search concern TradFi/stock contracts and were excluded from Linear crypto counts.
+
+Primary sources: [Apr 28 risk-limit notice](https://announcements.bybit.com/en/article/risk-limit-adjustment-for-selected-perpetual-contracts-polusdt-algousdt-apr-28-2026--blt57993cb6d157988e/); [Jun 12 risk-limit notice](https://announcements.bybit.com/en/article/risk-limit-adjustment-for-selected-perpetual-contracts-paxgusdt-galausdt-jun-12-2026--blt366cf2f185d6d505/); [Jul 8 risk-limit notice](https://announcements.bybit.com/en/article/risk-limit-adjustment-for-selected-perpetual-contracts-blurusdt-fartcoinusdt-jul-8-2026--blt22544b85ab5016cf/); [Sep 4 risk-limit notice](https://announcements.bybit.com/en/article/risk-limit-adjustment-for-selected-perpetual-contracts-avaxusdt-xlmusdt-sep-4-2026--art453915b9e8fd/).
+
+### 52.5. D4 — listing/delisting/lifecycle result
+
+The batched symbol searches for listing, delisting and trading-suspension terms did not surface a confirmed D4 notice naming one of the 47 sample symbols. This is **zero confirmed hits surfaced in this bounded search**, not 0/47 archive coverage and not evidence that no listing/delisting/suspension event occurred. Earlier sampled D4 notices for SCUSDT, ASPUSDT, TMXUSDT and AGIUSDT, and the CPUSDT listing, are outside this 47-symbol sample. D4 therefore remains unmeasured by this spot check.
+
+### 52.6. Coverage summary and decision
+
+| Stream | Unique symbols with a positive match in sampled notices | Interpretation |
+|---|---:|---|
+| D4 lifecycle | 0 surfaced | Search sample only; no absence inference |
+| D5 selected tick/order-size changes | 11 / 47 (23.4%) | Partial event evidence, not complete spec history |
+| D6 selected risk-limit changes | 19 / 47 (40.4%) | Partial event evidence, not full tier history |
+| D5 ∪ D6 | 24 / 47 (51.1%) | 23 symbols had no positive hit in the notices sampled; unknown whether archive contains events for them |
+
+The 24/47 union is not a “51.1% archive completeness” metric. It only describes distinct sample symbols named by at least one selected D5/D6 notice. A systematic archive inventory still requires official archive pagination/category reconciliation, symbol-by-symbol event ledger, exact source URLs and publication/effective timestamps, and a complete denominator that is genuinely Bybit Linear rather than a survivor-biased proxy sample.
+
+**Decision:** no D4/D5/D6 gate is accepted or upgraded. No market data, Bybit API endpoints, automated collectors, raw announcement pages, PnL, backtests, sweeps or event studies were run. Only the already-existing E11 result artifact was read to recover its manifest; public announcement pages/search results were inspected without raw capture. The next useful step is to design the archive-pagination and reconciliation protocol, but automated crawling/raw capture remains outside the present authorization scope.

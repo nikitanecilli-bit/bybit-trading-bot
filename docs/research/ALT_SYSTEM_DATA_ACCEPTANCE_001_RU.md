@@ -2164,3 +2164,14 @@ This was an offline audit of the existing artifact, not a new crawl. The old art
 The corrected dual-format extraction was applied offline to the 1,275-article artifact. A bounded title/body review identified 63 risk-limit / position-tier / maximum-leverage candidates; 9 official notices intersect the frozen 47-symbol proxy universe, covering 32 distinct proxy symbols. The event-level publication timestamps, stated effective times, buffer-period ends where supplied, matched symbols, official article links and raw HTML SHA-256 values are recorded in `BYBIT_RISK_LIMIT_NOTICE_EVENT_INVENTORY_PARTIAL_2026-11-25_RU.md`.
 
 These notices establish dated risk-parameter change events and affected-symbol evidence. They do not provide a complete tier ladder with notional thresholds and maintenance-margin rates. The 47-symbol set remains a Binance-style survivor-biased proxy, not a Bybit point-in-time universe. D6 remains NOT ACCEPTED. No market/account API, orders, PnL or backtests were used.
+
+
+## 59. Expanded dated Bybit tick-size and maximum-order-size evidence (2026-11-25)
+
+Using the corrected dual-format article extraction, reviewed official announcement tables from the existing 1,275-article artifact. The expanded partial inventory contains:
+- 7 tick-size notices intersecting the 47-symbol proxy: 19 symbol/event rows across 14 distinct proxy symbols.
+- 8 maximum market/limit order-size notices intersecting the proxy: 29 symbol/event rows across 31 distinct proxy symbols.
+- Two January maximum-order-size articles have an internal year conflict: title/publication indicate 2026, but the article body states 2025 for the effective date. They are preserved and quarantined from a 2026 effective-time timeline pending independent resolution.
+- All rows are linked to official announcements and exact captured raw-body SHA-256 values in `BYBIT_DATED_PERPETUAL_PARAMETER_EVENTS_EXPANDED_PARTIAL_2026-11-25_RU.md`.
+
+Maximum order quantities are in coins and must not be confused with qtyStep, minimum quantity/notional or risk tiers. This improves D5 evidence but does not establish a complete historical specification database. D5 remains NOT ACCEPTED. D6 remains NOT ACCEPTED because these tables do not contain complete historical risk-limit tier ladders or maintenance-margin rates. The 47-symbol universe remains a proxy, not a Bybit point-in-time universe. No new market API calls, account API calls, orders, PnL or backtests were used.

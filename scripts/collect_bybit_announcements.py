@@ -78,7 +78,16 @@ class VisibleText(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.parts = []
+        self.skip_depth = 0
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() in {"script", "style"}:
+            self.skip_depth += 1
+    def handle_endtag(self, tag):
+        if tag.lower() in {"script", "style"} and self.skip_depth:
+            self.skip_depth -= 1
     def handle_data(self, data):
+        if self.skip_depth:
+            return
         text = " ".join(data.split())
         if text:
             self.parts.append(text)
@@ -342,10 +351,15 @@ def main():
     run["symbol_hits"] = dict(symbol_hits)
     run["article_records"] = article_records
     run["finished_at_utc"] = utc_now()
+    run["semantic_complete"] = (
+        run["article_count_captured"] == run["article_count_unique"]
+        and all(record.get("content_text_chars", 0) > 0 for record in article_records)
+    )
     run["complete"] = (
         not run["failures"]
         and all(v.get("complete") for v in run["categories"].values())
         and run["article_count_captured"] == run["article_count_unique"]
+        and run["semantic_complete"]
     )
     (root / "inventory.json").write_text(
         json.dumps(run, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8"
@@ -356,6 +370,7 @@ def main():
             for k, v in run["categories"].items()
         }, "unique_articles": run["article_count_unique"],
         "captured_articles": run["article_count_captured"],
+        "semantic_complete": run["semantic_complete"],
         "failure_count": len(run["failures"]),
         "symbols_with_hits": sum(bool(v) for v in symbol_hits.values()),
     }, ensure_ascii=False), flush=True)

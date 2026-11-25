@@ -1,6 +1,6 @@
 # Research Board — текущее состояние лаборатории
 
-> Последняя сверка: 2026-11-24. Рабочая ветка: `research/market-regime-v1-main`. Это короткая управленческая панель; детали, доказательства и исторические значения остаются в Experiment Ledger и первичных отчётах.
+> Последняя сверка: 2026-11-25. Рабочая ветка: `research/market-regime-v1-main`. Это короткая управленческая панель; детали, доказательства и исторические значения остаются в Experiment Ledger и первичных отчётах.
 
 ## 0. Цель компании и текущее ограничение
 
@@ -8,9 +8,9 @@
 
 **Метод управления:** Theory of Constraints — найти ограничение, использовать его, подчинить ему остальную работу, расширить и повторить. Любая задача должна снимать текущее ограничение или быть обязательным контролем качества/риска; активность и количество артефактов не являются результатом.
 
-**Текущее ограничение:** ни одна гипотеза не соединяет сейчас полностью специфицированный trading lifecycle с независимым допустимым data/evidence path. H-B — только signal/entry mechanics; H1 baseline — lifecycle есть, но прежние folds уже использованы и net-PnL старых прогонов не годится для доказательства. Реальные Bybit archives и effective-time evidence также отсутствуют.
+**Текущее ограничение:** путь получения Bybit-native данных теперь доказан на уровне одного часа, но полной принятой независимой выборки ещё нет. CryptoHFTData: BTCUSDT, 2026-11-01 12:00 UTC — сделки, L2 и Mark Price скачаны и прошли базовую проверку. Это снимает блокер доступа к источнику, но не закрывает полноту истории, пропуски reconnect, settled funding, dated specs/risk tiers, PIT universe и независимый holdout. Ни одна гипотеза пока не соединяет полностью специфицированный lifecycle с принятой доказательной базой.
 
-Ближайшая задача — найти один минимальный кандидат и действительно независимый период/данные. Узкий single-instrument scope может убрать cross-sectional universe requirement, но не отменяет lifecycle, D1/D3/D5 и применимые D2/D6/D8 gates. Детали: [Minimum Viable Edge Validation](MINIMUM_VIABLE_EDGE_VALIDATION_RU.md).
+Следующая задача — выбрать один frozen candidate/execution contract и только под него расширять проверенную выборку. Узкий single-instrument scope может убрать cross-sectional universe requirement, но не отменяет lifecycle, D1/D3/D5 и применимые D2/D6/D8 gates. Детали: [Minimum Viable Edge Validation](MINIMUM_VIABLE_EDGE_VALIDATION_RU.md).
 
 Канон: [Философия и операционная модель компании](../COMPANY_OPERATING_PHILOSOPHY_RU.md).
 
@@ -22,20 +22,19 @@
 
 ## 2. Текущий режим работы
 
-**Разрешено:**
-- read-only аудит кода, GitHub history, уже сохранённых данных и результатов;
-- deterministic synthetic tests и проверки временной причинности;
-- исправления, которые предотвращают искажение исследовательских результатов;
-- точечное улучшение документации и воспроизводимости.
+**Разрешено с 2026-11-25:**
+- получать публичные независимые исторические рыночные данные, скачивать ограниченные sample/backfill-периоды и проверять provenance, полноту, CRC, схему, timestamps и hashes;
+- использовать бесплатные публичные файлы CryptoHFTData и Tardis в пределах доступных лимитов;
+- создавать узкие скрипты/workflows, которые только скачивают и валидируют исторические данные; сохранять отчёты, не публикуя сырые архивы.
 
-**Не является текущей задачей и запрещено действующими gates:**
-- подключение Bybit, private/account API, API keys или live-режима;
-- настройка self-hosted runner и обход сетевых ограничений;
-- новые биржевые архивы/collectors;
-- новые market-PnL backtests, parameter sweeps или event studies на текущем пакете;
-- paper/live trading и реальные ордера.
+**По-прежнему запрещено / не разрешено этим решением:**
+- Bybit private/account API, ключи аккаунта, торговые endpoint и реальные ордера;
+- paper/live trading и подключение торгового робота;
+- обход сетевых ограничений через прокси или self-hosted runner;
+- платные подписки/платные API keys без отдельного согласования;
+- market-PnL backtests, parameter sweeps и event studies до приёмки достаточного периода данных и фиксации гипотезы.
 
-Запрет на Bybit/runner/новые архивы действует до последовательного прохождения исторической проверки и paper/forward validation. Это не отменяет отдельного разрешения, которое потребуется для любых реальных ордеров.
+Разрешение касается только публичных исторических данных. Оно не является разрешением на торговлю или на оплату источников.
 
 ## 3. Доска гипотез
 
@@ -51,11 +50,15 @@
 
 ## 4. Данные: что реально есть
 
-В рабочем дереве на момент аудита обнаружены шесть ZIP в `data/archives/cryptofetch/`. Аудит архива сообщает 67 CSV entries: 64 непустых/пригодных для legacy loader, три пустых; перекрывающиеся дубликаты прошли сравнение без обнаруженных конфликтов.
+В рабочем дереве остаются шесть старых CryptoFetch ZIP — Binance-style OHLCV proxy. Дополнительно 2026-11-25 в GitHub Actions был скачан и проверен один час CryptoHFTData Bybit BTCUSDT (2026-11-01 12:00 UTC):
+- trades: 25 700 строк, 25 700 уникальных trade ID, 0 null/duplicate ID, 0 временных регрессий;
+- orderbook: 655 729 строк, 1 snapshot + 105 736 update messages, 0 crossed message states, финальная книга 50 bid / 50 ask; `prev_final_update_id` отсутствует во всех строках, поэтому этот конкретный continuity check недоступен;
+- mark_price: 5 728 строк, без null в mark/index/funding_rate/next_funding_time; estimated_settle_price пуст во всех строках;
+- SHA-256 и schema/Parquet metadata сохранены в отчёте Actions run #45625276612, artifact #15028337972. Сырые файлы в публичный artifact не загружались.
 
-Это Binance-style OHLCV proxy. В репозитории нет подтверждённого Bybit-native пакета trade OHLCV + mark + funding + dated instrument/risk-tier snapshots и нет полного point-in-time universe. Наличие collector-кода и его mocked/offline tests не означает, что реальные архивы были получены.
+Tardis также проверен на однодневном BTCUSDT sample 2026-11-01: trades и L2 CSV прошли gzip/CSV проверку. Но его нормализованный L2 CSV не содержит Bybit `cts`/sequence IDs; для точного queue replay он уступает CryptoHFTData и остаётся вторичным источником.
 
-Следствие: текущий data package не открывает путь к достоверному Bybit execution replay. Не маскировать этот пробел новыми расчётами на той же выборке.
+**Это подтверждает доступность и базовую корректность отдельных файлов, но не полную пригодность источника для backtest.** В Bybit trades у CryptoHFTData задокументированы reconnect gaps до примерно 3 минут около 02:00–02:50 UTC; Bybit orderbook имеет известные пропуски часов 2025-11-26 10 — 2025-12-26 19 и 2026-04-13 15 — 2026-04-14 21. Funding rate/next funding time в mark stream — это опубликованное состояние будущего funding, а не settled funding ledger. PIT universe и effective-time instrument/risk-tier history также не закрыты.
 
 
 
@@ -64,10 +67,11 @@
 ## 5. Ближайшая последовательность
 
 1. **H-B заморожена.** Её узкая синтетическая цель выполнена; никакой engine lifecycle, sizing, persistence, exit manager или новые семейства стратегий не добавлять.
-2. **Проверять только уже существующие данные и provenance.** В текущем Git tree — шесть CryptoFetch ZIP и никаких подтверждённых Bybit-native market archives. Read-only archive audit (run #41542079766, artifact #13187466159) проверил 67 CSV members: 67 структурно валидны, 64 имеют данные и проходят legacy 200-bar floor, три пусты; пропусков/нерегулярных интервалов и конфликтующих overlapping candles не обнаружено. Все шесть SHA-256 зафиксированы в артефакте.
-3. **Сохранять ограничения как блокирующие.** Данные — Binance-style OHLCV proxy; отсутствуют подтверждённые Bybit trade OHLCV, mark-price, funding, dated specs/risk tiers и полноценный point-in-time tradable universe. Не запускать новые market-PnL backtests, sweeps или event studies на этом пакете.
-4. **Поддерживать чистоту источников истины.** Синхронизировать верхние статусы Board/Compass с последними решениями; старые записи оставлять как историю, не удалять отрицательные результаты.
-5. **Не создавать искусственный следующий этап.** Если read-only аудит не открывает разрешённого независимого пути проверки, фиксировать BLOCKED и не заменять отсутствие доказательств дополнительной инфраструктурой.
+2. **Зафиксировать минимальный candidate и execution contract.** H1 Donchian48+EMA50/200 остаётся ближайшим по полноте lifecycle, но текущая maker OHLC модель не принимается как реалистичное исполнение. До нового PnL требуется отдельная preregistration, включая однозначную такерную/мейкерную модель и критерии ACCEPT/REJECT/INCONCLUSIVE.
+3. **Расширять CryptoHFTData только под frozen candidate.** Сначала проверить соседние часы, continuity, известные missing hours/reconnect gaps и Mark state; затем ограниченный независимый период одного инструмента. Не скачивать весь universe без причины. Лимит бесплатного доступа и число файлов оценивать до backfill.
+4. **Закрыть денежные потоки и спецификации.** Mark stream не заменяет settled funding history. Нужны точные funding settlement events, dated instrument specs/risk tiers и обоснованные fee assumptions; если доказать их нельзя, сузить claim или оставить D-gate NOT ACCEPTED.
+5. **Только после data acceptance — один preregistered market replay.** Не тюнить старые folds, не делать parameter sweep/event study на тех же данных и не использовать повторно уже просмотренный holdout.
+6. **Поддерживать чистоту источников истины.** Синхронизировать Board/Compass с последними решениями; исторические отрицательные результаты не удалять.
 ## 6. Критерии остановки и доказательности
 
 - Если signal contract требует будущих данных, неоднозначного timestamp или скрытого подбора параметров — остановить/переформулировать гипотезу.

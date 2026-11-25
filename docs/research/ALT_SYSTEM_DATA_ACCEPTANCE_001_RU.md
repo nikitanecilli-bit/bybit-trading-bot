@@ -2141,3 +2141,26 @@ This is strictly a parser/classifier diagnostic on an artifact already marked IN
 ### 56.1. Raw-capture integrity check on the invalid diagnostic artifact
 
 Separately verified every body file referenced by that 80-article artifact against its inventory metadata: 84/84 captures (4 archive HTML pages + 80 article HTML pages) had exact byte-size and SHA-256 matches; 0 missing and 0 mismatches. This confirms integrity of the bytes that were captured, not completeness of the archive crawl. The artifact remains INVALID / NOT ACCEPTED because it captured only page 1 of each category and its original page-chrome-derived classifications were contaminated.
+
+
+## 57. Correction of announcement content extraction audit (2026-11-25)
+
+The earlier Section 56.1 follow-up note that treated five empty `content_html` fields as empty article bodies was incorrect. Bybit stores article content in two payload formats: rendered `content_html` and Contentstack rich-text `content.json`. Independent inspection of all 1,275 captured article payloads found 721 with non-empty HTML and 554 with empty HTML but non-empty rich-text JSON; 0 were empty in both formats. The five risk-limit articles previously listed as gaps all have full text in `content.json`. The prior five-article gap finding is withdrawn and superseded by `BYBIT_ANNOUNCEMENT_CONTENT_EXTRACTION_GAP_2026-11-25_RU.md`, now explicitly a correction/resolution record.
+
+Collector update:
+- `extract_article_payload` prefers visible HTML and falls back to recursive text extraction from `content.json`.
+- The source used and extracted character count are recorded per article.
+- HTML parsing ignores script/style content.
+- Collector-level `complete` now requires non-empty text for every captured article in addition to complete pagination and byte capture.
+- The separate semantic validator uses the same extractor and continues to reject genuinely empty content, parse errors, unsafe/missing paths and byte-hash/size mismatches.
+- Regression tests cover HTML, rich JSON fallback, truly empty bodies, script/style exclusion and byte-integrity failure.
+
+CI on the corrected extractor and tests has passed for commit `95431074854e71ef01468fbb54d7d62e0ed1bde7`; a later script/style regression fixture initially failed because the test embedded a literal closing script tag inside the JSON fixture. That was a fixture-escaping defect, not an extractor failure, and was corrected in the next test revision. The corrected test revision must be checked before declaring the current head green.
+
+This was an offline audit of the existing artifact, not a new crawl. The old artifact's raw HTML remains the evidence source; the corrected extractor still needs to be exercised in the next manual crawl. D4/D5/D6 remain PARTIAL / NOT ACCEPTED.
+
+## 58. Partial Bybit risk-limit notice event inventory (2026-11-25)
+
+The corrected dual-format extraction was applied offline to the 1,275-article artifact. A bounded title/body review identified 63 risk-limit / position-tier / maximum-leverage candidates; 9 official notices intersect the frozen 47-symbol proxy universe, covering 32 distinct proxy symbols. The event-level publication timestamps, stated effective times, buffer-period ends where supplied, matched symbols, official article links and raw HTML SHA-256 values are recorded in `BYBIT_RISK_LIMIT_NOTICE_EVENT_INVENTORY_PARTIAL_2026-11-25_RU.md`.
+
+These notices establish dated risk-parameter change events and affected-symbol evidence. They do not provide a complete tier ladder with notional thresholds and maintenance-margin rates. The 47-symbol set remains a Binance-style survivor-biased proxy, not a Bybit point-in-time universe. D6 remains NOT ACCEPTED. No market/account API, orders, PnL or backtests were used.

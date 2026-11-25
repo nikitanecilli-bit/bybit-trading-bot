@@ -24,7 +24,7 @@ SYMBOL = os.getenv("SYMBOL", "AAVEUSDT").upper()
 TRADE_DATE = os.getenv("TRADE_DATE", "2025-09-02")
 URL = os.getenv(
     "TRADES_URL",
-    f"https://public.bybit.com/trading/{SYMBOL}/{SYMBOL}{TRADE_DATE.replace('-', '')}.csv.gz",
+    f"https://public.bybit.com/trading/{SYMBOL}/{SYMBOL}{TRADE_DATE}.csv.gz",
 )
 ORDERBOOK_REPORT = Path("bybit_orderbook_sample_inspection.json")
 CHUNK = 1024 * 1024

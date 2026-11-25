@@ -74,18 +74,141 @@ def _decimal(value: Any, field: str, *, positive: bool = False) -> Decimal:
     return result
 
 
+def _atomic_write_bytes(path: Path, content: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_name, path)
+    finally:
+        if os.path.exists(temp_name):
+            os.unlink(temp_name)
+
+
+def validate_raw_response_manifest(manifest_path: str | Path) -> dict[str, Any]:
+    """Verify the immutable raw response bodies and their request audit records."""
+    manifest_path = Path(manifest_path)
+    errors: list[str] = []
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"ok": False, "errors": ["manifest_missing_or_invalid"], "records": 0}
+    if manifest.get("schema_version") != 1 or manifest.get("source") != "Bybit V5 public GET raw responses":
+        errors.append("manifest_identity_invalid")
+    records = manifest.get("records")
+    if not isinstance(records, list) or not records:
+        return {"ok": False, "errors": errors + ["records_missing"], "records": 0}
+    root = manifest_path.parent.resolve()
+    for record in records:
+        if not isinstance(record, dict):
+            errors.append("record_invalid")
+            continue
+        for key in ("body_file", "audit_file"):
+            relative = record.get(key)
+            if not isinstance(relative, str) or not relative:
+                errors.append(f"{key}_missing")
+                continue
+            target = (root / relative).resolve()
+            try:
+                target.relative_to(root)
+            except ValueError:
+                errors.append(f"{key}_escapes_manifest_root")
+                continue
+            if not target.is_file():
+                errors.append(f"{key}_not_found")
+                continue
+            if key == "body_file":
+                if hashlib.sha256(target.read_bytes()).hexdigest() != record.get("body_sha256"):
+                    errors.append("raw_body_hash_mismatch")
+            else:
+                try:
+                    audit = json.loads(target.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    errors.append("audit_record_invalid")
+                    continue
+                if audit != record:
+                    errors.append("audit_record_content_mismatch")
+    return {"ok": not errors, "errors": errors, "records": len(records)}
+
+
 def _request_json(base_url: str, endpoint: str, params: dict[str, Any],
-                  timeout: float = 20.0) -> dict[str, Any]:
+                  timeout: float = 20.0,
+                  raw_evidence_dir: str | Path | None = None,
+                  raw_records: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     validate_base_url(base_url)
     url = f"{base_url.rstrip('/')}{endpoint}?{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(url, headers={"User-Agent": "bybit-trading-bot-research/1.0"})
     try:
         with urllib.request.build_opener(_NoRedirectHandler()).open(req, timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            raw_body = response.read()
+            status = int(getattr(response, "status", 200))
+            response_headers = {
+                name: response.headers.get(name)
+                for name in ("Date", "Content-Type", "Content-Length", "Server")
+                if response.headers.get(name) is not None
+            }
     except urllib.error.HTTPError as exc:
         raise RuntimeError(f"Bybit market-history HTTP status {exc.code}; body suppressed") from exc
     except (urllib.error.URLError, TimeoutError) as exc:
         raise RuntimeError(f"Bybit market-history request failed ({type(exc).__name__})") from exc
+
+    if raw_evidence_dir is not None:
+        root = Path(raw_evidence_dir)
+        body_sha256 = hashlib.sha256(raw_body).hexdigest()
+        body_relative = f"bodies/{body_sha256}.json"
+        request_identity = {
+            "method": "GET", "base_url": base_url.rstrip("/"),
+            "endpoint": endpoint, "params": params,
+        }
+        request_id = hashlib.sha256(json.dumps(
+            request_identity, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8") + body_sha256.encode("ascii")).hexdigest()
+        audit_relative = f"requests/{request_id}.json"
+        record = {
+            "schema_version": 1,
+            "request_id": request_id,
+            "request": request_identity,
+            "retrieved_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "http_status": status,
+            "response_headers": response_headers,
+            "body_bytes": len(raw_body),
+            "body_sha256": body_sha256,
+            "body_file": body_relative,
+            "audit_file": audit_relative,
+        }
+        body_path = root / body_relative
+        if body_path.exists() and hashlib.sha256(body_path.read_bytes()).hexdigest() != body_sha256:
+            raise RuntimeError("existing raw response body failed its content-addressed hash")
+        if not body_path.exists():
+            _atomic_write_bytes(body_path, raw_body)
+        audit_path = root / audit_relative
+        if audit_path.exists():
+            try:
+                existing = json.loads(audit_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RuntimeError("existing raw response audit record is invalid") from exc
+            if existing != record:
+                # A repeated identical request may be captured at a different time.
+                # Keep each observation distinct without overwriting prior evidence.
+                request_id = hashlib.sha256(
+                    (request_id + record["retrieved_at_utc"]).encode("utf-8")
+                ).hexdigest()
+                record["request_id"] = request_id
+                record["audit_file"] = f"requests/{request_id}.json"
+                audit_path = root / record["audit_file"]
+        _atomic_write_bytes(audit_path, (json.dumps(
+            record, ensure_ascii=False, sort_keys=True, indent=2
+        ) + "\n").encode("utf-8"))
+        if raw_records is not None:
+            raw_records.append(record)
+
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("Bybit response body is not valid UTF-8 JSON") from exc
     if not isinstance(payload, dict):
         raise ValueError("Bybit response root must be an object")
     code = payload.get("retCode")

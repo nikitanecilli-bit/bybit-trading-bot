@@ -1926,3 +1926,71 @@ Self-hosted runner и новые collectors остаются запрещены 
 | D8 Fees | Current grouped Pro/MM fee information | Historical retail/account-specific fees | NOT ACCEPTED |
 
 **Решение:** не писать ещё один downloader и не переписывать runner. Основной технический вопрос теперь не «можем ли мы вызвать API», а «есть ли разрешённый, достаточно полный, воспроизводимый и независимый исторический период». Исследовательский статус остаётся **BLOCKED BY DATA + INDEPENDENCE**.
+
+
+## 51. Bybit official announcements as point-in-time evidence for D4–D6 (2026-11-25)
+
+### 51.1. D4 — listing/delisting announcements provide dated lifecycle events
+
+Read-only search of official Bybit announcements found repeatable primary-source event types:
+
+- New listings specify that trading is open and often include symbol, product category, settlement asset, initial tick size, maximum leverage, capped funding rate and funding interval. Example: CPUSDT Linear perpetual listing dated 2026-09-04, trading open, tick size 0.00001, max leverage 20, capped funding 2.5%, funding interval 4h.
+- Delisting announcements specify exact UTC delisting time and confirm trading ceases. Examples: SCUSDT 2026-06-11 09:00 UTC; ASPUSDT 2026-09-05 09:00 UTC; TMXUSDT 2026-10-30 09:00 UTC; AGIUSDT 2026-11-13 09:00 UTC.
+- Multi-asset migrations/rebrands can delist several perpetual symbols in one notice. Example: IPUSDT and IPUSDC delisted 2026-06-26 07:00 UTC; TON perpetual pairs delisted 2026-06-15 09:00 UTC.
+- Some corporate-action/contract-size announcements include explicit intraday trading halt windows and resume windows, including funding settlements skipped during the halt. Such events must be represented as temporary trading availability interruptions, not ordinary candle gaps.
+
+This is materially useful for PIT lifecycle: announcements can establish explicit listing/delisting effective timestamps and known halt windows for named symbols. However, search results and a sample of notices do not prove that the announcement archive is complete for all historical symbols, all suspension/resume events, or all categories. A notice can also cover Spot and Perpetual separately; product category must be parsed, never inferred from token name.
+
+**D4 status:** PARTIAL, with a stronger primary-source event reconstruction path. Not accepted until a systematic archive inventory, symbol-level coverage reconciliation, and conflict/absence policy are implemented. Current instruments-info snapshots remain corroboration, not a substitute.
+
+### 51.2. D5 — dated announcements contain several useful spec-change fields
+
+Official announcements expose at least these effective-time changes in structured text:
+
+- Tick size: current and new tick size plus effective UTC time. Examples: broad USDT Perpetual change on 2026-11-20 07:30 UTC; another batch 2026-10-12 07:30 UTC; another 2026-08-11 08:30 UTC.
+- Maximum order size: before/after market and limit order sizes in coin units plus effective UTC time. Examples: SOXXUSDT and SNDKUSDT on 2026-11-20 12:30 UTC; another batch on 2026-11-05 05:31 UTC.
+- Listing-time initial specifications: tick size, max leverage, capped funding rate and funding interval for the new contract.
+- Contract-size/corporate-action adjustments can include old/new conversion ratios, pause window, trading resume window, and whether funding settlements are skipped during the pause.
+
+This can reconstruct selected changes in `tickSize`, `maxMarketOrderSize`, `maxLimitOrderSize`, selected initial leverage/funding parameters, and contract multiplier/size conversion where explicitly stated.
+
+It does **not** reconstruct a complete historical spec vector for every symbol: minOrderQty, qtyStep, minNotional, price bounds, every leverage step, every contract multiplier change and all effective-time corrections are not guaranteed to appear in every announcement. A listing announcement is an initial snapshot, not proof that parameters stayed unchanged until the next discovered notice.
+
+**D5 status:** PARTIAL, with a practical primary-source event ledger path for fields explicitly announced. Not accepted as complete execution-spec history.
+
+### 51.3. D6 — risk-limit announcements prove dated changes, but often not full tier ladders
+
+Official examples show two levels of detail:
+
+1. Some announcements provide current and after-adjustment maximum leverage per symbol (e.g. selected perpetuals effective 2026-09-11 08:00 UTC).
+2. Other announcements only name affected symbols, state effective time, and link to a generic/current risk-limit rules page. Some notices describe account buffer periods and automatic application timing.
+
+The official Help Center explains that risk-limit changes can affect IMR, MMR, maximum leverage and position limits, and that tier can change dynamically as position value changes with Mark Price. This means a dated max-leverage change is not equivalent to a full historical tier table or an account-applied tier observation.
+
+**D6 status:** PARTIAL. Announcements can timestamp selected risk parameter changes and identify affected symbols, but cannot by themselves reconstruct every tier's notional ceiling/MMR/IMR values or the user's account-applied tier. Do not infer the missing table from a current endpoint.
+
+### 51.4. Proposed event-ledger schema and confidence rules
+
+A future offline parser/inventory should normalize each official notice into append-only event records:
+
+- `event_id`, `announcement_url`, `announcement_title`, `published_at_utc`, `source_language`, `retrieved_at_utc`, `raw_html_sha256` (only if captured later under an authorized collection step);
+- `category` (linear/spot/inverse/option/TradFi), `symbol`, `event_type` (LIST, DELIST, TRADING_HALT, RESUME, TICK_CHANGE, ORDER_SIZE_CHANGE, RISK_LIMIT_CHANGE, CONTRACT_SIZE_CHANGE, FUNDING_RULE_CHANGE);
+- `effective_from_utc`, `effective_to_utc` (nullable), `before_values`, `after_values`, `unit`, `explicitness`;
+- `source_evidence` (exact notice section/table row), `confidence`, `supersedes_event_id`, `notes`.
+
+Rules:
+1. Preserve the published notice date separately from the effective timestamp.
+2. A missing field is unknown, never zero and never inherited from a modern API response without a dated observation.
+3. Keep notices and API snapshots as separate evidence types; use snapshots to corroborate, not silently fill historical gaps.
+4. Conflicting notices remain unresolved until a later explicit correction is found.
+5. Announced max leverage must not be promoted into a full D6 tier ladder.
+6. Product type must be explicit; TradFi perpetuals, Spot, inverse and linear crypto perpetuals must not be mixed.
+7. A search miss is not proof that no announcement existed. Coverage requires pagination/archive inventory and reconciliation against all symbols in the research universe.
+
+### 51.5. Research decision
+
+Official announcements are a credible route to improve D4 and selected D5/D6 fields. The route is more promising than relying only on current Instruments Info/Risk Limit endpoints or importing unanchored third-party snapshots.
+
+However, this is a source-capability review, not an accepted historical dataset. The current search was targeted and sampled, not a full systematic crawl; no notices were downloaded into the repository, no event records were generated, no API or archive collector was run, and no gate status changes to ACCEPTED.
+
+**Next permissible research step:** design a bounded offline announcement inventory for the frozen 47-symbol Linear universe, beginning with D4 listing/delisting and D5 tick-size/order-size events, then D6 risk notices. Before any automated collection or raw archive capture, confirm that its network/source-access scope is separately authorized. Until then, keep all D4–D6 gates PARTIAL / NOT ACCEPTED.

@@ -132,3 +132,13 @@ PnL replay запрещён, пока не выполнены все сущес�
 - CI [41734540443](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/41734540443) — SUCCESS. Это подтверждает только компиляцию и детерминированные тесты реализации.
 - После изменения runner code hash старый Top-5 selection manifest устаревает и должен быть заново создан из официального набора данных при открытом data gate.
 - Стратегия не запускалась на рыночных данных; прибыльность не оценивалась.
+
+## 9. Инженерное уточнение и границы реализации (2026-11-25)
+
+- D20 Control A использует volume lookback 20; D48 Control B и Candidate C используют volume lookback 48. Сигнальная свеча не входит в baseline volume window.
+- В текущем эксперименте нет дополнительного breakout-distance ATR-фильтра. Единственная Explore-размерность — заранее ограниченный `min_volume_ratio`; в Confirm фиксируется только выбранный volume threshold. `min_breakout_atr` фиксирован на 0 и не подбирается.
+- Трёхсторонний pairing fail-closed проверяет BTCUSDT scope, lookbacks 20/48/48 и общие временные/портфельные инварианты.
+
+**Ограничение scope:** исходный протокол выше был описан с Top-5 universe. Текущий проектный scope ограничен BTCUSDT. Это не считается автоматически эквивалентным исходному Top-5 эксперименту. Runner всё ещё требует train-only Top-5 selection manifest в загрузчике и main path; следовательно, полностью работающий BTC-only путь ещё не реализован. До отдельной preregistration/реализации и тестов запускать runner нельзя.
+
+CI `45649835753` — SUCCESS (commit `6082860b6be3284e890b39e841d73e55f953d1b8`). Подтверждены компиляция и детерминированные тесты; это не PnL, не подтверждение edge и не открытие data gate. Market PnL, paper trading и реальные ордера не запускались.

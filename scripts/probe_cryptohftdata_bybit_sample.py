@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Bounded public CryptoHFTData endpoint probe for paired Bybit files."""
+"""Bounded public CryptoHFTData endpoint probe for paired Bybit files.
+
+Uses a one-byte GET range request; it never downloads an archive body.
+"""
 from __future__ import annotations
 
 import json

@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sys
 import tempfile
 import time
@@ -610,8 +611,11 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
     kline_path = root / "kline" / f"{symbol.upper()}.csv"
     mark_path = root / "mark_price" / f"{symbol.upper()}.csv"
     schedule_path = funding_path.parent / f"{symbol}.schedule.json"
+    raw_evidence_root = root / "raw_responses" / symbol.upper()
+    raw_manifest_path = raw_evidence_root / "manifest.json"
     existing_outputs = [
         funding_path, funding_manifest_path, schedule_path, kline_path, mark_path,
+        raw_evidence_root,
     ]
     if any(path.exists() for path in existing_outputs):
         raise FileExistsError(
@@ -620,14 +624,26 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
         )
     interval_ms = int(interval) * 60_000
     funding_pages: list[dict[str, Any]] = []
+    trade_pages: list[dict[str, Any]] = []
+    mark_pages: list[dict[str, Any]] = []
+    raw_records: list[dict[str, Any]] = []
     # Funding is settled at the final H1 candle CLOSE boundary. Its endpoint
     # uses inclusive endTime, so query through end_ms (exclusive API helper
     # boundary is end_ms + 1) rather than stopping at end_ms - 1.
-    funding = fetch_funding_history(
-        symbol, start_ms, end_ms + 1, base_url=base_url, pause=pause,
-        audit_pages=funding_pages,
-    )
-    klines = fetch_trade_klines(symbol, start_ms, end_ms, interval, base_url=base_url, pause=pause)
+    try:
+        funding = fetch_funding_history(
+            symbol, start_ms, end_ms + 1, base_url=base_url, pause=pause,
+            audit_pages=funding_pages, raw_evidence_dir=raw_evidence_root,
+            raw_records=raw_records,
+        )
+        klines = fetch_trade_klines(
+            symbol, start_ms, end_ms, interval, base_url=base_url, pause=pause,
+            raw_evidence_dir=raw_evidence_root, raw_records=raw_records,
+            audit_pages=trade_pages,
+        )
+    except Exception:
+        shutil.rmtree(raw_evidence_root, ignore_errors=True)
+        raise
     _atomic_csv(funding_path, ["symbol", "funding_timestamp_ms", "funding_rate"], funding)
     from funding_archive_manifest import record_funding_collection
     funding_manifest = record_funding_collection(
@@ -650,7 +666,9 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
     mark_end_exclusive = end_ms + interval_ms if terminal_settlement else end_ms
     try:
         marks = fetch_mark_klines(
-            symbol, start_ms, mark_end_exclusive, interval, base_url=base_url, pause=pause
+            symbol, start_ms, mark_end_exclusive, interval, base_url=base_url, pause=pause,
+            raw_evidence_dir=raw_evidence_root, raw_records=raw_records,
+            audit_pages=mark_pages,
         )
         _atomic_csv(kline_path, ["symbol", "timestamp_ms", "open", "high", "low", "close", "volume", "turnover"], klines)
         _atomic_csv(mark_path, ["symbol", "timestamp_ms", "open", "high", "low", "close"], marks)
@@ -660,7 +678,47 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
         # content-addressed and safe to reuse on a retry in the same output root.
         for path in (funding_path, funding_manifest_path, schedule_path, kline_path, mark_path):
             path.unlink(missing_ok=True)
+        shutil.rmtree(raw_evidence_root, ignore_errors=True)
         raise
+
+    raw_manifest = {
+        "schema_version": 1,
+        "source": "Bybit V5 public GET raw responses",
+        "symbol": symbol.upper(),
+        "category": "linear",
+        "interval": interval,
+        "normalized_outputs": {
+            "funding_csv": {
+                "path": os.path.relpath(funding_path, raw_evidence_root).replace(os.sep, "/"),
+                "sha256": hashlib.sha256(funding_path.read_bytes()).hexdigest(),
+                "rows": len(funding),
+            },
+            "trade_kline_csv": {
+                "path": os.path.relpath(kline_path, raw_evidence_root).replace(os.sep, "/"),
+                "sha256": hashlib.sha256(kline_path.read_bytes()).hexdigest(),
+                "rows": len(klines),
+            },
+            "mark_price_csv": {
+                "path": os.path.relpath(mark_path, raw_evidence_root).replace(os.sep, "/"),
+                "sha256": hashlib.sha256(mark_path.read_bytes()).hexdigest(),
+                "rows": len(marks),
+            },
+        },
+        "collection_pages": {
+            "funding": funding_pages,
+            "trade_kline": trade_pages,
+            "mark_price": mark_pages,
+        },
+        "records": raw_records,
+    }
+    raw_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    _atomic_write_bytes(
+        raw_manifest_path,
+        (json.dumps(raw_manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\\n").encode("utf-8"),
+    )
+    raw_validation = validate_raw_response_manifest(raw_manifest_path)
+    if not raw_validation["ok"]:
+        raise RuntimeError(f"raw response evidence validation failed: {raw_validation['errors']}")
     return {
         "symbol": symbol.upper(), "funding_events": len(funding), "trade_candles": len(klines), "mark_candles": len(marks),
         "start_ms": start_ms, "end_exclusive_ms": end_ms,
@@ -675,6 +733,10 @@ def archive_symbol(symbol: str, start_ms: int, end_ms: int, output_root: str | P
         "funding_query_pages": len(funding_pages),
         "funding_complete_query_pages": sum(1 for page in funding_pages if page.get("complete")),
         "trade_kline_file": str(kline_path), "mark_file": str(mark_path),
+        "raw_response_manifest_file": str(raw_manifest_path),
+        "raw_response_manifest_sha256": hashlib.sha256(raw_manifest_path.read_bytes()).hexdigest(),
+        "raw_response_count": len(raw_records),
+        "raw_response_manifest_valid": raw_validation["ok"],
     }
 
 

@@ -1,0 +1,64 @@
+name: Revalidate captured Bybit announcement artifact
+
+on:
+  push:
+    branches: [research/bybit-raw-response-evidence-v1]
+    paths:
+      - 'scripts/collect_bybit_announcements.py'
+      - 'scripts/validate_bybit_announcement_content.py'
+      - 'scripts/extract_bybit_lifecycle_events.py'
+      - 'tests/test_collect_bybit_announcements.py'
+      - 'tests/test_validate_bybit_announcement_content.py'
+      - 'tests/test_extract_bybit_lifecycle_events.py'
+      - '.github/workflows/bybit-announcement-artifact-reprocess.yml'
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "Completed workflow run containing bybit-public-announcement-inventory"
+        required: true
+        default: "45586354775"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bybit-announcement-reprocess-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  revalidate-existing-artifact:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[reprocess]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run offline parser and extractor tests
+        run: |
+          python tests/test_collect_bybit_announcements.py
+          python tests/test_validate_bybit_announcement_content.py
+          python tests/test_extract_bybit_lifecycle_events.py
+      - name: Download previously captured public announcement artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bybit-public-announcement-inventory
+          run-id: ${{ inputs.source_run_id || '45586354775' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: reprocess_input
+      - name: Validate captured article content and byte integrity
+        run: python scripts/validate_bybit_announcement_content.py --output reprocess_input
+      - name: Extract listing and delisting event candidates
+        run: python scripts/extract_bybit_lifecycle_events.py --input reprocess_input --output reprocess_input/lifecycle_events.json
+      - name: Upload revalidated manifest and lifecycle event index
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bybit-announcement-reprocessed-evidence
+          path: reprocess_input/
+          if-no-files-found: warn
+          retention-days: 14

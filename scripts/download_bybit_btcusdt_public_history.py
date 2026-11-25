@@ -69,9 +69,8 @@ for y, m in months_between(START, END):
         if len(parts) < 6:
             continue
         try:
-            # Bybit MT4 archive labels use UTC+3; normalize to UTC.
-            dt_local = datetime.strptime(parts[0].strip(), "%Y.%m.%d %H:%M")
-            dt_utc = (dt_local - timedelta(hours=3)).replace(tzinfo=timezone.utc)
+            # Archive timestamps align directly with Bybit UTC H1 candles; do not apply an MT4 offset.
+            dt_utc = datetime.strptime(parts[0].strip(), "%Y.%m.%d %H:%M").replace(tzinfo=timezone.utc)
             ts = int(dt_utc.timestamp() * 1000)
             if ts < int(datetime.combine(START, datetime.min.time(), tzinfo=timezone.utc).timestamp()*1000):
                 continue

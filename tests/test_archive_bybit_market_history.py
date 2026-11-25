@@ -141,6 +141,27 @@ class BybitMarketHistoryTests(unittest.TestCase):
                 "records": records,
             }), encoding="utf-8")
             self.assertTrue(validate_raw_response_manifest(manifest_path)["ok"])
+            original_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+            broken_manifest = dict(original_manifest)
+            broken_manifest["collection_pages"] = dict(original_manifest["collection_pages"])
+            broken_manifest["collection_pages"]["funding"] = []
+            manifest_path.write_text(json.dumps(broken_manifest), encoding="utf-8")
+            report = validate_raw_response_manifest(manifest_path)
+            self.assertFalse(report["ok"])
+            self.assertIn("funding_pages_missing", report["errors"])
+            self.assertIn("raw_response_record_unreferenced", report["errors"])
+
+            manifest_path.write_text(json.dumps(original_manifest), encoding="utf-8")
+            output_files["funding_csv"][0].write_text("tampered\n", encoding="utf-8")
+            report = validate_raw_response_manifest(manifest_path)
+            self.assertFalse(report["ok"])
+            self.assertIn("funding_csv_hash_mismatch", report["errors"])
+
+            output_files["funding_csv"][0].write_text(
+                "symbol,funding_timestamp_ms,funding_rate\nBTCUSDT,3600000,0.0001\n",
+                encoding="utf-8",
+            )
             body_path.write_bytes(body + b" ")
             report = validate_raw_response_manifest(manifest_path)
             self.assertFalse(report["ok"])

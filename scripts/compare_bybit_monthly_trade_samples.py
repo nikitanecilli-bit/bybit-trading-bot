@@ -96,9 +96,10 @@ def chd_url(date: str, hour: str) -> str:
     return file_url(CHD_BASE, file_path)
 
 
-def load_tardis_day(path: Path) -> tuple[dict[str, Counter], int]:
+def load_tardis_day(path: Path) -> tuple[dict[str, Counter], int, dict]:
     by_hour = {hour: Counter() for hour in HOURS}
     unknown_sides = 0
+    ids = []
     expected = ["exchange", "symbol", "timestamp", "local_timestamp",
                 "id", "side", "price", "amount"]
     with gzip.open(path, "rt", encoding="utf-8", newline="") as stream:
@@ -109,13 +110,21 @@ def load_tardis_day(path: Path) -> tuple[dict[str, Counter], int]:
             if None in row or row["exchange"] != "bybit" or row["symbol"] != SYMBOL:
                 raise ValueError(f"invalid Tardis row {row_no}")
             ts_us = int(row["timestamp"])
+            if row["id"]:
+                ids.append(row["id"])
             hour = datetime.fromtimestamp(ts_us // 1_000_000, tz=timezone.utc).strftime("%H")
             side = row["side"].lower()
             if side not in ("buy", "sell"):
                 unknown_sides += 1
                 continue
             by_hour[hour][(ts_us // 1000, side, dec(row["price"]), dec(row["amount"]))] += 1
-    return by_hour, unknown_sides
+    id_diagnostics = {
+        "rows_with_nonempty_id": len(ids),
+        "empty_id_rows": sum(sum(counter.values()) for counter in by_hour.values()) - len(ids),
+        "unique_ids": len(set(ids)),
+        "duplicate_id_rows": len(ids) - len(set(ids)),
+    }
+    return by_hour, unknown_sides, id_diagnostics
 
 
 def main() -> int:
@@ -146,8 +155,9 @@ def main() -> int:
                 day_report["tardis_download"] = download(
                     tardis_url(date), tardis_path, MAX_TARDIS_BYTES
                 )
-                tardis_by_hour, unknown_sides = load_tardis_day(tardis_path)
+                tardis_by_hour, unknown_sides, tardis_id_diagnostics = load_tardis_day(tardis_path)
                 day_report["tardis_unknown_side_rows"] = unknown_sides
+                day_report["tardis_id_integrity"] = tardis_id_diagnostics
                 day_report["tardis_rows"] = sum(sum(c.values()) for c in tardis_by_hour.values())
             except Exception as exc:
                 day_report["status"] = "TARDIS_SAMPLE_FAILED"

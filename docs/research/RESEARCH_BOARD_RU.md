@@ -336,3 +336,13 @@
 - **D3 accepted for one-year realized funding event/rate coverage for BTC-USDT-SWAP**, with the method-metadata limitation documented. D4/D5/D6/D8 remain open; current specs are not historical specs.
 - Full audit and artifact provenance: [OKX_FUNDING_ARCHIVE_QA_2026-11-25_RU.md](OKX_FUNDING_ARCHIVE_QA_2026-11-25_RU.md). Funding cloud run [45576601291](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45576601291).
 - No PnL/backtest/sweep/event study was run. OKX data does not resolve Bybit execution evidence or independent-calendar holdout requirements.
+
+
+### 2026-11-25 — prospective independent validation protocol drafted (not activated)
+
+- Зафиксировано: независимость создаётся только будущими timestamp-ами после freeze гипотезы, execution contract, code hash, cost assumptions и критериев; новый venue на старых датах не создаёт holdout.
+- Ближайший кандидат — H1 Donchian(48)+EMA50/EMA200-up, но исходная maker OHLC execution версия не доказывает fill. Для минимального будущего эксперимента требуется отдельная TAKER-ONLY / SINGLE-INSTRUMENT preregistration и deterministic tests; leverage предлагается исключить из первого пилота, чтобы не заявлять liquidation/margin safety и не открывать D6 без необходимости.
+- Bybit остаётся исходной целью проекта, но допустимый публичный data path не принят и прежние ограничения на сбор остаются. OKX имеет accepted public-data path, но может быть только отдельным venue-specific target, не заменой Bybit execution evidence.
+- Holdout не активирован; граница 2026-11-26T00:00:00Z — лишь предложение, не старт сбора. Не создан новый collector, не запущен PnL/backtest/paper/live execution.
+- До активации требуются venue decision, eligibility/access confirmation без обхода ограничений, D1-D5/D8 (D6 при leverage, D7 при maker/capacity claims), preregistered cost/slippage model и долговременное append-only хранение.
+- Полный протокол: [PROSPECTIVE_INDEPENDENT_VALIDATION_PROTOCOL_RU.md](PROSPECTIVE_INDEPENDENT_VALIDATION_PROTOCOL_RU.md). Статус: DESIGN ONLY / NOT ACTIVATED.

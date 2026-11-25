@@ -116,6 +116,18 @@ def extract_events(root: Path) -> tuple[dict, list[dict]]:
                 symbols = [title_symbol.group(1).upper()]
         if not symbols:
             symbols = sorted(set(SYMBOL_PATTERN.findall(text.upper())))
+        explicit_perpetual = bool(re.search(r"\\bperpetual\\b", full_text, re.IGNORECASE))
+        if symbols and not explicit_perpetual:
+            out_of_scope.append({
+                "reason": "product_scope_not_explicitly_perpetual",
+                "symbols": symbols,
+                "title": article_title, "url": record.get("url"),
+                "category_keys": payload.get("category_keys", []),
+                "published_at_source": payload.get("published_at"),
+                "body_file": relative.as_posix(), "body_sha256": digest,
+            })
+            continue
+
         if not symbols:
             lower_title = article_title.lower()
             if "bybit alpha" in lower_title:

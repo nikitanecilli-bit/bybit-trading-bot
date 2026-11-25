@@ -18,7 +18,7 @@ permissions:
 
 # Prevent duplicate full-archive crawls from overlapping manual dispatches.
 concurrency:
-  group: bybit-announcement-inventory-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[full-archive]') && 'full' || 'tests' }}
+  group: bybit-announcement-inventory-${{ github.ref }}-${{ (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[full-archive]')) && 'full' || 'tests' }}
   cancel-in-progress: true
 
 jobs:

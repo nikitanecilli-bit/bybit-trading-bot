@@ -206,10 +206,12 @@ def main() -> None:
     page_counts: Counter[str] = Counter()
     raw_records: list[dict[str, Any]] = []
     collection_pages: list[dict[str, Any]] = []
+    collection_started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     output_root = Path(args.output_dir) / "linear"
-    pending_dir = output_root / "raw_evidence" / "pending"
-    if pending_dir.exists():
-        raise FileExistsError(f"unfinished raw evidence capture exists: {pending_dir}")
+    capture_id = collection_started_at.replace(":", "-").replace(".", "-")
+    capture_dir = output_root / "raw_evidence" / f"capture-{capture_id}"
+    if capture_dir.exists():
+        raise FileExistsError(f"raw evidence capture path already exists: {capture_dir}")
 
     def fetch_page(status: str | None, cursor: str | None):
         status_filter = status or "default"
@@ -218,7 +220,7 @@ def main() -> None:
         before = len(raw_records)
         rows, next_cursor = _request_page(
             args.base_url, "linear", cursor, status=status,
-            raw_evidence_dir=pending_dir, raw_records=raw_records,
+            raw_evidence_dir=capture_dir, raw_records=raw_records,
         )
         record = raw_records[-1] if len(raw_records) > before else None
         collection_pages.append({
@@ -236,7 +238,6 @@ def main() -> None:
             time.sleep(args.pause)
         return rows, next_cursor
 
-    collection_started_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     rows, counts = fetch_linear_universe(fetch_page)
     snapshot = build_universe_snapshot(
         rows, counts, collection_started_at=collection_started_at,
@@ -250,7 +251,7 @@ def main() -> None:
     evidence_manifest = finalize_snapshot_evidence(
         output_root, stamp, source="Bybit V5 GET /v5/market/instruments-info",
         category="linear", normalized_output=output, records=raw_records,
-        collection_pages=collection_pages,
+        collection_pages=collection_pages, capture_dir=capture_dir,
     )
     now_ms = int(fetched.timestamp() * 1000)
     active = sum(is_linear_usdt_perpetual_within_lifecycle_at(row, now_ms) for row in rows)

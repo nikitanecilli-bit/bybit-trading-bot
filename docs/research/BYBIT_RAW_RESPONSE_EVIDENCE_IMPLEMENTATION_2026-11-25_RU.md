@@ -28,7 +28,7 @@ For each captured response it writes:
 
 Funding, trade-kline and Mark-kline page metadata now retain the raw response request ID, body hash and audit-record path. This creates a traceable link from a normalized collection page back to its exact source response.
 
-A validator checks that each body exists, its SHA-256 matches, and the audit JSON matches the manifest record. The output manifest is written only after all three streams have been collected and the normalized CSVs have been written.
+A validator checks that each raw body exists and matches its SHA-256/byte length, audit JSON matches the record, every Funding/trade-kline/Mark page links to exactly one raw response, no response is orphaned or referenced twice, and all three normalized CSVs exist with matching SHA-256 and row counts. Paths are constrained to the raw-evidence directory or archive root as appropriate. The manifest is written only after all three streams and normalized CSVs are complete.
 
 The collector continues to use official HTTPS Bybit API hosts and public GET endpoints only. No account/private endpoints, API keys, orders, proxies, mirrors, VPN routing or geography circumvention were added.
 
@@ -36,16 +36,18 @@ The collector continues to use official HTTPS Bybit API hosts and public GET end
 
 GitHub Actions run:
 
-https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45579198847
+https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45581812910
 
-Result: **SUCCESS**
+Result: **SUCCESS** (commit `c8df338b2b4605c307af02ccd92b5ccdd30a8090`)
 
 - Python compile: PASS
 - Offline Bybit collector test suite: PASS
 - Raw-response capture test: PASS
-- Exact body SHA-256 verification: PASS
+- Exact body SHA-256 and byte-length verification: PASS
 - Tampered-body detection: PASS
-- Archive-flow test verifies Funding, trade-kline and Mark page records are linked into the raw manifest: PASS
+- Missing page/orphan response detection: PASS
+- Normalized CSV hash and row-count verification: PASS
+- Archive-flow tests verify Funding, trade-kline and Mark page records are linked one-to-one into the raw manifest: PASS
 
 The workflow uses GitHub-hosted Ubuntu and performs no network collection. Test fixtures are synthetic.
 

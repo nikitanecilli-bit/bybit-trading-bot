@@ -9,7 +9,9 @@ import csv, gzip, hashlib, json, os, sys, time, urllib.parse, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-BASE = "https://api.bybit.com"
+# Official Bybit mainnet hosts; US-based runners may be restricted.
+BASE_CANDIDATES = ["https://api.bybit.com", "https://api.bytick.com", "https://api.bybit.eu"]
+BASE = None
 CATEGORY = "linear"
 SYMBOL = "BTCUSDT"
 INTERVAL = "60"
@@ -19,22 +21,28 @@ OUT = Path(os.getenv("OUT_DIR", "bybit_btcusdt_initial"))
 OUT.mkdir(parents=True, exist_ok=True)
 
 def request(path, params):
-    url = BASE + path + "?" + urllib.parse.urlencode(params)
+    global BASE
+    hosts = [BASE] if BASE else BASE_CANDIDATES
     last = None
-    for attempt in range(7):
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent":"bybit-btcusdt-research/1.0"})
-            with urllib.request.urlopen(req, timeout=35) as r:
-                payload = json.loads(r.read())
-            if payload.get("retCode") != 0:
-                raise RuntimeError(f"Bybit retCode={payload.get('retCode')} retMsg={payload.get('retMsg')}")
-            return payload
-        except Exception as e:
-            last = e
-            time.sleep(min(2 ** attempt, 30))
-    raise RuntimeError(f"Request failed after retries: {url}: {last}")
+    for host in hosts:
+        url = host + path + "?" + urllib.parse.urlencode(params)
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent":"bybit-btcusdt-research/1.0"})
+                with urllib.request.urlopen(req, timeout=35) as r:
+                    payload = json.loads(r.read())
+                if payload.get("retCode") != 0:
+                    raise RuntimeError(f"Bybit retCode={payload.get('retCode')} retMsg={payload.get('retMsg')}")
+                BASE = host
+                return payload
+            except Exception as e:
+                last = e
+                if isinstance(e, urllib.error.HTTPError) and e.code == 403:
+                    break
+                time.sleep(min(2 ** attempt, 8))
+    raise RuntimeError(f"Request failed on official Bybit hosts {hosts}: {last}")
 
-def collect(path, name, params, row_key, timestamp_index, limit=1000):
+def collect(path, name, params, row_key, timestamp_index, limit=1000, time_keys=("startTime","endTime")):
     cursor = END_MS
     pages = 0
     rows = {}
@@ -70,7 +78,7 @@ def collect(path, name, params, row_key, timestamp_index, limit=1000):
 
 results=[]
 results.append(collect("/v5/market/kline","trade_h1",
-    {"category":CATEGORY,"symbol":SYMBOL,"interval":INTERVAL},"list",0,1000))
+    {"category":CATEGORY,"symbol":SYMBOL,"interval":INTERVAL},"list",0,1000,("start","end")))
 results.append(collect("/v5/market/mark-price-kline","mark_h1",
     {"category":CATEGORY,"symbol":SYMBOL,"interval":INTERVAL},"list",0,1000))
 results.append(collect("/v5/market/funding/history","funding",

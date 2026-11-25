@@ -311,7 +311,7 @@ def test_paired_donchian48_rejects_missing_or_invalid_arm_metadata():
         "volume_lookback_period": 20, "net_pnl": -100.0, "trades": 40,
     }
     valid_rows = [
-        dict(base, donchian_period=period, ema50_200_gate=ema)
+        dict(base, donchian_period=period, ema50_200_gate=ema, volume_lookback_period=period)
         for period, ema in ((20, False), (48, False), (48, True))
     ]
     missing_period = [dict(row) for row in valid_rows]
@@ -394,7 +394,7 @@ def test_paired_donchian48_rejects_changed_volume_lookback():
     try:
         build_paired_donchian48_comparison(rows, enabled=True)
     except ValueError as exc:
-        assert "volume_lookback_period" in str(exc)
+        assert "volume lookbacks 20/48/48" in str(exc)
     else:
         raise AssertionError("Donchian arms must share the same volume lookback")
 

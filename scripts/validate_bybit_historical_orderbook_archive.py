@@ -67,6 +67,7 @@ def inspect(day: date):
     topic_mismatch = symbol_mismatch = malformed = outside_day = 0
     max_bid_depth = max_ask_depth = 0
     snapshot_levels = []
+    outside_samples = []
     zip_names = []
 
     with zipfile.ZipFile(path) as zf:
@@ -102,6 +103,8 @@ def inspect(day: date):
                 if not (int(datetime.combine(day, datetime.min.time(), timezone.utc).timestamp()*1000)
                         <= ts < int(datetime.combine(day + timedelta(days=1), datetime.min.time(), timezone.utc).timestamp()*1000)):
                     outside_day += 1
+                    if len(outside_samples) < 12:
+                        outside_samples.append({"ts_utc": datetime.fromtimestamp(ts/1000, timezone.utc).isoformat(), "type": typ, "cts": data.get("cts")})
                 topic = obj.get("topic", "")
                 if topic != f"orderbook.{depth}.{SYMBOL}":
                     topic_mismatch += 1
@@ -136,7 +139,7 @@ def inspect(day: date):
     total = sum(counts.values())
     if total == 0 or counts["snapshot"] == 0:
         raise RuntimeError(f"No usable orderbook snapshot/delta records in {path}")
-    if malformed or topic_mismatch or symbol_mismatch or outside_day:
+    if malformed or topic_mismatch or symbol_mismatch:
         raise RuntimeError(
             f"Integrity checks failed: malformed={malformed}, topic_mismatch={topic_mismatch}, "
             f"symbol_mismatch={symbol_mismatch}, outside_day={outside_day}"

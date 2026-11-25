@@ -506,3 +506,25 @@ This audit narrows the implementation change to a possible **entry execution abl
 **Статус:** implementation/preregistration mismatch; market PnL запрещён. Не исправлять runner молча и не переписывать preregistration задним числом. Перед будущим тестом выбрать буквальную preregistration (lookback 48, без breakout-ATR фильтра) либо зарегистрировать фактический runner как новую гипотезу. Для single-symbol — отдельный preregistered дизайн. Подробности внесены в MINIMUM_VIABLE_EDGE_VALIDATION_RU.md, раздел 6B.
 
 **Дополнительный lifecycle finding (2026-11-25):** в H1 engine исходный stop проверяется до TP1 и обновления ATR trailing stop. Если TP1 и новый trailing stop могли быть задеты в одной свече, после поднятия stop текущий low/high повторно не проверяется — новый stop начинает действовать со следующей свечи. Поскольку H1 OHLC не показывает порядок экстремумов, это потенциально оптимистичное разрешение same-bar ambiguity. До PnL нужен явный frozen rule; считать эту неоднозначность закрытой нельзя.
+
+## 6C. Проверка фактического Bybit H1 archive artifact (2026-11-25)
+
+Artifact `bybit-btcusdt-public-history` из GitHub Actions run `45645008915` (artifact ID `15036563599`) скачан и проверен, а не только принят по статусу workflow. Job `download` завершился SUCCESS.
+
+Результат проверки ZIP:
+- 69/69 SHA-256 entries из manifest совпали с фактическими файлами.
+- Нормализованный `trade_h1.csv`: 47,085 строк, 6 колонок; период от 2020-04-01 00:00 UTC до 2025-11-03 04:00 UTC.
+- Timestamp отсортированы; дубликатов нет.
+- 4 разрыва H1-сетки, суммарно 1,928 отсутствующих баров: 2023-12-09 07:00 → 2024-01-01 00:00 UTC (544); 2024-01-09 07:00 → 2024-02-01 00:00 UTC (544); 2024-02-17 15:00 → 2024-03-01 00:00 UTC (296); 2024-03-09 07:00 → 2024-04-01 00:00 UTC (544).
+- OHLC consistency violations: 0; negative volume: 0; missing values: 0.
+
+Вывод: artifact и manifest внутренне согласованы, а базовая структура OHLCV проходит проверку. Это подтверждает только целостность и непрерывность доступных сегментов. Архив всё ещё неполный в перечисленных интервалах и заканчивается 2025-11-03; он не закрывает Mark/Funding, instrument lifecycle/specifications, liquidation inputs или независимость test period. Никакой market-PnL replay не выполнялся.
+
+### Решение по расхождениям Donchian(48)
+
+Для дальнейшего исправления использовать вариант **A — буквальное соответствие preregistration от 2026-11-04**, а не подгонять документ под текущий runner:
+- D48 volume ratio должен использовать предыдущие 48 завершённых свечей;
+- дополнительный breakout-ATR threshold не входит в первичную гипотезу и должен быть выключен/удалён из этого experiment path;
+- три paired arms остаются D20 / D48 / D48+EMA, с остальными условиями идентичными.
+
+Это решение определяет только целевой контракт реализации. Оно не разрешает market-PnL запуск: dataset и accounting gates остаются закрытыми, а существующий пятисимвольный selector несовместим с single-symbol маршрутом.

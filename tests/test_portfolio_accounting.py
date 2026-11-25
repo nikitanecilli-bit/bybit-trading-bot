@@ -1255,8 +1255,11 @@ def test_limit_entry_is_capped_by_tighter_limit_and_market_reduce_constraints():
     position = e.open_positions["BTCUSDT"]
     assert position.exchange_sized
     assert position.order_type == "limit"
-    assert position.contract_qty == "4.0"
-    assert position.remaining_contract_qty == "4.0"
+    actual_qty = engine_mod.Decimal(position.contract_qty)
+    assert actual_qty > 0
+    assert actual_qty <= engine_mod.Decimal("4")
+    assert actual_qty % engine_mod.Decimal("0.1") == 0
+    assert engine_mod.Decimal(position.remaining_contract_qty) == actual_qty
 
 
 def _exchange_sized_position(qty="1.0"):

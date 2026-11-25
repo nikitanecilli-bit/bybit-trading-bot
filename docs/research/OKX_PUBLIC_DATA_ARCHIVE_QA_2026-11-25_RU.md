@@ -104,3 +104,17 @@ A read-only review of current official OKX documentation found a possible route 
 - No further endpoints, downloads, archives, or account APIs were called during this review.
 
 **Scope boundary:** retrieving the longer historical Funding archive would be a new collection step beyond the already completed narrow pilot. It is not silently enabled by this report. The candidate is documented for a separate explicit decision. No PnL/backtest/sweep/event study is started.
+
+
+## Repeat-capture reproducibility check
+
+A second cloud capture was run after the workflow was hardened to fail the job on downloader errors and retain artifacts for 90 days.
+
+- First run: [45572813249](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45572813249), completed / success.
+- Second run: [45574106964](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45574106964), completed / success.
+- Both requested the exact same half-open 365-day interval.
+- All four normalized outputs were byte-identical across captures: `candles_h1.csv`, `mark_price_h1.csv`, `funding_history.csv`, and `instrument_current.json`; their SHA-256 hashes matched exactly.
+- Each archive independently passed verification of all 180 raw files (179 paginated responses plus one instrument response): byte lengths and SHA-256 hashes matched its manifest, with zero mismatches.
+- Both manifests report the same 8,760-row complete H1 grids and the same Funding coverage limitation.
+
+This is a useful repeatability check for the capture pipeline and normalized data. It does not establish exchange-side historical immutability, Funding completeness, or strategy validity.

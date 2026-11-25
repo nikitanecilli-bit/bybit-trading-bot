@@ -96,6 +96,30 @@ def build_features(bars):
         out[b["ts"]] = vals
     return out, bars, seg
 
+def rank_values(values):
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    ranks = [0.0] * len(values)
+    i = 0
+    while i < len(order):
+        j = i + 1
+        while j < len(order) and values[order[j]] == values[order[i]]:
+            j += 1
+        avg = (i + 1 + j) / 2.0
+        for k in range(i, j):
+            ranks[order[k]] = avg
+        i = j
+    return ranks
+
+def spearman(xs, ys):
+    if len(xs) < 3:
+        return None
+    rx, ry = rank_values(xs), rank_values(ys)
+    mx, my = sum(rx)/len(rx), sum(ry)/len(ry)
+    cov = sum((a-mx)*(b-my) for a,b in zip(rx,ry))
+    vx = sum((a-mx)**2 for a in rx)
+    vy = sum((b-my)**2 for b in ry)
+    return cov / (vx*vy)**0.5 if vx and vy else None
+
 def main():
     bars = load_bars()
     features, bars, seg = build_features(bars)
@@ -139,6 +163,21 @@ def main():
     with (OUT / "group_medians.csv").open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(summary[0])); w.writeheader(); w.writerows(summary)
 
+    # Spearman rank correlations: exploratory only, never used to select a filter.
+    correlations = []
+    for fold in (1, 2, 3, "ALL"):
+        rows = [r for r in detailed if float(r["stop_atr"]) == 3.5 and
+                (fold == "ALL" or int(r["fold"]) == fold)]
+        for feature in FEATURES:
+            pairs = [(float(r[feature]), float(r["net_pnl"])) for r in rows
+                     if r.get(feature) not in ("", None)]
+            rho = spearman([x for x,_ in pairs], [y for _,y in pairs])
+            correlations.append({"fold": fold, "feature": feature,
+                                 "trades": len(pairs),
+                                 "spearman_rho": round(rho, 4) if rho is not None else None})
+    with (OUT / "spearman_correlations.csv").open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(correlations[0])); w.writeheader(); w.writerows(correlations)
+
     # A compact fold comparison for the 3.5 ATR candidate; descriptive only.
     lines = [
         "# BTC H1 Entry-Quality Diagnostics (descriptive, no filter selected)",
@@ -164,7 +203,8 @@ def main():
         "## Interpretation guardrails",
         "",
         "- These are medians and small-to-moderate samples, not statistically validated predictors.",
-        "- The third fold has materially weaker pre-entry 6h/24h momentum and lower volume expansion than the earlier folds in this sample; this is a description of the historical periods, not a proposed filter.",
+        "- The third fold has lower median pre-entry volume expansion and 6h/24h momentum than folds 1–2 in this sample; this describes the historical period and is not a proposed filter.",
+        "- Inspect spearman_correlations.csv: feature/PnL associations are exploratory, unstable across folds, and must not be interpreted as predictive rules.",
         "- Forward returns are calculated from entry open to future close independently of the strategy's actual exit. They must not be used to construct a live filter.",
         "- Do not add thresholds from this report. Any candidate feature must be preregistered and tested on a separate untouched period.",
         "- OHLCV-only: funding, mark price, liquidation, historical instrument/risk specs, spread and execution effects remain excluded.",
@@ -179,7 +219,7 @@ def main():
         "forward_horizons_hours": [1,3,6,12,24,32],
         "cost_filter": "cost_multiplier=1.0; trade PnL labels only",
         "purpose": "descriptive entry-quality diagnostics; no feature selection",
-        "rows": len(detailed),
+        "rows": len(detailed),\n        "correlation_method": "Spearman rank correlation of each pre-entry feature with net trade PnL, separately by fold and pooled; exploratory only",
         "limitations": ["OHLCV only", "no funding", "no mark price", "no liquidation model",
                         "no dated instrument/risk specs", "no spread or execution model"]
     }, indent=2), encoding="utf-8")

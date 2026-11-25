@@ -176,7 +176,8 @@ def extract_events(root: Path) -> tuple[dict, list[dict]]:
             event["symbol"], event["event_type"], event["published_at_utc"] or ""
         )),
         "failures": failures,
-        "extraction_complete": not failures,\n        "historical_universe_complete": False,
+        "extraction_complete": not failures,
+        "historical_universe_complete": False,
     }
     return output, failures
 

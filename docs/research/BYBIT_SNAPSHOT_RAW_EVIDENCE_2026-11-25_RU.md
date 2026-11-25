@@ -28,18 +28,19 @@ For each successful public GET response, the collector preserves:
 
 Each collection-page entry in the evidence manifest links to its raw response request ID and body hash. The manifest also records the normalized snapshot's relative path, byte count, and SHA-256.
 
-The shared validator checks raw body hashes and sizes, audit-record equality, collection-page-to-response links, and the normalized snapshot hash/size. Dated snapshot paths are protected against accidental overwrite. Each capture uses a unique working directory, so an interrupted collection cannot silently mix into the next run.
+The shared validator checks raw body hashes and sizes, audit-record equality, unique request IDs, one-to-one collection-page-to-response coverage, page-index/status consistency with the normalized snapshot, and normalized snapshot hash/size. It rejects orphaned raw responses, missing page links, duplicate references, and mismatched page inventories. Dated snapshot paths are protected against accidental overwrite. Each capture uses a unique working directory, so an interrupted collection cannot silently mix into the next run.
 
 ## Validation
 
 GitHub Actions run:
 
-https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45580464884
+https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45581283920
 
-**Result: SUCCESS**
+**Result: SUCCESS** (latest strengthened validator, commit `32a1f6a11a2ec1d40653f3d08242ca8b24635bf1`)
 
 - Python compilation: PASS
-- Raw evidence capture, finalization, and tamper tests: PASS
+- Raw evidence capture/finalization, body and normalized-output tamper tests: PASS
+- Missing page link, orphan response, duplicate reference and page-inventory rejection tests: PASS
 - Instrument snapshot regression tests: PASS
 - Linear universe snapshot regression tests: PASS
 - Risk-limit snapshot regression tests: PASS

@@ -7,11 +7,13 @@ on:
     paths:
       - 'scripts/archive_bybit_market_history.py'
       - 'scripts/bybit_raw_evidence.py'
+      - 'scripts/validate_bybit_raw_semantics.py'
       - 'scripts/snapshot_bybit_instruments.py'
       - 'scripts/snapshot_bybit_linear_universe.py'
       - 'scripts/snapshot_bybit_risk_limits.py'
       - 'tests/test_archive_bybit_market_history.py'
       - 'tests/test_bybit_raw_evidence.py'
+      - 'tests/test_validate_bybit_raw_semantics.py'
       - 'tests/test_snapshot_bybit_instruments.py'
       - 'tests/test_snapshot_bybit_linear_universe.py'
       - 'tests/test_snapshot_bybit_risk_limits.py'
@@ -21,11 +23,13 @@ on:
     paths:
       - 'scripts/archive_bybit_market_history.py'
       - 'scripts/bybit_raw_evidence.py'
+      - 'scripts/validate_bybit_raw_semantics.py'
       - 'scripts/snapshot_bybit_instruments.py'
       - 'scripts/snapshot_bybit_linear_universe.py'
       - 'scripts/snapshot_bybit_risk_limits.py'
       - 'tests/test_archive_bybit_market_history.py'
       - 'tests/test_bybit_raw_evidence.py'
+      - 'tests/test_validate_bybit_raw_semantics.py'
       - 'tests/test_snapshot_bybit_instruments.py'
       - 'tests/test_snapshot_bybit_linear_universe.py'
       - 'tests/test_snapshot_bybit_risk_limits.py'
@@ -46,8 +50,10 @@ jobs:
           python-version: '3.11'
       - name: Compile collectors, helpers and tests
         run: |
-          python -m py_compile scripts/archive_bybit_market_history.py scripts/bybit_raw_evidence.py scripts/snapshot_bybit_instruments.py scripts/snapshot_bybit_linear_universe.py scripts/snapshot_bybit_risk_limits.py
-          python -m py_compile tests/test_archive_bybit_market_history.py tests/test_bybit_raw_evidence.py tests/test_snapshot_bybit_instruments.py tests/test_snapshot_bybit_linear_universe.py tests/test_snapshot_bybit_risk_limits.py
+          python -m py_compile scripts/archive_bybit_market_history.py scripts/bybit_raw_evidence.py scripts/validate_bybit_raw_semantics.py scripts/snapshot_bybit_instruments.py scripts/snapshot_bybit_linear_universe.py scripts/snapshot_bybit_risk_limits.py
+          python -m py_compile tests/test_archive_bybit_market_history.py tests/test_bybit_raw_evidence.py tests/test_validate_bybit_raw_semantics.py tests/test_snapshot_bybit_instruments.py tests/test_snapshot_bybit_linear_universe.py tests/test_snapshot_bybit_risk_limits.py
+      - name: Run semantic raw-response audit tests
+        run: python tests/test_validate_bybit_raw_semantics.py
       - name: Run offline raw-evidence tests
         run: python tests/test_bybit_raw_evidence.py
       - name: Run instrument snapshot tests

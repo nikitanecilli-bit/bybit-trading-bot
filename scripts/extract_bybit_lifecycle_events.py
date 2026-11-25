@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.collect_bybit_announcements import SYMBOLS, extract_article_payload
 
-SYMBOL_PATTERN = re.compile(r"(?<![A-Z0-9])([A-Z0-9]{2,30}(?:USDT|USDC|USD))(?![A-Z0-9])")
+SYMBOL_PATTERN = re.compile(r"(?<![A-Z0-9])([A-Z0-9]{1,30}(?:USDT|USDC|USD))(?![A-Z0-9])")
 EFFECTIVE_PATTERN = re.compile(
     r"(?:will be delisting|will delist|will be delisted)[^.!?]{0,240}?\b(?:at|on)\s+"
     r"([A-Z][a-z]{2}\s+\d{1,2},\s+\d{4},\s+\d{1,2}(?::\d{2})?\s*(?:AM|PM)\s*UTC)",
@@ -75,6 +75,7 @@ def extract_events(root: Path) -> tuple[dict, list[dict]]:
     manifest_path = root / "inventory.json"
     inventory = json.loads(manifest_path.read_text(encoding="utf-8"))
     failures = []
+    out_of_scope = []
     events = []
     checked = 0
     proxy = set(SYMBOLS)
@@ -116,7 +117,26 @@ def extract_events(root: Path) -> tuple[dict, list[dict]]:
         if not symbols:
             symbols = sorted(set(SYMBOL_PATTERN.findall(text.upper())))
         if not symbols:
-            failures.append({"kind": "lifecycle_article_without_symbol", "url": record.get("url"), "title": article_title})
+            lower_title = article_title.lower()
+            if "bybit alpha" in lower_title:
+                reason = "alpha_spot_or_token_notice"
+            elif "tradfi" in lower_title or any(term in lower_title for term in ("stock", "pre-ipo", "ind50")):
+                reason = "tradfi_or_noncrypto_instrument_notice"
+            elif "spot trading pair" in lower_title or "trading pair" in lower_title:
+                reason = "spot_trading_pair_notice"
+            elif "earn" in lower_title:
+                reason = "earn_product_notice"
+            elif "supports $" in lower_title or "trading with 0 fee" in lower_title:
+                reason = "spot_or_token_listing_notice"
+            else:
+                failures.append({"kind": "lifecycle_article_without_symbol", "url": record.get("url"), "title": article_title})
+                continue
+            out_of_scope.append({
+                "reason": reason, "title": article_title, "url": record.get("url"),
+                "category_keys": payload.get("category_keys", []),
+                "published_at_source": payload.get("published_at"),
+                "body_file": relative.as_posix(), "body_sha256": digest,
+            })
             continue
 
         try:
@@ -166,6 +186,8 @@ def extract_events(root: Path) -> tuple[dict, list[dict]]:
         ),
         "proxy_matched_rows": sum(event["matched_47_symbol_proxy"] for event in events),
         "failures": len(failures),
+        "out_of_scope_article_records": len(out_of_scope),
+        "scope_review_required": bool(out_of_scope),
     }
     output = {
         "schema_version": 1,
@@ -176,7 +198,9 @@ def extract_events(root: Path) -> tuple[dict, list[dict]]:
             event["symbol"], event["event_type"], event["published_at_utc"] or ""
         )),
         "failures": failures,
+        "out_of_scope_articles": out_of_scope,
         "extraction_complete": not failures,
+        "scope_review_required": bool(out_of_scope),
         "historical_universe_complete": False,
     }
     return output, failures
@@ -191,7 +215,7 @@ def main() -> int:
     target = Path(args.output)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(output, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(output["summary"] | {"extraction_complete": output["extraction_complete"], "historical_universe_complete": False}, ensure_ascii=False), flush=True)
+    print(json.dumps(output["summary"] | {"extraction_complete": output["extraction_complete"], "scope_review_required": output["scope_review_required"], "historical_universe_complete": False}, ensure_ascii=False), flush=True)
     return 0 if not failures else 2
 
 

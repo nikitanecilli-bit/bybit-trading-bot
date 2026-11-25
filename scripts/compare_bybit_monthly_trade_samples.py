@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import csv
 import gzip
-from datetime import timedelta
 import hashlib
 import json
 import sys
@@ -18,9 +17,8 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import zstandard as zstd
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -249,8 +247,9 @@ def main() -> int:
 
     report["totals"] = total
     report["comparison_status"] = (
-        "OPERATIONAL_GAPS" if total.get("missing_hour_files", 0)
-        or total.get("failed_hour_checks", 0)
+        "OPERATIONAL_GAPS" if any(
+            day.get("status") == "OPERATIONAL_GAPS" for day in report["days"].values()
+        )
         else "MISMATCH_REVIEW_REQUIRED"
         if total["missing_from_cryptohftdata"] or total["extra_in_cryptohftdata"]
         else "EXACT_MATCH"

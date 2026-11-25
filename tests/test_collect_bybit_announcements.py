@@ -4,7 +4,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from scripts.collect_bybit_announcements import canonical_url, parse_page, classify, page_url, HOST
+from scripts.collect_bybit_announcements import canonical_url, parse_page, classify, page_url, HOST, extract_article_payload
 
 class AnnouncementCollectorTests(unittest.TestCase):
     def test_page_parser_extracts_article_and_page_numbers(self):
@@ -33,6 +33,14 @@ class AnnouncementCollectorTests(unittest.TestCase):
     def test_archive_page_baseline_is_explicit(self):
         from scripts.collect_bybit_announcements import EXPECTED_PAGES
         self.assertEqual(EXPECTED_PAGES, {"new_crypto": 25, "delistings": 11, "maintenance_updates": 19, "latest_bybit_news": 11})
+    def test_article_payload_uses_structured_body_not_site_chrome(self):
+        body = b'''<html><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"articleDetail":{"title":"Tick size change for BTCUSDT","date":"2026-11-20T09:00:00Z","categoryConnection":{"edges":[{"node":{"key":"latest_bybit_news"}}]},"content_html":"<p>BTCUSDT tick size changes from 0.1 to 0.01.</p>"}}}}</script><footer>TradFi delisting notices</footer></html>'''
+        payload = extract_article_payload(body)
+        self.assertEqual(payload["title"], "Tick size change for BTCUSDT")
+        self.assertEqual(payload["published_at"], "2026-11-20T09:00:00Z")
+        self.assertEqual(payload["category_keys"], ["latest_bybit_news"])
+        self.assertIn("BTCUSDT tick size", payload["content_text"])
+        self.assertNotIn("TradFi", payload["content_text"])
     def test_symbol_set_is_47_and_host_is_official(self):
         from scripts.collect_bybit_announcements import SYMBOLS
         self.assertEqual(len(SYMBOLS), 47)

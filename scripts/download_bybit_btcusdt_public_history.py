@@ -7,7 +7,9 @@ from pathlib import Path
 
 SYMBOL = "BTCUSDT"
 START = date.fromisoformat(os.getenv("START_DATE", "2020-01-01"))
-END = datetime.now(timezone.utc).date()
+END = date.fromisoformat(os.getenv("END_DATE", datetime.now(timezone.utc).date().isoformat()))
+if END < START:
+    raise ValueError("END_DATE must be on or after START_DATE")
 OUT = Path(os.getenv("OUT_DIR", "bybit_btcusdt_initial"))
 OUT.mkdir(parents=True, exist_ok=True)
 

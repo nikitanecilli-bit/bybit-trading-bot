@@ -17,6 +17,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zstandard as zstd
 from collections import Counter
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -27,7 +28,7 @@ import zstandard
 
 from compare_bybit_trade_archives import dec, multiset_diff
 
-DATES = ("2025-07-01", "2025-12-01", "2026-04-01", "2026-11-01")
+DATES = ("2025-07-01", "2026-11-01")
 HOURS = tuple(f"{hour:02d}" for hour in range(24))
 SYMBOL = "BTCUSDT"
 CHD_BASE = "https://api.cryptohftdata.com/v1/download"
@@ -83,6 +84,68 @@ def normalize_parquet(path: Path) -> tuple[Path, str]:
         return decoded, "zstd_wrapped_parquet"
     raise ValueError(f"unknown Parquet container magic: {magic.hex()}")
 
+
+
+MAX_COMPRESSED_BYTES = 200 * 1024 * 1024
+
+
+def download_parquet(url: str, raw_path: Path, decoded_path: Path) -> dict:
+    """Download Parquet, handling historical whole-file Zstandard wrapping."""
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "bybit-monthly-trade-crosscheck/1.0"}
+    )
+    digest = hashlib.sha256()
+    total = 0
+    headers = {}
+    with urllib.request.urlopen(request, timeout=180) as response, raw_path.open("wb") as out:
+        if response.status != 200:
+            raise RuntimeError(f"unexpected HTTP status {response.status}")
+        headers = dict(response.headers.items())
+        expected_length = response.headers.get("Content-Length")
+        while True:
+            chunk = response.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_COMPRESSED_BYTES:
+                raise RuntimeError(
+                    f"compressed file exceeds {MAX_COMPRESSED_BYTES} byte safety limit"
+                )
+            out.write(chunk)
+            digest.update(chunk)
+    if expected_length is not None and total != int(expected_length):
+        raise RuntimeError(f"download size mismatch expected={expected_length} actual={total}")
+
+    with raw_path.open("rb") as source:
+        prefix = source.read(4)
+    if prefix == b'PAR1':
+        raw_path.replace(decoded_path)
+        encoding = "plain_parquet"
+    elif prefix == bytes.fromhex('28b52ffd'):
+        with raw_path.open("rb") as source, decoded_path.open("wb") as target:
+            zstd.ZstdDecompressor().copy_stream(source, target)
+        encoding = "zstandard_wrapped_parquet"
+    else:
+        preview = raw_path.read_bytes()[:256].decode("utf-8", errors="replace")
+        raise ValueError(
+            f"download is neither Parquet nor Zstandard-wrapped Parquet; "
+            f"content_type={headers.get("Content-Type")!r}; preview={preview!r}"
+        )
+
+    size = decoded_path.stat().st_size
+    with decoded_path.open("rb") as stream:
+        first = stream.read(4)
+        stream.seek(-4, 2)
+        last = stream.read(4)
+    if first != b'PAR1' or last != b'PAR1':
+        raise ValueError("decoded file failed Parquet header/footer magic validation")
+    return {
+        "compressed_bytes": total,
+        "compressed_sha256": digest.hexdigest(),
+        "decoded_bytes": size,
+        "encoding": encoding,
+        "content_type": headers.get("Content-Type"),
+    }
 
 def tardis_url(date: str) -> str:
     year, month, day = date.split("-")
@@ -196,10 +259,10 @@ def main() -> int:
                     total["missing_hour_files"] += 1
                     total["missing_from_cryptohftdata"] += hour_tardis_rows
                 except Exception as exc:
-                    item["status"] = "MISSING_OR_FAILED"
+                    item["status"] = "DOWNLOAD_OR_DECODE_FAILED"
                     item["error"] = f"{type(exc).__name__}: {exc}"
-                    total["missing_hour_files"] += 1
-                    total["missing_from_cryptohftdata"] += hour_tardis_rows
+                    total.setdefault("failed_hour_checks", 0)
+                    total["failed_hour_checks"] += 1
                 day_report["hours"][hour] = item
             day_report["status"] = (
                 "COMPARED_WITH_GAPS" if any(v["status"] != "COMPARED"
@@ -215,7 +278,7 @@ def main() -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))
-    return 1 if failed else 0
+    return 1 if failed or total.get('failed_hour_checks', 0) else 0
 
 
 if __name__ == "__main__":

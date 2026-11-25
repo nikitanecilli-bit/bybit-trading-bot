@@ -528,3 +528,17 @@ Artifact `bybit-btcusdt-public-history` из GitHub Actions run `45645008915` (a
 - три paired arms остаются D20 / D48 / D48+EMA, с остальными условиями идентичными.
 
 Это решение определяет только целевой контракт реализации. Оно не разрешает market-PnL запуск: dataset и accounting gates остаются закрытыми, а существующий пятисимвольный selector несовместим с single-symbol маршрутом.
+
+## 6D. Повторный static audit: preregistration ↔ runner mismatch (2026-11-25)
+
+Проверены актуальные файлы `LOW_FREQUENCY_DONCHIAN48_EMA_H1_PREREGISTRATION_RU.md`, `scripts/run_h1_shared_capital_portfolio_validation.py`, `tests/test_h1_ema_trend_gate.py` и `tests/test_h1_runner_execution_gate.py`. Обнаружено, что предыдущее решение о целевом контракте ещё НЕ реализовано в runner. Market PnL не запускался.
+
+Подтверждённые несовпадения:
+1. Runner задаёт `VOLUME_LOOKBACK_PERIOD = 20` глобально и передаёт его в `cfg.volume_lookback_period` для обоих Donchian arms. Для preregistered D48 требуется 48 предыдущих завершённых свечей. Текущий pairing invariant лишь подтверждает, что arms используют одно и то же значение 20; он не подтверждает соответствие preregistration.
+2. Runner сохраняет grid `BREAKOUT_ATR_THRESHOLDS = [0.0, 0.10, 0.25]`, требует `H1_FROZEN_MIN_BREAKOUT_ATR` в Confirm и применяет breakout-distance filter. В preregistration нет такого дополнительного условия: это незарегистрированный фактор, который должен быть исключён из текущего трёхarm эксперимента.
+3. Explore/Confirm protocol всё ещё индексирует результаты по breakout threshold. Его нельзя считать корректным для preregistration без отдельного изменения design schema и tests.
+4. Runner использует train-only Top-5 selection manifest и пятисимвольный allowlist. Пользовательское ограничение проекта — начать с BTCUSDT и не расширять universe без необходимости. Поэтому этот runner не должен запускаться для данного проекта, пока не создан отдельный согласованный single-symbol маршрут; текущий пятисимвольный selection path не соответствует этому scope.
+5. Существующий тест подтверждает pairing D20/D48/D48+EMA и volume lookback=20, то есть закрепляет текущую реализацию, а не новый целевой контракт. Его нужно заменить тестами: D20 volume lookback=20; D48 volume lookback=48; отсутствие breakout-ATR фильтра во всех трёх arms; single-symbol BTCUSDT data scope.
+6. Preregistration описывает Maker limit proxy и leverage model. Эти допущения не меняются в рамках данного аудита; maker fill remains optimistic and no execution edge is established.
+
+Решение: не запускать этот runner и не считать его готовым к эксперименту. Следующая безопасная задача — отдельный небольшой refactor конфигурации/validation design и unit tests, не затрагивающий торговую логику движка, затем CI. После этого повторно сверить весь runner с preregistration. Даже успешный CI не откроет PnL gate: текущий Bybit archive содержит gaps, не содержит Mark/Funding и заканчивается 2025-11-03.

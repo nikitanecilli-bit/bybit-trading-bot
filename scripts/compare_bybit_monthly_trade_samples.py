@@ -158,6 +158,7 @@ def main() -> int:
 
 
             candidate_by_event_hour = {hour: Counter() for hour in HOURS}
+            candidate_received_by_event_hour = {hour: {} for hour in HOURS}
             file_diagnostics = {}
             receive_partitions = [(date, hour) for hour in HOURS]
             next_day = (datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -194,12 +195,13 @@ def main() -> int:
                         side = "sell" if d["is_buyer_maker"][i] else "buy"
                         key = (trade_ts, side, dec(d["price"][i]), dec(d["quantity"][i]))
                         candidate_by_event_hour[event_hour][key] += 1
+                        received_ts = int(d["received_time"][i])
+                        candidate_received_by_event_hour[event_hour].setdefault(key, []).append(received_ts)
                         event_rows_in_target_day += 1
                         order_types[str(d["order_type"][i])] += 1
                         trade_id = d["trade_id"][i]
                         if trade_id is not None:
                             id_to_keys.setdefault(str(trade_id), set()).add(key)
-                        received_ts = int(d["received_time"][i])
                         lag_ms.append(received_ts // 1_000_000 - trade_ts)
                     sorted_lag = sorted(lag_ms)
                     file_diagnostics[partition_key] = {
@@ -230,7 +232,38 @@ def main() -> int:
 
             day_hour_comparisons = {}
             for event_hour in HOURS:
-                comparison = multiset_diff(tardis_by_hour[event_hour], candidate_by_event_hour[event_hour])
+                reference = tardis_by_hour[event_hour]
+                candidate = candidate_by_event_hour[event_hour]
+                comparison = multiset_diff(reference, candidate)
+                multiplicity = Counter()
+                samples = []
+                for key in set(reference) | set(candidate):
+                    ref_n = reference[key]
+                    chd_n = candidate[key]
+                    if ref_n == 0:
+                        category = "candidate_only"
+                    elif chd_n == ref_n:
+                        category = "exact_count"
+                    elif chd_n == 3 * ref_n:
+                        category = "exactly_3x"
+                    elif chd_n > ref_n:
+                        category = "more_than_reference"
+                    else:
+                        category = "less_than_reference"
+                    multiplicity[category] += 1
+                    if category == "exactly_3x" and len(samples) < 5:
+                        receive_values = candidate_received_by_event_hour[event_hour].get(key, [])
+                        samples.append({
+                            "trade_key": [key[0], key[1], str(key[2]), str(key[3])],
+                            "tardis_multiplicity": ref_n,
+                            "cryptohftdata_multiplicity": chd_n,
+                            "receive_times_ns": receive_values[:6],
+                            "distinct_receive_times": len(set(receive_values)),
+                        })
+                comparison["payload_multiplicity_diagnostics"] = {
+                    "unique_payload_keys_by_relation": dict(multiplicity),
+                    "examples_exactly_3x": samples,
+                }
                 day_hour_comparisons[event_hour] = comparison
                 for key in ("tardis_rows", "cryptohftdata_rows", "matched_rows", "missing_from_cryptohftdata", "extra_in_cryptohftdata"):
                     total[key] += comparison[key]

@@ -1,4 +1,5 @@
 name: Tardis Bybit one-day sample inspection
+# Bounded public-data sample only; raw data stays in the ephemeral runner.
 
 on:
   push:

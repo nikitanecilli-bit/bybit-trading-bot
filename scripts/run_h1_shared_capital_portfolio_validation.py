@@ -28,8 +28,8 @@ from multibar_limit_wait import evaluate_limit_wait, prepare_signal_for_next_bar
 
 FOLDS = [(1, 0.50, 0.65), (2, 0.65, 0.80), (3, 0.80, 1.00)]
 VOL_THRESHOLDS = [1.2, 1.6, 2.0, 2.5]
-BREAKOUT_ATR_THRESHOLDS = [0.0, 0.10, 0.25]
-VOLUME_LOOKBACK_PERIOD = 20  # held fixed across Donchian20/48 arms
+BREAKOUT_ATR_THRESHOLDS = [0.0]  # no additional breakout-distance filter in preregistered signal
+VOLUME_LOOKBACK_PERIOD = None  # per-arm volume lookback equals its Donchian period
 ENTRY_OFFSET_BPS = 20.0
 ENTRY_PENETRATION_BPS = 5.0
 WAIT_BARS = 3
@@ -302,12 +302,17 @@ def build_paired_donchian48_comparison(result_rows, enabled):
     invariants = (
         "timeframe", "symbol_list", "symbols", "common_h1_bars",
         "test_start_ts", "test_end_ts", "shared_starting_capital",
-        "max_concurrent_positions", "volume_lookback_period",
+        "max_concurrent_positions",
     )
     for key in sorted(indexed):
         d20, d48, d48ema = (
             indexed[key][(20, False)], indexed[key][(48, False)], indexed[key][(48, True)]
         )
+        expected_scope = ("BTCUSDT", 1)
+        if any((row.get("symbol_list"), row.get("symbols")) != expected_scope for row in (d20, d48, d48ema)):
+            raise ValueError("Donchian comparison requires BTCUSDT-only portfolios")
+        if tuple(row.get("volume_lookback_period") for row in (d20, d48, d48ema)) != (20, 48, 48):
+            raise ValueError("Donchian arms must use volume lookbacks 20/48/48")
         for field in invariants:
             if field not in d20 or d20[field] is None:
                 raise ValueError(
@@ -549,15 +554,15 @@ def resolve_validation_design(environ=None):
         }
     try:
         volume = float(env["H1_FROZEN_MIN_VOLUME_RATIO"])
-        breakout = float(env["H1_FROZEN_MIN_BREAKOUT_ATR"])
+        breakout = float(env.get("H1_FROZEN_MIN_BREAKOUT_ATR", "0.0"))
     except (KeyError, TypeError, ValueError) as exc:
         raise SystemExit(
             "confirm mode requires H1_FROZEN_MIN_VOLUME_RATIO and "
-            "H1_FROZEN_MIN_BREAKOUT_ATR from the predeclared research grid"
+            "the preregistered design fixes breakout ATR filter at zero"
         ) from exc
     if not math.isfinite(volume) or volume not in VOL_THRESHOLDS:
         raise SystemExit(f"frozen volume threshold must be one of {VOL_THRESHOLDS}")
-    if not math.isfinite(breakout) or breakout not in BREAKOUT_ATR_THRESHOLDS:
+    if not math.isfinite(breakout) or breakout != 0.0:
         raise SystemExit(f"frozen breakout ATR threshold must be one of {BREAKOUT_ATR_THRESHOLDS}")
     frozen_strategy_mode = resolve_frozen_strategy_mode(env, strategy_modes)
     return {
@@ -1016,7 +1021,7 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
     cfg.daily_stop_loss_pct = 5.0
     cfg.emergency_kill_switch_pct = 30.0
     cfg.donchian_period = int(donchian_period)
-    cfg.volume_lookback_period = VOLUME_LOOKBACK_PERIOD
+    cfg.volume_lookback_period = int(donchian_period)
     cfg.atr_period = 14
     cfg.min_volume_ratio = min_vol
     cfg.stop_atr_mult = 2.5
@@ -1056,12 +1061,6 @@ def run_portfolio_variant(base_candles, symbols, timestamps, fold, start_frac, e
             return None
         if float(sig.get("vol_ratio", 0.0)) < min_vol:
             return None
-        if min_breakout_atr > 0:
-            prev = bars[:-1]
-            hi_ch, _, _ = core.compute_donchian_and_volume(prev, conf.donchian_period)
-            atr = float(sig.get("atr", 0.0))
-            if atr <= 0 or (float(bars[-1].close) - hi_ch) / atr < min_breakout_atr:
-                return None
         return sig
 
     core.evaluate_signal = staticmethod(wrapped_eval)
@@ -1489,8 +1488,10 @@ def main():
     ]
     first_scored_timestamp = selection_validation_boundary(timestamps)
     validate_selection_cutoff(design["selection"], first_scored_timestamp)
+    if design.get("donchian48_ema_ablation_enabled") and symbols != ["BTCUSDT"]:
+        raise SystemExit("Donchian48 experiment is BTCUSDT-only; aligned data must contain exactly BTCUSDT")
     if set(design["selection"]["symbols"]) != set(symbols):
-        raise SystemExit("Aligned Bybit universe does not exactly match frozen top-five selection manifest")
+        raise SystemExit("Aligned Bybit universe does not exactly match frozen selection manifest")
     repo_root = Path(__file__).resolve().parents[1]
     selection_code_files = [
         _file_manifest_record(repo_root / relative)

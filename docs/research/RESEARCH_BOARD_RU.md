@@ -326,3 +326,13 @@
 - Follow-up official-doc review: OKX's standard Funding History API is limited to three months, but the official historical-data portal advertises perpetual Funding from March 2022 and the official API changelog records a separate public historical-market-data query capability with funding module support. This is a promising D3 lead, not yet retrieved or accepted; using it requires a separate scope decision. Current `upcChg` means upcoming instrument changes, not a past effective-time history. Account fee endpoint requires authentication and remains out of scope. No further API calls/downloads were made.
 
 - Повторяемость подтверждена вторым cloud run [45574106964](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45574106964): все четыре нормализованных файла побайтно идентичны первому захвату; в каждом архиве проверены 180 raw-файлов, хеши и размеры совпали. Workflow теперь fail-closed и хранит artifacts 90 дней. Это подтверждает повторяемость capture pipeline, но не полноту Funding или историчность спецификаций.
+
+### 2026-11-25 — OKX one-year BTC-USDT-SWAP funding history recovered and accepted for realized-rate coverage
+
+- Official OKX `market-data-history` module 3 catalog returned all ten monthly funding archives from 2025-11 through 2026-08. All ten official CDN ZIPs downloaded; all ZIP CRC checks and SHA-256 checks passed.
+- Monthly archives contain 912 events total. The public REST funding history supplied 278 events inside the requested year (279 returned; the event exactly at the exclusive end boundary was clipped).
+- Merged half-open interval `[2025-11-25T08:00:00Z, 2026-11-25T08:00:00Z)`: **1,095 unique funding events**, 1,094 consecutive 8-hour intervals, no missing slots or duplicates.
+- Archive `funding_rate` exactly matches REST `realizedRate` on all 21 overlapping timestamps (0 mismatches). Formula metadata: REST rows expose `withRate/current_period`; monthly files omit these fields. Official OKX notices establish BTCUSDT entered the new formula in the 2025-04-24 batch; the 2026-06-01 8/N revision leaves the per-period rate unchanged for an 8h contract. Historical `method` remains absent from archive-only rows.
+- **D3 accepted for one-year realized funding event/rate coverage for BTC-USDT-SWAP**, with the method-metadata limitation documented. D4/D5/D6/D8 remain open; current specs are not historical specs.
+- Full audit and artifact provenance: [OKX_FUNDING_ARCHIVE_QA_2026-11-25_RU.md](OKX_FUNDING_ARCHIVE_QA_2026-11-25_RU.md). Funding cloud run [45576601291](https://github.com/nikitanecilli-bit/bybit-trading-bot/actions/runs/45576601291).
+- No PnL/backtest/sweep/event study was run. OKX data does not resolve Bybit execution evidence or independent-calendar holdout requirements.

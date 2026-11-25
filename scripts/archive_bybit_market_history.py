@@ -252,7 +252,9 @@ def parse_funding_rows(rows: Any, symbol: str) -> list[dict[str, Any]]:
 def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
                           fetch_page: Callable[[int, int], list[dict[str, Any]]] | None = None,
                           base_url: str = DEFAULT_BASE_URL, pause: float = 0.1,
-                          audit_pages: list[dict[str, Any]] | None = None
+                          audit_pages: list[dict[str, Any]] | None = None,
+                          raw_evidence_dir: str | Path | None = None,
+                          raw_records: list[dict[str, Any]] | None = None
                           ) -> list[dict[str, Any]]:
     symbol = normalize_symbol(symbol)
     if start_ms <= 0 or end_ms <= start_ms or pause < 0:
@@ -262,11 +264,15 @@ def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
             base_url, FUNDING_ENDPOINT,
             {"category": "linear", "symbol": symbol, "startTime": start,
              "endTime": end, "limit": FUNDING_LIMIT},
+            raw_evidence_dir=raw_evidence_dir, raw_records=raw_records,
         ).get("list")
     events: dict[int, dict[str, Any]] = {}
 
     def fetch_window(window_start: int, window_end: int) -> None:
+        raw_count_before = len(raw_records) if raw_records is not None else 0
         page = parse_funding_rows(fetch_page(window_start, window_end - 1), symbol)
+        raw_record = (raw_records[-1] if raw_records is not None
+                      and len(raw_records) > raw_count_before else None)
         saturated = len(page) >= FUNDING_LIMIT
         if audit_pages is not None:
             page_timestamps = [row["funding_timestamp_ms"] for row in page]
@@ -278,6 +284,9 @@ def fetch_funding_history(symbol: str, start_ms: int, end_ms: int,
                 "last_ts": max(page_timestamps) if page_timestamps else None,
                 "complete": not saturated,
                 "saturated": saturated,
+                "raw_response_request_id": raw_record.get("request_id") if raw_record else None,
+                "raw_response_body_sha256": raw_record.get("body_sha256") if raw_record else None,
+                "raw_response_audit_file": raw_record.get("audit_file") if raw_record else None,
             })
         if saturated:
             if window_end - window_start <= 1:
@@ -340,7 +349,10 @@ def parse_trade_rows(rows: Any, symbol: str, interval_ms: int) -> list[dict[str,
 
 def fetch_trade_klines(symbol: str, start_ms: int, end_ms: int, interval: str = "60",
                        fetch_page: Callable[[int, int, int], list[Any]] | None = None,
-                       base_url: str = DEFAULT_BASE_URL, pause: float = 0.1
+                       base_url: str = DEFAULT_BASE_URL, pause: float = 0.1,
+                       raw_evidence_dir: str | Path | None = None,
+                       raw_records: list[dict[str, Any]] | None = None,
+                       audit_pages: list[dict[str, Any]] | None = None
                        ) -> list[dict[str, Any]]:
     symbol = normalize_symbol(symbol)
     if interval not in INTERVALS or start_ms <= 0 or end_ms <= start_ms or pause < 0:
@@ -357,13 +369,27 @@ def fetch_trade_klines(symbol: str, start_ms: int, end_ms: int, interval: str = 
             base_url, KLINE_ENDPOINT,
             {"category": "linear", "symbol": symbol, "interval": interval,
              "start": start, "end": end, "limit": limit},
+            raw_evidence_dir=raw_evidence_dir, raw_records=raw_records,
         ).get("list")
     candles: dict[int, dict[str, Any]] = {}
     cursor = start_ms
     chunk_ms = (MARK_LIMIT - 1) * interval_ms
     while cursor < end_ms:
         chunk_end = min(cursor + chunk_ms, end_ms)
+        raw_count_before = len(raw_records) if raw_records is not None else 0
         page = parse_trade_rows(fetch_page(cursor, chunk_end - 1, MARK_LIMIT), symbol, interval_ms)
+        raw_record = (raw_records[-1] if raw_records is not None
+                      and len(raw_records) > raw_count_before else None)
+        if audit_pages is not None:
+            audit_pages.append({
+                "request_start_ms": cursor, "request_end_ms": chunk_end - 1,
+                "response_rows": len(page),
+                "first_ts": min((row["timestamp_ms"] for row in page), default=None),
+                "last_ts": max((row["timestamp_ms"] for row in page), default=None),
+                "raw_response_request_id": raw_record.get("request_id") if raw_record else None,
+                "raw_response_body_sha256": raw_record.get("body_sha256") if raw_record else None,
+                "raw_response_audit_file": raw_record.get("audit_file") if raw_record else None,
+            })
         if pause and chunk_end < end_ms:
             time.sleep(pause)
         if len(page) >= MARK_LIMIT:
@@ -410,7 +436,10 @@ def parse_mark_rows(rows: Any, symbol: str, interval_ms: int) -> list[dict[str, 
 
 def fetch_mark_klines(symbol: str, start_ms: int, end_ms: int, interval: str = "60",
                       fetch_page: Callable[[int, int, int], list[Any]] | None = None,
-                      base_url: str = DEFAULT_BASE_URL, pause: float = 0.1
+                      base_url: str = DEFAULT_BASE_URL, pause: float = 0.1,
+                      raw_evidence_dir: str | Path | None = None,
+                      raw_records: list[dict[str, Any]] | None = None,
+                      audit_pages: list[dict[str, Any]] | None = None
                       ) -> list[dict[str, Any]]:
     symbol = normalize_symbol(symbol)
     if interval not in INTERVALS or start_ms <= 0 or end_ms <= start_ms or pause < 0:
@@ -427,13 +456,27 @@ def fetch_mark_klines(symbol: str, start_ms: int, end_ms: int, interval: str = "
             base_url, MARK_ENDPOINT,
             {"category": "linear", "symbol": symbol, "interval": interval,
              "start": start, "end": end, "limit": limit},
+            raw_evidence_dir=raw_evidence_dir, raw_records=raw_records,
         ).get("list")
     candles: dict[int, dict[str, Any]] = {}
     cursor = start_ms
     chunk_ms = (MARK_LIMIT - 1) * interval_ms
     while cursor < end_ms:
         chunk_end = min(cursor + chunk_ms, end_ms)
+        raw_count_before = len(raw_records) if raw_records is not None else 0
         page = parse_mark_rows(fetch_page(cursor, chunk_end - 1, MARK_LIMIT), symbol, interval_ms)
+        raw_record = (raw_records[-1] if raw_records is not None
+                      and len(raw_records) > raw_count_before else None)
+        if audit_pages is not None:
+            audit_pages.append({
+                "request_start_ms": cursor, "request_end_ms": chunk_end - 1,
+                "response_rows": len(page),
+                "first_ts": min((row["timestamp_ms"] for row in page), default=None),
+                "last_ts": max((row["timestamp_ms"] for row in page), default=None),
+                "raw_response_request_id": raw_record.get("request_id") if raw_record else None,
+                "raw_response_body_sha256": raw_record.get("body_sha256") if raw_record else None,
+                "raw_response_audit_file": raw_record.get("audit_file") if raw_record else None,
+            })
         if pause and chunk_end < end_ms:
             time.sleep(pause)
         if len(page) >= MARK_LIMIT:

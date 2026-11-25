@@ -215,7 +215,7 @@ Raw body SHA-256: `233e01289ff4a39e7062ed8b9f23a8242062df7a6470ec1983098571fc09e
 - Maximum order quantity in coins is not a lot-size step, minimum quantity, minimum notional, or leverage tier.
 - The two January max-order notices have an internal date conflict (title/publication in 2026; body says 2025). They are preserved but quarantined from a 2026 effective-time timeline.
 - No values are inferred for symbols absent from these notices.
-- Current `instruments-info` data must not be backfilled into earlier periods.
+- Bybit's [Get Instruments Info API documentation](https://bybit-exchange.github.io/docs/v5/market/instrument) warns that `maxLimitOrderQty`, `maxMarketOrderQty` and `postOnlyMaxLimitOrderSize` are adjusted twice monthly (3rd and 17th, 08:00 UTC+8); point-in-time snapshots are therefore needed. Current `instruments-info` data must not be backfilled into earlier periods.
 - The selected archive categories and 47-symbol proxy do not establish exhaustive Bybit history.
 
 ## 5. Gate decision

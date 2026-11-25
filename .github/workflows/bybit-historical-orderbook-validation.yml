@@ -1,0 +1,37 @@
+name: Bybit historical BTCUSDT orderbook archive validation
+
+on:
+  push:
+    branches:
+      - research/h1-volume-lookback-provenance-fix
+    paths:
+      - scripts/validate_bybit_historical_orderbook_archive.py
+      - .github/workflows/bybit-historical-orderbook-validation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/h1-volume-lookback-provenance-fix
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download and validate Bybit BTCUSDT historical orderbook samples
+        env:
+          ORDERBOOK_DATES: "2024-04-11,2025-11-02"
+          OUT_DIR: orderbook_archive_validation
+        run: python scripts/validate_bybit_historical_orderbook_archive.py
+      - name: Upload compact validation manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: bybit-historical-orderbook-validation
+          path: orderbook_archive_validation/manifest.json
+          if-no-files-found: error
+          retention-days: 90

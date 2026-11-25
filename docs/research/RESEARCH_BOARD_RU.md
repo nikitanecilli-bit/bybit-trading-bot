@@ -62,7 +62,7 @@ Event-time cross-check четырёх дневных окон Tardis/CryptoHFTDa
 - 2025-07-01: Tardis 1 116 359; CryptoHFTData 2 683 702; 521 missing / 1 567 865 extra. В активных часах 10–20 тройной multiplicity; у примеров три разных received_time. trade_id=0 в проверенных partitions.
 - 2025-08-01: Tardis 2 360 190; CryptoHFTData 2 360 132; 102 missing / 44 extra, расхождения в 08,09,15 UTC. В том числе trade_id=0 во всех проверенных partitions; идентификатор непригоден для дедупликации.
 - 2026-11-01: Tardis 360 226; CryptoHFTData 360 227; 0 missing / 1 extra.
-- 2025-07-02: Tardis HTTP 401, контрольный день не оценён.
+- 2025-07-02, 2025-07-03 и 2025-08-15: Tardis HTTP 401, контрольные дни не оценены; это access failures, не нулевые данные. Расширенный run #45633254036 новых сравнимых дней не добавил.
 Вывод: июльский multiplicity — локальная аномалия периода; trade_id=0 — более широкий структурный дефект как минимум в июле и августе. Payload dedup небезопасен. Июль/август NOT ACCEPTED для L2 replay; ноябрьская одна дата не доказывает качество всего архива. Ранний same-receive-hour comparison отозван; используйте только event-time результат.
 
 

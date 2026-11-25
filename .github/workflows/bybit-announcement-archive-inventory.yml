@@ -10,6 +10,7 @@ on:
       - 'tests/test_validate_bybit_announcement_content.py'
       - 'scripts/extract_bybit_lifecycle_events.py'
       - 'tests/test_extract_bybit_lifecycle_events.py'
+      - 'docs/research/BYBIT_LIFECYCLE_EVENT_INVENTORY_PARTIAL_2026-11-25_RU.md'
       - '.github/workflows/bybit-announcement-archive-inventory.yml'
   workflow_dispatch:
 

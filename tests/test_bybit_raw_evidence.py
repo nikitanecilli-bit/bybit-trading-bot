@@ -61,7 +61,7 @@ class RawEvidenceTests(unittest.TestCase):
                 endpoint="/v5/market/instruments-info",
                 params={"category": "linear", "limit": 1000},
                 http_status=200, response_headers={"Content-Type": "application/json"},
-                evidence_dir=root / "raw", records=records,
+                evidence_dir=root, records=records,
             )
             manifest = root / "evidence.json"
             write_evidence_manifest(
@@ -74,7 +74,7 @@ class RawEvidenceTests(unittest.TestCase):
                 }],
             )
             self.assertTrue(validate_evidence_manifest(manifest)["ok"])
-            (root / "raw" / record["body_file"]).write_bytes(body + b" ")
+            (root / record["body_file"]).write_bytes(body + b" ")
             report = validate_evidence_manifest(manifest)
             self.assertFalse(report["ok"])
             self.assertIn("raw_body_hash_mismatch", report["errors"])

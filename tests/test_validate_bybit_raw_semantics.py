@@ -83,6 +83,7 @@ class BybitRawSemanticsTests(unittest.TestCase):
             path = root / "manifest.json"
             manifest["collection_pages"]["funding"][0]["response_rows"] = 2
             manifest["collection_pages"]["trade_kline"][0]["request_start_ms"] = 3600001
+            manifest["collection_pages"]["trade_kline"][0]["request_end_ms"] = 3600001
             manifest["collection_pages"]["mark_price"][0]["raw_response_request_id"] = "missing"
             path.write_text(json.dumps(manifest))
             result = validate_semantics(path)

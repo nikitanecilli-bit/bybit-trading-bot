@@ -126,7 +126,7 @@ class RawEvidenceTests(unittest.TestCase):
                     endpoint="/v5/market/risk-limit",
                     params={"category": "linear", "cursor": str(index)},
                     http_status=200, response_headers={},
-                    evidence_dir=root / "raw", records=records,
+                    evidence_dir=root, records=records,
                 )
                 pages.append({
                     "page_index": index,

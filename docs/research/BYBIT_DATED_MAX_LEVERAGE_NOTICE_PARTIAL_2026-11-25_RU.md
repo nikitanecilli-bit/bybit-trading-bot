@@ -4,7 +4,7 @@
 **Official article:** https://announcements.bybit.com/en/article/risk-limit-adjustment-for-selected-perpetual-contracts-aug-20-2026--artd5e4344ee603/  
 **Published:** `2026-08-18T15:12:52Z`  
 **Effective:** `2026-08-20T08:00:00Z` (announcement wording: takes effect at 8AM UTC)  
-**Captured raw article SHA-256:** `<HASH>`
+**Captured raw article SHA-256:** `21e66fac4807297fb2c89ba79d491705882425a7343dcad3c8a8698c953e0a0d`
 
 ## Extracted rows
 

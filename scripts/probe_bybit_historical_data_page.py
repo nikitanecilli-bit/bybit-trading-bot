@@ -77,7 +77,15 @@ for path in p.scripts:
             shared_script_hits.append({"path":path,"status":st,"bytes":len(data),"snippets":snippets})
     except Exception as e:
         shared_script_hits.append({"path":path,"error":repr(e)})
-result={"url":URL,"http_status":status,"html_bytes":len(raw),"html_sha256":hashlib.sha256(raw).hexdigest(),"scripts":p.scripts,"page_scripts":page_scripts,"links":p.links[:120],"bundles":bundles,"api_probe":api_probe,"core_probe":core_probe,"shared_script_hits":shared_script_hits}
+official_api_probe=[]
+for host in ("https://api.bybit.com",):
+    path="/s1/quote/public/support/download/list-products"
+    try:
+        st,data,headers=get(host+path)
+        official_api_probe.append({"url":host+path,"status":st,"content_type":headers.get("Content-Type"),"body":data.decode("utf-8",errors="replace")[:8000]})
+    except Exception as e:
+        official_api_probe.append({"url":host+path,"error":repr(e)})
+result={"url":URL,"http_status":status,"html_bytes":len(raw),"html_sha256":hashlib.sha256(raw).hexdigest(),"scripts":p.scripts,"page_scripts":page_scripts,"links":p.links[:120],"bundles":bundles,"api_probe":api_probe,"core_probe":core_probe,"shared_script_hits":shared_script_hits,"official_api_probe":official_api_probe}
 Path("bybit_history_page_probe").mkdir(exist_ok=True)
 Path("bybit_history_page_probe/result.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
 print(json.dumps(result,indent=2))

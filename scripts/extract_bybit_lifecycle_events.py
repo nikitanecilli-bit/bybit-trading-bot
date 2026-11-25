@@ -116,7 +116,7 @@ def extract_events(root: Path) -> tuple[dict, list[dict]]:
                 symbols = [title_symbol.group(1).upper()]
         if not symbols:
             symbols = sorted(set(SYMBOL_PATTERN.findall(text.upper())))
-        explicit_perpetual = bool(re.search(r"\\bperpetual\\b", full_text, re.IGNORECASE))
+        explicit_perpetual = bool(re.search(r"\bperpetual\b", full_text, re.IGNORECASE))
         if symbols and not explicit_perpetual:
             out_of_scope.append({
                 "reason": "product_scope_not_explicitly_perpetual",
